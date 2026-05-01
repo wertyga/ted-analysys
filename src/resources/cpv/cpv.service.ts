@@ -1,0 +1,283 @@
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
+import { CpvCategoryModel, CpvCategory } from './schemas';
+import {
+  CpvCategoriesResponse,
+  CpvCategoryResponseItem,
+  CpvCategorySyncResult,
+} from './types';
+
+@Injectable()
+export class CpvService {
+  private readonly cpvCodelistUrl: string;
+
+  constructor(private readonly configService: ConfigService) {
+    this.cpvCodelistUrl =
+      this.configService.get<string>('CPV_CODELIST_URL') ??
+      'https://docs.ted.europa.eu/eforms/latest/reference/code-lists/cpv.html';
+  }
+
+  async search(q: string, limit: number = 20): Promise<CpvCategoriesResponse> {
+    const trimmedQuery = q.trim();
+    const filter =
+      trimmedQuery.length === 0
+        ? {}
+        : {
+            $or: [
+              {
+                code: { $regex: this.escapeRegex(trimmedQuery), $options: 'i' },
+              },
+              {
+                name: { $regex: this.escapeRegex(trimmedQuery), $options: 'i' },
+              },
+            ],
+          };
+    const [items, count] = await Promise.all([
+      CpvCategoryModel.find(filter)
+        .select('code name parentCode level -_id')
+        .sort({ code: 1 })
+        .limit(limit)
+        .lean(),
+      CpvCategoryModel.countDocuments(filter),
+    ]);
+
+    return {
+      count,
+      items: items.map((item) => this.toResponseItem(item)),
+    };
+  }
+
+  async popular(limit: number = 50): Promise<CpvCategoriesResponse> {
+    const [items, count] = await Promise.all([
+      CpvCategoryModel.find({ level: 2 })
+        .select('code name parentCode level -_id')
+        .sort({ code: 1 })
+        .limit(limit)
+        .lean(),
+      CpvCategoryModel.countDocuments({ level: 2 }),
+    ]);
+
+    return {
+      count,
+      items: items.map((item) => this.toResponseItem(item)),
+    };
+  }
+
+  async updateCpvCategories(): Promise<CpvCategorySyncResult> {
+    const response = await axios.get<string>(this.cpvCodelistUrl, {
+      timeout: 30000,
+    });
+    const syncedAt = new Date();
+    const sourceVersion = this.parseCpvSourceVersion(response.data);
+    const categories = this.parseCpvCategoriesFromHtml(
+      response.data,
+      syncedAt,
+      sourceVersion,
+    );
+
+    if (categories.length === 0) {
+      throw new ServiceUnavailableException(
+        'CPV codelist source did not contain any categories',
+      );
+    }
+
+    const existingCodes = new Set(categories.map((category) => category.code));
+    const categoriesWithParents = categories.map((category) => ({
+      ...category,
+      parentCode: this.findCpvParentCode(category.code, existingCodes),
+    }));
+
+    const result = await CpvCategoryModel.bulkWrite(
+      categoriesWithParents.map((category) => ({
+        updateOne: {
+          filter: { code: category.code },
+          update: { $set: category },
+          upsert: true,
+        },
+      })),
+      { ordered: false },
+    );
+
+    return {
+      source: this.cpvCodelistUrl,
+      sourceVersion,
+      fetchedCount: categoriesWithParents.length,
+      insertedCount: result.insertedCount,
+      modifiedCount: result.modifiedCount,
+      upsertedCount: result.upsertedCount,
+      matchedCount: result.matchedCount,
+      syncedAt: syncedAt.toISOString(),
+    };
+  }
+
+  async findByCodes(codes: string[]): Promise<CpvCategoryResponseItem[]> {
+    const normalizedCodes = this.normalizeCodes(codes);
+
+    if (normalizedCodes.length === 0) {
+      return [];
+    }
+
+    const items = await CpvCategoryModel.find({
+      code: { $in: normalizedCodes },
+    })
+      .select('code name parentCode level -_id')
+      .lean();
+    const byCode = new Map(
+      items.map((item) => [item.code, this.toResponseItem(item)]),
+    );
+
+    return normalizedCodes
+      .map((code) => byCode.get(code))
+      .filter((item): item is CpvCategoryResponseItem => item !== undefined);
+  }
+
+  async findDescendantCodes(codes: string[]): Promise<string[]> {
+    const normalizedCodes = this.normalizeCodes(codes);
+
+    if (normalizedCodes.length === 0) {
+      return [];
+    }
+
+    const descendants = await CpvCategoryModel.find({
+      $or: normalizedCodes.map((code) => ({
+        code: { $regex: `^${this.getSignificantPrefix(code)}` },
+      })),
+    })
+      .select('code -_id')
+      .lean();
+
+    return Array.from(
+      new Set([...normalizedCodes, ...descendants.map((item) => item.code)]),
+    ).sort();
+  }
+
+  private normalizeCodes(codes: string[]): string[] {
+    return Array.from(
+      new Set(
+        codes.map((code) => code.trim()).filter((code) => /^\d{8}$/.test(code)),
+      ),
+    );
+  }
+
+  private getSignificantPrefix(code: string): string {
+    const trimmed = code.replace(/0+$/, '');
+
+    return this.escapeRegex(trimmed.length >= 2 ? trimmed : code.slice(0, 2));
+  }
+
+  private parseCpvSourceVersion(html: string): string {
+    const versionMatch = html.match(
+      /Version\s*<\/td>\s*<td class="hdlist2">\s*<p>(\d{4})<\/p>/i,
+    );
+
+    return versionMatch?.[1] ?? '2008';
+  }
+
+  private parseCpvCategoriesFromHtml(
+    html: string,
+    syncedAt: Date,
+    sourceVersion: string,
+  ): CpvCategory[] {
+    const codeLabelPattern =
+      /<code>(\d{8})<\/code>[\s\S]*?<td class="hdlist2">\s*<p>(.*?)<\/p>/gis;
+    const categories: CpvCategory[] = [];
+    const seenCodes = new Set<string>();
+    let match: RegExpExecArray | null;
+
+    while ((match = codeLabelPattern.exec(html)) !== null) {
+      const code = match[1];
+
+      if (seenCodes.has(code)) {
+        continue;
+      }
+
+      seenCodes.add(code);
+      categories.push({
+        code,
+        name: this.decodeHtml(this.stripHtml(match[2])).trim(),
+        level: this.getCpvCodeLevel(code),
+        source: this.cpvCodelistUrl,
+        sourceVersion,
+        syncedAt,
+      });
+    }
+
+    return categories;
+  }
+
+  private findCpvParentCode(
+    code: string,
+    existingCodes: Set<string>,
+  ): string | undefined {
+    for (
+      let parentLevel = this.getCpvCodeLevel(code) - 1;
+      parentLevel >= 2;
+      parentLevel -= 1
+    ) {
+      const parentCode = code.slice(0, parentLevel).padEnd(8, '0');
+
+      if (existingCodes.has(parentCode)) {
+        return parentCode;
+      }
+    }
+
+    return undefined;
+  }
+
+  private getCpvCodeLevel(code: string): number {
+    const lastSignificantDigit = code.search(/0+$/);
+
+    if (lastSignificantDigit === -1) {
+      return code.length;
+    }
+
+    return Math.max(2, lastSignificantDigit);
+  }
+
+  async getCpvCategories(): Promise<CpvCategoriesResponse> {
+    const categories = await CpvCategoryModel.find()
+      .select('code name parentCode level -_id')
+      .sort({ code: 1 })
+      .lean();
+
+    return {
+      count: categories.length,
+      items: categories.map((category) => ({
+        code: category.code,
+        name: category.name,
+        parentCode: category.parentCode,
+        level: category.level,
+      })),
+    };
+  }
+
+  private stripHtml(value: string): string {
+    return value.replace(/<[^>]*>/g, '');
+  }
+
+  private decodeHtml(value: string): string {
+    return value
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&apos;/g, "'");
+  }
+
+  private toResponseItem(
+    item: Pick<CpvCategory, 'code' | 'name' | 'parentCode' | 'level'>,
+  ): CpvCategoryResponseItem {
+    return {
+      code: item.code,
+      name: item.name,
+      parentCode: item.parentCode,
+      level: item.level,
+    };
+  }
+
+  private escapeRegex(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+}
