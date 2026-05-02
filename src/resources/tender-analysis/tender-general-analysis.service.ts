@@ -54,6 +54,7 @@ export class TenderGeneralAnalysisService {
         {
           $set: {
             status: TenderGeneralAnalysisStatus.PROCESSING,
+            tenderId: tender.id,
           },
         },
         { new: true, upsert: true },
@@ -80,32 +81,35 @@ export class TenderGeneralAnalysisService {
 
       const execution =
         await this.tenderAnalysisService.analyzeTenderGeneral(analysisInput);
+
       const result = execution.result;
 
-      await TenderGeneralAnalysisModel.findByIdAndUpdate(
-        analysis._id,
-        {
-          $set: {
-            status: TenderGeneralAnalysisStatus.DONE,
-            resultJson: result,
-            summary: result.summary,
-            complexityScore: result.complexityScore,
-            opportunityScore: result.opportunityScore,
-            generalRecommendation: this.mapGeneralRecommendation(
-              result.generalGoNoGo,
-            ),
-            confidenceScore: result.confidenceScore,
-            sourceHash: execution.sourceHash,
-            promptVersion: execution.promptVersion,
-            model: execution.model,
-            analyzedAt: new Date(),
-          },
-          $unset: {
-            errorMessage: '',
-          },
+      await TenderGeneralAnalysisModel.findByIdAndUpdate(analysis._id, {
+        $set: {
+          status: TenderGeneralAnalysisStatus.DONE,
+
+          resultJson: result,
+          summary: result.summary,
+
+          estimatedValue: result.estimatedValue,
+
+          complexityScore: result.complexityScore,
+          opportunityScore: result.opportunityScore,
+          generalRecommendation: result.generalRecommendation,
+          confidenceScore: result.confidenceScore,
+
+          analysisDepth: result.analysisDepth,
+          documentsAnalyzedCount: result.documentsAnalyzedCount,
+          missingDocumentsWarning: result.missingDocumentsWarning,
+
+          sourceHash: execution.sourceHash,
+          promptVersion: execution.promptVersion,
+          model: execution.model,
         },
-        { new: true },
-      ).exec();
+        $unset: {
+          errorMessage: '',
+        },
+      }).exec();
     } catch (error: unknown) {
       await TenderGeneralAnalysisModel.findByIdAndUpdate(
         analysis._id,
@@ -303,19 +307,19 @@ export class TenderGeneralAnalysisService {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 
-  private mapGeneralRecommendation(
-    goNoGo: GeneralGoNoGo,
-  ): TenderGeneralRecommendation {
-    if (goNoGo === 'GO') {
-      return TenderGeneralRecommendation.PROMISING;
-    }
-
-    if (goNoGo === 'NO_GO') {
-      return TenderGeneralRecommendation.NOT_RECOMMENDED;
-    }
-
-    return TenderGeneralRecommendation.REVIEW;
-  }
+  // private mapGeneralRecommendation(
+  //   goNoGo: GeneralGoNoGo,
+  // ): TenderGeneralRecommendation {
+  //   if (goNoGo === 'GO') {
+  //     return TenderGeneralRecommendation.PROMISING;
+  //   }
+  //
+  //   if (goNoGo === 'NO_GO') {
+  //     return TenderGeneralRecommendation.NOT_RECOMMENDED;
+  //   }
+  //
+  //   return TenderGeneralRecommendation.REVIEW;
+  // }
 
   private getSafeErrorMessage(error: unknown): string {
     if (error instanceof Error) {

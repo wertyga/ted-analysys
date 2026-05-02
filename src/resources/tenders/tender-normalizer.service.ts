@@ -8,10 +8,7 @@ import { TenderDto } from './dto/tender.dto';
 
 @Injectable()
 export class TenderNormalizerService {
-  async normalizeTedNotice(
-    rawNotice: TedNotice,
-    options: { includeRaw?: boolean } = {},
-  ): Promise<TenderDto> {
+  async normalizeTedNotice(rawNotice: TedNotice): Promise<TenderDto> {
     const normalizedNotice = await fillClassificationCpvByCodes(
       tenderNormilizer(rawNotice),
     );
@@ -42,10 +39,6 @@ export class TenderNormalizerService {
       ]) as TenderDto['cpvCodes'],
       links: normalizedNotice.links,
     };
-
-    if (options.includeRaw === true) {
-      dto.raw = rawNotice;
-    }
 
     return dto;
   }

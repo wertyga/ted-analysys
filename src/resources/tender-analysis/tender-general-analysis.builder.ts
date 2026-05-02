@@ -110,14 +110,17 @@ export class TenderGeneralAnalysisBuilder {
     >,
   ): TenderLinkDocumentCandidate[] {
     const isPdfExists = !!Object.values(links.pdf)[0]?.trim();
-    return [links.xml, isPdfExists ? links.pdf : links.html, links.pdfs]
-      .filter(Boolean)
-      .map((url) => {
-        const needUrl = this.getNeedDocumentByLanguage(url);
+    return (
+      [links.xml]
+        // return [links.xml, isPdfExists ? links.pdf : links.html, links.pdfs]
+        .filter(Boolean)
+        .map((url) => {
+          const needUrl = this.getNeedDocumentByLanguage(url);
 
-        return needUrl ? this.addDocumentCandidate(needUrl) : null;
-      })
-      .filter(Boolean) as TenderLinkDocumentCandidate[];
+          return needUrl ? this.addDocumentCandidate(needUrl) : null;
+        })
+        .filter(Boolean) as TenderLinkDocumentCandidate[]
+    );
   }
 
   private selectPreferredLanguageCandidates(

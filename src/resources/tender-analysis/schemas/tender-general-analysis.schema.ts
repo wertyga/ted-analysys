@@ -9,57 +9,156 @@ export enum TenderGeneralAnalysisStatus {
 
 export enum TenderGeneralRecommendation {
   PROMISING = 'PROMISING',
-  REVIEW = 'REVIEW',
+  NEEDS_REVIEW = 'NEEDS_REVIEW',
   NOT_RECOMMENDED = 'NOT_RECOMMENDED',
 }
 
+export enum TenderAnalysisDepth {
+  STRUCTURED_NOTICE_ONLY = 'STRUCTURED_NOTICE_ONLY',
+  NOTICE_WITH_DOCUMENTS = 'NOTICE_WITH_DOCUMENTS',
+  FULL_DOCUMENTS = 'FULL_DOCUMENTS',
+}
+
+export enum EstimatedValueSource {
+  STRUCTURED_DATA = 'STRUCTURED_DATA',
+  XML_NOTICE = 'XML_NOTICE',
+  DOCUMENT_TEXT = 'DOCUMENT_TEXT',
+  NOT_FOUND = 'NOT_FOUND',
+}
+
+export interface TenderEstimatedValue {
+  amount: number | null;
+  currency: string | null;
+  description: string | null;
+  source: EstimatedValueSource;
+}
+
 export interface TenderGeneralAnalysis {
+  /**
+   * Business tender id, e.g. "ted-756265-2023".
+   */
+  tenderId: string;
+
+  /**
+   * Mongo ObjectId reference to Tender document.
+   */
   tender: mongoose.Types.ObjectId;
+
   status: TenderGeneralAnalysisStatus;
+
   resultJson?: unknown;
   summary?: string;
+
+  estimatedValue?: TenderEstimatedValue;
+
   complexityScore?: number;
   opportunityScore?: number;
   generalRecommendation?: TenderGeneralRecommendation;
   confidenceScore?: number;
+
+  analysisDepth?: TenderAnalysisDepth;
+  documentsAnalyzedCount?: number;
+  missingDocumentsWarning?: boolean;
+
   sourceHash?: string;
   promptVersion?: string;
   model?: string;
   errorMessage?: string;
   analyzedAt?: Date;
+
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 export type TenderGeneralAnalysisDocument = TenderGeneralAnalysis & Document;
 
-const TenderGeneralAnalysisSchema = new Schema(
+const EstimatedValueSchema = new Schema<TenderEstimatedValue>(
   {
+    amount: { type: Number, default: null },
+    currency: { type: String, default: null },
+    description: { type: String, default: null },
+    source: {
+      type: String,
+      enum: Object.values(EstimatedValueSource),
+      required: true,
+    },
+  },
+  { _id: false },
+);
+
+const TenderGeneralAnalysisSchema = new Schema<TenderGeneralAnalysisDocument>(
+  {
+    tenderId: {
+      type: String,
+      required: true,
+    },
+
     tender: {
       type: Schema.Types.ObjectId,
       ref: 'Tender',
       required: true,
     },
+
     status: {
       type: String,
-      enum: TenderGeneralAnalysisStatus,
+      enum: Object.values(TenderGeneralAnalysisStatus),
       default: TenderGeneralAnalysisStatus.PENDING,
-      index: true,
     },
+
     resultJson: { type: Schema.Types.Mixed, default: undefined },
+
     summary: String,
-    complexityScore: { type: Number, min: 0, max: 100, index: true },
-    opportunityScore: { type: Number, min: 0, max: 100, index: true },
+
+    estimatedValue: {
+      type: EstimatedValueSchema,
+      default: undefined,
+    },
+
+    complexityScore: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+
+    opportunityScore: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+
     generalRecommendation: {
       type: String,
-      enum: TenderGeneralRecommendation,
+      enum: Object.values(TenderGeneralRecommendation),
     },
-    confidenceScore: { type: Number, min: 0, max: 100 },
-    sourceHash: { type: String, index: true },
+
+    confidenceScore: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+
+    analysisDepth: {
+      type: String,
+      enum: Object.values(TenderAnalysisDepth),
+    },
+
+    documentsAnalyzedCount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+
+    missingDocumentsWarning: {
+      type: Boolean,
+      default: false,
+    },
+
+    sourceHash: {
+      type: String,
+    },
+
     promptVersion: String,
-    model: String,
     errorMessage: String,
-    analyzedAt: Date,
   },
   {
     collection: 'tender_general_analyses',
@@ -68,10 +167,13 @@ const TenderGeneralAnalysisSchema = new Schema(
 );
 
 TenderGeneralAnalysisSchema.index({ tender: 1 }, { unique: true });
+TenderGeneralAnalysisSchema.index({ tenderId: 1 }, { unique: true });
 TenderGeneralAnalysisSchema.index({ status: 1, updatedAt: 1 });
 TenderGeneralAnalysisSchema.index({ generalRecommendation: 1 });
 TenderGeneralAnalysisSchema.index({ opportunityScore: -1 });
 TenderGeneralAnalysisSchema.index({ complexityScore: -1 });
+TenderGeneralAnalysisSchema.index({ analysisDepth: 1 });
+TenderGeneralAnalysisSchema.index({ missingDocumentsWarning: 1 });
 
 export const TenderGeneralAnalysisModel: Model<TenderGeneralAnalysisDocument> =
   (mongoose.models.TenderGeneralAnalysis as

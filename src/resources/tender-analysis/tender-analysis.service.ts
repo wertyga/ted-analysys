@@ -3,8 +3,8 @@ import {
   GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
   GeneralTenderAnalysisInput,
   GeneralTenderAnalysisResult,
-} from '../../openai/dto/openai-analysis.dto';
-import { OpenAiService } from '../../openai/openai.service';
+} from '@/openai/dto/openai-analysis.dto';
+import { OpenAiService } from '@/openai/openai.service';
 
 export interface TenderAnalysisExecutionResult {
   result: GeneralTenderAnalysisResult;

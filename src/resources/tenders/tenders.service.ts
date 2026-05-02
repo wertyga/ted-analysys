@@ -21,20 +21,15 @@ export class TendersService {
     private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
   ) {}
 
-  async findById(id: string, includeRaw = false): Promise<TenderDto> {
-    return this.findByIdOrFetchFromTed(id, { includeRaw });
+  async findById(id: string): Promise<TenderDto> {
+    return this.findByIdOrFetchFromTed(id);
   }
 
-  async findByIdOrFetchFromTed(
-    id: string,
-    options: { includeRaw?: boolean } = {},
-  ): Promise<TenderDto> {
+  async findByIdOrFetchFromTed(id: string): Promise<TenderDto> {
     const localTender = await this.findLocalTender(id);
 
     if (localTender) {
-      const dto = this.mapTenderDocumentToDto(localTender, {
-        includeRaw: options.includeRaw ?? false,
-      });
+      const dto = this.mapTenderDocumentToDto(localTender);
 
       this.tenderGeneralAnalysisService.ensureAnalyzedForTender(
         localTender as TenderDocument,
@@ -56,9 +51,7 @@ export class TendersService {
       throw new NotFoundException(`Tender ${id} not found`);
     }
 
-    const dto = await this.tenderNormalizer.normalizeTedNotice(tedNotice, {
-      includeRaw: options.includeRaw ?? false,
-    });
+    const dto = await this.tenderNormalizer.normalizeTedNotice(tedNotice);
     const normalizedDto = this.ensureTedIdentity(dto, publicationNumber);
 
     await this.upsertTender(normalizedDto, tedNotice);
@@ -182,10 +175,7 @@ export class TendersService {
       .exec();
   }
 
-  mapTenderDocumentToDto(
-    tender: TenderRecord,
-    options: { includeRaw?: boolean },
-  ): TenderDto {
+  mapTenderDocumentToDto(tender: TenderRecord): TenderDto {
     const normalizedJson = this.isRecord(tender.normalizedJson)
       ? tender.normalizedJson
       : {};

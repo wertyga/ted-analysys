@@ -48,7 +48,7 @@ export class OpenAiService {
     const responseText = await this.createJsonResponse(prompt, context);
     const parsed = this.parseJson(responseText);
 
-    return this.validateGeneralTenderAnalysisResult(parsed);
+    return this.validateGeneralTenderAnalysisResult(parsed as any);
   }
 
   buildGeneralTenderAnalysisSourceHash(
@@ -179,7 +179,7 @@ export class OpenAiService {
   }
 
   private validateGeneralTenderAnalysisResult(
-    value: unknown,
+    value: GeneralTenderAnalysisResult,
   ): GeneralTenderAnalysisResult {
     if (!this.isRecord(value)) {
       throw new Error('OpenAI tender analysis result must be a JSON object');
@@ -203,8 +203,12 @@ export class OpenAiService {
       questionsToAsk: this.requireStringArray(value, 'questionsToAsk'),
       complexityScore: this.requireScore(value, 'complexityScore'),
       opportunityScore: this.requireScore(value, 'opportunityScore'),
-      generalGoNoGo: this.requireGoNoGo(value.generalGoNoGo),
       confidenceScore: this.requireScore(value, 'confidenceScore'),
+      generalRecommendation: value.generalRecommendation,
+      estimatedValue: value.estimatedValue,
+      analysisDepth: value.analysisDepth,
+      documentsAnalyzedCount: value.documentsAnalyzedCount,
+      missingDocumentsWarning: value.missingDocumentsWarning,
     };
 
     return result;
@@ -245,15 +249,15 @@ export class OpenAiService {
     return value;
   }
 
-  private requireGoNoGo(
-    value: unknown,
-  ): GeneralTenderAnalysisResult['generalGoNoGo'] {
-    if (value === 'GO' || value === 'NO_GO' || value === 'REVIEW') {
-      return value;
-    }
-
-    throw new Error('OpenAI analysis field generalGoNoGo is invalid');
-  }
+  // private requireGoNoGo(
+  //   value: unknown,
+  // ): GeneralTenderAnalysisResult['generalGoNoGo'] {
+  //   if (value === 'GO' || value === 'NO_GO' || value === 'REVIEW') {
+  //     return value;
+  //   }
+  //
+  //   throw new Error('OpenAI analysis field generalGoNoGo is invalid');
+  // }
 
   private requireDeadlines(
     value: unknown,
@@ -281,7 +285,7 @@ export class OpenAiService {
     });
   }
 
-  private requireRisks(value: unknown): GeneralTenderAnalysisResult['risks'] {
+  private requireRisks(value: any): GeneralTenderAnalysisResult['risks'] {
     if (!Array.isArray(value)) {
       throw new Error('OpenAI analysis field risks must be an array');
     }
@@ -314,7 +318,7 @@ export class OpenAiService {
         description: this.requireString(item, 'description'),
         ...(mitigation ? { mitigation } : {}),
       };
-    });
+    }) as any;
   }
 
   private getSafeErrorMessage(error: unknown): string {
