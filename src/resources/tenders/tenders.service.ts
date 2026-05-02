@@ -21,10 +21,6 @@ export class TendersService {
     private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
   ) {}
 
-  async findById(id: string): Promise<TenderDto> {
-    return this.findByIdOrFetchFromTed(id);
-  }
-
   async findByIdOrFetchFromTed(id: string): Promise<TenderDto> {
     const localTender = await this.findLocalTender(id);
 
@@ -54,11 +50,9 @@ export class TendersService {
     const dto = await this.tenderNormalizer.normalizeTedNotice(tedNotice);
     const normalizedDto = this.ensureTedIdentity(dto, publicationNumber);
 
-    await this.upsertTender(normalizedDto, tedNotice);
+    await this.upsertTender(normalizedDto);
 
-    return options.includeRaw === true
-      ? normalizedDto
-      : this.withoutRaw(normalizedDto);
+    return normalizedDto;
   }
 
   async fetchTedNoticeByPublicationNumber(
@@ -122,43 +116,44 @@ export class TendersService {
     };
   }
 
-  async upsertTender(dto: TenderDto, raw: unknown): Promise<void> {
+  async upsertTender(dto: TenderDto): Promise<void> {
     const now = new Date();
 
-    const savedTender = await TenderModel.findOneAndUpdate(
-      { id: dto.id },
-      {
-        $set: {
-          id: dto.id,
-          source: dto.source,
-          sourceNoticeId: dto.sourceNoticeId,
-          publicationNumber: dto.publicationNumber,
-          noticeType: dto.noticeType,
-          procedureType: dto.procedureType,
-          title: dto.title,
-          buyerName: dto.buyerName,
-          buyerCountry: dto.buyerCountry,
-          publicationDate: dto.publicationDate,
-          submissionDeadline: dto.submissionDeadline,
-          classificationCpv: dto.classificationCpv,
-          cpvCodes: dto.cpvCodes,
-          contractNature: dto.contractNature,
-          links: dto.links,
-          rawJson: raw,
-          normalizedJson: this.withoutRaw(dto),
-          lastSeenAt: now,
-          updatedAt: now,
-        },
-        $setOnInsert: {
-          createdAt: now,
-        },
-      },
-      { new: true, upsert: true },
-    ).exec();
+    let savedTender = await TenderModel.findOne({ id: dto.id });
 
-    await this.tenderGeneralAnalysisService.ensureAnalyzedForTender(
-      savedTender,
-    );
+    if (!savedTender) {
+      savedTender = await TenderModel.findOneAndUpdate(
+        { id: dto.id },
+        {
+          $set: {
+            id: dto.id,
+            source: dto.source,
+            sourceNoticeId: dto.sourceNoticeId,
+            publicationNumber: dto.publicationNumber,
+            noticeType: dto.noticeType,
+            procedureType: dto.procedureType,
+            title: dto.title,
+            buyerName: dto.buyerName,
+            buyerCountry: dto.buyerCountry,
+            publicationDate: dto.publicationDate,
+            submissionDeadline: dto.submissionDeadline,
+            classificationCpv: dto.classificationCpv,
+            cpvCodes: dto.cpvCodes,
+            contractNature: dto.contractNature,
+            links: dto.links,
+            lastSeenAt: now,
+            updatedAt: now,
+          },
+          $setOnInsert: {
+            createdAt: now,
+          },
+        },
+        { new: true, upsert: true },
+      ).exec();
+    }
+
+    // Async update general analysis
+    this.tenderGeneralAnalysisService.ensureAnalyzedForTender(savedTender);
   }
 
   async findLocalTender(id: string): Promise<TenderRecord | null> {
@@ -176,50 +171,24 @@ export class TendersService {
   }
 
   mapTenderDocumentToDto(tender: TenderRecord): TenderDto {
-    const normalizedJson = this.isRecord(tender.normalizedJson)
-      ? tender.normalizedJson
-      : {};
     const dto: TenderDto = {
-      ...normalizedJson,
-      id: this.valueToString(normalizedJson.id) ?? tender.id,
+      id: tender.id,
       source: 'TED',
-      sourceNoticeId:
-        this.valueToString(normalizedJson.sourceNoticeId) ??
-        tender.sourceNoticeId,
-      publicationNumber:
-        this.valueToString(normalizedJson.publicationNumber) ??
-        tender.publicationNumber,
-      noticeType:
-        this.valueToString(normalizedJson.noticeType) ?? tender.noticeType,
-      procedureType:
-        this.valueToString(normalizedJson.procedureType) ??
-        tender.procedureType,
-      title: this.valueToString(normalizedJson.title) ?? tender.title,
-      buyerName:
-        this.valueToString(normalizedJson.buyerName) ?? tender.buyerName,
-      buyerCountry:
-        this.valueToString(normalizedJson.buyerCountry) ?? tender.buyerCountry,
-      publicationDate:
-        this.valueToString(normalizedJson.publicationDate) ??
-        tender.publicationDate,
-      submissionDeadline:
-        this.valueToString(normalizedJson.submissionDeadline) ??
-        tender.submissionDeadline,
-      contractNature:
-        this.valueToString(normalizedJson.contractNature) ??
-        tender.contractNature,
-      classificationCpv: (Array.isArray(normalizedJson.classificationCpv)
-        ? normalizedJson.classificationCpv
-        : tender.classificationCpv) as TenderDto['classificationCpv'],
-      cpvCodes: (Array.isArray(normalizedJson.cpvCodes)
-        ? normalizedJson.cpvCodes
-        : tender.cpvCodes) as TenderDto['cpvCodes'],
-      links: normalizedJson.links ?? tender.links,
+      sourceNoticeId: tender.sourceNoticeId,
+      publicationNumber: tender.publicationNumber,
+      noticeType: tender.noticeType,
+      procedureType: tender.procedureType,
+      title: tender.title,
+      buyerName: tender.buyerName,
+      buyerCountry: tender.buyerCountry,
+      publicationDate: tender.publicationDate,
+      submissionDeadline: tender.submissionDeadline,
+      contractNature: tender.contractNature,
+      classificationCpv:
+        tender.classificationCpv as TenderDto['classificationCpv'],
+      cpvCodes: tender.cpvCodes as TenderDto['cpvCodes'],
+      links: tender.links,
     };
-
-    if (options.includeRaw === true) {
-      dto.raw = tender.rawJson;
-    }
 
     const publicationNumber =
       dto.publicationNumber ?? tender.publicationNumber ?? tender.id;
@@ -229,17 +198,6 @@ export class TendersService {
 
   private isTedPublicationNumber(value: string): boolean {
     return /^\d{5,8}-\d{4}$/.test(value);
-  }
-
-  private withoutRaw(dto: TenderDto): TenderDto {
-    const rest = { ...dto };
-    delete rest.raw;
-
-    return rest;
-  }
-
-  private valueToString(value: unknown): string | undefined {
-    return typeof value === 'string' ? value : undefined;
   }
 
   private isRecord(value: unknown): value is Record<string, unknown> {

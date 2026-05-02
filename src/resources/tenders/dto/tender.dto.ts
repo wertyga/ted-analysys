@@ -64,11 +64,6 @@ export class TenderDto {
   @ApiPropertyOptional({ type: Object })
   links?: unknown;
 
-  @ApiPropertyOptional({
-    description: 'Raw TED notice, only returned when includeRaw=true',
-  })
-  raw?: unknown;
-
   @ApiPropertyOptional({ type: Object })
   generalAnalysis?: TenderGeneralAnalysisDetailDto | null;
 }

@@ -166,6 +166,8 @@ const TenderGeneralAnalysisSchema = new Schema<TenderGeneralAnalysisDocument>(
   },
 );
 
+TenderGeneralAnalysisSchema.add({ model: String } as Record<string, unknown>);
+
 TenderGeneralAnalysisSchema.index({ tender: 1 }, { unique: true });
 TenderGeneralAnalysisSchema.index({ tenderId: 1 }, { unique: true });
 TenderGeneralAnalysisSchema.index({ status: 1, updatedAt: 1 });

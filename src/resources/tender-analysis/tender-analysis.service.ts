@@ -4,7 +4,7 @@ import {
   GeneralTenderAnalysisInput,
   GeneralTenderAnalysisResult,
 } from '@/openai/dto/openai-analysis.dto';
-import { OpenAiService } from '@/openai/openai.service';
+import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 
 export interface TenderAnalysisExecutionResult {
   result: GeneralTenderAnalysisResult;
@@ -17,15 +17,18 @@ export interface TenderAnalysisExecutionResult {
 export class TenderAnalysisService {
   private readonly logger = new Logger(TenderAnalysisService.name);
 
-  constructor(private readonly openAiService: OpenAiService) {}
+  constructor(
+    private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
+  ) {}
 
   async analyzeTenderGeneral(
     input: GeneralTenderAnalysisInput,
   ): Promise<TenderAnalysisExecutionResult> {
     const sourceHash =
-      this.openAiService.buildGeneralTenderAnalysisSourceHash(input);
+      this.deepSeekAnalysisService.buildGeneralTenderAnalysisSourceHash(input);
 
-    const result = await this.openAiService.analyzeTenderGeneral(input);
+    const result =
+      await this.deepSeekAnalysisService.analyzeTenderGeneral(input);
 
     this.logger.debug(
       `General tender analysis completed: tender=${input.tender.id} sourceHash=${sourceHash}`,
@@ -35,7 +38,7 @@ export class TenderAnalysisService {
       result,
       sourceHash,
       promptVersion: GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
-      model: this.openAiService.getGeneralAnalysisModel(),
+      model: this.deepSeekAnalysisService.getGeneralAnalysisModel(),
     };
   }
 }

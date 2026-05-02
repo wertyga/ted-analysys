@@ -33,7 +33,7 @@ export class TenderGeneralAnalysisBuilder {
     tender: TenderDocument,
   ): Promise<GeneralTenderAnalysisInput> {
     const documents = await this.buildAnalysisDocuments(tender);
-    console.log({ documents });
+
     return {
       tender: {
         id: tender.id,

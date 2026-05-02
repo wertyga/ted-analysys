@@ -111,6 +111,7 @@ export class TenderGeneralAnalysisService {
         },
       }).exec();
     } catch (error: unknown) {
+      console.log({ error });
       await TenderGeneralAnalysisModel.findByIdAndUpdate(
         analysis._id,
         {
