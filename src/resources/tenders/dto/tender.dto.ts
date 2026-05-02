@@ -19,7 +19,7 @@ export class TenderCpvDto {
 }
 
 export class TenderDto {
-  @ApiProperty({ example: 'ted-756265-2023' })
+  @ApiProperty({ example: '756265-2023' })
   id!: string;
 
   @ApiProperty({ example: 'TED' })

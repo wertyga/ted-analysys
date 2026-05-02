@@ -9,7 +9,7 @@ export enum TenderGeneralAnalysisStatus {
 
 export enum TenderGeneralRecommendation {
   PROMISING = 'PROMISING',
-  NEEDS_REVIEW = 'NEEDS_REVIEW',
+  REVIEW = 'REVIEW',
   NOT_RECOMMENDED = 'NOT_RECOMMENDED',
 }
 
@@ -42,7 +42,7 @@ const TenderGeneralAnalysisSchema = new Schema(
     },
     status: {
       type: String,
-      enum: Object.values(TenderGeneralAnalysisStatus),
+      enum: TenderGeneralAnalysisStatus,
       default: TenderGeneralAnalysisStatus.PENDING,
       index: true,
     },
@@ -52,8 +52,7 @@ const TenderGeneralAnalysisSchema = new Schema(
     opportunityScore: { type: Number, min: 0, max: 100, index: true },
     generalRecommendation: {
       type: String,
-      enum: Object.values(TenderGeneralRecommendation),
-      index: true,
+      enum: TenderGeneralRecommendation,
     },
     confidenceScore: { type: Number, min: 0, max: 100 },
     sourceHash: { type: String, index: true },

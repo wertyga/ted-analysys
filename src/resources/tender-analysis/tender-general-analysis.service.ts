@@ -12,17 +12,22 @@ import {
   TenderGeneralAnalysisListDto,
 } from './dto/tender-general-analysis.dto';
 import { TenderAnalysisService } from './tender-analysis.service';
-import {
-  GeneralGoNoGo,
-  GeneralTenderAnalysisInput,
-} from '@/openai/dto/openai-analysis.dto';
+import { GeneralGoNoGo } from '@/openai/dto/openai-analysis.dto';
 import { TenderDocument, TenderModel } from '../tenders/schemas';
+import {
+  TedNotice,
+  TedSearchResponse,
+} from '../ted-search/types/ted-search.types';
+import { TenderGeneralAnalysisBuilder } from './tender-general-analysis.builder';
 
 type TenderGeneralAnalysisRecord = TenderGeneralAnalysis & { _id?: unknown };
 
 @Injectable()
 export class TenderGeneralAnalysisService {
-  constructor(private readonly tenderAnalysisService: TenderAnalysisService) {}
+  constructor(
+    private readonly tenderAnalysisService: TenderAnalysisService,
+    private readonly analysisBuilder: TenderGeneralAnalysisBuilder,
+  ) {}
 
   async ensureAnalyzedForTender(tender: TenderDocument): Promise<void> {
     const tenderObjectId = tender._id as mongoose.Types.ObjectId;
@@ -30,17 +35,29 @@ export class TenderGeneralAnalysisService {
       tender: tenderObjectId,
     }).exec();
 
-    if (existing) {
+    const analysisExists =
+      existing &&
+      existing.status !== TenderGeneralAnalysisStatus.FAILED &&
+      existing.resultJson;
+
+    if (analysisExists) {
       return;
     }
 
     let analysis: TenderGeneralAnalysisDocument;
 
     try {
-      analysis = await TenderGeneralAnalysisModel.create({
-        tender: tenderObjectId,
-        status: TenderGeneralAnalysisStatus.PROCESSING,
-      });
+      analysis = await TenderGeneralAnalysisModel.findOneAndUpdate(
+        {
+          tender: tenderObjectId,
+        },
+        {
+          $set: {
+            status: TenderGeneralAnalysisStatus.PROCESSING,
+          },
+        },
+        { new: true, upsert: true },
+      );
     } catch (error: unknown) {
       if (!this.isDuplicateKeyError(error)) {
         throw error;
@@ -58,9 +75,11 @@ export class TenderGeneralAnalysisService {
     }
 
     try {
-      const execution = await this.tenderAnalysisService.analyzeTenderGeneral(
-        this.buildAnalysisInput(tender),
-      );
+      const analysisInput =
+        await this.analysisBuilder.buildAnalysisInput(tender);
+
+      const execution =
+        await this.tenderAnalysisService.analyzeTenderGeneral(analysisInput);
       const result = execution.result;
 
       await TenderGeneralAnalysisModel.findByIdAndUpdate(
@@ -122,6 +141,82 @@ export class TenderGeneralAnalysisService {
     return this.toDetailDto(analysis);
   }
 
+  async addGeneralAnalysisToTenderSearchResponse(
+    response: TedSearchResponse,
+  ): Promise<TedSearchResponse> {
+    if (!Array.isArray(response.notices) || response.notices.length === 0) {
+      return response;
+    }
+
+    const publicationNumbers = Array.from(
+      new Set(
+        response.notices
+          .map((notice) => this.extractPublicationNumberFromNotice(notice))
+          .filter((value): value is string => value !== undefined),
+      ),
+    );
+
+    if (publicationNumbers.length === 0) {
+      return response;
+    }
+
+    const tenders = await TenderModel.find({
+      $or: [
+        { publicationNumber: { $in: publicationNumbers } },
+        { sourceNoticeId: { $in: publicationNumbers } },
+        { id: { $in: publicationNumbers } },
+      ],
+    })
+      .select({ _id: 1, id: 1, publicationNumber: 1, sourceNoticeId: 1 })
+      .lean()
+      .exec();
+
+    if (tenders.length === 0) {
+      return response;
+    }
+
+    const analyses = await TenderGeneralAnalysisModel.find({
+      tender: { $in: tenders.map((tender) => tender._id) },
+    })
+      .lean()
+      .exec();
+    const analysesByTenderId = new Map(
+      analyses.map((analysis) => [String(analysis.tender), analysis]),
+    );
+    const analysesByPublicationNumber = new Map<
+      string,
+      TenderGeneralAnalysisListDto
+    >();
+
+    for (const tender of tenders) {
+      const analysis = analysesByTenderId.get(String(tender._id));
+      const analysisDto = this.toListDto(analysis ?? null);
+
+      if (analysisDto === null) {
+        continue;
+      }
+
+      for (const key of this.getTenderPublicationKeys(tender)) {
+        analysesByPublicationNumber.set(key, analysisDto);
+      }
+    }
+
+    return {
+      ...response,
+      notices: response.notices.map((notice) => {
+        const publicationNumber =
+          this.extractPublicationNumberFromNotice(notice);
+        const generalAnalysis = publicationNumber
+          ? analysesByPublicationNumber.get(publicationNumber)
+          : undefined;
+
+        return generalAnalysis === undefined
+          ? notice
+          : { ...notice, generalAnalysis };
+      }),
+    };
+  }
+
   toListDto(
     analysis: TenderGeneralAnalysisRecord | null,
   ): TenderGeneralAnalysisListDto | null {
@@ -137,9 +232,43 @@ export class TenderGeneralAnalysisService {
       generalRecommendation: analysis.generalRecommendation,
       confidenceScore: analysis.confidenceScore,
       analyzedAt: analysis.analyzedAt,
-      model: analysis.model,
-      promptVersion: analysis.promptVersion,
     };
+  }
+
+  private extractPublicationNumberFromNotice(
+    notice: TedNotice,
+  ): string | undefined {
+    const value = notice.publicationNumber ?? notice['publication-number'];
+
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+
+    if (typeof value === 'number') {
+      const text = String(value);
+
+      if (/^\d{9,12}$/.test(text)) {
+        return `${text.slice(0, -4)}-${text.slice(-4)}`;
+      }
+    }
+
+    return undefined;
+  }
+
+  private getTenderPublicationKeys(tender: {
+    id?: string;
+    publicationNumber?: string;
+    sourceNoticeId?: string;
+  }): string[] {
+    const keys = [
+      tender.publicationNumber,
+      tender.sourceNoticeId,
+      tender.id,
+    ].filter(
+      (value): value is string => value !== undefined && value.length > 0,
+    );
+
+    return Array.from(new Set(keys));
   }
 
   toDetailDto(
@@ -174,49 +303,6 @@ export class TenderGeneralAnalysisService {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 
-  private buildAnalysisInput(
-    tender: TenderDocument,
-  ): GeneralTenderAnalysisInput {
-    return {
-      tender: {
-        id: tender.id,
-        publicationNumber: tender.publicationNumber ?? null,
-        title: tender.title ?? null,
-        buyerName: tender.buyerName ?? null,
-        country: tender.buyerCountry ?? null,
-        procedureType: tender.procedureType ?? null,
-        noticeType: tender.noticeType ?? null,
-        publicationDate: tender.publicationDate ?? null,
-        deadlineDate: tender.submissionDeadline ?? null,
-        cpvCodes: this.extractCpvCodes(tender),
-      },
-      documents: [],
-    };
-  }
-
-  private extractCpvCodes(tender: TenderDocument): string[] {
-    const codes = [
-      ...(tender.cpvCodes ?? []),
-      ...(tender.classificationCpv ?? []),
-    ]
-      .map((cpv) => this.extractCpvCode(cpv))
-      .filter((code): code is string => code !== null);
-
-    return Array.from(new Set(codes));
-  }
-
-  private extractCpvCode(cpv: unknown): string | null {
-    if (typeof cpv === 'string') {
-      return cpv;
-    }
-
-    if (!this.isRecord(cpv)) {
-      return null;
-    }
-
-    return typeof cpv.code === 'string' ? cpv.code : null;
-  }
-
   private mapGeneralRecommendation(
     goNoGo: GeneralGoNoGo,
   ): TenderGeneralRecommendation {
@@ -228,7 +314,7 @@ export class TenderGeneralAnalysisService {
       return TenderGeneralRecommendation.NOT_RECOMMENDED;
     }
 
-    return TenderGeneralRecommendation.NEEDS_REVIEW;
+    return TenderGeneralRecommendation.REVIEW;
   }
 
   private getSafeErrorMessage(error: unknown): string {

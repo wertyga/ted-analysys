@@ -19,14 +19,11 @@ export class TenderAnalysisService {
 
   constructor(private readonly openAiService: OpenAiService) {}
 
-  // TODO: move this into a background queue once tender document extraction is asynchronous.
   async analyzeTenderGeneral(
     input: GeneralTenderAnalysisInput,
   ): Promise<TenderAnalysisExecutionResult> {
     const sourceHash =
       this.openAiService.buildGeneralTenderAnalysisSourceHash(input);
-
-    this.logger.debug(`input: ${input}, sourceHash: ${sourceHash}`);
 
     const result = await this.openAiService.analyzeTenderGeneral(input);
 

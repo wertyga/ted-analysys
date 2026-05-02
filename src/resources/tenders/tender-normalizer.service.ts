@@ -20,9 +20,7 @@ export class TenderNormalizerService {
       'publicationNumber',
     ]);
     const dto: TenderDto = {
-      id: publicationNumber
-        ? `ted-${publicationNumber}`
-        : this.createFallbackId(normalizedNotice),
+      id: publicationNumber ?? this.createFallbackId(normalizedNotice),
       source: 'TED',
       sourceNoticeId:
         this.pickText(normalizedNotice, ['noticeIdentifier', 'noticeId']) ??
@@ -131,7 +129,7 @@ export class TenderNormalizerService {
       hash = (hash * 31 + text.charCodeAt(index)) >>> 0;
     }
 
-    return `ted-${hash.toString(16)}`;
+    return hash.toString(16);
   }
 
   private isRecord(value: unknown): value is Record<string, unknown> {

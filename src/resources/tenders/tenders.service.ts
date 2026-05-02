@@ -8,7 +8,7 @@ import {
 } from '../ted-search/types/ted-search.types';
 import { TenderGeneralAnalysisService } from '../tender-analysis/tender-general-analysis.service';
 import { TenderDto } from './dto/tender.dto';
-import { Tender, TenderModel } from './schemas';
+import { Tender, TenderDocument, TenderModel } from './schemas';
 import { TenderNormalizerService } from './tender-normalizer.service';
 
 type TenderRecord = Tender & { _id?: unknown };
@@ -36,12 +36,16 @@ export class TendersService {
         includeRaw: options.includeRaw ?? false,
       });
 
+      this.tenderGeneralAnalysisService.ensureAnalyzedForTender(
+        localTender as TenderDocument,
+      );
+
       return dto;
     }
 
-    const publicationNumber = this.extractTedPublicationNumber(id);
+    const publicationNumber = id.trim();
 
-    if (publicationNumber === null) {
+    if (!this.isTedPublicationNumber(publicationNumber)) {
       throw new NotFoundException(`Tender ${id} not found`);
     }
 
@@ -62,47 +66,6 @@ export class TendersService {
     return options.includeRaw === true
       ? normalizedDto
       : this.withoutRaw(normalizedDto);
-  }
-
-  normalizeTenderId(id: string): string {
-    const trimmed = id.trim();
-
-    if (trimmed.startsWith('ted-')) {
-      return trimmed;
-    }
-
-    if (/^\d{6,8}-\d{4}$/.test(trimmed)) {
-      return `ted-${trimmed}`;
-    }
-
-    if (/^\d{10,12}$/.test(trimmed)) {
-      const publicationId = trimmed.slice(0, -4);
-      const year = trimmed.slice(-4);
-
-      return `ted-${publicationId}-${year}`;
-    }
-
-    return trimmed;
-  }
-
-  extractTedPublicationNumber(id: string): string | null {
-    const trimmed = id.trim();
-    const withoutPrefix = trimmed.startsWith('ted-')
-      ? trimmed.slice('ted-'.length)
-      : trimmed;
-
-    if (/^\d{6,8}-\d{4}$/.test(withoutPrefix)) {
-      return withoutPrefix;
-    }
-
-    if (/^\d{10,12}$/.test(withoutPrefix)) {
-      const publicationId = withoutPrefix.slice(0, -4);
-      const year = withoutPrefix.slice(-4);
-
-      return `${publicationId}-${year}`;
-    }
-
-    return null;
   }
 
   async fetchTedNoticeByPublicationNumber(
@@ -159,9 +122,9 @@ export class TendersService {
   ensureTedIdentity(dto: TenderDto, publicationNumber: string): TenderDto {
     return {
       ...dto,
-      id: `ted-${publicationNumber}`,
+      id: publicationNumber,
       source: 'TED',
-      sourceNoticeId: dto.sourceNoticeId ?? publicationNumber,
+      sourceNoticeId: publicationNumber,
       publicationNumber: dto.publicationNumber ?? publicationNumber,
     };
   }
@@ -206,30 +169,17 @@ export class TendersService {
   }
 
   async findLocalTender(id: string): Promise<TenderRecord | null> {
-    const normalizedId = this.normalizeTenderId(id);
-    const publicationNumber = this.extractTedPublicationNumber(id);
-    const compactPublicationNumber = publicationNumber?.replace('-', '');
-    const candidates = Array.from(
-      new Set(
-        [
-          id.trim(),
-          normalizedId,
-          publicationNumber,
-          compactPublicationNumber,
-        ].filter(
-          (value): value is string => value !== undefined && value !== null,
-        ),
-      ),
-    );
+    const publicationNumber = id.trim();
 
-    const or = [
-      { id: { $in: candidates } },
-      ...(publicationNumber
-        ? [{ publicationNumber }, { sourceNoticeId: publicationNumber }]
-        : []),
-    ];
-
-    return TenderModel.findOne({ $or: or }).lean<TenderRecord>().exec();
+    return TenderModel.findOne({
+      $or: [
+        { id: publicationNumber },
+        { publicationNumber },
+        { sourceNoticeId: publicationNumber },
+      ],
+    })
+      .lean<TenderRecord>()
+      .exec();
   }
 
   mapTenderDocumentToDto(
@@ -282,12 +232,13 @@ export class TendersService {
     }
 
     const publicationNumber =
-      dto.publicationNumber ??
-      tender.publicationNumber ??
-      this.extractTedPublicationNumber(tender.id) ??
-      tender.id.replace(/^ted-/, '');
+      dto.publicationNumber ?? tender.publicationNumber ?? tender.id;
 
     return this.ensureTedIdentity(dto, publicationNumber);
+  }
+
+  private isTedPublicationNumber(value: string): boolean {
+    return /^\d{5,8}-\d{4}$/.test(value);
   }
 
   private withoutRaw(dto: TenderDto): TenderDto {

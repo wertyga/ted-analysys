@@ -12,11 +12,15 @@ import { TedSearchService } from './ted-search.service';
 import { normalizeTenderSearchResponse } from './utils';
 import { TedSearchResponse } from './types/ted-search.types';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
+import { TenderGeneralAnalysisService } from '../tender-analysis/tender-general-analysis.service';
 
 @ApiTags('ted')
 @Controller('ted')
 export class TedSearchController {
-  constructor(private readonly tedSearchService: TedSearchService) {}
+  constructor(
+    private readonly tedSearchService: TedSearchService,
+    private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
+  ) {}
 
   @Post('search')
   @ApiOperation({ summary: 'Search TED tenders by structured filters' })
@@ -34,7 +38,10 @@ export class TedSearchController {
       noticeTypes: TENDER_COMPETITION_NOTICE_TYPES,
     };
     const data = await this.tedSearchService.searchTenders(updatedData);
+    const normalized = await normalizeTenderSearchResponse(data);
 
-    return await normalizeTenderSearchResponse(data);
+    return this.tenderGeneralAnalysisService.addGeneralAnalysisToTenderSearchResponse(
+      normalized,
+    );
   }
 }

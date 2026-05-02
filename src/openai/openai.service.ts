@@ -22,8 +22,8 @@ export class OpenAiService {
   private readonly client: OpenAI;
   private readonly generalAnalysisModel: string;
   private readonly retryDelaysMs = [500, 1500];
-  private readonly maxDocumentChars = 30_000;
-  private readonly maxContextChars = 120_000;
+  private readonly maxDocumentChars = 40_000;
+  private readonly maxContextChars = 180_000;
 
   constructor(private readonly configService: ConfigService) {
     const apiKey = this.configService.get<string>('OPENAI_API_KEY');
@@ -44,6 +44,7 @@ export class OpenAiService {
     const context = this.buildTenderContext(input);
     const outputLanguage = input.outputLanguage ?? 'en';
     const prompt = buildGeneralTenderAnalysisPrompt(outputLanguage);
+
     const responseText = await this.createJsonResponse(prompt, context);
     const parsed = this.parseJson(responseText);
 
@@ -53,6 +54,23 @@ export class OpenAiService {
   buildGeneralTenderAnalysisSourceHash(
     input: GeneralTenderAnalysisInput,
   ): string {
+    console.log(
+      JSON.stringify(
+        {
+          promptVersion: GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
+          tender: input.tender,
+          documents: input.documents.map((document) => ({
+            id: document.id,
+            filename: document.filename,
+            language: document.language,
+            documentType: document.documentType,
+            extractedText: document.extractedText,
+          })),
+        },
+        null,
+        2,
+      ),
+    );
     return createHash('sha256')
       .update(
         JSON.stringify({
