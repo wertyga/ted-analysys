@@ -1,65 +1,50 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
-import { TenderDto } from '../dto/tender.dto';
 
-export type TenderDocument = TenderDto &
-  Document & {
-    source?: string;
-    rawJson?: unknown;
-    normalizedJson?: TenderDto;
-    lastSeenAt?: Date;
-  };
+export interface Tender {
+  id: string;
+  source: string;
+  sourceNoticeId?: string;
+  publicationNumber?: string;
+  noticeType?: string;
+  procedureType?: string;
+  title?: string;
+  buyerName?: string;
+  buyerCountry?: string;
+  publicationDate?: string;
+  submissionDeadline?: string;
+  contractNature?: string;
+  classificationCpv?: unknown[];
+  cpvCodes?: unknown[];
+  links?: unknown;
+  rawJson?: unknown;
+  normalizedJson?: unknown;
+  lastSeenAt: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
 
-const TenderCpvSchema = new Schema(
-  {
-    code: { type: String, required: true },
-    label: String,
-    parentCode: String,
-  },
-  { _id: false },
-);
-
-const TenderValueSchema = new Schema(
-  {
-    amount: Number,
-    currency: String,
-  },
-  { _id: false },
-);
-
-const TenderLotSchema = new Schema(
-  {
-    id: String,
-    title: String,
-    description: String,
-    cpvCodes: { type: [TenderCpvSchema], default: [] },
-    estimatedValue: TenderValueSchema,
-  },
-  { _id: false },
-);
+export type TenderDocument = Tender & Document;
 
 const TenderSchema = new Schema<TenderDocument>(
   {
     id: { type: String, required: true, unique: true, index: true },
-    source: { type: String, index: true },
-    sourceNoticeId: String,
+    source: { type: String, required: true, index: true },
+    sourceNoticeId: { type: String, index: true },
     publicationNumber: { type: String, index: true },
-    title: String,
-    description: String,
-    buyerName: String,
-    buyerCountry: String,
-    buyerCity: String,
-    publicationDate: String,
-    deadline: String,
-    cpvCodes: { type: [TenderCpvSchema], default: [] },
     noticeType: String,
     procedureType: String,
-    estimatedValue: TenderValueSchema,
-    lots: { type: [TenderLotSchema], default: [] },
-    tedUrl: String,
-    raw: Schema.Types.Mixed,
+    title: String,
+    buyerName: String,
+    buyerCountry: String,
+    publicationDate: String,
+    submissionDeadline: String,
+    contractNature: String,
+    classificationCpv: { type: [Schema.Types.Mixed], default: undefined },
+    cpvCodes: { type: [Schema.Types.Mixed], default: undefined },
+    links: Schema.Types.Mixed,
     rawJson: Schema.Types.Mixed,
     normalizedJson: Schema.Types.Mixed,
-    lastSeenAt: Date,
+    lastSeenAt: { type: Date, required: true },
   },
   {
     collection: 'tenders',
@@ -68,5 +53,5 @@ const TenderSchema = new Schema<TenderDocument>(
 );
 
 export const TenderModel: Model<TenderDocument> =
-  mongoose.models.Tender ??
+  (mongoose.models.Tender as Model<TenderDocument> | undefined) ??
   mongoose.model<TenderDocument>('Tender', TenderSchema);

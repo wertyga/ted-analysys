@@ -1,125 +1,27 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
-import { CpvService } from '../cpv/cpv.service';
-import { TedSearchRequestDto } from '../ted-search/dto/ted-search-request.dto';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { TedSearchService } from '../ted-search/ted-search.service';
 import {
   TedNotice,
   TedPaginationMode,
   TedScope,
   TedSearchResponse,
 } from '../ted-search/types/ted-search.types';
-import { TedSearchService } from '../ted-search/ted-search.service';
-import {
-  CpvMatchMode,
-  TenderSearchByCpvDto,
-  TenderSearchDto,
-} from './dto/tender-search.dto';
-import { TenderDto, TenderSearchResponseDto } from './dto/tender.dto';
-import { TenderModel } from './schemas/tender.schema';
+import { TenderGeneralAnalysisService } from '../tender-analysis/tender-general-analysis.service';
+import { TenderDto } from './dto/tender.dto';
+import { Tender, TenderModel } from './schemas';
 import { TenderNormalizerService } from './tender-normalizer.service';
 
-const TED_PUBLICATION_NUMBER_FIELD = 'publication-number';
+type TenderRecord = Tender & { _id?: unknown };
 
 @Injectable()
 export class TendersService {
-  private readonly logger = new Logger(TendersService.name);
-
   constructor(
     private readonly tedSearchService: TedSearchService,
     private readonly tenderNormalizer: TenderNormalizerService,
-    private readonly cpvService: CpvService,
+    private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
   ) {}
-  
-  private async upsertTendersWithRaw(
-    items: TenderDto[],
-    rawNotices: TedNotice[],
-  ): Promise<void> {
-    if (items.length === 0) {
-      return;
-    }
-    
-    await TenderModel.bulkWrite(
-      items.map((item, index) => {
-        const rawNotice = rawNotices[index];
-        const publicationNumber =
-          item.publicationNumber ?? this.extractTedPublicationNumber(item.id);
-        
-        const normalizedItem = this.normalizeTenderDtoId(
-          item,
-          publicationNumber,
-        );
-        
-        return {
-          updateOne: {
-            filter: { id: normalizedItem.id },
-            update: {
-              $set: this.buildTenderPersistencePayload(
-                normalizedItem,
-                rawNotice,
-              ),
-            },
-            upsert: true,
-          },
-        };
-      }),
-      { ordered: false },
-    );
-  }
-  
-  async search(dto: TenderSearchDto): Promise<TenderSearchResponseDto> {
-    const payload = this.buildTedSearchPayload(dto);
-    console.log('DTO FROM FRONT:', dto);
-    console.log('TED PAYLOAD:', payload);
-    
-    this.logger.debug(`TED search query: ${payload.query}`);
-    
-    const rawResponse = await this.tedSearchService.searchNotices(payload);
-    const notices = this.extractNotices(rawResponse);
-    
-    const items = await Promise.all(
-      notices.map((notice) =>
-        this.tenderNormalizer.normalize(notice, dto.includeRaw),
-      ),
-    );
-    
-    await this.upsertTendersWithRaw(items, notices);
-    
-    const totalCount =
-      typeof rawResponse.totalNoticeCount === 'number'
-        ? rawResponse.totalNoticeCount
-        : typeof rawResponse.totalCount === 'number'
-          ? rawResponse.totalCount
-          : items.length;
-    
-    return {
-      items,
-      meta: {
-        page: dto.page,
-        limit: dto.limit,
-        totalCount,
-        hasNextPage: dto.page * dto.limit < totalCount,
-      },
-    };
-  }
-  
-  async searchByCpv(
-    dto: TenderSearchByCpvDto,
-  ): Promise<TenderSearchResponseDto> {
-    return this.search({
-      cpvCodes: dto.cpvCodes,
-      scope: dto.scope,
-      page: dto.page,
-      limit: dto.limit,
-      includeRaw: dto.includeRaw,
-      matchMode: dto.matchMode,
-    });
-  }
 
-  async findById(id: string, includeRaw: boolean = false): Promise<TenderDto> {
+  async findById(id: string, includeRaw = false): Promise<TenderDto> {
     return this.findByIdOrFetchFromTed(id, { includeRaw });
   }
 
@@ -130,9 +32,11 @@ export class TendersService {
     const localTender = await this.findLocalTender(id);
 
     if (localTender) {
-      return this.mapTenderDocumentToDto(localTender, {
+      const dto = this.mapTenderDocumentToDto(localTender, {
         includeRaw: options.includeRaw ?? false,
       });
+
+      return dto;
     }
 
     const publicationNumber = this.extractTedPublicationNumber(id);
@@ -151,82 +55,13 @@ export class TendersService {
     const dto = await this.tenderNormalizer.normalizeTedNotice(tedNotice, {
       includeRaw: options.includeRaw ?? false,
     });
-    const normalizedDto = this.normalizeTenderDtoId(dto, publicationNumber);
+    const normalizedDto = this.ensureTedIdentity(dto, publicationNumber);
 
     await this.upsertTender(normalizedDto, tedNotice);
 
-    return normalizedDto;
-  }
-
-  private buildTedSearchPayload(dto: TenderSearchDto): TedSearchRequestDto {
-    const query = this.buildExpertQuery(dto);
-
-    return {
-      query,
-      scope: dto.scope,
-      page: dto.page,
-      limit: dto.limit,
-      paginationMode: TedPaginationMode.PAGE_NUMBER,
-      onlyLatestVersions: false,
-      checkQuerySyntax: false,
-      fields: [
-        'publication-number',
-        'notice-title',
-        'publication-date',
-        'deadline',
-        'classification-cpv',
-        'contract-nature',
-        'buyer-name',
-        'buyer-country',
-        'notice-type',
-      ],
-    };
-  }
-  
-  private buildCpvQuery(
-    cpvCodes: string[],
-    matchMode: CpvMatchMode = CpvMatchMode.TREE,
-  ): string {
-    const codes = this.normalizeCpvCodes(cpvCodes);
-    
-    if (matchMode === CpvMatchMode.EXACT) {
-      return `classification-cpv IN (${codes.join(' ')})`;
-    }
-    
-    const parts = codes.map((code) => {
-      const prefix = code.replace(/0+$/, '');
-      
-      if (prefix.length >= 2 && prefix.length < 8) {
-        return `${prefix}*`;
-      }
-      
-      return code;
-    });
-    
-    return `classification-cpv IN (${parts.join(' ')})`;
-  }
-  
-  private buildExpertQuery(dto: TenderSearchDto): string {
-    const parts: string[] = [];
-    
-    // Временно добавляем рабочий фильтр, чтобы TED точно возвращал services notices
-    parts.push('contract-nature IN (services)');
-    
-    if (dto.cpvCodes !== undefined && dto.cpvCodes.length > 0) {
-      parts.push(this.buildCpvQuery(dto.cpvCodes, dto.matchMode));
-    }
-    
-    if (dto.countries !== undefined && dto.countries.length > 0) {
-      parts.push(
-        `place-of-performance IN (${this.normalizeCountryCodes(dto.countries).join(' ')})`,
-      );
-    }
-    
-    if (dto.keyword !== undefined && dto.keyword.trim().length > 0) {
-      parts.push(`FT ~ (${this.normalizeKeyword(dto.keyword)})`);
-    }
-    
-    return parts.length === 1 ? `(${parts[0]})` : `(${parts.join(' AND ')})`;
+    return options.includeRaw === true
+      ? normalizedDto
+      : this.withoutRaw(normalizedDto);
   }
 
   normalizeTenderId(id: string): string {
@@ -236,8 +71,15 @@ export class TendersService {
       return trimmed;
     }
 
-    if (/^\d{6}-\d{4}$/.test(trimmed)) {
+    if (/^\d{6,8}-\d{4}$/.test(trimmed)) {
       return `ted-${trimmed}`;
+    }
+
+    if (/^\d{10,12}$/.test(trimmed)) {
+      const publicationId = trimmed.slice(0, -4);
+      const year = trimmed.slice(-4);
+
+      return `ted-${publicationId}-${year}`;
     }
 
     return trimmed;
@@ -245,264 +87,225 @@ export class TendersService {
 
   extractTedPublicationNumber(id: string): string | null {
     const trimmed = id.trim();
-    const prefixedMatch = trimmed.match(/^ted-(\d{6}-\d{4})$/);
+    const withoutPrefix = trimmed.startsWith('ted-')
+      ? trimmed.slice('ted-'.length)
+      : trimmed;
 
-    if (prefixedMatch) {
-      return prefixedMatch[1];
+    if (/^\d{6,8}-\d{4}$/.test(withoutPrefix)) {
+      return withoutPrefix;
     }
 
-    if (/^\d{6}-\d{4}$/.test(trimmed)) {
-      return trimmed;
-    }
+    if (/^\d{10,12}$/.test(withoutPrefix)) {
+      const publicationId = withoutPrefix.slice(0, -4);
+      const year = withoutPrefix.slice(-4);
 
-    const compactMatch = trimmed.match(/^(\d{6})(\d{4})$/);
-
-    if (compactMatch) {
-      return `${compactMatch[1]}-${compactMatch[2]}`;
+      return `${publicationId}-${year}`;
     }
 
     return null;
   }
 
-  isLikelyTedPublicationNumber(id: string): boolean {
-    return this.extractTedPublicationNumber(id) !== null;
-  }
-
   async fetchTedNoticeByPublicationNumber(
     publicationNumber: string,
   ): Promise<TedNotice | null> {
-    // TODO: Verify the exact TED expert-search field name if TED changes
-    // publication number search semantics.
-    const query = `(${TED_PUBLICATION_NUMBER_FIELD} = "${publicationNumber}")`;
+    const response = await this.tedSearchService.searchNotices({
+      query: `publication-number = ${publicationNumber}`,
+      scope: TedScope.ALL,
+      limit: 1,
+      page: 1,
+      paginationMode: TedPaginationMode.PAGE_NUMBER,
+      onlyLatestVersions: true,
+      checkQuerySyntax: false,
+      fields: [
+        'publication-number',
+        'notice-title',
+        'publication-date',
+        'deadline',
+        'classification-cpv',
+        'contract-nature',
+        'procedure-type',
+        'buyer-name',
+        'buyer-country',
+        'notice-type',
+        'links',
+      ],
+    });
 
-    try {
-      const response = await this.tedSearchService.searchNotices({
-        query,
-        scope: TedScope.ALL,
-        limit: 1,
-        page: 1,
-        paginationMode: TedPaginationMode.PAGE_NUMBER,
-        onlyLatestVersions: true,
-        checkQuerySyntax: true,
-      });
-
-      return this.extractNotices(response)[0] ?? null;
-    } catch (error) {
-      if (error instanceof BadRequestException) {
-        this.logger.warn(
-          `TED publication-number lookup query was rejected for ${publicationNumber}`,
-        );
-
-        return null;
-      }
-
-      throw error;
-    }
+    return this.extractNotices(response)[0] ?? null;
   }
 
-  private normalizeCpvCodes(codes: string[]): string[] {
-    const normalized = Array.from(
-      new Set(
-        codes.map((code) => code.trim()).filter((code) => /^\d{8}$/.test(code)),
-      ),
-    );
-
-    if (normalized.length === 0) {
-      throw new BadRequestException('At least one valid CPV code is required');
-    }
-
-    return normalized;
-  }
-
-  private normalizeCountryCodes(countries: string[]): string[] {
-    const normalized = Array.from(
-      new Set(
-        countries
-          .map((country) =>
-            country
-              .trim()
-              .replace(/[^A-Za-z0-9_-]/g, '')
-              .toUpperCase(),
-          )
-          .filter(Boolean),
-      ),
-    );
-
-    if (normalized.length === 0) {
-      throw new BadRequestException(
-        'At least one valid country code is required',
-      );
-    }
-
-    return normalized;
-  }
-
-  private normalizeKeyword(keyword: string): string {
-    return keyword
-      .trim()
-      .split(/\s+/)
-      .map((term) => term.replace(/[^\p{L}\p{N}_*-]/gu, ''))
-      .filter(Boolean)
-      .join(' ');
-  }
-  
-  private extractNotices(response: TedSearchResponse | any): TedNotice[] {
-    if (Array.isArray(response?.notices)) {
+  extractNotices(response: TedSearchResponse): TedNotice[] {
+    if (Array.isArray(response.notices)) {
       return response.notices;
     }
-    
-    if (Array.isArray(response?.data?.notices)) {
-      return response.data.notices;
-    }
-    
-    if (Array.isArray(response?.results)) {
-      return response.results.filter(
-        (item): item is TedNotice =>
-          typeof item === 'object' && item !== null && !Array.isArray(item),
+
+    const data = response.data;
+
+    if (this.isRecord(data) && Array.isArray(data.notices)) {
+      return data.notices.filter((notice): notice is TedNotice =>
+        this.isTedNotice(notice),
       );
     }
-    
+
+    if (Array.isArray(response.results)) {
+      return response.results.filter((notice): notice is TedNotice =>
+        this.isTedNotice(notice),
+      );
+    }
+
     return [];
   }
 
-  private async upsertTenders(items: TenderDto[]): Promise<void> {
-    if (items.length === 0) {
-      return;
-    }
-
-    await TenderModel.bulkWrite(
-      items.map((item) => {
-        const publicationNumber =
-          item.publicationNumber ?? this.extractTedPublicationNumber(item.id);
-        const normalizedItem = this.normalizeTenderDtoId(
-          item,
-          publicationNumber,
-        );
-
-        return {
-          updateOne: {
-            filter: { id: normalizedItem.id },
-            update: {
-              $set: this.buildTenderPersistencePayload(
-                normalizedItem,
-                item.raw,
-              ),
-            },
-            upsert: true,
-          },
-        };
-      }),
-      { ordered: false },
-    );
+  ensureTedIdentity(dto: TenderDto, publicationNumber: string): TenderDto {
+    return {
+      ...dto,
+      id: `ted-${publicationNumber}`,
+      source: 'TED',
+      sourceNoticeId: dto.sourceNoticeId ?? publicationNumber,
+      publicationNumber: dto.publicationNumber ?? publicationNumber,
+    };
   }
 
-  private async upsertTender(dto: TenderDto, raw: unknown): Promise<void> {
-    await TenderModel.updateOne(
+  async upsertTender(dto: TenderDto, raw: unknown): Promise<void> {
+    const now = new Date();
+
+    const savedTender = await TenderModel.findOneAndUpdate(
       { id: dto.id },
-      { $set: this.buildTenderPersistencePayload(dto, raw) },
-      { upsert: true },
+      {
+        $set: {
+          id: dto.id,
+          source: dto.source,
+          sourceNoticeId: dto.sourceNoticeId,
+          publicationNumber: dto.publicationNumber,
+          noticeType: dto.noticeType,
+          procedureType: dto.procedureType,
+          title: dto.title,
+          buyerName: dto.buyerName,
+          buyerCountry: dto.buyerCountry,
+          publicationDate: dto.publicationDate,
+          submissionDeadline: dto.submissionDeadline,
+          classificationCpv: dto.classificationCpv,
+          cpvCodes: dto.cpvCodes,
+          contractNature: dto.contractNature,
+          links: dto.links,
+          rawJson: raw,
+          normalizedJson: this.withoutRaw(dto),
+          lastSeenAt: now,
+          updatedAt: now,
+        },
+        $setOnInsert: {
+          createdAt: now,
+        },
+      },
+      { new: true, upsert: true },
+    ).exec();
+
+    await this.tenderGeneralAnalysisService.ensureAnalyzedForTender(
+      savedTender,
     );
   }
 
-  private async findLocalTender(id: string) {
+  async findLocalTender(id: string): Promise<TenderRecord | null> {
     const normalizedId = this.normalizeTenderId(id);
     const publicationNumber = this.extractTedPublicationNumber(id);
-    const idCandidates = Array.from(
+    const compactPublicationNumber = publicationNumber?.replace('-', '');
+    const candidates = Array.from(
       new Set(
         [
           id.trim(),
           normalizedId,
           publicationNumber,
-          publicationNumber?.replace('-', ''),
+          compactPublicationNumber,
         ].filter(
           (value): value is string => value !== undefined && value !== null,
         ),
       ),
     );
 
-    return TenderModel.findOne({
-      $or: [
-        { id: { $in: idCandidates } },
-        ...(publicationNumber
-          ? [{ publicationNumber }, { sourceNoticeId: publicationNumber }]
-          : []),
-      ],
-    }).lean();
+    const or = [
+      { id: { $in: candidates } },
+      ...(publicationNumber
+        ? [{ publicationNumber }, { sourceNoticeId: publicationNumber }]
+        : []),
+    ];
+
+    return TenderModel.findOne({ $or: or }).lean<TenderRecord>().exec();
   }
 
-  private mapTenderDocumentToDto(
-    tender: Record<string, any>,
-    options: { includeRaw: boolean },
+  mapTenderDocumentToDto(
+    tender: TenderRecord,
+    options: { includeRaw?: boolean },
   ): TenderDto {
-    const normalizedJson = tender.normalizedJson;
-    const baseDto =
-      this.isRecord(normalizedJson) && typeof normalizedJson.id === 'string'
-        ? (normalizedJson as unknown as TenderDto)
-        : ({
-            id: tender.id,
-            sourceNoticeId: tender.sourceNoticeId,
-            publicationNumber: tender.publicationNumber,
-            title: tender.title,
-            description: tender.description,
-            buyerName: tender.buyerName,
-            buyerCountry: tender.buyerCountry,
-            buyerCity: tender.buyerCity,
-            publicationDate: tender.publicationDate,
-            deadline: tender.deadline,
-            cpvCodes: tender.cpvCodes ?? [],
-            noticeType: tender.noticeType,
-            procedureType: tender.procedureType,
-            estimatedValue: tender.estimatedValue,
-            lots: tender.lots ?? [],
-            tedUrl: tender.tedUrl,
-          } as TenderDto);
-    const dto: TenderDto = { ...baseDto };
+    const normalizedJson = this.isRecord(tender.normalizedJson)
+      ? tender.normalizedJson
+      : {};
+    const dto: TenderDto = {
+      ...normalizedJson,
+      id: this.valueToString(normalizedJson.id) ?? tender.id,
+      source: 'TED',
+      sourceNoticeId:
+        this.valueToString(normalizedJson.sourceNoticeId) ??
+        tender.sourceNoticeId,
+      publicationNumber:
+        this.valueToString(normalizedJson.publicationNumber) ??
+        tender.publicationNumber,
+      noticeType:
+        this.valueToString(normalizedJson.noticeType) ?? tender.noticeType,
+      procedureType:
+        this.valueToString(normalizedJson.procedureType) ??
+        tender.procedureType,
+      title: this.valueToString(normalizedJson.title) ?? tender.title,
+      buyerName:
+        this.valueToString(normalizedJson.buyerName) ?? tender.buyerName,
+      buyerCountry:
+        this.valueToString(normalizedJson.buyerCountry) ?? tender.buyerCountry,
+      publicationDate:
+        this.valueToString(normalizedJson.publicationDate) ??
+        tender.publicationDate,
+      submissionDeadline:
+        this.valueToString(normalizedJson.submissionDeadline) ??
+        tender.submissionDeadline,
+      contractNature:
+        this.valueToString(normalizedJson.contractNature) ??
+        tender.contractNature,
+      classificationCpv: (Array.isArray(normalizedJson.classificationCpv)
+        ? normalizedJson.classificationCpv
+        : tender.classificationCpv) as TenderDto['classificationCpv'],
+      cpvCodes: (Array.isArray(normalizedJson.cpvCodes)
+        ? normalizedJson.cpvCodes
+        : tender.cpvCodes) as TenderDto['cpvCodes'],
+      links: normalizedJson.links ?? tender.links,
+    };
 
-    delete dto.raw;
-
-    if (options.includeRaw) {
-      dto.raw = tender.rawJson ?? tender.raw;
+    if (options.includeRaw === true) {
+      dto.raw = tender.rawJson;
     }
 
-    return dto;
-  }
-
-  private normalizeTenderDtoId(
-    dto: TenderDto,
-    publicationNumber?: string | null,
-  ): TenderDto {
-    const detectedPublicationNumber =
-      publicationNumber ??
+    const publicationNumber =
       dto.publicationNumber ??
-      this.extractTedPublicationNumber(dto.id);
+      tender.publicationNumber ??
+      this.extractTedPublicationNumber(tender.id) ??
+      tender.id.replace(/^ted-/, '');
 
-    return {
-      ...dto,
-      id:
-        detectedPublicationNumber !== null &&
-        detectedPublicationNumber !== undefined
-          ? this.normalizeTenderId(detectedPublicationNumber)
-          : this.normalizeTenderId(dto.id),
-      publicationNumber:
-        dto.publicationNumber ?? detectedPublicationNumber ?? undefined,
-    };
+    return this.ensureTedIdentity(dto, publicationNumber);
   }
 
-  private buildTenderPersistencePayload(dto: TenderDto, raw: unknown) {
-    const normalizedJson = { ...dto };
-    delete normalizedJson.raw;
+  private withoutRaw(dto: TenderDto): TenderDto {
+    const rest = { ...dto };
+    delete rest.raw;
 
-    return {
-      ...normalizedJson,
-      source: 'TED',
-      raw: raw ?? dto.raw,
-      rawJson: raw ?? dto.raw,
-      normalizedJson,
-      lastSeenAt: new Date(),
-    };
+    return rest;
+  }
+
+  private valueToString(value: unknown): string | undefined {
+    return typeof value === 'string' ? value : undefined;
   }
 
   private isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
+  }
+
+  private isTedNotice(value: unknown): value is TedNotice {
+    return this.isRecord(value);
   }
 }

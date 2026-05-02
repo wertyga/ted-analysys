@@ -1,28 +1,14 @@
-import {
-  BadRequestException,
-  HttpException,
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import { TedSearchRequestDto } from './dto/ted-search-request.dto';
 import { TedTenderSearchRequestDto } from './dto/ted-tender-search-request.dto';
-import { buildTedTenderSearchQuery, normalizeCpvCodes } from './ted-builders';
+import { buildTedTenderSearchQuery } from './ted-builders';
 import {
   TedPaginationMode,
   TedScope,
   TedSearchResponse,
 } from './types/ted-search.types';
-import { TENDER_COMPETITION_NOTICE_TYPES } from './utils/niticies';
-
-interface TedSearchOptions {
-  scope?: TedScope;
-  limit?: number;
-  page?: number;
-  countries?: string[];
-}
+import { mapTedError, resolveDeadlineRange } from './utils';
 
 @Injectable()
 export class TedSearchService {
@@ -47,6 +33,8 @@ export class TedSearchService {
     'buyer-name',
     'buyer-country',
     'notice-type',
+    'contract-nature',
+    'procedure-type',
   ];
 
   private withDefaultFields(payload: TedSearchRequestDto): TedSearchRequestDto {
@@ -66,44 +54,13 @@ export class TedSearchService {
   async searchTenders(
     filters: TedTenderSearchRequestDto,
   ): Promise<TedSearchResponse> {
+    const resolvedFilters = resolveDeadlineRange(filters);
+
     return this.searchNotices({
-      query: buildTedTenderSearchQuery(filters),
+      query: buildTedTenderSearchQuery(resolvedFilters),
       scope: filters.scope ?? TedScope.ACTIVE,
       limit: filters.limit ?? 20,
       page: filters.page ?? 1,
-      paginationMode: TedPaginationMode.PAGE_NUMBER,
-      onlyLatestVersions: true,
-      checkQuerySyntax: false,
-      fields: this.defaultFields,
-    });
-  }
-
-  async searchByCpv(
-    cpvCodes: string[],
-    options: TedSearchOptions = {},
-  ): Promise<TedSearchResponse> {
-    const normalizedCpvCodes = normalizeCpvCodes(cpvCodes);
-
-    if (normalizedCpvCodes.length === 0) {
-      throw new BadRequestException(
-        'At least one valid 8-digit CPV code is required',
-      );
-    }
-
-    if (options.countries?.length) {
-      this.logger.warn(
-        'Country filtering was requested but skipped because TED country expert-search field name must be verified.',
-      );
-    }
-
-    return this.searchNotices({
-      query: buildTedTenderSearchQuery({
-        cpvCodes: normalizedCpvCodes,
-        noticeTypes: TENDER_COMPETITION_NOTICE_TYPES,
-      }),
-      scope: options.scope ?? TedScope.ACTIVE,
-      limit: options.limit ?? 20,
-      page: options.page ?? 1,
       paginationMode: TedPaginationMode.PAGE_NUMBER,
       onlyLatestVersions: true,
       checkQuerySyntax: false,
@@ -148,7 +105,9 @@ export class TedSearchService {
       }
     }
 
-    throw this.mapTedError(lastError);
+    throw mapTedError(lastError, this.logger, (error) =>
+      this.isAxiosError(error),
+    );
   }
 
   private shouldRetry(error: unknown): boolean {
@@ -158,44 +117,6 @@ export class TedSearchService {
 
     const status = error.response?.status;
     return status === undefined || status >= 500;
-  }
-
-  private mapTedError(error: unknown): HttpException {
-    if (this.isAxiosError(error)) {
-      const status = error.response?.status;
-
-      this.logger.error(
-        `TED Search API request failed: status=${status ?? 'network'} code=${
-          error.code ?? 'unknown'
-        }`,
-      );
-
-      if (status === 400) {
-        return new BadRequestException(
-          'TED query syntax is invalid or request body is not accepted',
-        );
-      }
-
-      if (status === 429) {
-        return new HttpException('TED API rate limit exceeded', 429);
-      }
-
-      if (status === undefined) {
-        return new ServiceUnavailableException('TED API is unavailable');
-      }
-
-      if (status !== undefined && status >= 500) {
-        return new ServiceUnavailableException(
-          'TED API is temporarily unavailable',
-        );
-      }
-    } else {
-      this.logger.error('TED Search API request failed with a non-Axios error');
-    }
-
-    return new InternalServerErrorException(
-      'TED API request failed unexpectedly',
-    );
   }
 
   private isAxiosError(error: unknown): error is AxiosError {

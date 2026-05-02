@@ -1,18 +1,22 @@
 import { TedNoticeType } from '../../tenders/types';
+import {
+  normalizeTedCountryCodes,
+  TedEligibleCountryCode,
+} from '../utils/ted-countries';
 
 export interface TedTenderSearchFilters {
   text?: string;
   title?: string;
   description?: string;
   cpvCodes?: string[];
-  buyerCountries?: string[];
-  placeOfPerformance?: string[];
+  buyerCountries?: TedEligibleCountryCode[];
+  placeOfPerformance?: TedEligibleCountryCode[];
   noticeTypes?: TedNoticeType[];
   contractNature?: 'services' | 'supplies' | 'works';
   publicationDateFrom?: string;
   publicationDateTo?: string;
-  deadlineFrom?: string;
-  deadlineTo?: string;
+  submissionDeadlineFrom?: string;
+  submissionDeadlineTo?: string;
 }
 
 export function quoteTedValue(value: string): string {
@@ -22,27 +26,30 @@ export function quoteTedValue(value: string): string {
 export function buildTedTenderSearchQuery(
   filters: TedTenderSearchFilters,
 ): string {
-  console.log({ filters });
   const parts = [
     buildTextPart('FT', filters.text),
     buildTextPart('notice-title', filters.title),
     buildTextPart('description-proc', filters.description),
     buildInPart('classification-cpv', filters.cpvCodes),
-    buildInPart('buyer-country', filters.buyerCountries),
-    buildInPart('place-of-performance', filters.placeOfPerformance),
+    buildCountryInPart('buyer-country', filters.buyerCountries),
+    buildCountryInPart('place-of-performance', filters.placeOfPerformance),
     buildInPart('notice-type', filters.noticeTypes),
     buildEqualsPart('contract-nature', filters.contractNature),
     buildPublicationDatePart(
       filters.publicationDateFrom,
       filters.publicationDateTo,
     ),
-    buildDateRangePart('deadline', filters.deadlineFrom, filters.deadlineTo),
+    buildDateRangePart(
+      'deadline',
+      filters.submissionDeadlineFrom,
+      filters.submissionDeadlineTo,
+    ),
   ].filter((part): part is string => part !== undefined);
 
   if (parts.length === 0) {
     return 'publication-number = *';
   }
-  console.log({ parts });
+
   return parts.map((part) => `(${part})`).join(' AND ');
 }
 
@@ -62,6 +69,19 @@ function buildInPart(
   values: string[] | undefined,
 ): string | undefined {
   const cleaned = values?.map((value) => value.trim()).filter(Boolean) ?? [];
+
+  if (cleaned.length === 0) {
+    return undefined;
+  }
+
+  return `${field} IN (${cleaned.join(' ')})`;
+}
+
+function buildCountryInPart(
+  field: string,
+  values: string[] | undefined,
+): string | undefined {
+  const cleaned = normalizeTedCountryCodes(values);
 
   if (cleaned.length === 0) {
     return undefined;

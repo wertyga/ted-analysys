@@ -73,7 +73,7 @@ function normalizeValue(value: unknown, sourceKey?: string): unknown {
       );
     }
 
-    return value.map((item) => normalizeValue(item));
+    return Array.from(new Set(value.map((item) => normalizeValue(item))));
   }
 
   if (!isRecord(value)) {

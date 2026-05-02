@@ -1,5 +1,4 @@
 export enum TedNoticeType {
-  // eForms high-level notice types
   PLANNING = 'planning',
   COMPETITION = 'competition',
   RESULT = 'result',
@@ -8,7 +7,6 @@ export enum TedNoticeType {
   CHANGE = 'change',
   COMPLETION = 'completion',
 
-  // Common/observed TED/eForms subtypes returned in search results
   CN_STANDARD = 'cn-standard',
   CN_SOCIAL = 'cn-social',
   CN_DESG = 'cn-desg',
