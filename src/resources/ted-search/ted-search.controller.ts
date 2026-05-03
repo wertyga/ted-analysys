@@ -1,4 +1,11 @@
-import { Body, Controller, forwardRef, Inject, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  forwardRef,
+  Get,
+  Inject,
+  Post,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -14,6 +21,12 @@ import { TedSearchResponse } from './types/ted-search.types';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { TenderGeneralAnalysisService } from '../tender-analysis/tender-general-analysis.service';
 import { TendersService } from '@/resources/tenders/tenders.service';
+import { TED_ELIGIBLE_COUNTRIES } from './utils';
+
+interface TedCountryResponse {
+  code: string;
+  name: string;
+}
 
 @ApiTags('ted')
 @Controller('ted')
@@ -25,6 +38,15 @@ export class TedSearchController {
     @Inject(forwardRef(() => TendersService))
     private readonly tendersService: TendersService,
   ) {}
+
+  @Get('countries')
+  @ApiOperation({ summary: 'Get TED eligible countries for frontend filters' })
+  @ApiOkResponse({ description: 'List of TED country codes and names' })
+  getCountries(): TedCountryResponse[] {
+    return Object.entries(TED_ELIGIBLE_COUNTRIES)
+      .map(([code, name]) => ({ code, name }))
+      .sort((left, right) => left.name.localeCompare(right.name));
+  }
 
   @Post('search')
   @ApiOperation({ summary: 'Search TED tenders by structured filters' })
