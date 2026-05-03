@@ -16,7 +16,6 @@ export interface Tender {
   classificationCpv?: unknown[];
   cpvCodes?: unknown[];
   links?: unknown;
-  lastSeenAt: Date;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -40,7 +39,6 @@ const TenderSchema = new Schema<TenderDocument>(
     classificationCpv: { type: [Schema.Types.Mixed], default: undefined },
     cpvCodes: { type: [Schema.Types.Mixed], default: undefined },
     links: Schema.Types.Mixed,
-    lastSeenAt: { type: Date, required: true },
   },
   {
     collection: 'tenders',

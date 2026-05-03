@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import { TedSearchRequestDto } from './dto/ted-search-request.dto';
+import { TedPublicationNumbersSearchRequestDto } from './dto/ted-publication-numbers-search-request.dto';
 import { TedTenderSearchRequestDto } from './dto/ted-tender-search-request.dto';
 import { buildTedTenderSearchQuery } from './ted-builders';
 import {
@@ -24,26 +25,29 @@ export class TedSearchService {
   });
   private readonly retryDelaysMs = [500, 1500];
 
-  private readonly defaultFields = [
+  private readonly searchTendersDefaultFields = [
     'publication-number',
     'notice-title',
     'publication-date',
     'deadline',
     'classification-cpv',
+    'contract-nature',
+    'procedure-type',
     'buyer-name',
     'buyer-country',
     'notice-type',
-    'contract-nature',
-    'procedure-type',
+    'links',
   ];
 
-  private withDefaultFields(payload: TedSearchRequestDto): TedSearchRequestDto {
+  private withDefaultFields({
+    fields = [],
+    ...payload
+  }: TedSearchRequestDto): TedSearchRequestDto {
     return {
       ...payload,
-      fields:
-        Array.isArray(payload.fields) && payload.fields.length > 0
-          ? payload.fields
-          : this.defaultFields,
+      fields: Array.from(
+        new Set([...fields, ...this.searchTendersDefaultFields]),
+      ),
     };
   }
 
@@ -64,7 +68,7 @@ export class TedSearchService {
       paginationMode: TedPaginationMode.PAGE_NUMBER,
       onlyLatestVersions: true,
       checkQuerySyntax: false,
-      fields: this.defaultFields,
+      fields: this.searchTendersDefaultFields,
     });
   }
 

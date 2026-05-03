@@ -1,5 +1,6 @@
 import { TedNotice, TedSearchResponse } from '../types/ted-search.types';
 import { CpvCategoryModel } from '../../cpv/schemas';
+import { isRecord } from '@/utils';
 
 type JsonRecord = Record<string, unknown>;
 type NormalizedCpvCategory = {
@@ -170,8 +171,4 @@ function collectCpvCodes(value: unknown, codes: Set<string>): void {
       collectCpvCodes(nestedValue, codes);
     }
   }
-}
-
-function isRecord(value: unknown): value is JsonRecord {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

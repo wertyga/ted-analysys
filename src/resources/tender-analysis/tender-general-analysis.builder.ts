@@ -6,6 +6,7 @@ import {
   TenderDocumentTextExtractorService,
   TenderSourceDocumentType,
 } from '../tenders/tender-document-text-extractor.service';
+import { isRecord } from '@/utils';
 
 interface TenderLinkDocumentCandidate {
   sourceUrl: string;
@@ -409,14 +410,10 @@ export class TenderGeneralAnalysisBuilder {
       return cpv;
     }
 
-    if (!this.isRecord(cpv)) {
+    if (!isRecord(cpv)) {
       return null;
     }
 
     return typeof cpv.code === 'string' ? cpv.code : null;
-  }
-
-  private isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 }

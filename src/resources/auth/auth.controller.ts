@@ -154,7 +154,7 @@ export class AuthController {
     const user = await UserModel.findOneAndUpdate(
       { email, user: { $ne: USER_TYPE.TEMPORARY } },
       { $set: { recoveryToken } },
-      { new: true },
+      { returnDocument: 'after' },
     );
 
     if (!user) {

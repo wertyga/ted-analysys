@@ -15,7 +15,7 @@ export enum TedSortOrder {
 }
 
 export interface TedNotice {
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 export interface TedSearchResponse {

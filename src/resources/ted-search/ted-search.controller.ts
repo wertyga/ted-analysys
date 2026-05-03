@@ -7,6 +7,7 @@ import {
   ApiServiceUnavailableResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { TedPublicationNumbersSearchRequestDto } from './dto/ted-publication-numbers-search-request.dto';
 import { TedTenderSearchRequestDto } from './dto/ted-tender-search-request.dto';
 import { TedSearchService } from './ted-search.service';
 import { normalizeTenderSearchResponse } from './utils';
@@ -40,8 +41,10 @@ export class TedSearchController {
     const data = await this.tedSearchService.searchTenders(updatedData);
     const normalized = await normalizeTenderSearchResponse(data);
 
-    return this.tenderGeneralAnalysisService.addGeneralAnalysisToTenderSearchResponse(
-      normalized,
+    this.tenderGeneralAnalysisService.ensureBaseAnalysisForMultipleTenders(
+      normalized.notices ?? [],
     );
+
+    return normalized;
   }
 }

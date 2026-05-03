@@ -1,10 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import {
   GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
   GeneralTenderAnalysisInput,
   GeneralTenderAnalysisResult,
 } from '@/openai/dto/openai-analysis.dto';
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
+import { TenderGeneralAnalysisService } from '@/resources/tender-analysis/tender-general-analysis.service';
 
 export interface TenderAnalysisExecutionResult {
   result: GeneralTenderAnalysisResult;
@@ -19,13 +20,21 @@ export class TenderAnalysisService {
 
   constructor(
     private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
+    @Inject(forwardRef(() => TenderGeneralAnalysisService))
+    private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
   ) {}
+
+  getBaseAnalysisSourceHash(input: GeneralTenderAnalysisInput): string {
+    return this.tenderGeneralAnalysisService.buildGeneralTenderAnalysisSourceHash(
+      input,
+      'deepseek',
+    );
+  }
 
   async analyzeTenderGeneral(
     input: GeneralTenderAnalysisInput,
   ): Promise<TenderAnalysisExecutionResult> {
-    const sourceHash =
-      this.deepSeekAnalysisService.buildGeneralTenderAnalysisSourceHash(input);
+    const sourceHash = this.getBaseAnalysisSourceHash(input);
 
     const result =
       await this.deepSeekAnalysisService.analyzeTenderGeneral(input);

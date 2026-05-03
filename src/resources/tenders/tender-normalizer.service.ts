@@ -5,6 +5,7 @@ import {
 } from '../ted-search/utils';
 import { TedNotice } from '../ted-search/types/ted-search.types';
 import { TenderDto } from './dto/tender.dto';
+import { isRecord } from '@/utils';
 
 @Injectable()
 export class TenderNormalizerService {
@@ -93,7 +94,7 @@ export class TenderNormalizerService {
       }
     }
 
-    if (this.isRecord(value)) {
+    if (isRecord(value)) {
       for (const key of ['ENG', 'eng', 'EN', 'en', 'value', 'text']) {
         const text = this.valueToText(value[key]);
 
@@ -123,9 +124,5 @@ export class TenderNormalizerService {
     }
 
     return hash.toString(16);
-  }
-
-  private isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 }

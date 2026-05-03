@@ -1,5 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { TedSearchService } from '../ted-search/ted-search.service';
+import { TenderGeneralAnalysisDetailDto } from '../tender-analysis/dto/tender-general-analysis.dto';
 import {
   TedNotice,
   TedPaginationMode,
@@ -10,54 +16,131 @@ import { TenderGeneralAnalysisService } from '../tender-analysis/tender-general-
 import { TenderDto } from './dto/tender.dto';
 import { Tender, TenderDocument, TenderModel } from './schemas';
 import { TenderNormalizerService } from './tender-normalizer.service';
+import { TedPublicationNumbersSearchRequestDto } from '@/resources/ted-search/dto/ted-publication-numbers-search-request.dto';
+import {
+  extractPublicationNumberFromNotice,
+  isRecord,
+  isTedNotice,
+  isTedPublicationNumber,
+  valueToString,
+} from '@/utils';
 
 type TenderRecord = Tender & { _id?: unknown };
+export type TenderDocumentWithGeneralAnalysis = TenderDocument & {
+  generalAnalysis?: TenderGeneralAnalysisDetailDto | null;
+};
 
 @Injectable()
 export class TendersService {
+  tenderDefaultFields = [
+    'publication-number',
+    'notice-title',
+    'publication-date',
+    'deadline',
+    'classification-cpv',
+    'contract-nature',
+    'procedure-type',
+    'buyer-name',
+    'buyer-country',
+    'notice-type',
+    'links',
+  ];
+
   constructor(
+    @Inject(forwardRef(() => TedSearchService))
     private readonly tedSearchService: TedSearchService,
     private readonly tenderNormalizer: TenderNormalizerService,
+    @Inject(forwardRef(() => TenderGeneralAnalysisService))
     private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
   ) {}
 
-  async findByIdOrFetchFromTed(id: string): Promise<TenderDto> {
+  async upsertMultipleTenders(notices: TedNotice[]): Promise<TenderDocument[]> {
+    const tenders: TenderDocument[] = (await Promise.all(
+      notices.map((notice) => {
+        const publicationNumber = extractPublicationNumberFromNotice(notice);
+
+        if (!publicationNumber) {
+          return undefined;
+        }
+
+        return TenderModel.findOneAndUpdate(
+          { id: publicationNumber },
+          {
+            $set: {
+              id: publicationNumber,
+              source: 'TED',
+              sourceNoticeId: publicationNumber,
+              publicationNumber,
+              noticeType: valueToString(notice.noticeType),
+              procedureType: valueToString(notice.procedureType),
+              title: valueToString(notice.noticeTitle ?? notice.title),
+              buyerName: valueToString(notice.buyerName),
+              buyerCountry: valueToString(notice.buyerCountry),
+              publicationDate: valueToString(notice.publicationDate),
+              submissionDeadline: valueToString(notice.deadline),
+              contractNature: valueToString(notice.contractNature),
+              classificationCpv: Array.isArray(notice.classificationCpv)
+                ? notice.classificationCpv
+                : undefined,
+              cpvCodes: Array.isArray(notice.classificationCpv)
+                ? notice.classificationCpv
+                : undefined,
+              links: notice.links,
+            },
+          },
+          { returnDocument: 'after', upsert: true },
+        ).exec();
+      }),
+    ).then((documents) => documents.filter(Boolean))) as TenderDocument[];
+
+    return tenders;
+  }
+
+  async getLocalTenderWithBaseAnalysis(
+    localTender: TenderDocument,
+  ): Promise<TenderDocumentWithGeneralAnalysis> {
+    const generalAnalysis =
+      await this.tenderGeneralAnalysisService.ensureAnalysisForTender(
+        localTender,
+      );
+
+    localTender.set(
+      'generalAnalysis',
+      this.tenderGeneralAnalysisService.toDetailDto(generalAnalysis),
+      { strict: false },
+    );
+
+    return localTender as TenderDocumentWithGeneralAnalysis;
+  }
+
+  async findByIdOrFetchFromTed(
+    id: string,
+  ): Promise<TenderDocumentWithGeneralAnalysis> {
     const localTender = await this.findLocalTender(id);
 
     if (localTender) {
-      const dto = this.mapTenderDocumentToDto(localTender);
-
-      this.tenderGeneralAnalysisService.ensureAnalyzedForTender(
-        localTender as TenderDocument,
-      );
-
-      return dto;
+      return this.getLocalTenderWithBaseAnalysis(localTender);
     }
 
     const publicationNumber = id.trim();
 
-    if (!this.isTedPublicationNumber(publicationNumber)) {
+    if (!isTedPublicationNumber(publicationNumber)) {
       throw new NotFoundException(`Tender ${id} not found`);
     }
 
     const tedNotice =
       await this.fetchTedNoticeByPublicationNumber(publicationNumber);
 
-    if (tedNotice === null) {
+    if (!tedNotice) {
       throw new NotFoundException(`Tender ${id} not found`);
     }
 
-    const dto = await this.tenderNormalizer.normalizeTedNotice(tedNotice);
-    const normalizedDto = this.ensureTedIdentity(dto, publicationNumber);
-
-    await this.upsertTender(normalizedDto);
-
-    return normalizedDto;
+    return this.upsertTenderWithGeneralAnalysis(tedNotice);
   }
 
   async fetchTedNoticeByPublicationNumber(
     publicationNumber: string,
-  ): Promise<TedNotice | null> {
+  ): Promise<TedNotice | undefined> {
     const response = await this.tedSearchService.searchNotices({
       query: `publication-number = ${publicationNumber}`,
       scope: TedScope.ALL,
@@ -66,22 +149,32 @@ export class TendersService {
       paginationMode: TedPaginationMode.PAGE_NUMBER,
       onlyLatestVersions: true,
       checkQuerySyntax: false,
-      fields: [
-        'publication-number',
-        'notice-title',
-        'publication-date',
-        'deadline',
-        'classification-cpv',
-        'contract-nature',
-        'procedure-type',
-        'buyer-name',
-        'buyer-country',
-        'notice-type',
-        'links',
-      ],
+      fields: this.tenderDefaultFields,
     });
 
-    return this.extractNotices(response)[0] ?? null;
+    return this.extractNotices(response)[0];
+  }
+
+  async searchTendersByPublicationNumbers(
+    dto: TedPublicationNumbersSearchRequestDto,
+  ): Promise<TedNotice[]> {
+    const publicationNumbers = Array.from(new Set(dto.publicationNumbers));
+    const quotedPublicationNumbers = publicationNumbers
+      .map((publicationNumber) => `"${publicationNumber}"`)
+      .join(', ');
+
+    return this.tedSearchService
+      .searchNotices({
+        query: `publication-number IN (${quotedPublicationNumbers})`,
+        scope: dto.scope ?? TedScope.ACTIVE,
+        limit: dto.limit ?? 20,
+        page: dto.page ?? 1,
+        paginationMode: TedPaginationMode.PAGE_NUMBER,
+        onlyLatestVersions: true,
+        checkQuerySyntax: false,
+        fields: this.tenderDefaultFields,
+      })
+      .then((response) => this.extractNotices(response).filter(Boolean));
   }
 
   extractNotices(response: TedSearchResponse): TedNotice[] {
@@ -91,34 +184,25 @@ export class TendersService {
 
     const data = response.data;
 
-    if (this.isRecord(data) && Array.isArray(data.notices)) {
+    if (isRecord(data) && Array.isArray(data.notices)) {
       return data.notices.filter((notice): notice is TedNotice =>
-        this.isTedNotice(notice),
+        isTedNotice(notice),
       );
     }
 
     if (Array.isArray(response.results)) {
       return response.results.filter((notice): notice is TedNotice =>
-        this.isTedNotice(notice),
+        isTedNotice(notice),
       );
     }
 
     return [];
   }
 
-  ensureTedIdentity(dto: TenderDto, publicationNumber: string): TenderDto {
-    return {
-      ...dto,
-      id: publicationNumber,
-      source: 'TED',
-      sourceNoticeId: publicationNumber,
-      publicationNumber: dto.publicationNumber ?? publicationNumber,
-    };
-  }
-
-  async upsertTender(dto: TenderDto): Promise<void> {
-    const now = new Date();
-
+  async upsertTenderWithGeneralAnalysis(
+    notice: TedNotice,
+  ): Promise<TenderDocumentWithGeneralAnalysis> {
+    const dto = await this.tenderNormalizer.normalizeTedNotice(notice);
     let savedTender = await TenderModel.findOne({ id: dto.id });
 
     if (!savedTender) {
@@ -141,22 +225,20 @@ export class TendersService {
             cpvCodes: dto.cpvCodes,
             contractNature: dto.contractNature,
             links: dto.links,
-            lastSeenAt: now,
-            updatedAt: now,
-          },
-          $setOnInsert: {
-            createdAt: now,
           },
         },
-        { new: true, upsert: true },
+        { returnDocument: 'after', upsert: true },
       ).exec();
     }
 
-    // Async update general analysis
-    this.tenderGeneralAnalysisService.ensureAnalyzedForTender(savedTender);
+    if (!savedTender) {
+      throw new NotFoundException(`Tender ${dto.id} not found`);
+    }
+
+    return this.getLocalTenderWithBaseAnalysis(savedTender);
   }
 
-  async findLocalTender(id: string): Promise<TenderRecord | null> {
+  async findLocalTender(id: string): Promise<TenderDocument | null> {
     const publicationNumber = id.trim();
 
     return TenderModel.findOne({
@@ -165,9 +247,7 @@ export class TendersService {
         { publicationNumber },
         { sourceNoticeId: publicationNumber },
       ],
-    })
-      .lean<TenderRecord>()
-      .exec();
+    }).exec();
   }
 
   mapTenderDocumentToDto(tender: TenderRecord): TenderDto {
@@ -190,21 +270,6 @@ export class TendersService {
       links: tender.links,
     };
 
-    const publicationNumber =
-      dto.publicationNumber ?? tender.publicationNumber ?? tender.id;
-
-    return this.ensureTedIdentity(dto, publicationNumber);
-  }
-
-  private isTedPublicationNumber(value: string): boolean {
-    return /^\d{5,8}-\d{4}$/.test(value);
-  }
-
-  private isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
-  }
-
-  private isTedNotice(value: unknown): value is TedNotice {
-    return this.isRecord(value);
+    return dto;
   }
 }

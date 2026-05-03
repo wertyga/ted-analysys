@@ -8,6 +8,7 @@ import {
 } from '@/openai/dto/openai-analysis.dto';
 import { buildGeneralTenderAnalysisPrompt } from '@/openai/prompts/general-tender-analysis.prompt';
 import { GENERAL_TENDER_ANALYSIS_JSON_SCHEMA } from '@/openai/schemas/general-tender-analysis.schema';
+import { getSafeErrorMessage, isRecord } from '@/utils';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -40,27 +41,6 @@ export abstract class BaseLlmAnalysisService {
     return this.validateGeneralTenderAnalysisResult(parsed);
   }
 
-  buildGeneralTenderAnalysisSourceHash(
-    input: GeneralTenderAnalysisInput,
-  ): string {
-    return createHash('sha256')
-      .update(
-        JSON.stringify({
-          promptVersion: GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
-          provider: this.providerName,
-          tender: input.tender,
-          documents: input.documents.map((document) => ({
-            id: document.id,
-            filename: document.filename,
-            language: document.language,
-            documentType: document.documentType,
-            extractedText: document.extractedText,
-          })),
-        }),
-      )
-      .digest('hex');
-  }
-
   protected buildGeneralTenderAnalysisPrompt(outputLanguage: string): string {
     return [
       buildGeneralTenderAnalysisPrompt(outputLanguage),
@@ -81,7 +61,7 @@ export abstract class BaseLlmAnalysisService {
       } catch (error: unknown) {
         lastError = error;
         this.logger.warn(
-          `${this.providerName} tender analysis failed on attempt ${attempt + 1}: ${this.getSafeErrorMessage(
+          `${this.providerName} tender analysis failed on attempt ${attempt + 1}: ${getSafeErrorMessage(
             error,
           )}`,
         );
@@ -95,7 +75,7 @@ export abstract class BaseLlmAnalysisService {
     }
 
     throw new ServiceUnavailableException(
-      `${this.providerName} tender analysis failed: ${this.getSafeErrorMessage(
+      `${this.providerName} tender analysis failed: ${getSafeErrorMessage(
         lastError,
       )}`,
     );
@@ -144,7 +124,7 @@ export abstract class BaseLlmAnalysisService {
   protected validateGeneralTenderAnalysisResult(
     value: unknown,
   ): GeneralTenderAnalysisResult {
-    if (!this.isRecord(value)) {
+    if (!isRecord(value)) {
       throw new Error(
         `${this.providerName} tender analysis result must be a JSON object`,
       );
@@ -258,7 +238,7 @@ export abstract class BaseLlmAnalysisService {
     }
 
     return value.map((item) => {
-      if (!this.isRecord(item)) {
+      if (!isRecord(item)) {
         throw new Error(
           `${this.providerName} analysis deadline item must be an object`,
         );
@@ -283,7 +263,7 @@ export abstract class BaseLlmAnalysisService {
   protected requireEstimatedValue(
     value: unknown,
   ): GeneralTenderAnalysisResult['estimatedValue'] {
-    if (!this.isRecord(value)) {
+    if (!isRecord(value)) {
       throw new Error(
         `${this.providerName} analysis field estimatedValue must be an object`,
       );
@@ -334,7 +314,7 @@ export abstract class BaseLlmAnalysisService {
     }
 
     return value.map((item) => {
-      if (!this.isRecord(item)) {
+      if (!isRecord(item)) {
         throw new Error(
           `${this.providerName} analysis risk item must be an object`,
         );
@@ -394,18 +374,6 @@ export abstract class BaseLlmAnalysisService {
     throw new Error(
       `${this.providerName} analysis field analysisDepth is invalid`,
     );
-  }
-
-  protected getSafeErrorMessage(error: unknown): string {
-    if (error instanceof Error) {
-      return error.message;
-    }
-
-    return 'unknown error';
-  }
-
-  protected isRecord(value: unknown): value is JsonRecord {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 
   protected async delay(ms: number): Promise<void> {
