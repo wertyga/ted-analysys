@@ -41,34 +41,178 @@ export class TenderNormalizerService {
     const publicationNumber =
       extractPublicationNumberFromNotice(rawNotice) ??
       this.pickText(rawNotice, ['publicationNumber']);
+    const estimatedValue = this.pickEstimatedValue(rawNotice);
+    const titleProc = this.pickText(rawNotice, ['title-proc', 'titleProc']);
+    const titleLot = this.pickTextArray(rawNotice, ['title-lot', 'titleLot']);
+    const description =
+      this.pickLocalizedText(rawNotice['description-proc']) ??
+      this.pickLocalizedText(rawNotice.descriptionProc) ??
+      this.pickLocalizedText(rawNotice['description-lot']) ??
+      this.pickLocalizedText(rawNotice.descriptionLot);
+    const descriptionLot = this.pickTextArray(rawNotice, [
+      'description-lot',
+      'descriptionLot',
+    ]);
 
     const dto: TenderDto = {
       id: publicationNumber ?? this.createFallbackId(rawNotice),
       source: 'TED',
-      sourceNoticeId:
-        this.pickText(rawNotice, [
-          'noticeIdentifier',
-          'noticeId',
-          'notice-identifier',
-        ]) ?? publicationNumber,
+      sourceNoticeId: this.pickText(rawNotice, [
+        'notice-identifier',
+        'noticeIdentifier',
+      ]),
       publicationNumber,
       noticeType: this.pickText(rawNotice, ['notice-type', 'noticeType']),
+      noticeSubtype: this.pickText(rawNotice, [
+        'notice-subtype',
+        'noticeSubtype',
+      ]),
+      noticeVersion: this.pickText(rawNotice, [
+        'notice-version',
+        'noticeVersion',
+      ]),
       procedureType: this.pickText(rawNotice, [
         'procedure-type',
         'procedureType',
       ]),
-      title: this.pickText(rawNotice, ['notice-title', 'noticeTitle', 'title']),
+      title:
+        this.pickText(rawNotice, ['notice-title', 'noticeTitle', 'title']) ??
+        titleProc ??
+        titleLot?.[0],
+      titleProc,
+      titleLot,
+      description,
+      descriptionLot,
+      estimatedValue,
+      noticeLanguage: this.pickText(rawNotice, [
+        'official-language',
+        'officialLanguage',
+      ]),
+      submissionLanguages: this.pickTextArray(rawNotice, [
+        'submission-language',
+        'submissionLanguage',
+      ]),
       buyerName: this.pickText(rawNotice, ['buyer-name', 'buyerName']),
+      buyerIdentifier: this.pickText(rawNotice, [
+        'buyer-identifier',
+        'buyerIdentifier',
+      ]),
       buyerCountry: this.pickText(rawNotice, ['buyer-country', 'buyerCountry']),
+      buyerCity: this.pickText(rawNotice, ['buyer-city', 'buyerCity']),
+      buyerEmail: this.pickText(rawNotice, ['buyer-email', 'buyerEmail']),
+      buyerInternetAddress: this.pickText(rawNotice, [
+        'buyer-internet-address',
+        'buyerInternetAddress',
+      ]),
+      buyerProfile: this.pickText(rawNotice, ['buyer-profile', 'buyerProfile']),
       publicationDate: this.pickText(rawNotice, [
         'publication-date',
         'publicationDate',
       ]),
-      submissionDeadline: this.pickText(rawNotice, ['deadline']),
+      dispatchDate: this.pickText(rawNotice, ['dispatch-date', 'dispatchDate']),
+      submissionDeadline:
+        this.pickText(rawNotice, ['deadline']) ??
+        this.pickDateTime(
+          rawNotice,
+          ['deadline-receipt-tender-date-lot', 'deadlineReceiptTenderDateLot'],
+          ['deadline-receipt-tender-time-lot', 'deadlineReceiptTenderTimeLot'],
+        ),
+      deadlineReceiptTender: this.pickDateTime(
+        rawNotice,
+        ['deadline-receipt-tender-date-lot', 'deadlineReceiptTenderDateLot'],
+        ['deadline-receipt-tender-time-lot', 'deadlineReceiptTenderTimeLot'],
+      ),
+      questionsDeadline: this.pickDateTime(
+        rawNotice,
+        ['deadline-receipt-answers-date-lot', 'deadlineReceiptAnswersDateLot'],
+        ['deadline-receipt-answers-time-lot', 'deadlineReceiptAnswersTimeLot'],
+      ),
+      plannedStartDate: this.pickEarliestText(rawNotice, [
+        'contract-duration-start-date-lot',
+        'contractDurationStartDateLot',
+      ]),
+      plannedEndDate: this.pickLatestText(rawNotice, [
+        'contract-duration-end-date-lot',
+        'contractDurationEndDateLot',
+      ]),
+      durationPeriodValue: this.pickText(rawNotice, [
+        'duration-period-value-lot',
+        'durationPeriodValueLot',
+      ]),
+      durationPeriodUnit: this.pickText(rawNotice, [
+        'duration-period-unit-lot',
+        'durationPeriodUnitLot',
+      ]),
       contractNature: this.pickText(rawNotice, [
         'contract-nature',
         'contractNature',
       ]),
+      legalBasis: this.pickText(rawNotice, ['legal-basis', 'legalBasis']),
+      isDps: this.systemCodeFlagFromValue(
+        rawNotice['dps-usage-lot'] ?? rawNotice.dpsUsageLot,
+      ),
+      isFrameworkAgreement: this.systemCodeFlagFromValue(
+        rawNotice['framework-agreement-lot'] ?? rawNotice.frameworkAgreementLot,
+      ),
+      isSmeSuitable: this.booleanFromValue(
+        rawNotice['sme-lot'] ?? rawNotice.smeLot,
+      ),
+      electronicSubmission: this.pickText(rawNotice, [
+        'electronic-submission-lot',
+        'electronicSubmissionLot',
+      ]),
+      mainClassificationProc: this.pickTextArray(rawNotice, [
+        'main-classification-proc',
+        'mainClassificationProc',
+      ]),
+      mainClassificationLot: this.pickTextArray(rawNotice, [
+        'main-classification-lot',
+        'mainClassificationLot',
+      ]),
+      additionalClassificationLot: this.pickTextArray(rawNotice, [
+        'additional-classification-lot',
+        'additionalClassificationLot',
+      ]),
+      placeOfPerformanceCountries: this.pickTextArray(rawNotice, [
+        'place-of-performance-country-proc',
+        'placeOfPerformanceCountryProc',
+        'place-of-performance-country-lot',
+        'placeOfPerformanceCountryLot',
+      ]),
+      placeOfPerformanceCities: this.pickTextArray(rawNotice, [
+        'place-of-performance-city-proc',
+        'placeOfPerformanceCityProc',
+        'place-of-performance-city-lot',
+        'placeOfPerformanceCityLot',
+      ]),
+      lotIdentifiers: this.pickTextArray(rawNotice, [
+        'identifier-lot',
+        'identifierLot',
+      ]),
+      internalLotIdentifiers: this.pickTextArray(rawNotice, [
+        'internal-identifier-lot',
+        'internalIdentifierLot',
+      ]),
+      documentUrls: this.pickTextArray(rawNotice, [
+        'document-url-lot',
+        'documentUrlLot',
+      ]),
+      submissionUrls: this.pickTextArray(rawNotice, [
+        'submission-url-lot',
+        'submissionUrlLot',
+      ]),
+      euFundLot: this.booleanFromValue(
+        rawNotice['eu-fund-lot'] ?? rawNotice.euFundLot,
+      ),
+      selectionCriteria: this.pickCriteria(
+        rawNotice,
+        ['selection-criterion-name-lot', 'selectionCriterionNameLot'],
+        [
+          'selection-criterion-description-lot',
+          'selectionCriterionDescriptionLot',
+        ],
+      ),
+      awardCriteria: this.pickAwardCriteria(rawNotice),
       classificationCpv: Array.from(
         new Set(
           this.pickArray(rawNotice, [
@@ -78,7 +222,15 @@ export class TenderNormalizerService {
         ),
       ) as TenderDto['classificationCpv'],
       cpvCodes: Array.from(
-        new Set(this.pickArray(rawNotice, ['classification-cpv'])),
+        new Set([
+          ...(this.pickTextArray(rawNotice, ['classification-cpv']) ?? []),
+          ...(this.pickTextArray(rawNotice, ['main-classification-proc']) ??
+            []),
+          ...(this.pickTextArray(rawNotice, ['main-classification-lot']) ?? []),
+          ...(this.pickTextArray(rawNotice, [
+            'additional-classification-lot',
+          ]) ?? []),
+        ]),
       ) as TenderDto['cpvCodes'],
       links: rawNotice.links,
     };
@@ -111,6 +263,199 @@ export class TenderNormalizerService {
     }
 
     return [];
+  }
+
+  private pickTextArray(
+    raw: Record<string, unknown>,
+    paths: string[],
+  ): string[] | undefined {
+    const values: string[] = [];
+
+    for (const path of paths) {
+      this.collectTextValues(raw[path], values);
+    }
+
+    const uniqueValues = Array.from(
+      new Set(values.map((value) => value.trim()).filter(Boolean)),
+    );
+
+    return uniqueValues.length > 0 ? uniqueValues : undefined;
+  }
+
+  private pickLocalizedText(
+    value: unknown,
+    noticeLanguage?: string,
+  ): string | undefined {
+    const candidates: TextCandidate[] = [];
+    this.collectTextCandidates(value, candidates);
+
+    return this.selectLocalizedText(candidates, noticeLanguage);
+  }
+
+  private collectTextValues(value: unknown, values: string[]): void {
+    if (value === undefined || value === null) {
+      return;
+    }
+
+    if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      values.push(String(value));
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        this.collectTextValues(item, values);
+      }
+
+      return;
+    }
+
+    if (isRecord(value)) {
+      const directText = this.valueToText(value);
+
+      if (directText !== undefined) {
+        values.push(directText);
+      }
+    }
+  }
+
+  private pickDateTime(
+    raw: Record<string, unknown>,
+    datePaths: string[],
+    timePaths: string[],
+  ): string | undefined {
+    return this.combineDateAndTime(
+      this.pickEarliestText(raw, datePaths),
+      this.pickText(raw, timePaths),
+    );
+  }
+
+  private pickEarliestText(
+    raw: Record<string, unknown>,
+    paths: string[],
+  ): string | undefined {
+    return this.pickSortedText(raw, paths, 'asc');
+  }
+
+  private pickLatestText(
+    raw: Record<string, unknown>,
+    paths: string[],
+  ): string | undefined {
+    return this.pickSortedText(raw, paths, 'desc');
+  }
+
+  private pickSortedText(
+    raw: Record<string, unknown>,
+    paths: string[],
+    sort: 'asc' | 'desc',
+  ): string | undefined {
+    const values = this.pickTextArray(raw, paths)?.sort() ?? [];
+
+    return sort === 'asc' ? values[0] : values[values.length - 1];
+  }
+
+  private pickEstimatedValue(
+    raw: Record<string, unknown>,
+  ): TenderDto['estimatedValue'] {
+    const procAmount = this.numberFromValue(
+      raw['estimated-value-proc'] ?? raw.estimatedValueProc,
+    );
+    const procCurrency = this.valueToText(
+      raw['estimated-value-cur-proc'] ?? raw.estimatedValueCurProc,
+    );
+
+    if (procAmount !== undefined || procCurrency !== undefined) {
+      return {
+        amount: procAmount ?? null,
+        currency: procCurrency ?? null,
+      };
+    }
+
+    const lotAmount = this.numberFromValue(
+      raw['estimated-value-lot'] ?? raw.estimatedValueLot,
+    );
+    const lotCurrency = this.valueToText(
+      raw['estimated-value-cur-lot'] ?? raw.estimatedValueCurLot,
+    );
+
+    if (lotAmount !== undefined || lotCurrency !== undefined) {
+      return {
+        amount: lotAmount ?? null,
+        currency: lotCurrency ?? null,
+      };
+    }
+
+    return undefined;
+  }
+
+  private pickCriteria(
+    raw: Record<string, unknown>,
+    namePaths: string[],
+    descriptionPaths: string[],
+  ): Array<{ name?: string; description?: string }> | undefined {
+    const names = this.pickTextArray(raw, namePaths) ?? [];
+    const descriptions = this.pickTextArray(raw, descriptionPaths) ?? [];
+    const length = Math.max(names.length, descriptions.length);
+
+    if (length === 0) {
+      return undefined;
+    }
+
+    return Array.from({ length }, (_, index) => ({
+      name: names[index],
+      description: descriptions[index],
+    }));
+  }
+
+  private pickAwardCriteria(raw: Record<string, unknown>):
+    | Array<{
+        name?: string;
+        description?: string;
+        type?: string;
+        weight?: string;
+      }>
+    | undefined {
+    const names =
+      this.pickTextArray(raw, [
+        'award-criterion-name-lot',
+        'awardCriterionNameLot',
+      ]) ?? [];
+    const descriptions =
+      this.pickTextArray(raw, [
+        'award-criterion-description-lot',
+        'awardCriterionDescriptionLot',
+      ]) ?? [];
+    const types =
+      this.pickTextArray(raw, [
+        'award-criterion-type-lot',
+        'awardCriterionTypeLot',
+      ]) ?? [];
+    const weights =
+      this.pickTextArray(raw, [
+        'award-criterion-number-weight-lot',
+        'awardCriterionNumberWeightLot',
+      ]) ?? [];
+    const length = Math.max(
+      names.length,
+      descriptions.length,
+      types.length,
+      weights.length,
+    );
+
+    if (length === 0) {
+      return undefined;
+    }
+
+    return Array.from({ length }, (_, index) => ({
+      name: names[index],
+      description: descriptions[index],
+      type: types[index],
+      weight: weights[index],
+    }));
   }
 
   private valueToText(value: unknown): string | undefined {
