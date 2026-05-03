@@ -74,6 +74,10 @@ function normalizeValue(
   sourceKey?: string,
   seen: WeakSet<object> = new WeakSet<object>(),
 ): unknown {
+  if (value instanceof Date) {
+    return value;
+  }
+
   if (Array.isArray(value)) {
     if (seen.has(value)) {
       return [];
