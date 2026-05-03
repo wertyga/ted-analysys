@@ -1,4 +1,5 @@
 import { TedNoticeType } from '../../tenders/types';
+import { buildAdaptiveCpvQuery } from './ted-cpv.builder';
 import {
   normalizeTedCountryCodes,
   TedEligibleCountryCode,
@@ -30,7 +31,7 @@ export function buildTedTenderSearchQuery(
     buildTextPart('FT', filters.text),
     buildTextPart('notice-title', filters.title),
     buildTextPart('description-proc', filters.description),
-    buildInPart('classification-cpv', filters.cpvCodes),
+    buildAdaptiveCpvQuery(filters.cpvCodes),
     buildCountryInPart('buyer-country', filters.buyerCountries),
     buildCountryInPart('place-of-performance', filters.placeOfPerformance),
     buildInPart('notice-type', filters.noticeTypes),

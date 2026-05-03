@@ -43,13 +43,6 @@ export class CpvController {
     return this.cpvService.getCpvCategories();
   }
 
-  @Get('popular')
-  @ApiOperation({ summary: 'List popular top-level CPV categories' })
-  @ApiOkResponse({ type: CpvCategoriesResponse })
-  async popular(): Promise<CpvCategoriesResponse> {
-    return this.cpvService.popular();
-  }
-
   // TODO: AdminGuard
   @Post('update')
   @ApiOperation({

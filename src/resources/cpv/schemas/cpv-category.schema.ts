@@ -15,7 +15,7 @@ export type CpvCategoryDocument = CpvCategory & Document;
 const CpvCategorySchema = new Schema<CpvCategoryDocument>(
   {
     code: { type: String, required: true, unique: true, index: true },
-    name: { type: String, required: true },
+    name: { type: String, required: true, index: true },
     parentCode: { type: String, index: true },
     level: { type: Number, required: true, index: true },
     source: { type: String, required: true },

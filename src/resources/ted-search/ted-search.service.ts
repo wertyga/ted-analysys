@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import { TedSearchRequestDto } from './dto/ted-search-request.dto';
-import { TedPublicationNumbersSearchRequestDto } from './dto/ted-publication-numbers-search-request.dto';
 import { TedTenderSearchRequestDto } from './dto/ted-tender-search-request.dto';
 import { buildTedTenderSearchQuery } from './ted-builders';
 import {

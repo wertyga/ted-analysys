@@ -96,11 +96,6 @@ export class TenderDto {
   @ApiPropertyOptional({ example: 'required' })
   electronicSubmission?: string;
 
-  @ApiPropertyOptional({
-    example: 'https://ted.europa.eu/en/notice/-/detail/756265-2023',
-  })
-  documentUrl?: string;
-
   @ApiPropertyOptional({ type: [TenderCpvDto] })
   classificationCpv?: TenderCpvDto[];
 

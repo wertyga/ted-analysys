@@ -13,9 +13,8 @@ import { cpvCodesListFields } from '@/resources/ted-search/utils';
 export class CpvService {
   private readonly cpvCodelistUrl: string;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor() {
     this.cpvCodelistUrl =
-      this.configService.get<string>('CPV_CODELIST_URL') ??
       'https://docs.ted.europa.eu/eforms/latest/reference/code-lists/cpv.html';
   }
 
@@ -41,22 +40,6 @@ export class CpvService {
         .limit(limit)
         .lean(),
       CpvCategoryModel.countDocuments(filter),
-    ]);
-
-    return {
-      count,
-      items: items.map((item) => this.toResponseItem(item)),
-    };
-  }
-
-  async popular(limit: number = 50): Promise<CpvCategoriesResponse> {
-    const [items, count] = await Promise.all([
-      CpvCategoryModel.find({ level: 2 })
-        .select(cpvCodesListFields)
-        .sort({ code: 1 })
-        .limit(limit)
-        .lean(),
-      CpvCategoryModel.countDocuments({ level: 2 }),
     ]);
 
     return {

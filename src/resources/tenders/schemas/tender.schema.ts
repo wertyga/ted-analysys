@@ -27,7 +27,6 @@ export interface Tender {
   isFrameworkAgreement?: boolean;
   isSmeSuitable?: boolean;
   electronicSubmission?: string;
-  documentUrl?: string;
   classificationCpv?: unknown[];
   cpvCodes?: unknown[];
   links?: unknown;
@@ -80,7 +79,6 @@ const TenderSchema = new Schema<TenderDocument>(
       index: true,
     },
     electronicSubmission: String,
-    documentUrl: String,
     classificationCpv: {
       type: [Schema.Types.ObjectId],
       ref: 'CpvCategory',

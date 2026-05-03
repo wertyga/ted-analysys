@@ -6,25 +6,45 @@ export function normalizeCpvCodes(codes: string[]): string[] {
   );
 }
 
-export function buildCpvQuery(
-  cpvCodes: string[],
-  matchMode: 'TREE' | 'EXACT' = 'TREE',
-): string {
-  const codes = normalizeCpvCodes(cpvCodes);
+export type CpvMatchMode = 'TREE' | 'EXACT';
 
-  if (matchMode === 'EXACT') {
-    return `classification-cpv IN (${codes.join(' ')})`;
+export function buildAdaptiveCpvQuery(
+  cpvCodes: string[] | undefined,
+): string | undefined {
+  const codes = normalizeCpvCodes(cpvCodes ?? []);
+
+  if (codes.length === 0) {
+    return undefined;
   }
 
   const parts = codes.map((code) => {
-    const prefix = code.replace(/0+$/, '');
+    const matchMode = resolveCpvMatchMode(code);
 
-    if (prefix.length >= 2 && prefix.length < 8) {
-      return `${prefix}*`;
-    }
-
-    return code;
+    return matchMode === 'TREE' ? toCpvTreePattern(code) : code;
   });
 
   return `classification-cpv IN (${parts.join(' ')})`;
+}
+
+export function resolveCpvMatchMode(code: string): CpvMatchMode {
+  const level = getCpvLevel(code);
+
+  return level >= 3 && level <= 4 ? 'TREE' : 'EXACT';
+}
+
+export function getCpvLevel(code: string): number {
+  const normalized = code.trim();
+  const significantLength = normalized.replace(/0+$/, '').length;
+
+  return Math.min(Math.max(significantLength, 2), 8);
+}
+
+function toCpvTreePattern(code: string): string {
+  const prefix = code.replace(/0+$/, '');
+
+  if (prefix.length >= 2 && prefix.length < 8) {
+    return `${prefix}*`;
+  }
+
+  return code;
 }
