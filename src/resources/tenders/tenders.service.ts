@@ -2,8 +2,10 @@ import {
   forwardRef,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
+import axios, { AxiosInstance } from 'axios';
 import { TedSearchService } from '../ted-search/ted-search.service';
 import { TenderGeneralAnalysisDetailDto } from '../tender-analysis/dto/tender-general-analysis.dto';
 import {
@@ -34,6 +36,14 @@ export type TenderDocumentWithGeneralAnalysis = TenderDocument & {
 
 @Injectable()
 export class TendersService {
+  private readonly logger = new Logger(TendersService.name);
+  private readonly http: AxiosInstance = axios.create({
+    timeout: 30000,
+    headers: {
+      Accept: 'application/xml, text/xml, text/plain, */*',
+    },
+  });
+
   tenderDefaultFields = [
     'publication-number',
     'notice-title',
@@ -63,10 +73,17 @@ export class TendersService {
       return undefined;
     }
 
-    const dto = await this.tenderNormalizer.normalizeTedNoticeWithCpvCodes(
+    const noticeWithXml = await this.withXmlContent(notice);
+    const baseDto = await this.tenderNormalizer.normalizeTedNoticeWithCpvCodes(
       notice,
       true,
     );
+    const xmlFields =
+      this.tenderNormalizer.parseTedNoticeXmlFields(noticeWithXml);
+    const dto: TenderDto = {
+      ...baseDto,
+      ...xmlFields,
+    };
 
     const tenderDoc = await TenderModel.findOneAndUpdate(
       { id: publicationNumber },
@@ -79,11 +96,23 @@ export class TendersService {
           noticeType: dto.noticeType,
           procedureType: dto.procedureType,
           title: dto.title,
+          description: dto.description,
+          estimatedValue: dto.estimatedValue,
+          noticeLanguage: dto.noticeLanguage,
+          submissionLanguages: dto.submissionLanguages,
           buyerName: dto.buyerName,
           buyerCountry: dto.buyerCountry,
           publicationDate: dto.publicationDate,
           submissionDeadline: dto.submissionDeadline,
+          questionsDeadline: dto.questionsDeadline,
+          plannedStartDate: dto.plannedStartDate,
+          plannedEndDate: dto.plannedEndDate,
           contractNature: dto.contractNature,
+          isDps: dto.isDps,
+          isFrameworkAgreement: dto.isFrameworkAgreement,
+          isSmeSuitable: dto.isSmeSuitable,
+          electronicSubmission: dto.electronicSubmission,
+          documentUrl: dto.documentUrl,
           classificationCpv: dto.classificationCpv,
           cpvCodes: dto.cpvCodes,
           links: dto.links,
@@ -103,6 +132,59 @@ export class TendersService {
     ).then((documents) => documents.filter(Boolean))) as TenderDocument[];
 
     return tenders;
+  }
+
+  private async withXmlContent(notice: TedNotice): Promise<TedNotice> {
+    const xmlUrl = this.extractXmlUrl(notice);
+
+    if (!xmlUrl) {
+      return notice;
+    }
+
+    console.log({ xmlUrl });
+
+    try {
+      const response = await this.http.get<string>(xmlUrl, {
+        responseType: 'text',
+      });
+
+      if (typeof response.data !== 'string' || response.data.length === 0) {
+        return notice;
+      }
+
+      return {
+        ...notice,
+        xmlContent: response.data,
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Failed to fetch TED XML from links.xml: ${xmlUrl}; ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+
+      return notice;
+    }
+  }
+
+  private findXmlContent(notice: TedNotice): string | undefined {
+    for (const key of ['xmlContent', 'xml', 'content', 'noticeXml']) {
+      const value = notice[key];
+
+      if (typeof value === 'string' && value.includes('<')) {
+        return value;
+      }
+    }
+
+    return undefined;
+  }
+
+  private extractXmlUrl(notice: TedNotice): string | undefined {
+    if (!isRecord(notice.links)) {
+      return undefined;
+    }
+
+    return Object.values(notice.links?.xml ?? {})?.[0] as string;
   }
 
   async getLocalTenderWithBaseAnalysis(
@@ -220,7 +302,7 @@ export class TendersService {
     let savedTender: TenderDocument | null | undefined =
       await TenderModel.findOne({ id: publicationNumber });
 
-    if (!savedTender) {
+    if (!savedTender || this.shouldRefreshXmlDerivedFields(savedTender)) {
       savedTender = await this.upsertTender(notice);
     }
 
@@ -229,6 +311,21 @@ export class TendersService {
     }
 
     return this.getLocalTenderWithBaseAnalysis(savedTender);
+  }
+
+  private shouldRefreshXmlDerivedFields(tender: TenderDocument): boolean {
+    return (
+      tender.description === undefined &&
+      tender.estimatedValue === undefined &&
+      tender.noticeLanguage === undefined &&
+      tender.submissionLanguages === undefined &&
+      tender.questionsDeadline === undefined &&
+      tender.plannedStartDate === undefined &&
+      tender.plannedEndDate === undefined &&
+      tender.isSmeSuitable === undefined &&
+      tender.electronicSubmission === undefined &&
+      tender.documentUrl === undefined
+    );
   }
 
   async upsertIfNeededMultipleTendersWithGeneralAnalysis(notices: TedNotice[]) {
@@ -262,11 +359,23 @@ export class TendersService {
       noticeType: tender.noticeType,
       procedureType: tender.procedureType,
       title: tender.title,
+      description: tender.description,
+      estimatedValue: tender.estimatedValue,
+      noticeLanguage: tender.noticeLanguage,
+      submissionLanguages: tender.submissionLanguages,
       buyerName: tender.buyerName,
       buyerCountry: tender.buyerCountry,
       publicationDate: tender.publicationDate,
       submissionDeadline: tender.submissionDeadline,
+      questionsDeadline: tender.questionsDeadline,
+      plannedStartDate: tender.plannedStartDate,
+      plannedEndDate: tender.plannedEndDate,
       contractNature: tender.contractNature,
+      isDps: tender.isDps,
+      isFrameworkAgreement: tender.isFrameworkAgreement,
+      isSmeSuitable: tender.isSmeSuitable,
+      electronicSubmission: tender.electronicSubmission,
+      documentUrl: tender.documentUrl,
       classificationCpv:
         tender.classificationCpv as TenderDto['classificationCpv'],
       cpvCodes: tender.cpvCodes as TenderDto['cpvCodes'],

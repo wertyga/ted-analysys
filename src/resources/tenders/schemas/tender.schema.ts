@@ -8,11 +8,26 @@ export interface Tender {
   noticeType?: string;
   procedureType?: string;
   title?: string;
+  description?: string;
+  estimatedValue?: {
+    amount: number | null;
+    currency: string | null;
+  };
+  noticeLanguage?: string;
+  submissionLanguages?: string[];
   buyerName?: string;
   buyerCountry?: string;
   publicationDate?: string;
   submissionDeadline?: string;
+  questionsDeadline?: string;
+  plannedStartDate?: string;
+  plannedEndDate?: string;
   contractNature?: string;
+  isDps?: boolean;
+  isFrameworkAgreement?: boolean;
+  isSmeSuitable?: boolean;
+  electronicSubmission?: string;
+  documentUrl?: string;
   classificationCpv?: unknown[];
   cpvCodes?: unknown[];
   links?: unknown;
@@ -31,11 +46,41 @@ const TenderSchema = new Schema<TenderDocument>(
     noticeType: String,
     procedureType: String,
     title: String,
+    description: String,
+    estimatedValue: {
+      amount: { type: Number, default: null },
+      currency: { type: String, default: null },
+    },
+    noticeLanguage: String,
+    submissionLanguages: {
+      type: [String],
+      default: undefined,
+    },
     buyerName: String,
     buyerCountry: String,
     publicationDate: String,
     submissionDeadline: String,
+    questionsDeadline: String,
+    plannedStartDate: String,
+    plannedEndDate: String,
     contractNature: String,
+    isDps: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    isFrameworkAgreement: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    isSmeSuitable: {
+      type: Boolean,
+      default: undefined,
+      index: true,
+    },
+    electronicSubmission: String,
+    documentUrl: String,
     classificationCpv: {
       type: [Schema.Types.ObjectId],
       ref: 'CpvCategory',
