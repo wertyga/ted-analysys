@@ -27,7 +27,31 @@ import {
 import { cpvCodesListFields } from '@/resources/ted-search/utils';
 
 type TenderRecord = Tender & { _id?: unknown };
-export type TenderListDto = Omit<TenderDto, 'links'>;
+export type TenderListDto = Omit<
+  TenderDto,
+  | 'links'
+  | 'sourceNoticeId'
+  | 'noticeVersion'
+  | 'titleProc'
+  | 'titleLot'
+  | 'descriptionLot'
+  | 'buyerIdentifier'
+  | 'buyerCity'
+  | 'buyerEmail'
+  | 'buyerInternetAddress'
+  | 'buyerProfile'
+  | 'dispatchDate'
+  | 'deadlineReceiptTender'
+  | 'durationPeriodValue'
+  | 'durationPeriodUnit'
+  | 'legalBasis'
+  | 'additionalClassificationLot'
+  | 'lotIdentifiers'
+  | 'internalLotIdentifiers'
+  | 'submissionUrls'
+  | 'selectionCriteria'
+  | 'awardCriteria'
+>;
 export type TenderDocumentWithGeneralAnalysis = TenderDocument & {
   generalAnalysis?: TenderGeneralAnalysisDetailDto | null;
 };
@@ -354,7 +378,31 @@ export class TendersService {
   }
 
   toListDto(tender: TenderRecord): TenderListDto {
-    const { links, ...dto } = this.mapTenderDocumentToDto(tender);
+    const {
+      links,
+      sourceNoticeId,
+      noticeVersion,
+      titleProc,
+      titleLot,
+      descriptionLot,
+      buyerIdentifier,
+      buyerCity,
+      buyerEmail,
+      buyerInternetAddress,
+      buyerProfile,
+      dispatchDate,
+      deadlineReceiptTender,
+      durationPeriodValue,
+      durationPeriodUnit,
+      legalBasis,
+      additionalClassificationLot,
+      lotIdentifiers,
+      internalLotIdentifiers,
+      submissionUrls,
+      selectionCriteria,
+      awardCriteria,
+      ...dto
+    } = this.mapTenderDocumentToDto(tender);
 
     return dto;
   }
