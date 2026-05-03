@@ -36,7 +36,12 @@ const TenderSchema = new Schema<TenderDocument>(
     publicationDate: String,
     submissionDeadline: String,
     contractNature: String,
-    classificationCpv: { type: [Schema.Types.Mixed], default: undefined },
+    classificationCpv: {
+      type: [Schema.Types.ObjectId],
+      ref: 'CpvCategory',
+      required: true,
+      default: [],
+    },
     cpvCodes: { type: [Schema.Types.Mixed], default: undefined },
     links: Schema.Types.Mixed,
   },

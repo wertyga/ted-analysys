@@ -107,8 +107,6 @@ export class TenderGeneralAnalysisService {
 
     const existingBaseAnalysis = await TenderGeneralAnalysisModel.findOne({
       tenderId: tender.id,
-      status: { $ne: TenderGeneralAnalysisStatus.FAILED },
-      $and: [{ resultJson: { $exists: true } }, { resultJson: { $ne: null } }],
     }).exec();
 
     const hasDoneAnalysis =
@@ -116,7 +114,10 @@ export class TenderGeneralAnalysisService {
       existingBaseAnalysis.resultJson &&
       existingBaseAnalysis.status === TenderGeneralAnalysisStatus.DONE;
 
-    if (hasDoneAnalysis) {
+    const isInProces =
+      existingBaseAnalysis?.status === TenderGeneralAnalysisStatus.PROCESSING;
+
+    if (hasDoneAnalysis || isInProces) {
       // TODO: Check source hash
       return existingBaseAnalysis;
     }
@@ -151,10 +152,8 @@ export class TenderGeneralAnalysisService {
   }
 
   async ensureBaseAnalysisForMultipleTenders(
-    notices: TedNotice[],
+    tenders: TenderDocument[],
   ): Promise<TenderGeneralAnalysisDocument[]> {
-    const tenders = await this.tendersService.upsertMultipleTenders(notices);
-
     return Promise.all(
       tenders.map(async (tender) => {
         return this.ensureAnalysisForTender(tender);
@@ -181,7 +180,7 @@ export class TenderGeneralAnalysisService {
   toListDto(
     analysis: TenderGeneralAnalysisRecord | null,
   ): TenderGeneralAnalysisListDto | null {
-    if (analysis === null) {
+    if (!analysis) {
       return null;
     }
 
@@ -192,16 +191,14 @@ export class TenderGeneralAnalysisService {
       opportunityScore: analysis.opportunityScore,
       generalRecommendation: analysis.generalRecommendation,
       confidenceScore: analysis.confidenceScore,
-      analyzedAt: analysis.analyzedAt,
-      model: analysis.model,
-      promptVersion: analysis.promptVersion,
+      updatedAt: analysis.updatedAt,
     };
   }
 
   toDetailDto(
     analysis: TenderGeneralAnalysisRecord | null,
   ): TenderGeneralAnalysisDetailDto | null {
-    if (analysis === null) {
+    if (!analysis) {
       return null;
     }
 

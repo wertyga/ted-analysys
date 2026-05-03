@@ -24,8 +24,10 @@ import {
   isTedPublicationNumber,
   valueToString,
 } from '@/utils';
+import { cpvCodesListFields } from '@/resources/ted-search/utils';
 
 type TenderRecord = Tender & { _id?: unknown };
+export type TenderListDto = Omit<TenderDto, 'links'>;
 export type TenderDocumentWithGeneralAnalysis = TenderDocument & {
   generalAnalysis?: TenderGeneralAnalysisDetailDto | null;
 };
@@ -54,42 +56,49 @@ export class TendersService {
     private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
   ) {}
 
+  async upsertTender(notice: TedNotice): Promise<TenderDocument | undefined> {
+    const publicationNumber = extractPublicationNumberFromNotice(notice);
+
+    if (!publicationNumber) {
+      return undefined;
+    }
+
+    const dto = await this.tenderNormalizer.normalizeTedNoticeWithCpvCodes(
+      notice,
+      true,
+    );
+
+    const tenderDoc = await TenderModel.findOneAndUpdate(
+      { id: publicationNumber },
+      {
+        $set: {
+          id: publicationNumber,
+          source: 'TED',
+          sourceNoticeId: publicationNumber,
+          publicationNumber,
+          noticeType: dto.noticeType,
+          procedureType: dto.procedureType,
+          title: dto.title,
+          buyerName: dto.buyerName,
+          buyerCountry: dto.buyerCountry,
+          publicationDate: dto.publicationDate,
+          submissionDeadline: dto.submissionDeadline,
+          contractNature: dto.contractNature,
+          classificationCpv: dto.classificationCpv,
+          cpvCodes: dto.cpvCodes,
+          links: dto.links,
+        },
+      },
+      { returnDocument: 'after', upsert: true },
+    ).exec();
+
+    return tenderDoc.populate('classificationCpv');
+  }
+
   async upsertMultipleTenders(notices: TedNotice[]): Promise<TenderDocument[]> {
     const tenders: TenderDocument[] = (await Promise.all(
       notices.map((notice) => {
-        const publicationNumber = extractPublicationNumberFromNotice(notice);
-
-        if (!publicationNumber) {
-          return undefined;
-        }
-
-        return TenderModel.findOneAndUpdate(
-          { id: publicationNumber },
-          {
-            $set: {
-              id: publicationNumber,
-              source: 'TED',
-              sourceNoticeId: publicationNumber,
-              publicationNumber,
-              noticeType: valueToString(notice.noticeType),
-              procedureType: valueToString(notice.procedureType),
-              title: valueToString(notice.noticeTitle ?? notice.title),
-              buyerName: valueToString(notice.buyerName),
-              buyerCountry: valueToString(notice.buyerCountry),
-              publicationDate: valueToString(notice.publicationDate),
-              submissionDeadline: valueToString(notice.deadline),
-              contractNature: valueToString(notice.contractNature),
-              classificationCpv: Array.isArray(notice.classificationCpv)
-                ? notice.classificationCpv
-                : undefined,
-              cpvCodes: Array.isArray(notice.classificationCpv)
-                ? notice.classificationCpv
-                : undefined,
-              links: notice.links,
-            },
-          },
-          { returnDocument: 'after', upsert: true },
-        ).exec();
+        return this.upsertTender(notice);
       }),
     ).then((documents) => documents.filter(Boolean))) as TenderDocument[];
 
@@ -110,7 +119,7 @@ export class TendersService {
       { strict: false },
     );
 
-    return localTender as TenderDocumentWithGeneralAnalysis;
+    return localTender.populate('classificationCpv');
   }
 
   async findByIdOrFetchFromTed(
@@ -135,7 +144,7 @@ export class TendersService {
       throw new NotFoundException(`Tender ${id} not found`);
     }
 
-    return this.upsertTenderWithGeneralAnalysis(tedNotice);
+    return this.upsertIfNeededTenderWithGeneralAnalysis(tedNotice);
   }
 
   async fetchTedNoticeByPublicationNumber(
@@ -199,43 +208,35 @@ export class TendersService {
     return [];
   }
 
-  async upsertTenderWithGeneralAnalysis(
+  async upsertIfNeededTenderWithGeneralAnalysis(
     notice: TedNotice,
   ): Promise<TenderDocumentWithGeneralAnalysis> {
-    const dto = await this.tenderNormalizer.normalizeTedNotice(notice);
-    let savedTender = await TenderModel.findOne({ id: dto.id });
+    const publicationNumber = extractPublicationNumberFromNotice(notice);
+
+    if (!publicationNumber) {
+      throw new NotFoundException('Tender publication number not found');
+    }
+
+    let savedTender: TenderDocument | null | undefined =
+      await TenderModel.findOne({ id: publicationNumber });
 
     if (!savedTender) {
-      savedTender = await TenderModel.findOneAndUpdate(
-        { id: dto.id },
-        {
-          $set: {
-            id: dto.id,
-            source: dto.source,
-            sourceNoticeId: dto.sourceNoticeId,
-            publicationNumber: dto.publicationNumber,
-            noticeType: dto.noticeType,
-            procedureType: dto.procedureType,
-            title: dto.title,
-            buyerName: dto.buyerName,
-            buyerCountry: dto.buyerCountry,
-            publicationDate: dto.publicationDate,
-            submissionDeadline: dto.submissionDeadline,
-            classificationCpv: dto.classificationCpv,
-            cpvCodes: dto.cpvCodes,
-            contractNature: dto.contractNature,
-            links: dto.links,
-          },
-        },
-        { returnDocument: 'after', upsert: true },
-      ).exec();
+      savedTender = await this.upsertTender(notice);
     }
 
     if (!savedTender) {
-      throw new NotFoundException(`Tender ${dto.id} not found`);
+      throw new NotFoundException(`Tender ${publicationNumber} not found`);
     }
 
     return this.getLocalTenderWithBaseAnalysis(savedTender);
+  }
+
+  async upsertIfNeededMultipleTendersWithGeneralAnalysis(notices: TedNotice[]) {
+    return Promise.all(
+      notices.map((notice) =>
+        this.upsertIfNeededTenderWithGeneralAnalysis(notice),
+      ),
+    );
   }
 
   async findLocalTender(id: string): Promise<TenderDocument | null> {
@@ -247,7 +248,9 @@ export class TendersService {
         { publicationNumber },
         { sourceNoticeId: publicationNumber },
       ],
-    }).exec();
+    })
+      .populate('classificationCpv', cpvCodesListFields)
+      .exec();
   }
 
   mapTenderDocumentToDto(tender: TenderRecord): TenderDto {
@@ -269,6 +272,12 @@ export class TendersService {
       cpvCodes: tender.cpvCodes as TenderDto['cpvCodes'],
       links: tender.links,
     };
+
+    return dto;
+  }
+
+  toListDto(tender: TenderRecord): TenderListDto {
+    const { links, ...dto } = this.mapTenderDocumentToDto(tender);
 
     return dto;
   }

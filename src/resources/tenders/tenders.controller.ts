@@ -5,11 +5,15 @@ import {
   TenderDocumentWithGeneralAnalysis,
   TendersService,
 } from './tenders.service';
+import { TenderGeneralAnalysisService } from '@/resources/tender-analysis/tender-general-analysis.service';
 
 @ApiTags('tenders')
 @Controller('tenders')
 export class TendersController {
-  constructor(private readonly tendersService: TendersService) {}
+  constructor(
+    private readonly tendersService: TendersService,
+    private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
+  ) {}
 
   @Get(':id')
   @ApiOperation({ summary: 'Get tender by local id or TED publication number' })
@@ -17,6 +21,14 @@ export class TendersController {
   async findById(
     @Param('id') id: string,
   ): Promise<TenderDocumentWithGeneralAnalysis> {
-    return this.tendersService.findByIdOrFetchFromTed(id);
+    const tba = await this.tendersService.findByIdOrFetchFromTed(id);
+    const tender = tba.toObject();
+
+    return {
+      ...tender,
+      generalAnalysis: this.tenderGeneralAnalysisService.toDetailDto(
+        tender.generalAnalysis,
+      ),
+    } as TenderDocumentWithGeneralAnalysis;
   }
 }

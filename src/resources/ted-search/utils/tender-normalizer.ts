@@ -10,8 +10,10 @@ type NormalizedCpvCategory = {
   level?: number;
 };
 
+export const cpvCodesListFields = 'code name parentCode level';
+
 export function tenderNormilizer(tender: TedNotice): TedNotice {
-  return normalizeValue(tender) as TedNotice;
+  return normalizeValue(tender, undefined, new WeakSet<object>()) as TedNotice;
 }
 
 export async function normalizeTenderSearchResponse(
@@ -41,7 +43,7 @@ export async function fillClassificationCpvByCodes(
   }
 
   const categories = await CpvCategoryModel.find({ code: { $in: codes } })
-    .select('code name parentCode level -_id')
+    .select(cpvCodesListFields)
     .lean();
   const byCode = new Map(
     categories.map((category) => [category.code, category]),
@@ -57,6 +59,7 @@ export async function fillClassificationCpvByCodes(
       }
 
       return {
+        _id: category._id,
         code: category.code,
         name: category.name,
         parentCode: category.parentCode,
@@ -66,15 +69,27 @@ export async function fillClassificationCpvByCodes(
   };
 }
 
-function normalizeValue(value: unknown, sourceKey?: string): unknown {
+function normalizeValue(
+  value: unknown,
+  sourceKey?: string,
+  seen: WeakSet<object> = new WeakSet<object>(),
+): unknown {
   if (Array.isArray(value)) {
+    if (seen.has(value)) {
+      return [];
+    }
+
+    seen.add(value);
+
     if (isBuyerCountryKey(sourceKey)) {
       return Array.from(
         new Set(value.map(toCountryCode).filter(isNonEmptyString)),
       );
     }
 
-    return Array.from(new Set(value.map((item) => normalizeValue(item))));
+    return Array.from(
+      new Set(value.map((item) => normalizeValue(item, undefined, seen))),
+    );
   }
 
   if (!isRecord(value)) {
@@ -87,11 +102,17 @@ function normalizeValue(value: unknown, sourceKey?: string): unknown {
     return value;
   }
 
+  if (seen.has(value)) {
+    return {};
+  }
+
+  seen.add(value);
+
   return Object.entries(value).reduce<JsonRecord>((acc, [key, nestedValue]) => {
     const normalizedKey = shouldUppercaseNestedKey(sourceKey)
       ? key.toUpperCase()
       : toCamelCase(key);
-    acc[normalizedKey] = normalizeValue(nestedValue, key);
+    acc[normalizedKey] = normalizeValue(nestedValue, key, seen);
 
     return acc;
   }, {});

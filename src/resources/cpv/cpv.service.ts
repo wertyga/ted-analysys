@@ -7,6 +7,7 @@ import {
   CpvCategoryResponseItem,
   CpvCategorySyncResult,
 } from './types';
+import { cpvCodesListFields } from '@/resources/ted-search/utils';
 
 @Injectable()
 export class CpvService {
@@ -35,7 +36,7 @@ export class CpvService {
           };
     const [items, count] = await Promise.all([
       CpvCategoryModel.find(filter)
-        .select('code name parentCode level -_id')
+        .select(cpvCodesListFields)
         .sort({ code: 1 })
         .limit(limit)
         .lean(),
@@ -51,7 +52,7 @@ export class CpvService {
   async popular(limit: number = 50): Promise<CpvCategoriesResponse> {
     const [items, count] = await Promise.all([
       CpvCategoryModel.find({ level: 2 })
-        .select('code name parentCode level -_id')
+        .select(cpvCodesListFields)
         .sort({ code: 1 })
         .limit(limit)
         .lean(),
@@ -121,7 +122,7 @@ export class CpvService {
     const items = await CpvCategoryModel.find({
       code: { $in: normalizedCodes },
     })
-      .select('code name parentCode level -_id')
+      .select(cpvCodesListFields)
       .lean();
     const byCode = new Map(
       items.map((item) => [item.code, this.toResponseItem(item)]),
@@ -237,7 +238,7 @@ export class CpvService {
 
   async getCpvCategories(): Promise<CpvCategoriesResponse> {
     const categories = await CpvCategoryModel.find()
-      .select('code name parentCode level -_id')
+      .select(cpvCodesListFields)
       .sort({ code: 1 })
       .lean();
 

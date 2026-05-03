@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, forwardRef, Inject, Post } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -7,20 +7,23 @@ import {
   ApiServiceUnavailableResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { TedPublicationNumbersSearchRequestDto } from './dto/ted-publication-numbers-search-request.dto';
 import { TedTenderSearchRequestDto } from './dto/ted-tender-search-request.dto';
 import { TedSearchService } from './ted-search.service';
 import { normalizeTenderSearchResponse } from './utils';
 import { TedSearchResponse } from './types/ted-search.types';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { TenderGeneralAnalysisService } from '../tender-analysis/tender-general-analysis.service';
+import { TendersService } from '@/resources/tenders/tenders.service';
 
 @ApiTags('ted')
 @Controller('ted')
 export class TedSearchController {
   constructor(
     private readonly tedSearchService: TedSearchService,
+    @Inject(forwardRef(() => TenderGeneralAnalysisService))
     private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
+    @Inject(forwardRef(() => TendersService))
+    private readonly tendersService: TendersService,
   ) {}
 
   @Post('search')
@@ -39,11 +42,27 @@ export class TedSearchController {
       noticeTypes: TENDER_COMPETITION_NOTICE_TYPES,
     };
     const data = await this.tedSearchService.searchTenders(updatedData);
-    const normalized = await normalizeTenderSearchResponse(data);
 
-    this.tenderGeneralAnalysisService.ensureBaseAnalysisForMultipleTenders(
-      normalized.notices ?? [],
-    );
+    const tendersWithBaseAnalysis =
+      await this.tendersService.upsertIfNeededMultipleTendersWithGeneralAnalysis(
+        data.notices ?? [],
+      );
+
+    const normalized = await normalizeTenderSearchResponse({
+      ...data,
+      notices: tendersWithBaseAnalysis.map((tba) => {
+        const tender = tba.toObject();
+
+        const dto = this.tendersService.toListDto(tender);
+
+        return {
+          ...dto,
+          generalAnalysis: this.tenderGeneralAnalysisService.toListDto(
+            tender.generalAnalysis as any,
+          ),
+        };
+      }),
+    });
 
     return normalized;
   }

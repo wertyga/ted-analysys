@@ -5,40 +5,70 @@ import {
 } from '../ted-search/utils';
 import { TedNotice } from '../ted-search/types/ted-search.types';
 import { TenderDto } from './dto/tender.dto';
-import { isRecord } from '@/utils';
+import { extractPublicationNumberFromNotice, isRecord } from '@/utils';
 
 @Injectable()
 export class TenderNormalizerService {
-  async normalizeTedNotice(rawNotice: TedNotice): Promise<TenderDto> {
-    const normalizedNotice = await fillClassificationCpvByCodes(
+  async normalizeTedNoticeWithCpvCodes(
+    rawNotice: TedNotice,
+    rawIds = false,
+  ): Promise<TenderDto> {
+    const { classificationCpv } = await fillClassificationCpvByCodes(
       tenderNormilizer(rawNotice),
     );
 
-    const publicationNumber = this.pickText(normalizedNotice, [
-      'publicationNumber',
-    ]);
+    return {
+      ...this.normalizeTedNotice(rawNotice),
+      classificationCpv: rawIds
+        ? classificationCpv.map((category) => category._id)
+        : classificationCpv,
+    };
+  }
+
+  normalizeTedNotice(rawNotice: TedNotice): TenderDto {
+    const publicationNumber =
+      extractPublicationNumberFromNotice(rawNotice) ??
+      this.pickText(rawNotice, ['publicationNumber']);
+
     const dto: TenderDto = {
-      id: publicationNumber ?? this.createFallbackId(normalizedNotice),
+      id: publicationNumber ?? this.createFallbackId(rawNotice),
       source: 'TED',
       sourceNoticeId:
-        this.pickText(normalizedNotice, ['noticeIdentifier', 'noticeId']) ??
-        publicationNumber,
+        this.pickText(rawNotice, [
+          'noticeIdentifier',
+          'noticeId',
+          'notice-identifier',
+        ]) ?? publicationNumber,
       publicationNumber,
-      noticeType: this.pickText(normalizedNotice, ['noticeType']),
-      procedureType: this.pickText(normalizedNotice, ['procedureType']),
-      title: this.pickText(normalizedNotice, ['noticeTitle', 'title']),
-      buyerName: this.pickText(normalizedNotice, ['buyerName']),
-      buyerCountry: this.pickText(normalizedNotice, ['buyerCountry']),
-      publicationDate: this.pickText(normalizedNotice, ['publicationDate']),
-      submissionDeadline: this.pickText(normalizedNotice, ['deadline']),
-      contractNature: this.pickText(normalizedNotice, ['contractNature']),
-      classificationCpv: this.pickArray(normalizedNotice, [
-        'classificationCpv',
-      ]) as TenderDto['classificationCpv'],
-      cpvCodes: this.pickArray(normalizedNotice, [
-        'classificationCpv',
-      ]) as TenderDto['cpvCodes'],
-      links: normalizedNotice.links,
+      noticeType: this.pickText(rawNotice, ['notice-type', 'noticeType']),
+      procedureType: this.pickText(rawNotice, [
+        'procedure-type',
+        'procedureType',
+      ]),
+      title: this.pickText(rawNotice, ['notice-title', 'noticeTitle', 'title']),
+      buyerName: this.pickText(rawNotice, ['buyer-name', 'buyerName']),
+      buyerCountry: this.pickText(rawNotice, ['buyer-country', 'buyerCountry']),
+      publicationDate: this.pickText(rawNotice, [
+        'publication-date',
+        'publicationDate',
+      ]),
+      submissionDeadline: this.pickText(rawNotice, ['deadline']),
+      contractNature: this.pickText(rawNotice, [
+        'contract-nature',
+        'contractNature',
+      ]),
+      classificationCpv: Array.from(
+        new Set(
+          this.pickArray(rawNotice, [
+            'classification-cpv',
+            'classificationCpv',
+          ]),
+        ),
+      ) as TenderDto['classificationCpv'],
+      cpvCodes: Array.from(
+        new Set(this.pickArray(rawNotice, ['classification-cpv'])),
+      ) as TenderDto['cpvCodes'],
+      links: rawNotice.links,
     };
 
     return dto;

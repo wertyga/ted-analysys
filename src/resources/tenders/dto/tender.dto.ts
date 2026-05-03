@@ -58,8 +58,8 @@ export class TenderDto {
   @ApiPropertyOptional({ type: [TenderCpvDto] })
   classificationCpv?: TenderCpvDto[];
 
-  @ApiPropertyOptional({ type: [TenderCpvDto] })
-  cpvCodes?: TenderCpvDto[];
+  @ApiPropertyOptional()
+  cpvCodes?: string[];
 
   @ApiPropertyOptional({ type: Object })
   links?: unknown;

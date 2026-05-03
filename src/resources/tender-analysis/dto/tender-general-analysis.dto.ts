@@ -24,7 +24,7 @@ export class TenderGeneralAnalysisListDto {
   confidenceScore?: number;
 
   @ApiPropertyOptional()
-  analyzedAt?: Date;
+  updatedAt?: Date;
 
   @ApiPropertyOptional()
   model?: string;
