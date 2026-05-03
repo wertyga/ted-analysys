@@ -24,20 +24,63 @@ export interface GeneralTenderAnalysisInput {
   outputLanguage?: AnalysisOutputLanguage;
   tender: {
     id: string;
+    sourceNoticeId?: string | null;
     publicationNumber?: string | null;
     title?: string | null;
+    procedureTitle?: string | null;
+    lotTitles?: string[];
     description?: string | null;
+    lotDescriptions?: string[];
     buyerName?: string | null;
+    buyerIdentifier?: string | null;
     country?: string | null;
+    buyerCity?: string | null;
+    buyerEmail?: string | null;
+    buyerWebsite?: string | null;
+    buyerProfileUrl?: string | null;
     procedureType?: string | null;
     noticeType?: string | null;
+    noticeSubtype?: string | null;
+    noticeVersion?: string | null;
     publicationDate?: string | null;
+    dispatchDate?: string | null;
     deadlineDate?: string | null;
+    submissionDeadlineFallback?: string | null;
+    questionsDeadline?: string | null;
+    plannedStartDate?: string | null;
+    plannedEndDate?: string | null;
+    duration?: {
+      value?: string | null;
+      unit?: string | null;
+    };
+    contractNature?: string | null;
+    legalBasis?: string | null;
     cpvCodes?: string[];
-    estimatedValue?: number | null;
-    currency?: string | null;
+    mainCpv?: string[];
+    lotMainCpvs?: string[];
+    lotAdditionalCpvs?: string[];
+    estimatedValue?: {
+      amount: number | null;
+      currency: string | null;
+    } | null;
+    placeOfPerformance?: {
+      countries?: string[];
+      cities?: string[];
+    };
+    lotIdentifiers?: string[];
+    internalLotIdentifiers?: string[];
+    documentUrls?: string[];
+    submissionUrls?: string[];
+    flags?: {
+      isDps?: boolean;
+      isFrameworkAgreement?: boolean;
+      isSmeSuitable?: boolean;
+      isEuFunded?: boolean;
+      electronicSubmission?: string | null;
+    };
     lots?: unknown;
     awardCriteria?: unknown;
+    selectionCriteria?: unknown;
     languages?: string[];
   };
   documents: Array<{

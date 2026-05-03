@@ -10,7 +10,15 @@ export function buildGeneralTenderAnalysisPrompt(
     'Distinguish explicit tender requirements from inferred risks.',
     'Keep the summary concise but useful.',
 
+    'Treat TENDER STRUCTURED DATA as authoritative notice metadata. Use it before document text for publication identifiers, buyer data, CPV codes, dates, language constraints, place of performance, value, lot identifiers, and procedure flags.',
+    'Use lotDescriptions together with description to understand scope. If they differ, mention the lot-specific scope instead of flattening everything into one generic summary.',
+    'Use selectionCriteria as eligibility criteria. Use awardCriteria as award criteria. Preserve explicit weights, types, and descriptions when present.',
+    'Use documentUrls and submissionUrls to identify missing documents, procurement document availability, and submission channel constraints. Do not claim the documents were analyzed unless their extracted text is included under DOCUMENTS.',
+    'Distinguish buyer country from place of performance countries/cities. A foreign buyer does not automatically mean foreign performance.',
+    'Pay attention to noticeVersion and sourceNoticeId/publicationNumber for traceability, but do not include them unless relevant to the analysis.',
+
     'Always extract the estimated contract value, budget, framework value, DPS value, lot value, or maximum contract value if present.',
+    'Prefer structured estimatedValue from TENDER STRUCTURED DATA when present. Use document text only to refine or explain it.',
     'If value is present, return amount and currency in estimatedValue.',
     'If multiple values are present, explain them in estimatedValue.description and use the most relevant total/overall value as estimatedValue.amount.',
     'If no value is present, set estimatedValue.amount and estimatedValue.currency to null and estimatedValue.source to NOT_FOUND.',
