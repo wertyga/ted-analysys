@@ -21,19 +21,13 @@ export class AuthService {
     this.utils = new AuthServiceUtils();
   }
 
-  constructCreateUserPayload({
-    username,
+  constructCreateTempUserPayload({
     email,
     password,
-  }: {
-    username: string;
-    email: string;
-    password: string;
-  }) {
+  }: Pick<UserType, 'email' | 'password'>) {
     const token = generateToken(email);
 
     const payload: Partial<UserType> = {
-      username,
       tempEmail: email,
       email: `${Math.random()}__TEMPORARY_EMAIL`,
       recoveryToken: token,
@@ -72,7 +66,7 @@ export class AuthService {
     const html = getEmailTemplate(emailTemplate)
       .replace('{{confirmLink}}', recoveryLink)
       .replace('{{recoveryToken}}', replaceData.recoveryToken)
-      .replace('{{username}}', replaceData.username);
+      .replace('{{companyName}}', replaceData.companyName);
 
     const subject = isRegister
       ? gfEmail.registerSubject
@@ -85,29 +79,10 @@ export class AuthService {
     });
   }
 
-  async createNewUser(
-    { username, email, password }: CreateUserDto,
-    existsUser?: UserDocument,
-  ): Promise<UserDocument> {
-    const payload = this.constructCreateUserPayload({
-      username,
-      email,
-      password,
-    });
+  async createNewUser(userPayload: CreateUserDto): Promise<UserDocument> {
+    const payload = this.constructCreateTempUserPayload(userPayload);
 
-    let user;
-    if (existsUser) {
-      for (let key in payload) {
-        existsUser[key] = payload[key];
-      }
-      await existsUser.save();
-      user = existsUser;
-    } else {
-      // @ts-ignore
-      user = await UserModel.create(payload);
-    }
-
-    return user;
+    return UserModel.create(payload as any);
   }
 
   async confirmUserEmail(recoveryToken: string) {
@@ -140,6 +115,7 @@ export class AuthService {
       email,
       status: { $ne: USER_TYPE.TEMPORARY },
     });
+
     const isPasswordsCompared = AuthService.isPasswordsValid(
       password,
       user?.hashPassword,
@@ -150,13 +126,13 @@ export class AuthService {
     }
 
     user.token = generateToken(email);
+    user.recoveryToken = '';
+    user.tempEmail = '';
 
     return user.save();
   }
 
-  async oauthSignIn({ email, username }: OauthSignInDto) {
-    const existsUser = await UserModel.findOne({ email });
-
+  async oauthSignIn({ email }: OauthSignInDto) {
     const token = generateToken(email);
 
     const user = await UserModel.findOneAndUpdate(
@@ -164,12 +140,12 @@ export class AuthService {
       {
         $set: {
           token,
+          recoveryToken: '',
+          tempEmail: '',
         },
         $setOnInsert: {
-          username: existsUser?.username || username,
-          status: existsUser?.status || USER_TYPE.USER,
-          credits: 0,
-          onboardingBonusApplied: false,
+          email,
+          status: USER_TYPE.USER,
         },
       },
       { upsert: true, returnDocument: 'after' },

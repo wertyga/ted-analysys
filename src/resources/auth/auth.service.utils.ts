@@ -3,9 +3,9 @@ import { USER_TYPE } from '@/resources/user/user.types';
 import { gfErrors } from '@/goldfish';
 
 export class AuthServiceUtils {
-  async checkIfUserExist(
+  async checkIfUserExistsGuard(
     fieldForCheck: Record<string, string>[],
-    error: any = gfErrors.entityExists('User'),
+    error: any = gfErrors.userExists(),
   ) {
     const existsUser = await UserModel.findOne({
       $or: fieldForCheck,

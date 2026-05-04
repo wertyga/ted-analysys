@@ -1,4 +1,4 @@
-import { Document, Model } from 'mongoose';
+import { Document, Model, Types } from 'mongoose';
 import { TSerializeOptions } from '@/types';
 
 export enum USER_TYPE {
@@ -8,9 +8,14 @@ export enum USER_TYPE {
   SUPER_ADMIN = 'SUPER_ADMIN',
 }
 
+export enum COMPANY_SIZE {
+  MICRO = 'Micro',
+  SME = 'SME',
+  ENTERPRISE = 'Enterprise',
+}
+
 export type TUser = {
   _id: string;
-  username: string;
   email: string;
   hashPassword: string;
   password: string;
@@ -19,6 +24,14 @@ export type TUser = {
   recoveryToken?: string;
   oauthId?: string;
   status: USER_TYPE;
+  companyName: string;
+  country: string;
+  operatingRegions: string[];
+  companySize: COMPANY_SIZE;
+  companyDescription: string;
+  industries: Types.ObjectId[];
+  mainServices: Types.ObjectId[];
+  languages: string[];
   createdAt: string;
   updatedAt: string;
 };

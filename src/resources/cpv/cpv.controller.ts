@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Get,
   Post,
@@ -15,6 +16,15 @@ import {
 } from '@nestjs/swagger';
 import { CpvCategoriesResponse, CpvCategorySyncResult } from './types';
 import { CpvService } from './cpv.service';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsArray, IsString } from 'class-validator';
+
+class CpvDescendantsRequestDto {
+  @ApiProperty({ type: [String], example: ['72000000', '48000000'] })
+  @IsArray()
+  @IsString({ each: true })
+  codes!: string[];
+}
 
 @ApiTags('cpv')
 @Controller('cpv')
@@ -41,6 +51,25 @@ export class CpvController {
   @ApiOkResponse({ type: CpvCategoriesResponse })
   async getCpvCategories(): Promise<CpvCategoriesResponse> {
     return this.cpvService.getCpvCategories();
+  }
+
+  @Get('industries')
+  @ApiOperation({ summary: 'List CPV industry codes with level 2' })
+  @ApiOkResponse({ type: CpvCategoriesResponse })
+  async getIndustries(): Promise<CpvCategoriesResponse> {
+    return this.cpvService.getIndustries();
+  }
+
+  @Get('descendants')
+  @ApiOperation({
+    summary: 'List child CPV categories for the given CPV codes',
+  })
+  @ApiOkResponse({ type: CpvCategoriesResponse })
+  @ApiBadRequestResponse({ description: 'Invalid CPV codes payload' })
+  async getDescendants(
+    @Query() { codes }: CpvDescendantsRequestDto,
+  ): Promise<CpvCategoriesResponse> {
+    return this.cpvService.findDescendants(codes);
   }
 
   // TODO: AdminGuard

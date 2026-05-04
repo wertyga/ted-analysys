@@ -7,7 +7,9 @@ import {
   UseFilters,
   UseGuards,
   Headers,
+  Res,
 } from '@nestjs/common';
+import { join } from 'path';
 import { AuthGuard } from '@/guards';
 import { UpdateUserDto, UserAuthDto } from './user.dto';
 import { UsersService } from './users.service';
@@ -29,6 +31,11 @@ import {
 export class UsersController {
   constructor(private usersService: UsersService) {}
 
+  @Get('/update-test')
+  updateUserTest(@Res() res) {
+    return res.sendFile(join(process.cwd(), 'test-html', 'update-user.html'));
+  }
+
   @ApiBearerAuth()
   @ApiBody({ type: UpdateUserDto })
   @ApiDefaultResponse({ type: UserAuthDto })
@@ -44,7 +51,7 @@ export class UsersController {
   @ApiDefaultResponse({ type: UserAuthDto })
   @Get('/self')
   async getSelfUser(@Req() req, @Headers() headers: Record<string, string>) {
-    const user = await UserModel.findById(req.user._id.toString());
+    const user = await this.usersService.getUser(req.user._id.toString());
 
     return {
       user: UserModel.serializeUser(user as UserDocument),

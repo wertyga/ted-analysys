@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const emailVariables = {
-  username: '{{username}}',
+  companyName: '{{companyName}}',
   confirmLink: '{{confirmLink}}',
   recoveryToken: '{{recoveryToken}}',
 
@@ -15,13 +15,13 @@ const emailVariables = {
 };
 
 type TEmailTemplatesCompare = {
-  [EMAIL_TEMPLATES.OauthRegistered]: 'username';
+  [EMAIL_TEMPLATES.OauthRegistered]: 'companyName';
   [EMAIL_TEMPLATES.RestorePassword]: 'recoveryToken';
-  [EMAIL_TEMPLATES.ConfirmEmail]: 'username' | 'confirmLink';
-  [EMAIL_TEMPLATES.ConfirmedEmail]: 'username';
+  [EMAIL_TEMPLATES.ConfirmEmail]: 'companyName' | 'confirmLink';
+  [EMAIL_TEMPLATES.ConfirmedEmail]: 'companyName';
   [EMAIL_TEMPLATES.ErrorEmail]: undefined;
   [EMAIL_TEMPLATES.PaymentSuccess]:
-    | 'username'
+    | 'companyName'
     | 'amount'
     | 'currency'
     | 'date'

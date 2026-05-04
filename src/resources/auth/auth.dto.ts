@@ -2,18 +2,20 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsArray,
   IsEmail,
+  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
   Length,
 } from 'class-validator';
+import { COMPANY_SIZE } from '@/resources/user/user.types';
 
 export class OauthBase {
   @ApiProperty({ required: true })
   email: string;
 
   @ApiProperty({ required: true })
-  username: string;
+  companyName: string;
 
   @ApiPropertyOptional()
   avatar?: string;
@@ -53,10 +55,6 @@ export class SignInUserDto {
 export class CreateUserDto {
   @ApiProperty({ required: true })
   @IsNotEmpty()
-  username: string;
-
-  @ApiProperty({ required: true })
-  @IsNotEmpty()
   @Length(6)
   password: string;
 
@@ -67,7 +65,7 @@ export class CreateUserDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  redirectUrl: string;
+  redirectUrl?: string;
 }
 
 export class ConfirmEmailDto {
@@ -128,5 +126,41 @@ export class OauthSignInDto {
   @ApiProperty()
   @IsNotEmpty()
   @IsString()
-  username: string;
+  companyName: string;
+
+  @ApiProperty({ example: 'PLN' })
+  @IsNotEmpty()
+  @IsString()
+  country: string;
+
+  @ApiProperty({ type: [String], example: ['PLN', 'GR'] })
+  @IsArray()
+  @IsString({ each: true })
+  operatingRegions: string[];
+
+  @ApiProperty({ enum: COMPANY_SIZE, example: COMPANY_SIZE.SME })
+  @IsEnum(COMPANY_SIZE)
+  companySize: COMPANY_SIZE;
+
+  @ApiProperty({
+    example: 'Software development company focused on public sector systems.',
+  })
+  @IsNotEmpty()
+  @IsString()
+  companyDescription: string;
+
+  @ApiProperty({ type: [String], example: ['3200000'] })
+  @IsArray()
+  @IsString({ each: true })
+  industries: string[];
+
+  @ApiProperty({ type: [String], example: ['3201000'] })
+  @IsArray()
+  @IsString({ each: true })
+  mainServices: string[];
+
+  @ApiProperty({ type: [String], example: ['ENG', 'PLN'] })
+  @IsArray()
+  @IsString({ each: true })
+  languages: string[];
 }

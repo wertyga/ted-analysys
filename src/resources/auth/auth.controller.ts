@@ -8,7 +8,9 @@ import {
   Res,
   UseFilters,
   Headers,
+  UseGuards,
 } from '@nestjs/common';
+import { join } from 'path';
 import {
   filterModel,
   generateToken,
@@ -42,6 +44,7 @@ import { AuthService } from './auth.service';
 import { getEmailTemplate } from '@/resources/email/email.utils';
 import { EMAIL_TEMPLATES } from '@/resources/email/type';
 import { HttpErrorLoggingFilter } from '@/http-logger/HTTPLogger';
+import { AuthGuard } from '@/guards';
 
 export const AUTH_EXCLUDE_FIELDS = '';
 
@@ -50,6 +53,11 @@ export const AUTH_EXCLUDE_FIELDS = '';
 @Controller('/auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
+
+  @Get('/google-test')
+  googleAuthTest(@Res() res) {
+    return res.sendFile(join(process.cwd(), 'test-html', 'google-auth.html'));
+  }
 
   @ApiBody({ type: SignInUserDto })
   @ApiDefaultResponse({ type: UserAuthDto })
@@ -86,26 +94,20 @@ export class AuthController {
   @ApiDefaultResponse({ type: SuccessDto })
   @Post('/signup')
   async signUpUser(@Body() userPayload: CreateUserDto, @Req() req) {
-    const { username, email } = userPayload;
-    const slug = string_to_slug(username);
+    const { email } = userPayload;
 
-    const existsUser = await this.authService.utils.checkIfUserExist([
+    await this.authService.utils.checkIfUserExistsGuard([
       { email },
-      { username },
-      { slug },
       { tempEmail: email },
     ]);
 
-    const user = await this.authService.createNewUser(
-      userPayload,
-      existsUser as UserDocument,
-    );
+    const user = await this.authService.createNewUser(userPayload);
 
     await this.authService.sendConfirmLink({
       email: user.tempEmail ?? '',
       origin: getOrigin(req),
       replaceData: {
-        username: user.username,
+        companyName: user.companyName,
       },
       token: user.recoveryToken,
       redirectUrl: '/auth/confirm-email',
@@ -130,13 +132,13 @@ export class AuthController {
     let html = '';
 
     if (!user) {
-      html = getEmailTemplate(EMAIL_TEMPLATES.ErrorEmail);
+      throw gfErrors.dataBroken();
     } else {
       logger.info('CONFIRM_EMAIL', { email: user.email });
 
       html = getEmailTemplate(EMAIL_TEMPLATES.ConfirmedEmail)?.replace(
-        '{{username}}',
-        user.username,
+        '{{companyName}}',
+        user.companyName,
       );
     }
 
@@ -207,19 +209,21 @@ export class AuthController {
   @ApiHeaders([headers.authorization])
   @ApiDefaultResponse({ type: SuccessDto })
   @ApiBody({ type: ChangeEmailDto })
+  @UseGuards(AuthGuard)
   @Post('/change-email')
   async changeEmail(
     @Req() req,
     @Body() { newEmail, password }: ChangeEmailDto,
   ) {
-    if (
-      !req.user ||
-      !AuthService.isPasswordsValid(password, req.user?.hashPassword)
-    ) {
+    const isUserValid = AuthService.isPasswordsValid(
+      password,
+      req.user?.hashPassword,
+    );
+    if (!isUserValid) {
       throw gfErrors.userNotFound();
     }
 
-    await this.authService.utils.checkIfUserExist([{ email: newEmail }]);
+    await this.authService.utils.checkIfUserExistsGuard([{ email: newEmail }]);
 
     req.user.tempEmail = newEmail;
     req.user.recoveryToken = generateToken(newEmail);
@@ -229,7 +233,7 @@ export class AuthController {
         email: req.user.tempEmail,
         origin: getOrigin(req),
         replaceData: {
-          username: req.user.username,
+          companyName: req.user.companyName,
         },
         token: req.user.recoveryToken,
         redirectUrl: '/auth/confirm-email',

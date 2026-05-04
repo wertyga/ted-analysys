@@ -136,6 +136,31 @@ export class CpvService {
     ).sort();
   }
 
+  async findDescendants(codes: string[]): Promise<CpvCategoriesResponse> {
+    const normalizedCodes = this.normalizeCodes(codes);
+
+    if (normalizedCodes.length === 0) {
+      return { count: 0, items: [] };
+    }
+
+    const categories = await CpvCategoryModel.find({
+      $or: normalizedCodes.map((code) => {
+        return {
+          code: { $regex: `^${this.getSignificantPrefix(code)}` },
+        };
+      }),
+    })
+      .select(cpvCodesListFields)
+      .sort({ level: 1 })
+      .lean()
+      .then((codes) => codes.slice(normalizedCodes.length));
+
+    return {
+      count: categories.length,
+      items: categories.map((category) => this.toResponseItem(category)),
+    };
+  }
+
   private normalizeCodes(codes: string[]): string[] {
     return Array.from(
       new Set(
@@ -227,12 +252,19 @@ export class CpvService {
 
     return {
       count: categories.length,
-      items: categories.map((category) => ({
-        code: category.code,
-        name: category.name,
-        parentCode: category.parentCode,
-        level: category.level,
-      })),
+      items: categories.map((category) => this.toResponseItem(category)),
+    };
+  }
+
+  async getIndustries(): Promise<CpvCategoriesResponse> {
+    const categories = await CpvCategoryModel.find({ level: 2 })
+      .select(cpvCodesListFields)
+      .sort({ code: 1 })
+      .lean();
+
+    return {
+      count: categories.length,
+      items: categories.map((category) => this.toResponseItem(category)),
     };
   }
 

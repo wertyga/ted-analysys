@@ -1,5 +1,6 @@
 import { model, Schema } from 'mongoose';
 import {
+  COMPANY_SIZE,
   TUser as UserType,
   USER_TYPE,
   UserDocument,
@@ -11,10 +12,6 @@ import { USER_LIST_FIELDS } from './user.dto';
 
 export const UserSchema = new Schema<UserType>(
   {
-    username: {
-      type: String,
-      require: true,
-    },
     email: {
       type: String,
       unique: true,
@@ -37,6 +34,37 @@ export const UserSchema = new Schema<UserType>(
       type: String,
       enum: USER_TYPE,
       require: true,
+    },
+    companyName: {
+      type: String,
+    },
+    country: {
+      type: String,
+    },
+    operatingRegions: {
+      type: [String],
+      default: [],
+    },
+    companySize: {
+      type: String,
+      enum: COMPANY_SIZE,
+    },
+    companyDescription: {
+      type: String,
+    },
+    industries: {
+      type: [Schema.Types.ObjectId],
+      ref: 'CpvCategory',
+      default: [],
+    },
+    mainServices: {
+      type: [Schema.Types.ObjectId],
+      ref: 'CpvCategory',
+      default: [],
+    },
+    languages: {
+      type: [String],
+      default: [],
     },
   },
   { timestamps: true },
