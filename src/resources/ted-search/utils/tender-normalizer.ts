@@ -5,11 +5,19 @@ import { CPV_CODES_LIST_FIELDS } from '@/resources/cpv/cpv.service';
 
 type JsonRecord = Record<string, unknown>;
 type NormalizedCpvCategory = {
+  _id?: unknown;
   code: string;
   name?: string;
   parentCode?: string;
   level?: number;
 };
+
+const cpvClassificationFields = [
+  'classificationCpv',
+  'mainClassificationProc',
+  'mainClassificationLot',
+  'additionalClassificationLot',
+] as const;
 
 export function tenderNormilizer(tender: TedNotice): TedNotice {
   return normalizeValue(tender, undefined, new WeakSet<object>()) as TedNotice;
@@ -35,7 +43,15 @@ export async function normalizeTenderSearchResponse(
 export async function fillClassificationCpvByCodes(
   tender: TedNotice,
 ): Promise<TedNotice> {
-  const codes = extractCpvCodes(tender.classificationCpv);
+  const fieldCodes = cpvClassificationFields.reduce(
+    (acc, field) => {
+      acc[field] = extractCpvCodes(tender[field]);
+
+      return acc;
+    },
+    {} as Record<(typeof cpvClassificationFields)[number], string[]>,
+  );
+  const codes = Array.from(new Set(Object.values(fieldCodes).flat()));
 
   if (codes.length === 0) {
     return tender;
@@ -48,23 +64,51 @@ export async function fillClassificationCpvByCodes(
     categories.map((category) => [category.code, category]),
   );
 
+  const normalizedFields = cpvClassificationFields.reduce(
+    (acc, field) => {
+      acc[field] = fieldCodes[field].map((code) =>
+        toNormalizedCpv(code, byCode),
+      );
+
+      return acc;
+    },
+    {} as Record<
+      (typeof cpvClassificationFields)[number],
+      NormalizedCpvCategory[]
+    >,
+  );
+
   return {
     ...tender,
-    classificationCpv: codes.map<NormalizedCpvCategory>((code) => {
-      const category = byCode.get(code);
+    ...normalizedFields,
+  };
+}
 
-      if (category === undefined) {
-        return { code };
-      }
+function toNormalizedCpv(
+  code: string,
+  byCode: Map<
+    string,
+    {
+      _id: unknown;
+      code: string;
+      name?: string;
+      parentCode?: string;
+      level?: number;
+    }
+  >,
+): NormalizedCpvCategory {
+  const category = byCode.get(code);
 
-      return {
-        _id: category._id,
-        code: category.code,
-        name: category.name,
-        parentCode: category.parentCode,
-        level: category.level,
-      };
-    }),
+  if (category === undefined) {
+    return { code };
+  }
+
+  return {
+    _id: category._id,
+    code: category.code,
+    name: category.name,
+    parentCode: category.parentCode,
+    level: category.level,
   };
 }
 

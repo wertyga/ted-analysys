@@ -70,9 +70,11 @@ export class TenderGeneralAnalysisBuilder {
         contractNature: tender.contractNature ?? null,
         legalBasis: tender.legalBasis ?? null,
         cpvCodes: this.extractCpvCodes(tender),
-        mainCpv: tender.mainClassificationProc ?? [],
-        lotMainCpvs: tender.mainClassificationLot ?? [],
-        lotAdditionalCpvs: tender.additionalClassificationLot ?? [],
+        mainCpv: this.extractCpvCodeList(tender.mainClassificationProc),
+        lotMainCpvs: this.extractCpvCodeList(tender.mainClassificationLot),
+        lotAdditionalCpvs: this.extractCpvCodeList(
+          tender.additionalClassificationLot,
+        ),
         estimatedValue: tender.estimatedValue
           ? {
               amount: tender.estimatedValue.amount,
@@ -453,6 +455,16 @@ export class TenderGeneralAnalysisBuilder {
       .filter((code): code is string => code !== null);
 
     return Array.from(new Set(codes));
+  }
+
+  private extractCpvCodeList(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .map((cpv) => this.extractCpvCode(cpv))
+      .filter((code): code is string => code !== null);
   }
 
   private extractCpvCode(cpv: unknown): string | null {

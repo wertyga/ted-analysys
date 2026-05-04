@@ -1,5 +1,4 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { CpvCategoryModel, CpvCategory } from './schemas';
 import {
@@ -7,7 +6,6 @@ import {
   CpvCategoryResponseItem,
   CpvCategorySyncResult,
 } from './types';
-import { cpvCodesListFields } from '@/resources/ted-search/utils';
 
 export const CPV_CODES_LIST_FIELDS = 'code name parentCode level';
 
@@ -37,7 +35,7 @@ export class CpvService {
           };
     const [items, count] = await Promise.all([
       CpvCategoryModel.find(filter)
-        .select(cpvCodesListFields)
+        .select(CPV_CODES_LIST_FIELDS)
         .sort({ code: 1 })
         .limit(limit)
         .lean(),
@@ -103,7 +101,7 @@ export class CpvService {
     const items = await CpvCategoryModel.find({
       code: { $in: normalizedCodes },
     })
-      .select(cpvCodesListFields)
+      .select(CPV_CODES_LIST_FIELDS)
       .lean();
     const byCode = new Map(
       items.map((item) => [item.code, this.toResponseItem(item)]),
@@ -148,7 +146,7 @@ export class CpvService {
         };
       }),
     })
-      .select(cpvCodesListFields)
+      .select(CPV_CODES_LIST_FIELDS)
       .sort({ level: 1 })
       .lean()
       .then((codes) => codes.slice(normalizedCodes.length));
@@ -241,7 +239,7 @@ export class CpvService {
 
   async getCpvCategories(): Promise<CpvCategoriesResponse> {
     const categories = await CpvCategoryModel.find()
-      .select(cpvCodesListFields)
+      .select(CPV_CODES_LIST_FIELDS)
       .sort({ code: 1 })
       .lean();
 
@@ -253,7 +251,7 @@ export class CpvService {
 
   async getIndustries(): Promise<CpvCategoriesResponse> {
     const categories = await CpvCategoryModel.find({ level: 2 })
-      .select(cpvCodesListFields)
+      .select(CPV_CODES_LIST_FIELDS)
       .sort({ code: 1 })
       .lean();
 

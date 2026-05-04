@@ -25,7 +25,12 @@ export class TenderNormalizerService {
     rawNotice: TedNotice,
     rawIds = false,
   ): Promise<TenderDto> {
-    const { classificationCpv } = await fillClassificationCpvByCodes(
+    const {
+      classificationCpv,
+      mainClassificationProc,
+      mainClassificationLot,
+      additionalClassificationLot,
+    } = await fillClassificationCpvByCodes(
       tenderNormilizer(rawNotice),
     );
 
@@ -34,6 +39,15 @@ export class TenderNormalizerService {
       classificationCpv: rawIds
         ? classificationCpv.map((category) => category._id)
         : classificationCpv,
+      mainClassificationProc: rawIds
+        ? mainClassificationProc.map((category) => category._id)
+        : mainClassificationProc,
+      mainClassificationLot: rawIds
+        ? mainClassificationLot.map((category) => category._id)
+        : mainClassificationLot,
+      additionalClassificationLot: rawIds
+        ? additionalClassificationLot.map((category) => category._id)
+        : additionalClassificationLot,
     };
   }
 
@@ -164,15 +178,15 @@ export class TenderNormalizerService {
       mainClassificationProc: this.pickTextArray(rawNotice, [
         'main-classification-proc',
         'mainClassificationProc',
-      ]),
+      ]) as TenderDto['mainClassificationProc'],
       mainClassificationLot: this.pickTextArray(rawNotice, [
         'main-classification-lot',
         'mainClassificationLot',
-      ]),
+      ]) as TenderDto['mainClassificationLot'],
       additionalClassificationLot: this.pickTextArray(rawNotice, [
         'additional-classification-lot',
         'additionalClassificationLot',
-      ]),
+      ]) as TenderDto['additionalClassificationLot'],
       placeOfPerformanceCountries: this.pickTextArray(rawNotice, [
         'place-of-performance-country-proc',
         'placeOfPerformanceCountryProc',

@@ -282,24 +282,25 @@ export class TenderDto {
   electronicSubmission?: string;
 
   @ApiPropertyOptional({
-    type: [String],
+    type: [TenderCpvDto],
     description:
-      'TED main-classification-proc: main CPV code at procedure level.',
+      'CpvCategory documents resolved from TED main-classification-proc.',
   })
-  mainClassificationProc?: string[];
+  mainClassificationProc?: TenderCpvDto[];
 
   @ApiPropertyOptional({
-    type: [String],
-    description: 'TED main-classification-lot: main CPV codes at lot level.',
+    type: [TenderCpvDto],
+    description:
+      'CpvCategory documents resolved from TED main-classification-lot.',
   })
-  mainClassificationLot?: string[];
+  mainClassificationLot?: TenderCpvDto[];
 
   @ApiPropertyOptional({
-    type: [String],
+    type: [TenderCpvDto],
     description:
-      'TED additional-classification-lot: additional CPV codes at lot level.',
+      'CpvCategory documents resolved from TED additional-classification-lot.',
   })
-  additionalClassificationLot?: string[];
+  additionalClassificationLot?: TenderCpvDto[];
 
   @ApiPropertyOptional({
     type: [String],

@@ -24,10 +24,15 @@ import {
   isTedPublicationNumber,
   valueToString,
 } from '@/utils';
-import { cpvCodesListFields } from '@/resources/ted-search/utils';
 import { CPV_CODES_LIST_FIELDS } from '@/resources/cpv/cpv.service';
 
 type TenderRecord = Tender & { _id?: unknown };
+const tenderCpvPopulateFields = [
+  { path: 'classificationCpv', select: CPV_CODES_LIST_FIELDS },
+  { path: 'mainClassificationProc', select: CPV_CODES_LIST_FIELDS },
+  { path: 'mainClassificationLot', select: CPV_CODES_LIST_FIELDS },
+  { path: 'additionalClassificationLot', select: CPV_CODES_LIST_FIELDS },
+];
 export type TenderListDto = Omit<
   TenderDto,
   | 'links'
@@ -156,7 +161,7 @@ export class TendersService {
       { returnDocument: 'after', upsert: true },
     ).exec();
 
-    return tenderDoc.populate('classificationCpv', CPV_CODES_LIST_FIELDS);
+    return tenderDoc.populate(tenderCpvPopulateFields);
   }
 
   async upsertMultipleTenders(notices: TedNotice[]): Promise<TenderDocument[]> {
@@ -183,7 +188,7 @@ export class TendersService {
       { strict: false },
     );
 
-    return localTender.populate('classificationCpv', CPV_CODES_LIST_FIELDS);
+    return localTender.populate(tenderCpvPopulateFields);
   }
 
   async findByIdOrFetchFromTed(
@@ -313,7 +318,7 @@ export class TendersService {
         { sourceNoticeId: publicationNumber },
       ],
     })
-      .populate('classificationCpv', cpvCodesListFields)
+      .populate(tenderCpvPopulateFields)
       .exec();
   }
 
@@ -357,9 +362,12 @@ export class TendersService {
       isFrameworkAgreement: tender.isFrameworkAgreement,
       isSmeSuitable: tender.isSmeSuitable,
       electronicSubmission: tender.electronicSubmission,
-      mainClassificationProc: tender.mainClassificationProc,
-      mainClassificationLot: tender.mainClassificationLot,
-      additionalClassificationLot: tender.additionalClassificationLot,
+      mainClassificationProc:
+        tender.mainClassificationProc as TenderDto['mainClassificationProc'],
+      mainClassificationLot:
+        tender.mainClassificationLot as TenderDto['mainClassificationLot'],
+      additionalClassificationLot:
+        tender.additionalClassificationLot as TenderDto['additionalClassificationLot'],
       placeOfPerformanceCountries: tender.placeOfPerformanceCountries,
       placeOfPerformanceCities: tender.placeOfPerformanceCities,
       lotIdentifiers: tender.lotIdentifiers,

@@ -4,11 +4,11 @@ import { TUser, USER_TYPE, UserDocument } from './user.types';
 import { getLimitAndSortCursor } from '@/utils';
 import { UserModel } from './user.schema';
 import { CpvCategoryModel } from '@/resources/cpv/schemas';
-import { cpvCodesListFields } from '@/resources/ted-search/utils';
+import { CPV_CODES_LIST_FIELDS } from '@/resources/cpv/cpv.service';
 
 const userCpvPopulateFields = [
-  { path: 'industries', select: cpvCodesListFields },
-  { path: 'mainServices', select: cpvCodesListFields },
+  { path: 'industries', select: CPV_CODES_LIST_FIELDS },
+  { path: 'mainServices', select: CPV_CODES_LIST_FIELDS },
 ];
 
 @Injectable()

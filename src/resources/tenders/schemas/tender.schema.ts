@@ -80,12 +80,12 @@ export interface Tender {
   isSmeSuitable?: boolean;
   /** TED electronic-submission-lot: electronic submission requirement/availability value. */
   electronicSubmission?: string;
-  /** TED main-classification-proc: main CPV code at procedure level. */
-  mainClassificationProc?: string[];
-  /** TED main-classification-lot: main CPV codes at lot level. */
-  mainClassificationLot?: string[];
-  /** TED additional-classification-lot: additional CPV codes at lot level. */
-  additionalClassificationLot?: string[];
+  /** Mongo ObjectId references to CpvCategory documents from TED main-classification-proc. */
+  mainClassificationProc?: unknown[];
+  /** Mongo ObjectId references to CpvCategory documents from TED main-classification-lot. */
+  mainClassificationLot?: unknown[];
+  /** Mongo ObjectId references to CpvCategory documents from TED additional-classification-lot. */
+  additionalClassificationLot?: unknown[];
   /** TED place-of-performance-country-* fields: countries where the contract is performed. */
   placeOfPerformanceCountries?: string[];
   /** TED place-of-performance-city-* fields: cities where the contract is performed. */
@@ -174,9 +174,21 @@ const TenderSchema = new Schema<TenderDocument>(
       index: true,
     },
     electronicSubmission: String,
-    mainClassificationProc: { type: [String], default: undefined },
-    mainClassificationLot: { type: [String], default: undefined },
-    additionalClassificationLot: { type: [String], default: undefined },
+    mainClassificationProc: {
+      type: [Schema.Types.ObjectId],
+      ref: 'CpvCategory',
+      default: [],
+    },
+    mainClassificationLot: {
+      type: [Schema.Types.ObjectId],
+      ref: 'CpvCategory',
+      default: [],
+    },
+    additionalClassificationLot: {
+      type: [Schema.Types.ObjectId],
+      ref: 'CpvCategory',
+      default: [],
+    },
     placeOfPerformanceCountries: { type: [String], default: undefined },
     placeOfPerformanceCities: { type: [String], default: undefined },
     lotIdentifiers: { type: [String], default: undefined },
