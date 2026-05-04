@@ -60,8 +60,8 @@ export class TedSearchController {
     @Body() body: TedTenderSearchRequestDto,
   ): Promise<TedSearchResponse> {
     const updatedData = {
-      ...body,
       noticeTypes: TENDER_COMPETITION_NOTICE_TYPES,
+      ...body,
     };
     const data = await this.tedSearchService.searchTenders(updatedData);
 
