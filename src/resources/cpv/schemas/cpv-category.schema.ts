@@ -5,9 +5,7 @@ export interface CpvCategory {
   name: string;
   parentCode?: string;
   level: number;
-  source: string;
   sourceVersion: string;
-  syncedAt: Date;
 }
 
 export type CpvCategoryDocument = CpvCategory & Document;
@@ -18,9 +16,7 @@ const CpvCategorySchema = new Schema<CpvCategoryDocument>(
     name: { type: String, required: true, index: true },
     parentCode: { type: String, index: true },
     level: { type: Number, required: true, index: true },
-    source: { type: String, required: true },
     sourceVersion: { type: String, required: true },
-    syncedAt: { type: Date, required: true },
   },
   {
     collection: 'cpv_categories',

@@ -9,6 +9,8 @@ import {
 } from './types';
 import { cpvCodesListFields } from '@/resources/ted-search/utils';
 
+export const CPV_CODES_LIST_FIELDS = 'code name parentCode level';
+
 @Injectable()
 export class CpvService {
   private readonly cpvCodelistUrl: string;
@@ -52,11 +54,9 @@ export class CpvService {
     const response = await axios.get<string>(this.cpvCodelistUrl, {
       timeout: 30000,
     });
-    const syncedAt = new Date();
     const sourceVersion = this.parseCpvSourceVersion(response.data);
     const categories = this.parseCpvCategoriesFromHtml(
       response.data,
-      syncedAt,
       sourceVersion,
     );
 
@@ -84,14 +84,12 @@ export class CpvService {
     );
 
     return {
-      source: this.cpvCodelistUrl,
       sourceVersion,
       fetchedCount: categoriesWithParents.length,
       insertedCount: result.insertedCount,
       modifiedCount: result.modifiedCount,
       upsertedCount: result.upsertedCount,
       matchedCount: result.matchedCount,
-      syncedAt: syncedAt.toISOString(),
     };
   }
 
@@ -185,7 +183,6 @@ export class CpvService {
 
   private parseCpvCategoriesFromHtml(
     html: string,
-    syncedAt: Date,
     sourceVersion: string,
   ): CpvCategory[] {
     const codeLabelPattern =
@@ -206,9 +203,7 @@ export class CpvService {
         code,
         name: this.decodeHtml(this.stripHtml(match[2])).trim(),
         level: this.getCpvCodeLevel(code),
-        source: this.cpvCodelistUrl,
         sourceVersion,
-        syncedAt,
       });
     }
 
@@ -282,15 +277,12 @@ export class CpvService {
       .replace(/&apos;/g, "'");
   }
 
-  private toResponseItem(
-    item: Pick<CpvCategory, 'code' | 'name' | 'parentCode' | 'level'>,
-  ): CpvCategoryResponseItem {
-    return {
-      code: item.code,
-      name: item.name,
-      parentCode: item.parentCode,
-      level: item.level,
-    };
+  private toResponseItem(item: CpvCategory): CpvCategoryResponseItem {
+    return CPV_CODES_LIST_FIELDS.split(' ').reduce((acc, field) => {
+      acc[field] = item[field];
+
+      return acc;
+    }, {} as CpvCategoryResponseItem);
   }
 
   private escapeRegex(value: string): string {

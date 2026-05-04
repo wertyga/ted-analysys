@@ -109,6 +109,8 @@ export class TenderGeneralAnalysisService {
       tenderId: tender.id,
     }).exec();
 
+    // this.buildGeneralTenderAnalysisSourceHash();
+
     const hasDoneAnalysis =
       existingBaseAnalysis &&
       existingBaseAnalysis.resultJson &&

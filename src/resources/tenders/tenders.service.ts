@@ -25,6 +25,7 @@ import {
   valueToString,
 } from '@/utils';
 import { cpvCodesListFields } from '@/resources/ted-search/utils';
+import { CPV_CODES_LIST_FIELDS } from '@/resources/cpv/cpv.service';
 
 type TenderRecord = Tender & { _id?: unknown };
 export type TenderListDto = Omit<
@@ -155,7 +156,7 @@ export class TendersService {
       { returnDocument: 'after', upsert: true },
     ).exec();
 
-    return tenderDoc.populate('classificationCpv');
+    return tenderDoc.populate('classificationCpv', CPV_CODES_LIST_FIELDS);
   }
 
   async upsertMultipleTenders(notices: TedNotice[]): Promise<TenderDocument[]> {
@@ -182,26 +183,26 @@ export class TendersService {
       { strict: false },
     );
 
-    return localTender.populate('classificationCpv');
+    return localTender.populate('classificationCpv', CPV_CODES_LIST_FIELDS);
   }
 
   async findByIdOrFetchFromTed(
     id: string,
   ): Promise<TenderDocumentWithGeneralAnalysis> {
-    const localTender = await this.findLocalTender(id);
-
-    if (localTender) {
-      return this.getLocalTenderWithBaseAnalysis(localTender);
-    }
-
     const publicationNumber = id.trim();
 
     if (!isTedPublicationNumber(publicationNumber)) {
       throw new NotFoundException(`Tender ${id} not found`);
     }
 
-    const tedNotice =
-      await this.fetchTedNoticeByPublicationNumber(publicationNumber);
+    const [localTender, tedNotice] = await Promise.all([
+      this.findLocalTender(id),
+      this.fetchTedNoticeByPublicationNumber(publicationNumber),
+    ]);
+    console.log({ tedNotice });
+    if (localTender) {
+      return this.getLocalTenderWithBaseAnalysis(localTender);
+    }
 
     if (!tedNotice) {
       throw new NotFoundException(`Tender ${id} not found`);

@@ -1,6 +1,7 @@
 import { TedNotice, TedSearchResponse } from '../types/ted-search.types';
 import { CpvCategoryModel } from '../../cpv/schemas';
 import { isRecord } from '@/utils';
+import { CPV_CODES_LIST_FIELDS } from '@/resources/cpv/cpv.service';
 
 type JsonRecord = Record<string, unknown>;
 type NormalizedCpvCategory = {
@@ -9,8 +10,6 @@ type NormalizedCpvCategory = {
   parentCode?: string;
   level?: number;
 };
-
-export const cpvCodesListFields = 'code name parentCode level';
 
 export function tenderNormilizer(tender: TedNotice): TedNotice {
   return normalizeValue(tender, undefined, new WeakSet<object>()) as TedNotice;
@@ -43,7 +42,7 @@ export async function fillClassificationCpvByCodes(
   }
 
   const categories = await CpvCategoryModel.find({ code: { $in: codes } })
-    .select(cpvCodesListFields)
+    .select(CPV_CODES_LIST_FIELDS)
     .lean();
   const byCode = new Map(
     categories.map((category) => [category.code, category]),
