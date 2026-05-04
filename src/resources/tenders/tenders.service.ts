@@ -204,7 +204,7 @@ export class TendersService {
       this.findLocalTender(id),
       this.fetchTedNoticeByPublicationNumber(publicationNumber),
     ]);
-    console.log({ tedNotice });
+
     if (localTender) {
       return this.getLocalTenderWithBaseAnalysis(localTender);
     }
