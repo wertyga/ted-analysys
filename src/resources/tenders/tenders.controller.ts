@@ -25,7 +25,7 @@ export class TendersController {
     const tender = tba.toObject();
 
     return {
-      ...tender,
+      ...this.tendersService.toDetailDto(tender),
       generalAnalysis: this.tenderGeneralAnalysisService.toDetailDto(
         tender.generalAnalysis,
       ),

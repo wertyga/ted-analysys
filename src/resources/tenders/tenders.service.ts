@@ -401,8 +401,15 @@ export class TendersService {
       submissionUrls,
       selectionCriteria,
       awardCriteria,
+      cpvCodes,
       ...dto
     } = this.mapTenderDocumentToDto(tender);
+
+    return dto;
+  }
+
+  toDetailDto(tender: TenderDocument) {
+    const { cpvCodes, ...dto } = this.mapTenderDocumentToDto(tender);
 
     return dto;
   }
