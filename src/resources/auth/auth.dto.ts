@@ -122,45 +122,4 @@ export class OauthSignInDto {
   @IsNotEmpty()
   @IsString()
   email: string;
-
-  @ApiProperty()
-  @IsNotEmpty()
-  @IsString()
-  companyName: string;
-
-  @ApiProperty({ example: 'PLN' })
-  @IsNotEmpty()
-  @IsString()
-  country: string;
-
-  @ApiProperty({ type: [String], example: ['PLN', 'GR'] })
-  @IsArray()
-  @IsString({ each: true })
-  operatingRegions: string[];
-
-  @ApiProperty({ enum: COMPANY_SIZE, example: COMPANY_SIZE.SME })
-  @IsEnum(COMPANY_SIZE)
-  companySize: COMPANY_SIZE;
-
-  @ApiProperty({
-    example: 'Software development company focused on public sector systems.',
-  })
-  @IsNotEmpty()
-  @IsString()
-  companyDescription: string;
-
-  @ApiProperty({ type: [String], example: ['3200000'] })
-  @IsArray()
-  @IsString({ each: true })
-  industries: string[];
-
-  @ApiProperty({ type: [String], example: ['3201000'] })
-  @IsArray()
-  @IsString({ each: true })
-  mainServices: string[];
-
-  @ApiProperty({ type: [String], example: ['ENG', 'PLN'] })
-  @IsArray()
-  @IsString({ each: true })
-  languages: string[];
 }
