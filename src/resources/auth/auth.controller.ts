@@ -62,10 +62,7 @@ export class AuthController {
   @ApiBody({ type: SignInUserDto })
   @ApiDefaultResponse({ type: UserAuthDto })
   @Post('/oauth/google')
-  async oauthGoogle(
-    @Body() data: OauthSignInDto,
-    @Headers() headers: Record<string, string>,
-  ) {
+  async oauthGoogle(@Body() data: OauthSignInDto) {
     const user = await this.authService.oauthSignIn(data);
 
     return {
@@ -182,10 +179,7 @@ export class AuthController {
   @ApiDefaultResponse({ type: UserAuthDto })
   @ApiBody({ type: ChangePasswordDto })
   @Post('/change-password')
-  async changePassword(
-    @Req() req,
-    @Body() { password, token, email }: ChangePasswordDto,
-  ) {
+  async changePassword(@Body() { password, token, email }: ChangePasswordDto) {
     const user = await UserModel.findOne({
       email,
       recoveryToken: token,

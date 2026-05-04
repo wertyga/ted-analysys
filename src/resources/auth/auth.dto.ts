@@ -44,12 +44,6 @@ export class SignInUserDto {
   })
   @IsNotEmpty()
   password: string;
-
-  @ApiPropertyOptional({ type: [String] })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  taskIds?: string[];
 }
 
 export class CreateUserDto {
