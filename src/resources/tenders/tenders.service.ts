@@ -18,11 +18,11 @@ import { Tender, TenderDocument, TenderModel } from './schemas';
 import { TenderNormalizerService } from './tender-normalizer.service';
 import { TedPublicationNumbersSearchRequestDto } from '@/resources/ted-search/dto/ted-publication-numbers-search-request.dto';
 import {
+  areTedNoticeVersionsDifferent,
   extractPublicationNumberFromNotice,
   isRecord,
   isTedNotice,
   isTedPublicationNumber,
-  valueToString,
 } from '@/utils';
 import { CPV_CODES_LIST_FIELDS } from '@/resources/cpv/cpv.service';
 
@@ -176,10 +176,12 @@ export class TendersService {
 
   async getLocalTenderWithBaseAnalysis(
     localTender: TenderDocument,
+    isForceBaseAnalysis?: boolean,
   ): Promise<TenderDocumentWithGeneralAnalysis> {
     const generalAnalysis =
       await this.tenderGeneralAnalysisService.ensureAnalysisForTender(
         localTender,
+        isForceBaseAnalysis,
       );
 
     localTender.set(
@@ -205,7 +207,12 @@ export class TendersService {
       this.fetchTedNoticeByPublicationNumber(publicationNumber),
     ]);
 
-    if (localTender) {
+    const areVersionsDifferent = areTedNoticeVersionsDifferent(
+      localTender?.noticeVersion,
+      tedNotice,
+    );
+
+    if (localTender && !areVersionsDifferent) {
       return this.getLocalTenderWithBaseAnalysis(localTender);
     }
 
@@ -213,7 +220,10 @@ export class TendersService {
       throw new NotFoundException(`Tender ${id} not found`);
     }
 
-    return this.upsertIfNeededTenderWithGeneralAnalysis(tedNotice);
+    return this.upsertIfNeededTenderWithGeneralAnalysis(
+      tedNotice,
+      areVersionsDifferent,
+    );
   }
 
   async fetchTedNoticeByPublicationNumber(
@@ -279,6 +289,7 @@ export class TendersService {
 
   async upsertIfNeededTenderWithGeneralAnalysis(
     notice: TedNotice,
+    isForceBaseAnalysis = false,
   ): Promise<TenderDocumentWithGeneralAnalysis> {
     const publicationNumber = extractPublicationNumberFromNotice(notice);
 
@@ -288,8 +299,11 @@ export class TendersService {
 
     let savedTender: TenderDocument | null | undefined =
       await TenderModel.findOne({ id: publicationNumber });
+    const shouldUpsertTender =
+      !savedTender ||
+      areTedNoticeVersionsDifferent(savedTender.noticeVersion, notice);
 
-    if (!savedTender) {
+    if (shouldUpsertTender) {
       savedTender = await this.upsertTender(notice);
     }
 
@@ -297,7 +311,10 @@ export class TendersService {
       throw new NotFoundException(`Tender ${publicationNumber} not found`);
     }
 
-    return this.getLocalTenderWithBaseAnalysis(savedTender);
+    return this.getLocalTenderWithBaseAnalysis(
+      savedTender,
+      isForceBaseAnalysis,
+    );
   }
 
   async upsertIfNeededMultipleTendersWithGeneralAnalysis(notices: TedNotice[]) {

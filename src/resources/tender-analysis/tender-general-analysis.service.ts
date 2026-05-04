@@ -102,14 +102,13 @@ export class TenderGeneralAnalysisService {
 
   async ensureAnalysisForTender(
     tender: TenderDocument,
+    isForceBaseAnalysis = false,
   ): Promise<TenderGeneralAnalysisDocument> {
     const tenderObjectId = tender._id as mongoose.Types.ObjectId;
 
     const existingBaseAnalysis = await TenderGeneralAnalysisModel.findOne({
       tenderId: tender.id,
     }).exec();
-
-    // this.buildGeneralTenderAnalysisSourceHash();
 
     const hasDoneAnalysis =
       existingBaseAnalysis &&
@@ -119,17 +118,25 @@ export class TenderGeneralAnalysisService {
     const isInProces =
       existingBaseAnalysis?.status === TenderGeneralAnalysisStatus.PROCESSING;
 
-    if (hasDoneAnalysis || isInProces) {
+    if ((hasDoneAnalysis || isInProces) && !isForceBaseAnalysis) {
       // TODO: Check source hash
       return existingBaseAnalysis;
     }
 
     try {
-      const analysis = await TenderGeneralAnalysisModel.create({
-        tender: tenderObjectId,
-        status: TenderGeneralAnalysisStatus.PROCESSING,
-        tenderId: tender.id,
-      });
+      const analysis = await TenderGeneralAnalysisModel.findOneAndUpdate(
+        {
+          tender: tenderObjectId,
+
+          tenderId: tender.id,
+        },
+        {
+          $set: {
+            status: TenderGeneralAnalysisStatus.PROCESSING,
+          },
+        },
+        { returnDocument: 'after', upsert: true },
+      );
 
       // Async update of analysis
       this.fetchBaseAnalysis(analysis, tender);

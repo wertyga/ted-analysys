@@ -64,6 +64,25 @@ export function extractPublicationNumberFromNotice(
   return undefined;
 }
 
+export function areTedNoticeVersionsDifferent(
+  localNoticeVersion: string | undefined,
+  notice: TedNotice | undefined,
+): boolean {
+  if (!notice) {
+    return false;
+  }
+
+  const noticeVersion = valueToString(
+    notice.noticeVersion ?? notice['notice-version'],
+  );
+
+  return (
+    noticeVersion !== undefined &&
+    localNoticeVersion !== undefined &&
+    localNoticeVersion !== noticeVersion
+  );
+}
+
 export function isDuplicateKeyError(error: unknown): boolean {
   return isRecord(error) && (error.code === 11000 || error.code === '11000');
 }
