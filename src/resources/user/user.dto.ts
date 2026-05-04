@@ -4,8 +4,11 @@ import { PaginationAndSortDto } from '@/Dto';
 import { CpvCategoryResponseItem } from '@/resources/cpv/types';
 import {
   IsArray,
+  IsBoolean,
   IsEnum,
   IsNotEmpty,
+  IsNumber,
+  IsObject,
   IsOptional,
   IsString,
 } from 'class-validator';
@@ -21,7 +24,29 @@ type CompanyProfileType = Pick<
   | 'companySize'
   | 'companyDescription'
   | 'languages'
+  | 'certifications'
+  | 'capabilities'
+  | 'yearsOfExperience'
+  | 'publicProcurementExperience'
+  | 'typicalContractSize'
 >;
+
+export class TypicalContractSizeDto {
+  @ApiPropertyOptional({ example: 10000 })
+  @IsOptional()
+  @IsNumber()
+  min?: number;
+
+  @ApiPropertyOptional({ example: 250000 })
+  @IsOptional()
+  @IsNumber()
+  max?: number;
+
+  @ApiPropertyOptional({ example: 'EUR' })
+  @IsOptional()
+  @IsString()
+  currency?: string;
+}
 
 type UserListType = Pick<TUser, 'email' | 'companyName'>;
 export class UserListDto implements UserListType {
@@ -71,6 +96,25 @@ export class UserDto extends UserOwnerDto implements CompanyProfileType {
 
   @ApiProperty({ type: [String], example: ['ENG', 'PLN'] })
   languages: string[];
+
+  @ApiPropertyOptional({ type: [String], example: ['ISO 9001', 'CE'] })
+  certifications?: string[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    example: ['24/7 support', 'installation'],
+  })
+  capabilities?: string[];
+
+  @ApiPropertyOptional({ example: 7 })
+  yearsOfExperience?: number;
+
+  @ApiPropertyOptional({ example: true })
+  publicProcurementExperience?: boolean;
+
+  @ApiPropertyOptional({ type: TypicalContractSizeDto })
+  typicalContractSize?: TypicalContractSizeDto;
+
 }
 
 export class GetUsersRequestDto extends PaginationAndSortDto {}
@@ -126,6 +170,37 @@ export class UpdateUserDto {
   @IsArray()
   @IsString({ each: true })
   languages: string[];
+
+  @ApiPropertyOptional({ type: [String], example: ['ISO 9001', 'CE'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  certifications?: string[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    example: ['24/7 support', 'installation'],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  capabilities?: string[];
+
+  @ApiPropertyOptional({ example: 7 })
+  @IsOptional()
+  @IsNumber()
+  yearsOfExperience?: number;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  publicProcurementExperience?: boolean;
+
+  @ApiPropertyOptional({ type: TypicalContractSizeDto })
+  @IsOptional()
+  @IsObject()
+  typicalContractSize?: TypicalContractSizeDto;
+
 }
 
 export class UserAuthDto extends UserDto {

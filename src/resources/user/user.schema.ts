@@ -66,6 +66,27 @@ export const UserSchema = new Schema<UserType>(
       type: [String],
       default: [],
     },
+    certifications: {
+      type: [String],
+      default: undefined,
+    },
+    capabilities: {
+      type: [String],
+      default: undefined,
+    },
+    yearsOfExperience: {
+      type: Number,
+      default: undefined,
+    },
+    publicProcurementExperience: {
+      type: Boolean,
+      default: undefined,
+    },
+    typicalContractSize: {
+      min: { type: Number, default: undefined },
+      max: { type: Number, default: undefined },
+      currency: { type: String, default: undefined },
+    },
   },
   { timestamps: true },
 );

@@ -14,6 +14,12 @@ export enum COMPANY_SIZE {
   ENTERPRISE = 'Enterprise',
 }
 
+export type TTypicalContractSize = {
+  min?: number;
+  max?: number;
+  currency?: string;
+};
+
 export type TUser = {
   _id: string;
   email: string;
@@ -32,6 +38,11 @@ export type TUser = {
   industries: Types.ObjectId[];
   mainServices: Types.ObjectId[];
   languages: string[];
+  certifications?: string[];
+  capabilities?: string[];
+  yearsOfExperience?: number;
+  publicProcurementExperience?: boolean;
+  typicalContractSize?: TTypicalContractSize;
   createdAt: string;
   updatedAt: string;
 };
