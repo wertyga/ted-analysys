@@ -9,6 +9,12 @@ import {
 import { buildGeneralTenderAnalysisPrompt } from '@/openai/prompts/general-tender-analysis.prompt';
 import { GENERAL_TENDER_ANALYSIS_JSON_SCHEMA } from '@/openai/schemas/general-tender-analysis.schema';
 import { getSafeErrorMessage, isRecord } from '@/utils';
+import { TenderDeepAnalysisResult, TenderDeepCompanyFitAnalysisInput } from '@/types';
+import {
+  buildTenderDeepCompanyFitSystemPrompt,
+  buildTenderDeepCompanyFitUserPrompt,
+} from '@/openai/prompts/tender-deep-company-fit.prompt';
+import { TENDER_DEEP_COMPANY_FIT_JSON_SCHEMA } from '@/openai/schemas/tender-deep-company-fit.schema';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -39,6 +45,30 @@ export abstract class BaseLlmAnalysisService {
     const parsed = this.parseJson(responseText);
 
     return this.validateGeneralTenderAnalysisResult(parsed);
+  }
+
+  async analyzeTenderDeepCompanyFit(
+    input: TenderDeepCompanyFitAnalysisInput,
+  ): Promise<TenderDeepAnalysisResult> {
+    const prompt = [
+      buildTenderDeepCompanyFitSystemPrompt(),
+      'Return JSON only. The JSON must match this schema:',
+      JSON.stringify(TENDER_DEEP_COMPANY_FIT_JSON_SCHEMA),
+    ].join('\n\n');
+    const context = buildTenderDeepCompanyFitUserPrompt(input).slice(
+      0,
+      this.maxContextChars,
+    );
+    const responseText = await this.createJsonResponse(prompt, context);
+    const parsed = this.parseJson(responseText);
+
+    if (!isRecord(parsed)) {
+      throw new Error(
+        `${this.providerName} deep tender analysis result must be a JSON object`,
+      );
+    }
+
+    return parsed as unknown as TenderDeepAnalysisResult;
   }
 
   protected buildGeneralTenderAnalysisPrompt(outputLanguage: string): string {

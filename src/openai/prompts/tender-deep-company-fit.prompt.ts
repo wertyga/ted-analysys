@@ -1,0 +1,138 @@
+import { TenderDeepCompanyFitAnalysisInput } from '@/types';
+
+export const TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION =
+  'tender-deep-company-fit-v1.0.0';
+
+const MAX_JSON_CHARS = 60_000;
+const MAX_SNIPPETS_JSON_CHARS = 40_000;
+
+export function buildTenderDeepCompanyFitSystemPrompt(): string {
+  return [
+    'You are a senior EU public procurement analyst, bid/no-bid advisor, and company-tender fit evaluator.',
+    '',
+    'Your task is to perform a deep analysis of a TED tender in the context of a specific company.',
+    '',
+    'You must analyze:',
+    '- tender requirements;',
+    '- tender risks;',
+    '- eligibility and award criteria;',
+    '- submission requirements;',
+    '- commercial attractiveness;',
+    '- company fit;',
+    '- capability gaps;',
+    '- blockers;',
+    '- bid/no-bid recommendation;',
+    '- next steps before submission.',
+    '',
+    'Rules:',
+    '- Use only the provided tender, general analysis, company profile, company analysis, derived metadata, and document analyses.',
+    '- Do not invent company capabilities, certifications, references, languages, countries, or financial capacity.',
+    '- Do not invent tender requirements.',
+    '- Clearly distinguish explicit facts from assumptions.',
+    '- If information is missing, reflect it in missingCompanyInformation, missingTenderInformation, assumptions, and confidenceScore.',
+    '- If a tender requirement is not explicitly present, do not mark it as mandatory.',
+    '- If a company capability is not explicitly present, do not mark it as met.',
+    '- Do not assume capabilities from companyName alone.',
+    '- Use companyDescription, industries, mainServices, capabilities, certifications, languages, operatingRegions, yearsOfExperience, publicProcurementExperience, and typicalContractSize as the main evidence for company fit.',
+    '- If industries or mainServices contain only ids without names/codes, treat CPV/category evidence as weak and reduce confidence.',
+    '- Return valid JSON only.',
+    '- Do not include markdown or explanation outside JSON.',
+  ].join('\n');
+}
+
+export function buildTenderDeepCompanyFitUserPrompt(
+  input: TenderDeepCompanyFitAnalysisInput,
+): string {
+  return [
+    'Perform a Deep Tender Company Fit Analysis.',
+    '',
+    'Inputs:',
+    '',
+    '1. Structured TED tender data:',
+    safeStringify(input.tender),
+    '',
+    '2. Existing TenderGeneralAnalysisResult:',
+    safeStringify(input.generalAnalysis ?? null),
+    '',
+    '3. Company profile:',
+    safeStringify(input.company),
+    '',
+    'Company profile fields:',
+    '- companyName: legal/display name of the company',
+    '- country: country where the company is based',
+    '- operatingRegions: countries/regions where the company can operate',
+    '- companySize: approximate company size',
+    '- companyDescription: free-text business description',
+    '- industries: CPV/category areas representing company industries',
+    '- mainServices: CPV/category areas representing main services',
+    '- languages: languages the company can work or submit in',
+    '- certifications: known certifications',
+    '- capabilities: free-text capabilities',
+    '- yearsOfExperience: number of years of experience',
+    '- publicProcurementExperience: whether the company has public procurement experience',
+    '- typicalContractSize: typical contract value range',
+    '',
+    '4. Existing company analysis, if available:',
+    safeStringify(input.companyAnalysis ?? null),
+    '',
+    '5. Derived metadata:',
+    safeStringify(input.derived),
+    '',
+    '6. Procurement document analyses, if available:',
+    safeStringify(input.documentAnalyses ?? []),
+    '',
+    '7. Raw extracted document snippets, if available:',
+    safeStringify(input.documentTextSnippets ?? [], MAX_SNIPPETS_JSON_CHARS),
+    '',
+    'Your task:',
+    '',
+    'Create a deep analysis suitable for company-specific bid/no-bid decision, company fit score calculation, risk review, tender response preparation, gap analysis, and clarification question generation.',
+    '',
+    'Analyze tender intelligence, requirements, company fit, gaps, blockers, commercial attractiveness, risks, opportunity, bid/no-bid decision, documentation completeness, clarification questions, and bid preparation next steps.',
+    '',
+    'Scoring rules:',
+    '- scopeFit: 18',
+    '- capabilityFit: 16',
+    '- cpvFit: 8',
+    '- geographicFit: 8',
+    '- languageFit: 7',
+    '- eligibilityFit: 12',
+    '- certificationFit: 7',
+    '- experienceFit: 8',
+    '- financialFit: 6',
+    '- commercialFit: 4',
+    '- deadlineFit: 4',
+    '- riskFit: 2',
+    '',
+    'For each criterion assign score from 0 to 100, set decimal weight, calculate weightedScore = score * weight, explain the score, provide evidence, and list missing information.',
+    '',
+    'Recommendation rules:',
+    '- strong_go: fitScore >= 80 and no critical blockers',
+    '- go: fitScore >= 65 and no critical blockers',
+    '- investigate: fitScore >= 45 or important information is missing',
+    '- caution: fitScore >= 30 but significant risks or gaps exist',
+    '- no_go: fitScore < 30 or unresolved critical company-fit blocker exists',
+    '- not_actionable: deadline expired or submission is impossible',
+    '',
+    'Important rules:',
+    '- Do not assume capabilities from companyName alone.',
+    '- If companyDescription is missing, reduce confidence.',
+    '- If industries or mainServices are only ids without names/codes, treat CPV evidence as weak.',
+    '- If company languages are missing, do not assume language fit.',
+    '- If company operatingRegions are missing, do not assume geographic fit.',
+    '- If company typicalContractSize is missing, do not assume financial fit.',
+    '- If publicProcurementExperience is false, treat it as a risk/weakness, but do not automatically set experienceFit to 0.',
+    '- If deadline is expired, finalRecommendation.value must be "not_actionable".',
+    '- Evidence must reference one of: structured_ted, tender_document, general_analysis, company_profile, derived, missing.',
+    '- Scores must be integers from 0 to 100.',
+    '- Return JSON only matching TenderDeepAnalysisResult.',
+  ].join('\n');
+}
+
+function safeStringify(value: unknown, maxChars = MAX_JSON_CHARS): string {
+  const json = JSON.stringify(value ?? null, null, 2);
+
+  return json.length > maxChars
+    ? `${json.slice(0, maxChars)}\n[TRUNCATED]`
+    : json;
+}

@@ -5,9 +5,6 @@ export class AuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext) {
     const req = context.switchToHttp().getRequest();
 
-    // TEMP MOCK
-    return true;
-
     return !!req.user;
   }
 }
