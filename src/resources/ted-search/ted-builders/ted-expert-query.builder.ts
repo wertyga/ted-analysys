@@ -1,4 +1,5 @@
 import { TedNoticeType } from '../../tenders/types';
+import { TedSortOrder, TedTenderSortColumn } from '../types/ted-search.types';
 import { buildAdaptiveCpvQuery } from './ted-cpv.builder';
 import {
   normalizeTedCountryCodes,
@@ -18,6 +19,8 @@ export interface TedTenderSearchFilters {
   publicationDateTo?: string;
   submissionDeadlineFrom?: string;
   submissionDeadlineTo?: string;
+  sortColumn?: TedTenderSortColumn;
+  sortOrder?: TedSortOrder;
 }
 
 export function quoteTedValue(value: string): string {
@@ -47,11 +50,26 @@ export function buildTedTenderSearchQuery(
     ),
   ].filter((part): part is string => part !== undefined);
 
-  if (parts.length === 0) {
-    return 'publication-number = *';
+  const query =
+    parts.length === 0
+      ? 'publication-number = *'
+      : parts.map((part) => `(${part})`).join(' AND ');
+
+  return appendSortPart(query, filters.sortColumn, filters.sortOrder);
+}
+
+function appendSortPart(
+  query: string,
+  sortColumn: TedTenderSortColumn | undefined,
+  sortOrder: TedSortOrder | undefined,
+): string {
+  if (sortColumn === undefined) {
+    return query;
   }
 
-  return parts.map((part) => `(${part})`).join(' AND ');
+  const direction = sortOrder === TedSortOrder.DESC ? ' DESC' : '';
+
+  return `${query} SORT BY ${sortColumn}${direction}`;
 }
 
 function buildTextPart(

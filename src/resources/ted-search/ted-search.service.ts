@@ -1,18 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosError, AxiosInstance } from 'axios';
+import { PipelineStage } from 'mongoose';
 import { TedSearchRequestDto } from './dto/ted-search-request.dto';
 import { TedTenderSearchRequestDto } from './dto/ted-tender-search-request.dto';
 import { buildTedTenderSearchQuery } from './ted-builders';
+import { TedSearchFilters } from './ted.search.filters';
+import { TedSearchSorting } from './ted.search.sorting';
 import {
   TedPaginationMode,
   TedScope,
   TedSearchResponse,
 } from './types/ted-search.types';
 import { mapTedError, resolveDeadlineRange } from './utils';
+import { TenderGeneralAnalysisModel } from '@/resources/tender-analysis/schemas';
+import { TenderModel } from '@/resources/tenders/schemas';
 
 @Injectable()
 export class TedSearchService {
   private readonly logger = new Logger(TedSearchService.name);
+  private readonly filters = new TedSearchFilters();
+  private readonly sorting = new TedSearchSorting();
   private readonly baseUrl = 'https://api.ted.europa.eu';
   private readonly http: AxiosInstance = axios.create({
     baseURL: this.baseUrl,
@@ -23,6 +30,7 @@ export class TedSearchService {
     },
   });
   private readonly retryDelaysMs = [500, 1500];
+  private readonly rateLimitRetryDelayMs = 30000;
 
   private readonly searchTendersDefaultFields = [
     'notice-identifier',
@@ -107,10 +115,8 @@ export class TedSearchService {
   async searchTenders(
     filters: TedTenderSearchRequestDto,
   ): Promise<TedSearchResponse> {
-    const resolvedFilters = resolveDeadlineRange(filters);
-
     return this.searchNotices({
-      query: buildTedTenderSearchQuery(resolvedFilters),
+      query: buildTedTenderSearchQuery(filters),
       scope: filters.scope ?? TedScope.ACTIVE,
       limit: filters.limit ?? 20,
       page: filters.page ?? 1,
@@ -119,6 +125,86 @@ export class TedSearchService {
       checkQuerySyntax: false,
       fields: this.searchTendersDefaultFields,
     });
+  }
+
+  async searchLocalTenders(
+    filters: TedTenderSearchRequestDto,
+  ): Promise<TedSearchResponse> {
+    const limit = filters.limit ?? 20;
+    const page = filters.page ?? 1;
+    const query = this.filters.buildLocalTenderQuery(filters);
+    const sort = this.sorting.buildLocalTenderSort(filters);
+    const skip = (page - 1) * limit;
+
+    this.logger.debug(`Local Search request: ${JSON.stringify(query)}`);
+
+    const opportunityScoreQuery =
+      this.filters.buildOpportunityScoreQuery(filters);
+
+    if (opportunityScoreQuery) {
+      return this.searchLocalTendersByAnalysisScore({
+        tenderQuery: query,
+        opportunityScoreQuery,
+        sort,
+        skip,
+        limit,
+      });
+    }
+
+    const [notices, totalCount] = await Promise.all([
+      TenderModel.find(query).sort(sort).skip(skip).limit(limit).lean().exec(),
+      TenderModel.countDocuments(query).exec(),
+    ]);
+
+    return {
+      notices,
+      totalNoticeCount: totalCount,
+    };
+  }
+
+  private async searchLocalTendersByAnalysisScore({
+    tenderQuery,
+    opportunityScoreQuery,
+    sort,
+    skip,
+    limit,
+  }: {
+    tenderQuery: Record<string, unknown>;
+    opportunityScoreQuery: Record<string, unknown>;
+    sort: Record<string, 1 | -1>;
+    skip: number;
+    limit: number;
+  }): Promise<TedSearchResponse> {
+    const pipeline: PipelineStage[] = [
+      { $match: opportunityScoreQuery },
+      {
+        $lookup: {
+          from: 'tenders',
+          localField: 'tender',
+          foreignField: '_id',
+          as: 'tender',
+        },
+      },
+      { $unwind: '$tender' },
+      { $replaceRoot: { newRoot: '$tender' } },
+      { $match: tenderQuery },
+      {
+        $facet: {
+          notices: [{ $sort: sort }, { $skip: skip }, { $limit: limit }],
+          total: [{ $count: 'count' }],
+        },
+      },
+    ];
+    const [result] = await TenderGeneralAnalysisModel.aggregate<{
+      notices: TedSearchResponse['notices'];
+      total: { count: number }[];
+    }>(pipeline).exec();
+    const totalCount = result?.total[0]?.count ?? 0;
+
+    return {
+      notices: result?.notices ?? [],
+      totalNoticeCount: totalCount,
+    };
   }
 
   private async postWithRetry(
@@ -154,7 +240,9 @@ export class TedSearchService {
           break;
         }
 
-        await this.delay(this.retryDelaysMs[attempt]);
+        const delayMs = this.getRetryDelayMs(error, attempt);
+        this.logger.warn(`Retrying TED Search request in ${delayMs}ms`);
+        await this.delay(delayMs);
       }
     }
 
@@ -169,7 +257,15 @@ export class TedSearchService {
     }
 
     const status = error.response?.status;
-    return status === undefined || status >= 500;
+    return status === undefined || status === 429 || status >= 500;
+  }
+
+  private getRetryDelayMs(error: unknown, attempt: number): number {
+    if (this.isAxiosError(error) && error.response?.status === 429) {
+      return this.rateLimitRetryDelayMs;
+    }
+
+    return this.retryDelaysMs[attempt];
   }
 
   private isAxiosError(error: unknown): error is AxiosError {

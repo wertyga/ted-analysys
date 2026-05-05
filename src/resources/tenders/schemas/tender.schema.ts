@@ -51,19 +51,19 @@ export interface Tender {
   /** TED buyer-profile: buyer procurement profile URL. */
   buyerProfile?: string;
   /** TED publication-date: date when the notice was published on TED. */
-  publicationDate?: string;
+  publicationDate?: Date;
   /** TED dispatch-date: date when the notice was dispatched for publication. */
-  dispatchDate?: string;
+  dispatchDate?: Date;
   /** Normalized submission deadline; uses lot tender deadline and falls back to TED deadline. */
-  submissionDeadline?: string;
+  submissionDeadline?: Date;
   /** TED deadline-receipt-tender-*-lot combined as date/time when tenders/offers are due. */
-  deadlineReceiptTender?: string;
+  deadlineReceiptTender?: Date;
   /** TED deadline-receipt-answers-*-lot combined as buyer answers/clarifications deadline. */
-  questionsDeadline?: string;
+  questionsDeadline?: Date;
   /** TED contract-duration-start-date-lot: earliest planned lot contract start date. */
-  plannedStartDate?: string;
+  plannedStartDate?: Date;
   /** TED contract-duration-end-date-lot: latest planned lot contract end date. */
-  plannedEndDate?: string;
+  plannedEndDate?: Date;
   /** TED duration-period-value-lot: numeric contract duration value when dates are not enough. */
   durationPeriodValue?: string;
   /** TED duration-period-unit-lot: duration unit such as day, month, or year. */
@@ -147,13 +147,13 @@ const TenderSchema = new Schema<TenderDocument>(
     buyerEmail: String,
     buyerInternetAddress: String,
     buyerProfile: String,
-    publicationDate: String,
-    dispatchDate: String,
-    submissionDeadline: String,
-    deadlineReceiptTender: String,
-    questionsDeadline: String,
-    plannedStartDate: String,
-    plannedEndDate: String,
+    publicationDate: Date,
+    dispatchDate: Date,
+    submissionDeadline: Date,
+    deadlineReceiptTender: Date,
+    questionsDeadline: Date,
+    plannedStartDate: Date,
+    plannedEndDate: Date,
     durationPeriodValue: String,
     durationPeriodUnit: String,
     contractNature: String,

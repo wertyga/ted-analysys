@@ -27,6 +27,23 @@ import {
 import { CPV_CODES_LIST_FIELDS } from '@/resources/cpv/cpv.service';
 
 type TenderRecord = Tender & { _id?: unknown };
+export interface GatherActiveTendersResult {
+  completed?: boolean;
+  totalCount?: number;
+  pagesFetched: number;
+  noticesFetched: number;
+  tendersSkipped: number;
+  tendersSaved: number;
+  resumeIterationNextToken?: string;
+  errorMessage?: string;
+}
+
+export interface MigrateTenderDateFieldsResult {
+  scanned: number;
+  updated: number;
+  skipped: number;
+}
+
 const tenderCpvPopulateFields = [
   { path: 'classificationCpv', select: CPV_CODES_LIST_FIELDS },
   { path: 'mainClassificationProc', select: CPV_CODES_LIST_FIELDS },
@@ -206,7 +223,7 @@ export class TendersService {
       this.findLocalTender(id),
       this.fetchTedNoticeByPublicationNumber(publicationNumber),
     ]);
-
+    console.log({ tedNotice: JSON.stringify(tedNotice, null, 2) });
     const areVersionsDifferent = areTedNoticeVersionsDifferent(
       localTender?.noticeVersion,
       tedNotice,

@@ -182,49 +182,49 @@ export class TenderDto {
     description:
       'TED publication-date: date when the notice was published on TED.',
   })
-  publicationDate?: string;
+  publicationDate?: Date;
 
   @ApiPropertyOptional({
     example: '2023-12-12Z',
     description:
       'TED dispatch-date: date when the notice was dispatched for publication.',
   })
-  dispatchDate?: string;
+  dispatchDate?: Date;
 
   @ApiPropertyOptional({
     example: '2029-12-17T12:00:00+02:00',
     description:
       'Normalized submission deadline; uses lot tender deadline and falls back to TED deadline.',
   })
-  submissionDeadline?: string;
+  submissionDeadline?: Date;
 
   @ApiPropertyOptional({
     example: '2029-12-17T12:00:00+02:00',
     description:
       'TED deadline-receipt-tender-*-lot combined as date/time when tenders/offers are due.',
   })
-  deadlineReceiptTender?: string;
+  deadlineReceiptTender?: Date;
 
   @ApiPropertyOptional({
     example: '2029-12-01T12:00:00+02:00',
     description:
       'TED deadline-receipt-answers-*-lot combined as buyer answers/clarifications deadline.',
   })
-  questionsDeadline?: string;
+  questionsDeadline?: Date;
 
   @ApiPropertyOptional({
     example: '2029-12-20',
     description:
       'TED contract-duration-start-date-lot: earliest planned lot contract start date.',
   })
-  plannedStartDate?: string;
+  plannedStartDate?: Date;
 
   @ApiPropertyOptional({
     example: '2030-12-20',
     description:
       'TED contract-duration-end-date-lot: latest planned lot contract end date.',
   })
-  plannedEndDate?: string;
+  plannedEndDate?: Date;
 
   @ApiPropertyOptional({
     example: '12',

@@ -30,23 +30,21 @@ export class TenderNormalizerService {
       mainClassificationProc,
       mainClassificationLot,
       additionalClassificationLot,
-    } = await fillClassificationCpvByCodes(
-      tenderNormilizer(rawNotice),
-    );
+    } = await fillClassificationCpvByCodes(tenderNormilizer(rawNotice));
 
     return {
       ...this.normalizeTedNotice(rawNotice),
       classificationCpv: rawIds
-        ? classificationCpv.map((category) => category._id)
+        ? (classificationCpv?.map((category) => category._id) ?? [])
         : classificationCpv,
       mainClassificationProc: rawIds
-        ? mainClassificationProc.map((category) => category._id)
+        ? (mainClassificationProc?.map((category) => category._id) ?? [])
         : mainClassificationProc,
       mainClassificationLot: rawIds
-        ? mainClassificationLot.map((category) => category._id)
+        ? (mainClassificationLot?.map((category) => category._id) ?? [])
         : mainClassificationLot,
       additionalClassificationLot: rawIds
-        ? additionalClassificationLot.map((category) => category._id)
+        ? (additionalClassificationLot?.map((category) => category._id) ?? [])
         : additionalClassificationLot,
     };
   }
@@ -119,36 +117,47 @@ export class TenderNormalizerService {
         'buyerInternetAddress',
       ]),
       buyerProfile: this.pickText(rawNotice, ['buyer-profile', 'buyerProfile']),
-      publicationDate: this.pickText(rawNotice, [
-        'publication-date',
-        'publicationDate',
-      ]),
-      dispatchDate: this.pickText(rawNotice, ['dispatch-date', 'dispatchDate']),
+      publicationDate: this.parseTenderDate(
+        this.pickText(rawNotice, ['publication-date', 'publicationDate']),
+      ),
+      dispatchDate: this.parseTenderDate(
+        this.pickText(rawNotice, ['dispatch-date', 'dispatchDate']),
+      ),
       submissionDeadline:
-        this.pickText(rawNotice, ['deadline']) ??
+        this.parseTenderDate(this.pickText(rawNotice, ['deadline'])) ??
+        this.parseTenderDate(
+          this.pickDateTime(
+            rawNotice,
+            ['deadline-receipt-tender-date-lot', 'deadlineReceiptTenderDateLot'],
+            ['deadline-receipt-tender-time-lot', 'deadlineReceiptTenderTimeLot'],
+          ),
+        ),
+      deadlineReceiptTender: this.parseTenderDate(
         this.pickDateTime(
           rawNotice,
           ['deadline-receipt-tender-date-lot', 'deadlineReceiptTenderDateLot'],
           ['deadline-receipt-tender-time-lot', 'deadlineReceiptTenderTimeLot'],
         ),
-      deadlineReceiptTender: this.pickDateTime(
-        rawNotice,
-        ['deadline-receipt-tender-date-lot', 'deadlineReceiptTenderDateLot'],
-        ['deadline-receipt-tender-time-lot', 'deadlineReceiptTenderTimeLot'],
       ),
-      questionsDeadline: this.pickDateTime(
-        rawNotice,
-        ['deadline-receipt-answers-date-lot', 'deadlineReceiptAnswersDateLot'],
-        ['deadline-receipt-answers-time-lot', 'deadlineReceiptAnswersTimeLot'],
+      questionsDeadline: this.parseTenderDate(
+        this.pickDateTime(
+          rawNotice,
+          ['deadline-receipt-answers-date-lot', 'deadlineReceiptAnswersDateLot'],
+          ['deadline-receipt-answers-time-lot', 'deadlineReceiptAnswersTimeLot'],
+        ),
       ),
-      plannedStartDate: this.pickEarliestText(rawNotice, [
-        'contract-duration-start-date-lot',
-        'contractDurationStartDateLot',
-      ]),
-      plannedEndDate: this.pickLatestText(rawNotice, [
-        'contract-duration-end-date-lot',
-        'contractDurationEndDateLot',
-      ]),
+      plannedStartDate: this.parseTenderDate(
+        this.pickEarliestText(rawNotice, [
+          'contract-duration-start-date-lot',
+          'contractDurationStartDateLot',
+        ]),
+      ),
+      plannedEndDate: this.parseTenderDate(
+        this.pickLatestText(rawNotice, [
+          'contract-duration-end-date-lot',
+          'contractDurationEndDateLot',
+        ]),
+      ),
       durationPeriodValue: this.pickText(rawNotice, [
         'duration-period-value-lot',
         'durationPeriodValueLot',
@@ -346,6 +355,69 @@ export class TenderNormalizerService {
       this.pickEarliestText(raw, datePaths),
       this.pickText(raw, timePaths),
     );
+  }
+
+  private parseTenderDate(value: string | undefined): Date | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    const trimmed = value.trim();
+
+    if (trimmed.length === 0) {
+      return undefined;
+    }
+
+    if (/^\d{8}$/.test(trimmed)) {
+      return this.toValidDate(
+        `${trimmed.slice(0, 4)}-${trimmed.slice(4, 6)}-${trimmed.slice(6, 8)}T00:00:00.000Z`,
+      );
+    }
+
+    const normalized = this.normalizeTenderDateText(trimmed);
+
+    if (normalized !== undefined) {
+      return this.toValidDate(normalized);
+    }
+
+    return this.toValidDate(trimmed);
+  }
+
+  private normalizeTenderDateText(value: string): string | undefined {
+    const match = value.match(
+      /^(\d{4}-\d{2}-\d{2})(?:Z|[+-]\d{2}:\d{2})?(?:T(\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?)(?:Z|[+-]\d{2}:\d{2})?)?/,
+    );
+
+    if (!match) {
+      return undefined;
+    }
+
+    const date = match[1];
+    const time = this.normalizeTenderTime(match[2]);
+
+    if (time) {
+      return `${date}T${time}`;
+    }
+
+    return `${date}T00:00:00.000Z`;
+  }
+
+  private normalizeTenderTime(value: string | undefined): string | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    const [baseTime, fraction] = value.split('.');
+    const seconds = baseTime.length === 5 ? `${baseTime}:00` : baseTime;
+    const milliseconds = fraction ? fraction.slice(0, 3).padEnd(3, '0') : '000';
+
+    return `${seconds}.${milliseconds}Z`;
+  }
+
+  private toValidDate(value: string): Date | undefined {
+    const date = new Date(value);
+
+    return Number.isNaN(date.getTime()) ? undefined : date;
   }
 
   private pickEarliestText(

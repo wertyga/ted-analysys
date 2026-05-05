@@ -56,13 +56,13 @@ export class TenderGeneralAnalysisBuilder {
         noticeType: tender.noticeType ?? null,
         noticeSubtype: tender.noticeSubtype ?? null,
         noticeVersion: tender.noticeVersion ?? null,
-        publicationDate: tender.publicationDate ?? null,
-        dispatchDate: tender.dispatchDate ?? null,
-        deadlineDate: tender.submissionDeadline ?? null,
-        submissionDeadlineFallback: tender.submissionDeadline ?? null,
-        questionsDeadline: tender.questionsDeadline ?? null,
-        plannedStartDate: tender.plannedStartDate ?? null,
-        plannedEndDate: tender.plannedEndDate ?? null,
+        publicationDate: this.formatDate(tender.publicationDate),
+        dispatchDate: this.formatDate(tender.dispatchDate),
+        deadlineDate: this.formatDate(tender.submissionDeadline),
+        submissionDeadlineFallback: this.formatDate(tender.submissionDeadline),
+        questionsDeadline: this.formatDate(tender.questionsDeadline),
+        plannedStartDate: this.formatDate(tender.plannedStartDate),
+        plannedEndDate: this.formatDate(tender.plannedEndDate),
         duration: {
           value: tender.durationPeriodValue ?? null,
           unit: tender.durationPeriodUnit ?? null,
@@ -145,6 +145,10 @@ export class TenderGeneralAnalysisBuilder {
     }
 
     return documents;
+  }
+
+  private formatDate(value: Date | undefined): string | null {
+    return value?.toISOString() ?? null;
   }
 
   private getNeedDocumentByLanguage(

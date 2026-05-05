@@ -70,6 +70,14 @@ export class TedSearchRequestDto {
   @IsBoolean()
   onlyLatestVersions: boolean = true;
 
+  @ApiPropertyOptional({
+    description:
+      'Opaque token returned by TED Search API for ITERATION pagination.',
+  })
+  @IsOptional()
+  @IsString()
+  iterationNextToken?: string;
+
   @ApiPropertyOptional({ example: 'publication-date' })
   @IsOptional()
   @IsString()

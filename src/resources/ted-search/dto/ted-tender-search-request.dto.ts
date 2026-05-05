@@ -6,6 +6,7 @@ import {
   IsEnum,
   IsIn,
   IsInt,
+  IsNumber,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -14,7 +15,11 @@ import {
   Min,
 } from 'class-validator';
 import { TedNoticeType } from '../../tenders/types';
-import { TedScope } from '../types/ted-search.types';
+import {
+  TedScope,
+  TedSortOrder,
+  TedTenderSortColumn,
+} from '../types/ted-search.types';
 import {
   TED_ELIGIBLE_COUNTRY_CODES,
   TedEligibleCountryCode,
@@ -157,6 +162,35 @@ export class TedTenderSearchRequestDto {
   @IsInt()
   @Min(1)
   page?: number;
+
+  @ApiPropertyOptional({
+    enum: TedTenderSortColumn,
+    example: TedTenderSortColumn.PUBLICATION_DATE,
+  })
+  @IsOptional()
+  @IsEnum(TedTenderSortColumn)
+  sortColumn?: TedTenderSortColumn;
+
+  @ApiPropertyOptional({ enum: TedSortOrder, example: TedSortOrder.DESC })
+  @IsOptional()
+  @IsEnum(TedSortOrder)
+  sortOrder?: TedSortOrder;
+
+  @ApiPropertyOptional({ minimum: 0, maximum: 100, example: 60 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  opportunityScoreFrom?: number;
+
+  @ApiPropertyOptional({ minimum: 0, maximum: 100, example: 100 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  opportunityScoreTo?: number;
 }
 
 function normalizeCountryInput(value: unknown): unknown {

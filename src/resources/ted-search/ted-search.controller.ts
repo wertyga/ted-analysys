@@ -16,7 +16,7 @@ import {
 } from '@nestjs/swagger';
 import { TedTenderSearchRequestDto } from './dto/ted-tender-search-request.dto';
 import { TedSearchService } from './ted-search.service';
-import { normalizeTenderSearchResponse } from './utils';
+import { normalizeTenderSearchResponse, resolveDeadlineRange } from './utils';
 import { TedSearchResponse } from './types/ted-search.types';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { TenderGeneralAnalysisService } from '../tender-analysis/tender-general-analysis.service';
@@ -60,10 +60,20 @@ export class TedSearchController {
     @Body() body: TedTenderSearchRequestDto,
   ): Promise<TedSearchResponse> {
     const updatedData = {
-      noticeTypes: TENDER_COMPETITION_NOTICE_TYPES,
       ...body,
     };
-    const data = await this.tedSearchService.searchTenders(updatedData);
+
+    updatedData.noticeTypes =
+      body.noticeTypes ?? TENDER_COMPETITION_NOTICE_TYPES;
+
+    const resolvedDateSinceTodayFilters = resolveDeadlineRange(updatedData);
+
+    const data = await this.tedSearchService.searchTenders(
+      resolvedDateSinceTodayFilters,
+    );
+    // const data = await this.tedSearchService.searchLocalTenders(
+    //   resolvedDateSinceTodayFilters,
+    // );
 
     const tendersWithBaseAnalysis =
       await this.tendersService.upsertIfNeededMultipleTendersWithGeneralAnalysis(
