@@ -187,7 +187,7 @@ export class TenderGeneralAnalysisService {
   }
 
   toListDto(
-    analysis: TenderGeneralAnalysisRecord | null,
+    analysis?: TenderGeneralAnalysisRecord | null,
   ): TenderGeneralAnalysisListDto | null {
     if (!analysis) {
       return null;

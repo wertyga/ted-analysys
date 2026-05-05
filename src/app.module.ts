@@ -7,6 +7,7 @@ import { CpvModule } from './resources/cpv/cpv.module';
 import { TedSearchModule } from './resources/ted-search/ted-search.module';
 import { TenderAnalysisModule } from './resources/tender-analysis/tender-analysis.module';
 import { TendersModule } from './resources/tenders/tenders.module';
+import { TenderWishlistModule } from './resources/tender-wishlist/tender-wishlist.module';
 import { AuthModule } from './resources/auth/auth.module';
 import { GetUserMiddleware } from './middlewares/auth.middleware';
 import { UsersModule } from './resources/user/users.module';
@@ -16,6 +17,7 @@ import { UsersModule } from './resources/user/users.module';
     ConfigModule.forRoot({ isGlobal: true }),
     TedSearchModule,
     CpvModule,
+    TenderWishlistModule,
     TendersModule,
     TenderAnalysisModule,
     DeepSeekModule,

@@ -25,6 +25,7 @@ import {
   isTedPublicationNumber,
 } from '@/utils';
 import { CPV_CODES_LIST_FIELDS } from '@/resources/cpv/cpv.service';
+import { TenderGeneralAnalysis } from '@/resources/tender-analysis/schemas';
 
 type TenderRecord = Tender & { _id?: unknown };
 export interface GatherActiveTendersResult {
@@ -223,7 +224,7 @@ export class TendersService {
       this.findLocalTender(id),
       this.fetchTedNoticeByPublicationNumber(publicationNumber),
     ]);
-    console.log({ tedNotice: JSON.stringify(tedNotice, null, 2) });
+
     const areVersionsDifferent = areTedNoticeVersionsDifferent(
       localTender?.noticeVersion,
       tedNotice,
@@ -237,10 +238,7 @@ export class TendersService {
       throw new NotFoundException(`Tender ${id} not found`);
     }
 
-    return this.upsertIfNeededTenderWithGeneralAnalysis(
-      tedNotice,
-      areVersionsDifferent,
-    );
+    return this.upsertIfNeededTenderWithGeneralAnalysis(tedNotice);
   }
 
   async fetchTedNoticeByPublicationNumber(
@@ -306,7 +304,6 @@ export class TendersService {
 
   async upsertIfNeededTenderWithGeneralAnalysis(
     notice: TedNotice,
-    isForceBaseAnalysis = false,
   ): Promise<TenderDocumentWithGeneralAnalysis> {
     const publicationNumber = extractPublicationNumberFromNotice(notice);
 
@@ -316,6 +313,7 @@ export class TendersService {
 
     let savedTender: TenderDocument | null | undefined =
       await TenderModel.findOne({ id: publicationNumber });
+
     const shouldUpsertTender =
       !savedTender ||
       areTedNoticeVersionsDifferent(savedTender.noticeVersion, notice);
@@ -328,10 +326,7 @@ export class TendersService {
       throw new NotFoundException(`Tender ${publicationNumber} not found`);
     }
 
-    return this.getLocalTenderWithBaseAnalysis(
-      savedTender,
-      isForceBaseAnalysis,
-    );
+    return this.getLocalTenderWithBaseAnalysis(savedTender, shouldUpsertTender);
   }
 
   async upsertIfNeededMultipleTendersWithGeneralAnalysis(notices: TedNotice[]) {
@@ -455,5 +450,15 @@ export class TendersService {
     const { cpvCodes, ...dto } = this.mapTenderDocumentToDto(tender);
 
     return dto;
+  }
+
+  toWholeTenderListDto(tender: TenderDocument): TenderListDto {
+    const tenderList = this.toListDto(tender);
+
+    tenderList.generalAnalysis = this.tenderGeneralAnalysisService.toListDto(
+      tenderList.generalAnalysis as TenderGeneralAnalysis,
+    );
+
+    return tenderList;
   }
 }

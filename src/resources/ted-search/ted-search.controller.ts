@@ -85,14 +85,7 @@ export class TedSearchController {
       notices: tendersWithBaseAnalysis.map((tba) => {
         const tender = tba.toObject();
 
-        const dto = this.tendersService.toListDto(tender);
-
-        return {
-          ...dto,
-          generalAnalysis: this.tenderGeneralAnalysisService.toListDto(
-            tender.generalAnalysis as any,
-          ),
-        };
+        return this.tendersService.toWholeTenderListDto(tender);
       }),
     });
 
