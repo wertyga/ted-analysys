@@ -60,14 +60,14 @@ export class CpvController {
     return this.cpvService.getIndustries();
   }
 
-  @Get('descendants')
+  @Post('descendants')
   @ApiOperation({
     summary: 'List child CPV categories for the given CPV codes',
   })
   @ApiOkResponse({ type: CpvCategoriesResponse })
   @ApiBadRequestResponse({ description: 'Invalid CPV codes payload' })
   async getDescendants(
-    @Query() { codes }: CpvDescendantsRequestDto,
+    @Body() { codes }: CpvDescendantsRequestDto,
   ): Promise<CpvCategoriesResponse> {
     return this.cpvService.findDescendants(codes);
   }
