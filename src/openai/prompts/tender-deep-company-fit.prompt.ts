@@ -61,7 +61,7 @@ export function buildTenderDeepCompanyFitUserPrompt(
     '- companyName: legal/display name of the company',
     '- country: country where the company is based',
     '- operatingRegions: countries/regions where the company can operate',
-    '- companySize: approximate company size',
+    '- companySize: number of people in the company',
     '- companyDescription: free-text business description',
     '- industries: CPV/category areas representing company industries',
     '- mainServices: CPV/category areas representing main services',

@@ -47,7 +47,8 @@ export class TenderDeepAnalysisBuilder {
       operatingRegions: Array.isArray(source.operatingRegions)
         ? source.operatingRegions
         : [],
-      companySize: source.companySize || undefined,
+      companySize:
+        typeof source.companySize === 'number' ? source.companySize : undefined,
       companyDescription: source.companyDescription || undefined,
       industries: normalizeCpvRefs(source.industries),
       mainServices: normalizeCpvRefs(source.mainServices),

@@ -8,12 +8,6 @@ export enum USER_TYPE {
   SUPER_ADMIN = 'SUPER_ADMIN',
 }
 
-export enum COMPANY_SIZE {
-  MICRO = 'Micro',
-  SME = 'SME',
-  ENTERPRISE = 'Enterprise',
-}
-
 export type TTypicalContractSize = {
   min?: number;
   max?: number;
@@ -33,7 +27,7 @@ export type TUser = {
   companyName: string;
   country: string;
   operatingRegions: string[];
-  companySize: COMPANY_SIZE;
+  companySize: number;
   companyDescription: string;
   industries: Types.ObjectId[];
   mainServices: Types.ObjectId[];

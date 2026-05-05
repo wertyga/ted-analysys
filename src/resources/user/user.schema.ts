@@ -1,6 +1,5 @@
 import { model, Schema } from 'mongoose';
 import {
-  COMPANY_SIZE,
   TUser as UserType,
   USER_TYPE,
   UserDocument,
@@ -46,8 +45,7 @@ export const UserSchema = new Schema<UserType>(
       default: [],
     },
     companySize: {
-      type: String,
-      enum: COMPANY_SIZE,
+      type: Number,
     },
     companyDescription: {
       type: String,
