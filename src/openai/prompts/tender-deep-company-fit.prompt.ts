@@ -104,7 +104,7 @@ export function buildTenderDeepCompanyFitUserPrompt(
     '- deadlineFit: 4',
     '- riskFit: 2',
     '',
-    'For each criterion assign score from 0 to 100, set decimal weight, calculate weightedScore = score * weight, explain the score, provide evidence, and list missing information.',
+    'For each criterion assign score from 0 to 100, set integer weight percentage, calculate weightedScore = score * weight / 100, explain the score, provide evidence, and list missing information.',
     '',
     'Recommendation rules:',
     '- strong_go: fitScore >= 80 and no critical blockers',

@@ -11,6 +11,7 @@ import { BaseLlmAnalysisService } from '@/llm/base-llm-analysis.service';
 export class DeepSeekAnalysisService extends BaseLlmAnalysisService {
   private readonly client: OpenAI;
   private readonly generalAnalysisModel: string;
+  private readonly deepAnalysisModel: string;
 
   constructor(private readonly configService: ConfigService) {
     super('DeepSeek', new Logger(DeepSeekAnalysisService.name));
@@ -30,18 +31,27 @@ export class DeepSeekAnalysisService extends BaseLlmAnalysisService {
     this.generalAnalysisModel =
       this.configService.get<string>('DEEPSEEK_GENERAL_ANALYSIS_MODEL') ??
       'deepseek-chat';
+    this.deepAnalysisModel =
+      this.configService.get<string>('DEEPSEEK_DEEP_ANALYSIS_MODEL') ??
+      this.generalAnalysisModel;
   }
 
   getGeneralAnalysisModel(): string {
     return this.generalAnalysisModel;
   }
 
+  getDeepAnalysisModel(): string {
+    return this.deepAnalysisModel;
+  }
+
   protected async createProviderJsonResponse(
     prompt: string,
     context: string,
+    purpose: 'general' | 'deep',
   ): Promise<string> {
     const response = await this.client.chat.completions.create({
-      model: this.generalAnalysisModel,
+      model:
+        purpose === 'deep' ? this.deepAnalysisModel : this.generalAnalysisModel,
       messages: [
         { role: 'system', content: prompt },
         { role: 'user', content: context },

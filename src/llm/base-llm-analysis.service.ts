@@ -18,6 +18,7 @@ import {
 import { TENDER_DEEP_COMPANY_FIT_JSON_SCHEMA } from '@/openai/schemas/tender-deep-company-fit.schema';
 
 type JsonRecord = Record<string, unknown>;
+type LlmAnalysisPurpose = 'general' | 'deep';
 
 export abstract class BaseLlmAnalysisService {
   protected readonly retryDelaysMs = [500, 1500];
@@ -30,10 +31,12 @@ export abstract class BaseLlmAnalysisService {
   ) {}
 
   abstract getGeneralAnalysisModel(): string;
+  abstract getDeepAnalysisModel(): string;
 
   protected abstract createProviderJsonResponse(
     prompt: string,
     context: string,
+    purpose: LlmAnalysisPurpose,
   ): Promise<string>;
 
   async analyzeTenderGeneral(
@@ -42,7 +45,11 @@ export abstract class BaseLlmAnalysisService {
     const context = this.buildTenderContext(input);
     const outputLanguage = input.outputLanguage ?? 'en';
     const prompt = this.buildGeneralTenderAnalysisPrompt(outputLanguage);
-    const responseText = await this.createJsonResponse(prompt, context);
+    const responseText = await this.createJsonResponse(
+      prompt,
+      context,
+      'general',
+    );
     const parsed = this.parseJson(responseText);
 
     return this.validateGeneralTenderAnalysisResult(parsed);
@@ -60,7 +67,7 @@ export abstract class BaseLlmAnalysisService {
       0,
       this.maxContextChars,
     );
-    const responseText = await this.createJsonResponse(prompt, context);
+    const responseText = await this.createJsonResponse(prompt, context, 'deep');
     const parsed = this.parseJson(responseText);
 
     if (!isRecord(parsed)) {
@@ -83,12 +90,13 @@ export abstract class BaseLlmAnalysisService {
   protected async createJsonResponse(
     prompt: string,
     context: string,
+    purpose: LlmAnalysisPurpose,
   ): Promise<string> {
     let lastError: unknown;
 
     for (let attempt = 0; attempt <= this.retryDelaysMs.length; attempt += 1) {
       try {
-        return await this.createProviderJsonResponse(prompt, context);
+        return await this.createProviderJsonResponse(prompt, context, purpose);
       } catch (error: unknown) {
         lastError = error;
         this.logger.warn(

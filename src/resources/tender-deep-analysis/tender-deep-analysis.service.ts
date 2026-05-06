@@ -133,7 +133,7 @@ export class TenderDeepAnalysisService {
             normalized.documentationAnalysis.documentsTotalCount,
           missingDocumentsWarning:
             normalized.documentationAnalysis.missingDocumentsWarning,
-          model: this.deepSeekAnalysisService.getGeneralAnalysisModel(),
+          model: this.deepSeekAnalysisService.getDeepAnalysisModel(),
           analyzedAt: new Date(),
         },
         $unset: { errorMessage: '' },

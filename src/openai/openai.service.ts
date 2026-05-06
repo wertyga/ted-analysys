@@ -12,6 +12,7 @@ import { GENERAL_TENDER_ANALYSIS_JSON_SCHEMA } from './schemas/general-tender-an
 export class OpenAiService extends BaseLlmAnalysisService {
   private readonly client: OpenAI;
   private readonly generalAnalysisModel: string;
+  private readonly deepAnalysisModel: string;
 
   constructor(private readonly configService: ConfigService) {
     super('OpenAI', new Logger(OpenAiService.name));
@@ -26,18 +27,27 @@ export class OpenAiService extends BaseLlmAnalysisService {
     this.generalAnalysisModel =
       this.configService.get<string>('OPENAI_GENERAL_ANALYSIS_MODEL') ??
       'gpt-4.1-mini';
+    this.deepAnalysisModel =
+      this.configService.get<string>('OPENAI_DEEP_ANALYSIS_MODEL') ??
+      this.generalAnalysisModel;
   }
 
   getGeneralAnalysisModel(): string {
     return this.generalAnalysisModel;
   }
 
+  getDeepAnalysisModel(): string {
+    return this.deepAnalysisModel;
+  }
+
   protected async createProviderJsonResponse(
     prompt: string,
     context: string,
+    purpose: 'general' | 'deep',
   ): Promise<string> {
     const response = await this.client.responses.create({
-      model: this.generalAnalysisModel,
+      model:
+        purpose === 'deep' ? this.deepAnalysisModel : this.generalAnalysisModel,
       instructions: prompt,
       input: context,
       text: {

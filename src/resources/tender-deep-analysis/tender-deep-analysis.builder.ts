@@ -14,23 +14,24 @@ import {
   TenderRequirement,
 } from '@/types';
 import { TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION } from '@/openai/prompts/tender-deep-company-fit.prompt';
+import { isRecord } from '@/utils';
 import { Tender, TenderDocument } from '../tenders/schemas';
 import { UserDocument } from '../user/user.types';
 import { TenderGeneralAnalysis } from '../tender-analysis/schemas';
 
 export const COMPANY_FIT_WEIGHTS = {
-  scopeFit: 0.18,
-  capabilityFit: 0.16,
-  cpvFit: 0.08,
-  geographicFit: 0.08,
-  languageFit: 0.07,
-  eligibilityFit: 0.12,
-  certificationFit: 0.07,
-  experienceFit: 0.08,
-  financialFit: 0.06,
-  commercialFit: 0.04,
-  deadlineFit: 0.04,
-  riskFit: 0.02,
+  scopeFit: 18,
+  capabilityFit: 16,
+  cpvFit: 8,
+  geographicFit: 8,
+  languageFit: 7,
+  eligibilityFit: 12,
+  certificationFit: 7,
+  experienceFit: 8,
+  financialFit: 6,
+  commercialFit: 4,
+  deadlineFit: 4,
+  riskFit: 2,
 } as const satisfies Record<CompanyFitScoreKey, number>;
 
 const SCORE_KEYS = Object.keys(COMPANY_FIT_WEIGHTS) as CompanyFitScoreKey[];
@@ -449,6 +450,8 @@ function ensureResultShape(
   result.documentationAnalysis ||=
     {} as TenderDeepAnalysisResult['documentationAnalysis'];
   result.scores ||= {} as TenderDeepAnalysisResult['scores'];
+  migrateLegacyScoreBreakdown(result);
+  applyDocumentCounts(result, input);
 
   for (const key of SCORE_KEYS) {
     result.companyFitAnalysis.scoreBreakdown[key] ||= {
@@ -462,6 +465,76 @@ function ensureResultShape(
   }
 }
 
+function migrateLegacyScoreBreakdown(result: TenderDeepAnalysisResult): void {
+  const scores = result.scores as unknown as Record<string, unknown>;
+
+  for (const key of SCORE_KEYS) {
+    if (result.companyFitAnalysis.scoreBreakdown[key]) {
+      continue;
+    }
+
+    const legacyScore = scores[key];
+
+    if (isScoreBreakdownItem(legacyScore)) {
+      result.companyFitAnalysis.scoreBreakdown[key] = {
+        score: legacyScore.score,
+        weight: COMPANY_FIT_WEIGHTS[key],
+        weightedScore: 0,
+        explanation:
+          legacyScore.explanation ?? 'Score returned in legacy scores block.',
+        evidence: normalizeStringList(legacyScore.evidence),
+        missingInformation: normalizeStringList(
+          legacyScore.missingInformation ?? legacyScore.missingInfo,
+        ),
+      };
+    }
+  }
+}
+
+function applyDocumentCounts(
+  result: TenderDeepAnalysisResult,
+  input: TenderDeepCompanyFitAnalysisInput,
+): void {
+  const documentsAnalyzedCount = input.derived.documentsAnalyzedCount;
+  const documentsTotalCount = Math.max(
+    input.derived.documentUrlsCount,
+    input.derived.documentsDownloadedCount,
+    documentsAnalyzedCount,
+  );
+
+  result.documentationAnalysis.documentsAnalyzedCount = documentsAnalyzedCount;
+  result.documentationAnalysis.documentsTotalCount = documentsTotalCount;
+  result.documentationAnalysis.documentsAvailable = documentsAnalyzedCount > 0;
+  result.documentationAnalysis.missingDocumentsWarning =
+    documentsTotalCount > documentsAnalyzedCount;
+}
+
+function isScoreBreakdownItem(
+  value: unknown,
+): value is {
+  score: number;
+  explanation?: string;
+  evidence?: unknown;
+  missingInformation?: unknown;
+  missingInfo?: unknown;
+} {
+  return isRecord(value) && typeof value.score === 'number';
+}
+
+function normalizeStringList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === 'string' ? item : undefined))
+      .filter((item): item is string => item !== undefined);
+  }
+
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return [value.trim()];
+  }
+
+  return [];
+}
+
 function applyScoreBreakdown(result: TenderDeepAnalysisResult): void {
   let fitScore = 0;
 
@@ -469,7 +542,7 @@ function applyScoreBreakdown(result: TenderDeepAnalysisResult): void {
     const item = result.companyFitAnalysis.scoreBreakdown[key];
     item.score = clampRound(item.score);
     item.weight = COMPANY_FIT_WEIGHTS[key];
-    item.weightedScore = roundScore(item.score * item.weight);
+    item.weightedScore = roundScore((item.score * item.weight) / 100);
     item.evidence = Array.isArray(item.evidence) ? item.evidence : [];
     item.missingInformation = Array.isArray(item.missingInformation)
       ? item.missingInformation
