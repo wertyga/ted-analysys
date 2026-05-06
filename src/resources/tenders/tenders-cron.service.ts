@@ -23,9 +23,11 @@ export class TendersCronService {
     private readonly tedSearchService: TedSearchService,
     private readonly tendersService: TendersService,
   ) {
-    setTimeout(() => {
-      this.gatherRecentCompetitionTenders();
-    }, 2000);
+    if (!isDev) {
+      setTimeout(() => {
+        this.gatherRecentCompetitionTenders();
+      }, 2000);
+    }
   }
 
   @Cron(RECENT_TENDERS_CRON, {
