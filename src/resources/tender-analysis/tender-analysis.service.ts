@@ -6,6 +6,7 @@ import {
 } from '@/openai/dto/openai-analysis.dto';
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 import { TenderGeneralAnalysisService } from '@/resources/tender-analysis/tender-general-analysis.service';
+import { isDev } from '@/utils';
 
 export interface TenderAnalysisExecutionResult {
   result: GeneralTenderAnalysisResult;
@@ -39,9 +40,11 @@ export class TenderAnalysisService {
     const result =
       await this.deepSeekAnalysisService.analyzeTenderGeneral(input);
 
-    this.logger.debug(
-      `General tender analysis completed: tender=${input.tender.id} sourceHash=${sourceHash}`,
-    );
+    if (isDev) {
+      this.logger.debug(
+        `General tender analysis completed: tender=${input.tender.id} sourceHash=${sourceHash}`,
+      );
+    }
 
     return {
       result,

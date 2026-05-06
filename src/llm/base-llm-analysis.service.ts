@@ -1,7 +1,5 @@
-import { createHash } from 'crypto';
 import { Logger, ServiceUnavailableException } from '@nestjs/common';
 import {
-  GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
   GeneralRecommendation,
   GeneralTenderAnalysisInput,
   GeneralTenderAnalysisResult,
@@ -9,7 +7,10 @@ import {
 import { buildGeneralTenderAnalysisPrompt } from '@/openai/prompts/general-tender-analysis.prompt';
 import { GENERAL_TENDER_ANALYSIS_JSON_SCHEMA } from '@/openai/schemas/general-tender-analysis.schema';
 import { getSafeErrorMessage, isRecord } from '@/utils';
-import { TenderDeepAnalysisResult, TenderDeepCompanyFitAnalysisInput } from '@/types';
+import {
+  TenderDeepAnalysisResult,
+  TenderDeepCompanyFitAnalysisInput,
+} from '@/types';
 import {
   buildTenderDeepCompanyFitSystemPrompt,
   buildTenderDeepCompanyFitUserPrompt,

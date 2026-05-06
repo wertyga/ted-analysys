@@ -1,5 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DeepSeekModule } from './deepseek/deepseek.module';
@@ -16,6 +17,7 @@ import { UsersModule } from './resources/user/users.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     TedSearchModule,
     CpvModule,
     TenderWishlistModule,

@@ -44,6 +44,11 @@ export interface MigrateTenderDateFieldsResult {
   skipped: number;
 }
 
+export interface SaveNewTedTendersResult {
+  saved: number;
+  skipped: number;
+}
+
 const tenderCpvPopulateFields = [
   { path: 'classificationCpv', select: CPV_CODES_LIST_FIELDS },
   { path: 'mainClassificationProc', select: CPV_CODES_LIST_FIELDS },
@@ -189,6 +194,58 @@ export class TendersService {
     ).then((documents) => documents.filter(Boolean))) as TenderDocument[];
 
     return tenders;
+  }
+
+  async saveNewTedTenders(
+    notices: TedNotice[],
+  ): Promise<SaveNewTedTendersResult> {
+    const noticesByPublicationNumber = new Map<string, TedNotice>();
+
+    for (const notice of notices) {
+      const publicationNumber = extractPublicationNumberFromNotice(notice);
+
+      if (publicationNumber) {
+        noticesByPublicationNumber.set(publicationNumber, notice);
+      }
+    }
+
+    if (noticesByPublicationNumber.size === 0) {
+      return { saved: 0, skipped: notices.length };
+    }
+
+    const publicationNumbers = Array.from(noticesByPublicationNumber.keys());
+    const existingTenders = await TenderModel.find({
+      id: { $in: publicationNumbers },
+    })
+      .select('id publicationNumber')
+      .lean()
+      .exec();
+    const existingPublicationNumbers = new Set(
+      existingTenders.flatMap((tender) =>
+        [tender.id, tender.publicationNumber].filter(
+          (value): value is string => typeof value === 'string',
+        ),
+      ),
+    );
+    let saved = 0;
+    let skipped = notices.length - noticesByPublicationNumber.size;
+
+    for (const [publicationNumber, notice] of noticesByPublicationNumber) {
+      if (existingPublicationNumbers.has(publicationNumber)) {
+        skipped += 1;
+        continue;
+      }
+
+      const savedTender = await this.upsertTender(notice);
+
+      if (savedTender) {
+        saved += 1;
+      } else {
+        skipped += 1;
+      }
+    }
+
+    return { saved, skipped };
   }
 
   async getLocalTenderWithBaseAnalysis(

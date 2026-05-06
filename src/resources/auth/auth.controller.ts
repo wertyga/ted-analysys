@@ -11,13 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { join } from 'path';
-import {
-  filterModel,
-  generateToken,
-  getOrigin,
-  logger,
-  string_to_slug,
-} from '@/utils';
+import { filterModel, generateToken, getOrigin, logger } from '@/utils';
 import { UserAuthDto } from '@/resources/user/user.dto';
 import { UserModel } from '@/resources/user/user.schema';
 import { USER_TYPE, UserDocument } from '@/resources/user/user.types';

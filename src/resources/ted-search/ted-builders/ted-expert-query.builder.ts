@@ -128,15 +128,15 @@ function buildPublicationDatePart(
   const toDate = to?.trim();
 
   if (fromDate && toDate) {
-    return `publication-date >=${fromDate}<=${toDate}`;
+    return `publication-date >= ${fromDate} AND publication-date <= ${toDate}`;
   }
 
   if (fromDate) {
-    return `publication-date >=${fromDate}`;
+    return `publication-date >= ${fromDate}`;
   }
 
   if (toDate) {
-    return `publication-date <=${toDate}`;
+    return `publication-date <= ${toDate}`;
   }
 
   return undefined;

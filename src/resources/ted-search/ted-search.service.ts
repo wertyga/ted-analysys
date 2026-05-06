@@ -14,6 +14,7 @@ import {
 import { mapTedError, resolveDeadlineRange } from './utils';
 import { TenderGeneralAnalysisModel } from '@/resources/tender-analysis/schemas';
 import { TenderModel } from '@/resources/tenders/schemas';
+import { isDev } from '@/utils';
 
 @Injectable()
 export class TedSearchService {
@@ -136,7 +137,9 @@ export class TedSearchService {
     const sort = this.sorting.buildLocalTenderSort(filters);
     const skip = (page - 1) * limit;
 
-    this.logger.debug(`Local Search request: ${JSON.stringify(query)}`);
+    if (isDev) {
+      this.logger.debug(`Local Search request: ${JSON.stringify(query)}`);
+    }
 
     const opportunityScoreQuery =
       this.filters.buildOpportunityScoreQuery(filters);
@@ -215,9 +218,11 @@ export class TedSearchService {
 
     for (let attempt = 0; attempt <= this.retryDelaysMs.length; attempt += 1) {
       try {
-        this.logger.debug(
-          `TED Search request: ${JSON.stringify(normalizedPayload)}`,
-        );
+        if (isDev) {
+          this.logger.debug(
+            `TED Search request: ${JSON.stringify(normalizedPayload)}`,
+          );
+        }
 
         const response = await this.http.post<TedSearchResponse>(
           '/v3/notices/search',
