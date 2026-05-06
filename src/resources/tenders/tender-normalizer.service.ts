@@ -19,12 +19,16 @@ interface EstimatedValueCandidate {
   currency: string | null;
 }
 
+type NormalizedTenderDto = TenderDto & {
+  rawData?: unknown;
+};
+
 @Injectable()
 export class TenderNormalizerService {
   async normalizeTedNoticeWithCpvCodes(
     rawNotice: TedNotice,
     rawIds = false,
-  ): Promise<TenderDto> {
+  ): Promise<NormalizedTenderDto> {
     const {
       classificationCpv,
       mainClassificationProc,
@@ -49,7 +53,7 @@ export class TenderNormalizerService {
     };
   }
 
-  normalizeTedNotice(rawNotice: TedNotice): TenderDto {
+  normalizeTedNotice(rawNotice: TedNotice): NormalizedTenderDto {
     const publicationNumber =
       extractPublicationNumberFromNotice(rawNotice) ??
       this.pickText(rawNotice, ['publicationNumber']);
@@ -66,7 +70,7 @@ export class TenderNormalizerService {
       'descriptionLot',
     ]);
 
-    const dto: TenderDto = {
+    const dto: NormalizedTenderDto = {
       id: publicationNumber ?? this.createFallbackId(rawNotice),
       source: 'TED',
       sourceNoticeId: this.pickText(rawNotice, [
@@ -256,6 +260,7 @@ export class TenderNormalizerService {
         ]),
       ) as TenderDto['cpvCodes'],
       links: rawNotice.links,
+      rawData: rawNotice,
     };
 
     return dto;

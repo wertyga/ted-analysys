@@ -115,6 +115,8 @@ export interface Tender {
   cpvCodes?: unknown[];
   /** Raw TED links object, including notice/XML/HTML/document links when returned. */
   links?: TenderDocumentsLinks;
+  /** Full raw TED notice payload as returned by TED before local normalization. */
+  rawData?: unknown;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -215,6 +217,7 @@ const TenderSchema = new Schema<TenderDocument>(
     },
     cpvCodes: { type: [Schema.Types.Mixed], default: undefined },
     links: Schema.Types.Mixed,
+    rawData: { type: Schema.Types.Mixed, select: false },
   },
   {
     collection: 'tenders',

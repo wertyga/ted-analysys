@@ -25,7 +25,6 @@ import {
   isTedPublicationNumber,
 } from '@/utils';
 import { CPV_CODES_LIST_FIELDS } from '@/resources/cpv/cpv.service';
-import { TenderGeneralAnalysis } from '@/resources/tender-analysis/schemas';
 
 type TenderRecord = Tender & { _id?: unknown };
 export interface GatherActiveTendersResult {
@@ -418,6 +417,7 @@ export class TendersService {
   toListDto(tender: TenderRecord): TenderListDto {
     const {
       links,
+      rawData,
       sourceNoticeId,
       noticeVersion,
       titleProc,
@@ -441,13 +441,17 @@ export class TendersService {
       awardCriteria,
       cpvCodes,
       ...dto
-    } = this.mapTenderDocumentToDto(tender);
+    } = this.mapTenderDocumentToDto(tender) as TenderDto & {
+      rawData?: unknown;
+    };
 
     return dto;
   }
 
   toDetailDto(tender: TenderDocument) {
-    const { cpvCodes, ...dto } = this.mapTenderDocumentToDto(tender);
+    const { cpvCodes, rawData, ...dto } = this.mapTenderDocumentToDto(
+      tender,
+    ) as TenderDto & { rawData?: unknown };
 
     return dto;
   }
