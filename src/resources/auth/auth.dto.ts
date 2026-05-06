@@ -1,14 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsArray,
   IsEmail,
-  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
   Length,
 } from 'class-validator';
-import { COMPANY_SIZE } from '@/resources/user/user.types';
 
 export class OauthBase {
   @ApiProperty({ required: true })

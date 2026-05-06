@@ -413,7 +413,7 @@ export interface CompanyAnalysisDto {
   companyName?: string;
   country?: string;
   operatingRegions: string[];
-  companySize?: string;
+  companySize?: number;
   companyDescription?: string;
   industries: CpvAnalysisRef[];
   mainServices: CpvAnalysisRef[];

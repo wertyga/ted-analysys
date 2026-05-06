@@ -1,16 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { COMPANY_SIZE, TUser } from './user.types';
+import { Type } from 'class-transformer';
+import { TUser } from './user.types';
 import { PaginationAndSortDto } from '@/Dto';
 import { CpvCategoryResponseItem } from '@/resources/cpv/types';
 import {
   IsArray,
   IsBoolean,
-  IsEnum,
   IsNotEmpty,
   IsNumber,
   IsObject,
   IsOptional,
   IsString,
+  Min,
 } from 'class-validator';
 
 export const USER_LIST_FIELDS = 'companyName email avatar';
@@ -76,8 +77,8 @@ export class UserDto extends UserOwnerDto implements CompanyProfileType {
   @ApiProperty({ type: [String], example: ['PLN', 'ENG'] })
   operatingRegions: string[];
 
-  @ApiProperty({ enum: COMPANY_SIZE, example: COMPANY_SIZE.SME })
-  companySize: COMPANY_SIZE;
+  @ApiProperty({ example: 25, description: 'Number of people in the company' })
+  companySize: number;
 
   @ApiProperty({
     example: 'Software development company focused on public sector systems.',
@@ -140,9 +141,12 @@ export class UpdateUserDto {
   @IsString({ each: true })
   operatingRegions: string[];
 
-  @ApiProperty({ enum: COMPANY_SIZE, example: COMPANY_SIZE.SME })
-  @IsEnum(COMPANY_SIZE)
-  companySize: COMPANY_SIZE;
+  @ApiProperty({ example: 25, description: 'Number of people in the company' })
+  @IsNotEmpty()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  companySize: number;
 
   @ApiProperty({
     example: 'Software development company focused on public sector systems.',
