@@ -20,6 +20,14 @@ export type EstimatedValueSource =
   | 'DOCUMENT_TEXT'
   | 'NOT_FOUND';
 
+export type DocumentInputAnalysis = {
+  id?: string;
+  filename?: string | null;
+  language?: string | null;
+  documentType?: string | null;
+  extractedText: string;
+};
+
 export interface GeneralTenderAnalysisInput {
   outputLanguage?: AnalysisOutputLanguage;
   tender: {
@@ -83,13 +91,7 @@ export interface GeneralTenderAnalysisInput {
     selectionCriteria?: unknown;
     languages?: string[];
   };
-  documents: Array<{
-    id?: string;
-    filename?: string | null;
-    language?: string | null;
-    documentType?: string | null;
-    extractedText: string;
-  }>;
+  documents: DocumentInputAnalysis[];
 }
 
 export interface GeneralTenderAnalysisResult {

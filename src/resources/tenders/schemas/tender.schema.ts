@@ -1,5 +1,10 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
 
+export type TenderDocumentsLinks = Record<
+  'xml' | 'pdf' | 'pdfs' | 'html' | 'htmlDirect',
+  Record<string, string>
+>;
+
 export interface Tender {
   /** Local canonical id. For TED tenders this is the publication number. */
   id: string;
@@ -109,7 +114,7 @@ export interface Tender {
   /** Aggregated raw CPV code strings from classification/main/additional CPV fields. */
   cpvCodes?: unknown[];
   /** Raw TED links object, including notice/XML/HTML/document links when returned. */
-  links?: unknown;
+  links?: TenderDocumentsLinks;
   createdAt?: Date;
   updatedAt?: Date;
 }

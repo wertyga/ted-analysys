@@ -17,6 +17,8 @@ import {
 import { TenderGeneralAnalysisService } from '../tender-analysis/tender-general-analysis.service';
 import { TenderDeepAnalysisBuilder } from './tender-deep-analysis.builder';
 import { TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION } from '@/openai/prompts/tender-deep-company-fit.prompt';
+import { TenderDeepDocumentInputService } from './tender-deep-document-input.service';
+import * as fs from 'node:fs';
 
 type TenderDeepAnalysisRecord = TenderDeepAnalysis & { _id?: unknown };
 
@@ -25,6 +27,7 @@ export class TenderDeepAnalysisService {
   constructor(
     private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
     private readonly deepAnalysisBuilder: TenderDeepAnalysisBuilder,
+    private readonly deepDocumentInputService: TenderDeepDocumentInputService,
     @Inject(forwardRef(() => TenderGeneralAnalysisService))
     private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
   ) {}
@@ -49,22 +52,33 @@ export class TenderDeepAnalysisService {
     }
 
     const generalAnalysis =
-      await this.getOrCreateCompletedGeneralAnalysis(tender);
-    const companyDto = this.deepAnalysisBuilder.buildCompanyAnalysisDto(company);
-    const documentAnalyses: unknown[] = [];
+      await this.tenderGeneralAnalysisService.getFinishedGeneralAnalysis(
+        tender,
+      );
+
+    const companyDto =
+      this.deepAnalysisBuilder.buildCompanyAnalysisDto(company);
+
+    const documentsInput =
+      await this.deepDocumentInputService.buildDeepDocumentInput(tender);
+
     const input = this.deepAnalysisBuilder.buildInput({
       tender,
       generalAnalysis,
       company: companyDto,
       companyAnalysis: null,
-      documentAnalyses,
+      documentAnalyses: documentsInput.documentAnalyses,
+      documentTextSnippets: documentsInput.documentTextSnippets,
     });
+    fs.writeFileSync('test.json', JSON.stringify(input));
+
     const sourceHash = this.deepAnalysisBuilder.buildSourceHash({
       tender,
       company,
       generalAnalysis,
       companyAnalysis: null,
-      documentAnalyses,
+      documentAnalyses: documentsInput.documentAnalyses,
+      documentTextSnippets: documentsInput.documentTextSnippets,
     });
 
     const existing = await TenderDeepAnalysisModel.findOne({
@@ -73,7 +87,7 @@ export class TenderDeepAnalysisService {
       sourceHash,
       status: TenderDeepAnalysisStatus.COMPLETED,
     }).exec();
-
+    //
     if (existing) {
       return existing;
     }

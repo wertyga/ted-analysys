@@ -211,6 +211,7 @@ export class TenderDeepAnalysisBuilder {
     generalAnalysis?: TenderGeneralAnalysis | null;
     companyAnalysis?: unknown;
     documentAnalyses?: unknown[];
+    documentTextSnippets?: unknown[];
   }): string {
     const companyAnalysis = input.companyAnalysis as
       | { sourceHash?: unknown }
@@ -275,8 +276,16 @@ export class TenderDeepAnalysisBuilder {
           companyAnalysisSourceHash: companyAnalysis?.sourceHash,
           documentAnalyses: input.documentAnalyses?.map((doc: any) => ({
             id: doc?._id,
+            sourceUrl: doc?.sourceUrl,
             sourceHash: doc?.sourceHash,
+            textHash: doc?.textHash,
             updatedAt: doc?.updatedAt,
+          })),
+          documentTextSnippets: input.documentTextSnippets?.map((doc: any) => ({
+            sourceUrl: doc?.sourceUrl,
+            textHash: doc?.textHash,
+            filename: doc?.filename,
+            documentType: doc?.documentType,
           })),
         }),
       )
@@ -423,7 +432,8 @@ function ensureResultShape(
   result.schemaVersion ||= '1.0.0';
   result.tenderId = input.tender.id;
   result.companyId = input.company.id;
-  result.companyFitAnalysis ||= {} as TenderDeepAnalysisResult['companyFitAnalysis'];
+  result.companyFitAnalysis ||=
+    {} as TenderDeepAnalysisResult['companyFitAnalysis'];
   result.companyFitAnalysis.scoreBreakdown ||= {} as CompanyFitScoreBreakdown;
   result.companyFitAnalysis.strengths ||= [];
   result.companyFitAnalysis.weaknesses ||= [];
@@ -435,7 +445,8 @@ function ensureResultShape(
   result.riskAnalysis ||= {} as TenderDeepAnalysisResult['riskAnalysis'];
   result.riskAnalysis.companySpecificRisks ||= [];
   result.riskAnalysis.criticalBlockers ||= [];
-  result.documentationAnalysis ||= {} as TenderDeepAnalysisResult['documentationAnalysis'];
+  result.documentationAnalysis ||=
+    {} as TenderDeepAnalysisResult['documentationAnalysis'];
   result.scores ||= {} as TenderDeepAnalysisResult['scores'];
 
   for (const key of SCORE_KEYS) {
@@ -483,7 +494,9 @@ function applyMissingCompanyInfo(
     input.company.industries.length === 0 &&
     input.company.mainServices.length === 0
   ) {
-    missing.push('Company industries and main services are missing or not populated.');
+    missing.push(
+      'Company industries and main services are missing or not populated.',
+    );
   }
 
   if (!input.company.capabilities || input.company.capabilities.length === 0) {
@@ -559,7 +572,9 @@ function applyGuardrails(
   }
 
   if (
-    containsRequiredCertification(result.requirementsAnalysis?.mandatoryRequirements) &&
+    containsRequiredCertification(
+      result.requirementsAnalysis?.mandatoryRequirements,
+    ) &&
     (!input.company.certifications || input.company.certifications.length === 0)
   ) {
     capCriterion(result, 'certificationFit', 50);
@@ -799,7 +814,9 @@ function extractCpvCode(value: unknown): string | undefined {
   return typeof code === 'string' ? code : undefined;
 }
 
-function getValueBand(amount?: number | null): TenderCompanyFitDerivedMetadata['valueBand'] {
+function getValueBand(
+  amount?: number | null,
+): TenderCompanyFitDerivedMetadata['valueBand'] {
   if (typeof amount !== 'number') {
     return 'unknown';
   }
@@ -842,8 +859,8 @@ function normalizeComparable(value: string): string {
 function hasTypicalContractSize(company: CompanyAnalysisDto): boolean {
   return Boolean(
     company.typicalContractSize &&
-      (typeof company.typicalContractSize.min === 'number' ||
-        typeof company.typicalContractSize.max === 'number'),
+    (typeof company.typicalContractSize.min === 'number' ||
+      typeof company.typicalContractSize.max === 'number'),
   );
 }
 

@@ -119,7 +119,6 @@ export class TenderGeneralAnalysisService {
       existingBaseAnalysis?.status === TenderGeneralAnalysisStatus.PROCESSING;
 
     if ((hasDoneAnalysis || isInProces) && !isForceBaseAnalysis) {
-      // TODO: Check source hash
       return existingBaseAnalysis;
     }
 
@@ -158,6 +157,22 @@ export class TenderGeneralAnalysisService {
 
       throw error;
     }
+  }
+
+  async getFinishedGeneralAnalysis(tender: TenderDocument) {
+    let analysis = await this.ensureAnalysisForTender(tender);
+
+    while (analysis.status !== TenderGeneralAnalysisStatus.DONE) {
+      analysis = (await TenderGeneralAnalysisModel.findById(
+        analysis._id,
+      )) as TenderGeneralAnalysisDocument;
+
+      if (analysis.status === TenderGeneralAnalysisStatus.FAILED) {
+        break;
+      }
+    }
+
+    return analysis;
   }
 
   async ensureBaseAnalysisForMultipleTenders(

@@ -214,7 +214,9 @@ export class TenderDocumentTextExtractorService {
       isMultilingual = this.resolveIsMultilingual(input, detectedLanguages);
     } else if (documentKind === 'html') {
       const html = this.contentToString(input.content);
+
       rawText = this.htmlToReadableText(html);
+
       detectedLanguages = this.mergeLanguages(
         detectedLanguages,
         this.detectLanguagesFromHtml(html),

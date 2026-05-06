@@ -4,6 +4,7 @@ import { TendersModule } from '../tenders/tenders.module';
 import { TenderAnalysisModule } from '../tender-analysis/tender-analysis.module';
 import { TenderDeepAnalysisBuilder } from './tender-deep-analysis.builder';
 import { TenderDeepAnalysisController } from './tender-deep-analysis.controller';
+import { TenderDeepDocumentInputService } from './tender-deep-document-input.service';
 import { TenderDeepAnalysisService } from './tender-deep-analysis.service';
 
 @Module({
@@ -13,7 +14,11 @@ import { TenderDeepAnalysisService } from './tender-deep-analysis.service';
     forwardRef(() => TenderAnalysisModule),
   ],
   controllers: [TenderDeepAnalysisController],
-  providers: [TenderDeepAnalysisService, TenderDeepAnalysisBuilder],
+  providers: [
+    TenderDeepAnalysisService,
+    TenderDeepAnalysisBuilder,
+    TenderDeepDocumentInputService,
+  ],
   exports: [TenderDeepAnalysisService],
 })
 export class TenderDeepAnalysisModule {}

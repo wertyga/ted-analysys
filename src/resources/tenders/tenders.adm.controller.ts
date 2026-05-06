@@ -120,8 +120,6 @@ export class TendersAdmController {
           }
         }
 
-        console.log({ totalCount, pagesFetched, iterationNextToken });
-
         if (!iterationNextToken) {
           break;
         }
@@ -137,8 +135,6 @@ export class TendersAdmController {
           errorMessage: getSafeErrorMessage(error),
         };
 
-        console.log(result);
-
         return result;
       }
     }
@@ -151,8 +147,6 @@ export class TendersAdmController {
       tendersSkipped,
       tendersSaved,
     };
-
-    console.log(result);
 
     return result;
   }
