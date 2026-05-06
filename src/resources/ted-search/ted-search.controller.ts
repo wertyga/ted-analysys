@@ -83,7 +83,7 @@ export class TedSearchController {
     const normalized = await normalizeTenderSearchResponse({
       ...data,
       notices: tendersWithBaseAnalysis.map((tba) => {
-        const tender = tba.toObject();
+        const tender = 'toObject' in tba ? tba.toObject() : tba;
 
         return this.tendersService.toWholeTenderListDto(tender);
       }),

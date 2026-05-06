@@ -456,7 +456,7 @@ export class TendersService {
     const tenderList = this.toListDto(tender);
 
     tenderList.generalAnalysis = this.tenderGeneralAnalysisService.toListDto(
-      tenderList.generalAnalysis as TenderGeneralAnalysis,
+      (tender as any).generalAnalysis,
     );
 
     return tenderList;
