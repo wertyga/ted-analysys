@@ -27,4 +27,6 @@ export enum TedNoticeType {
   QU_SY = 'qu-sy',
 
   VEAT = 'veat',
+  SUBCO = 'subco',
+  COMPL = 'compl',
 }

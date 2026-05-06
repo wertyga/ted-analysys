@@ -169,12 +169,12 @@ export class TedTenderSearchRequestDto {
   })
   @IsOptional()
   @IsEnum(TedTenderSortColumn)
-  sortColumn?: TedTenderSortColumn;
+  sortColumn?: TedTenderSortColumn = TedTenderSortColumn.PUBLICATION_DATE;
 
   @ApiPropertyOptional({ enum: TedSortOrder, example: TedSortOrder.DESC })
   @IsOptional()
   @IsEnum(TedSortOrder)
-  sortOrder?: TedSortOrder;
+  sortOrder?: TedSortOrder = TedSortOrder.DESC;
 
   @ApiPropertyOptional({ minimum: 0, maximum: 100, example: 60 })
   @IsOptional()
