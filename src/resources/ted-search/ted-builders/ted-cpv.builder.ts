@@ -6,30 +6,26 @@ export function normalizeCpvCodes(codes: string[]): string[] {
   );
 }
 
-export type CpvMatchMode = 'TREE' | 'EXACT';
+export function getNarrowerCodes(codes: string[]): string[] {
+  return codes.filter(
+    (code) =>
+      !codes.some(
+        (candidateChild) =>
+          candidateChild !== code && isCpvDescendant(candidateChild, code),
+      ),
+  );
+}
 
 export function buildAdaptiveCpvQuery(
   cpvCodes: string[] | undefined,
 ): string | undefined {
-  const codes = normalizeCpvCodes(cpvCodes ?? []);
+  const codes = getNarrowerCodes(normalizeCpvCodes(cpvCodes ?? []));
 
   if (codes.length === 0) {
     return undefined;
   }
 
-  const parts = codes.map((code) => {
-    const matchMode = resolveCpvMatchMode(code);
-
-    return matchMode === 'TREE' ? toCpvTreePattern(code) : code;
-  });
-
-  return `classification-cpv IN (${parts.join(' ')})`;
-}
-
-export function resolveCpvMatchMode(code: string): CpvMatchMode {
-  const level = getCpvLevel(code);
-
-  return level >= 3 && level <= 4 ? 'TREE' : 'EXACT';
+  return `classification-cpv IN (${codes.join(' ')})`;
 }
 
 export function getCpvLevel(code: string): number {
@@ -39,12 +35,19 @@ export function getCpvLevel(code: string): number {
   return Math.min(Math.max(significantLength, 2), 8);
 }
 
-function toCpvTreePattern(code: string): string {
-  const prefix = code.replace(/0+$/, '');
+function isCpvDescendant(childCode: string, parentCode: string): boolean {
+  const childLevel = getCpvLevel(childCode);
+  const parentLevel = getCpvLevel(parentCode);
 
-  if (prefix.length >= 2 && prefix.length < 8) {
-    return `${prefix}*`;
+  if (childLevel <= parentLevel) {
+    return false;
   }
 
-  return code;
+  return childCode.startsWith(getCpvPrefix(parentCode));
+}
+
+function getCpvPrefix(code: string): string {
+  const prefix = code.replace(/0+$/, '');
+
+  return prefix.length >= 2 ? prefix : code.slice(0, 2);
 }

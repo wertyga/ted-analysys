@@ -44,7 +44,7 @@ export function buildTedTenderSearchQuery(
       filters.publicationDateTo,
     ),
     buildDateRangePart(
-      'deadline-receipt-tender-date-lot',
+      'deadline-receipt-request',
       filters.submissionDeadlineFrom,
       filters.submissionDeadlineTo,
     ),
