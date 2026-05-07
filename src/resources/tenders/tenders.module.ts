@@ -7,11 +7,13 @@ import { TendersCronService } from './tenders-cron.service';
 import { TendersAdmController } from './tenders.adm.controller';
 import { TendersController } from './tenders.controller';
 import { TendersService } from './tenders.service';
+import { TenderWishlistModule } from '@/resources/tender-wishlist/tender-wishlist.module';
 
 @Module({
   imports: [
     forwardRef(() => TedSearchModule),
     forwardRef(() => TenderAnalysisModule),
+    forwardRef(() => TenderWishlistModule),
   ],
   controllers: [TendersController, TendersAdmController],
   providers: [

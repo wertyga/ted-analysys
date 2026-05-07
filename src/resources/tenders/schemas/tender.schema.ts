@@ -6,6 +6,7 @@ export type TenderDocumentsLinks = Record<
 >;
 
 export interface Tender {
+  _id: string;
   /** Local canonical id. For TED tenders this is the publication number. */
   id: string;
   /** Source system name. Currently always TED. */
@@ -122,6 +123,10 @@ export interface Tender {
 }
 
 export type TenderDocument = Tender & Document;
+
+export type TenderWithWishlist = Tender & {
+  isInWishlist: boolean;
+};
 
 const TenderSchema = new Schema<TenderDocument>(
   {

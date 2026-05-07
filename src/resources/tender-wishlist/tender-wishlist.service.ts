@@ -4,19 +4,19 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import mongoose from 'mongoose';
-import { TenderDocument } from '@/resources/tenders/schemas';
+import {
+  TenderDocument,
+  TenderWithWishlist,
+} from '@/resources/tenders/schemas';
 import { isDuplicateKeyError } from '@/utils';
-import { TendersService } from '@/resources/tenders/tenders.service';
+import {
+  TenderListDto,
+  TendersService,
+} from '@/resources/tenders/tenders.service';
 import { TenderWishlistItemModel } from './schemas';
 import { UserDocument } from '@/resources/user/user.types';
 import { CPV_CODES_LIST_FIELDS } from '@/resources/cpv/cpv.service';
-
-const tenderCpvPopulateFields = [
-  { path: 'classificationCpv', select: CPV_CODES_LIST_FIELDS },
-  { path: 'mainClassificationProc', select: CPV_CODES_LIST_FIELDS },
-  { path: 'mainClassificationLot', select: CPV_CODES_LIST_FIELDS },
-  { path: 'additionalClassificationLot', select: CPV_CODES_LIST_FIELDS },
-];
+import { tenderCpvPopulateFields } from '@/resources/tenders/utils/tender.utils';
 
 @Injectable()
 export class TenderWishlistService {
@@ -72,7 +72,7 @@ export class TenderWishlistService {
       tenderId,
     }).exec();
 
-    return { tenderId, isWishlisted: false };
+    return { tenderId, isInWishlist: false };
   }
 
   async getTenderStatus(user: unknown, tenderId: string) {
@@ -87,8 +87,29 @@ export class TenderWishlistService {
 
     return {
       tenderId,
-      isWishlisted: item !== null,
+      isInWishlist: item !== null,
     };
+  }
+
+  async getPopulatedTendersByWishlists(
+    tenders: (TenderDocument | TenderListDto)[],
+    userId: string,
+  ): Promise<TenderWithWishlist[]> {
+    const ids = tenders.map((t) => t._id.toString());
+
+    const wishTendersIds = await TenderWishlistItemModel.find({
+      user: userId,
+      tender: { $in: ids },
+    })
+      .lean()
+      .then((items) => items.map((t) => t.tender.toString()));
+
+    return tenders.map((tender) => {
+      return {
+        ...('toObject' in tender ? tender.toObject() : tender),
+        isInWishlist: wishTendersIds.includes(tender._id.toString()),
+      };
+    });
   }
 
   async listUserTenders(user: UserDocument, page = 1, limit = 20) {

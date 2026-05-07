@@ -19,6 +19,7 @@ import { TenderDeepAnalysisBuilder } from './tender-deep-analysis.builder';
 import { TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION } from '@/openai/prompts/tender-deep-company-fit.prompt';
 import { TenderDeepDocumentInputService } from './tender-deep-document-input.service';
 import * as fs from 'node:fs';
+import { CPV_CODES_LIST_FIELDS } from '@/resources/cpv/cpv.service';
 
 type TenderDeepAnalysisRecord = TenderDeepAnalysis & { _id?: unknown };
 
@@ -43,8 +44,8 @@ export class TenderDeepAnalysisService {
     }
 
     const company = await UserModel.findById(params.companyId)
-      .populate('industries')
-      .populate('mainServices')
+      .populate('industries', CPV_CODES_LIST_FIELDS)
+      .populate('mainServices', CPV_CODES_LIST_FIELDS)
       .exec();
 
     if (!company) {

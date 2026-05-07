@@ -12,6 +12,7 @@ import {
 import {
   ApiBearerAuth,
   ApiDefaultResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiQuery,
   ApiTags,
@@ -20,6 +21,7 @@ import { AuthGuard } from '@/guards';
 import { TenderWishlistService } from './tender-wishlist.service';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { TenderDocument } from '@/resources/tenders/schemas';
+import { TenderWishlistStatusDto } from './dto/tender-wishlist-status.dto';
 
 @ApiTags('Tender Wishlist')
 @ApiBearerAuth()
@@ -59,21 +61,21 @@ export class TenderWishlistController {
 
   @Get('/:tenderId')
   @ApiOperation({ summary: 'Check whether tender is in current user wishlist' })
-  @ApiDefaultResponse({ description: 'Tender wishlist status.' })
+  @ApiOkResponse({ type: TenderWishlistStatusDto })
   getWishlistStatus(@Req() req, @Param('tenderId') tenderId: string) {
     return this.wishlistService.getTenderStatus(req.user, tenderId);
   }
 
   @Post('/:tenderId')
   @ApiOperation({ summary: 'Add tender to current user wishlist' })
-  @ApiDefaultResponse({ description: 'Tender wishlist status.' })
+  @ApiOkResponse({ type: TenderWishlistStatusDto })
   addTender(@Req() req, @Param('tenderId') tenderId: string) {
     return this.wishlistService.addTender(req.user, tenderId);
   }
 
   @Delete('/:tenderId')
   @ApiOperation({ summary: 'Remove tender from current user wishlist' })
-  @ApiDefaultResponse({ description: 'Tender wishlist status.' })
+  @ApiOkResponse({ type: TenderWishlistStatusDto })
   removeTender(@Req() req, @Param('tenderId') tenderId: string) {
     return this.wishlistService.removeTender(req.user, tenderId);
   }

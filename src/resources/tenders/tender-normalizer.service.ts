@@ -19,7 +19,7 @@ interface EstimatedValueCandidate {
   currency: string | null;
 }
 
-type NormalizedTenderDto = TenderDto & {
+type NormalizedTenderDto = Omit<TenderDto, '_id'> & {
   rawData?: unknown;
 };
 
@@ -132,8 +132,14 @@ export class TenderNormalizerService {
         this.parseTenderDate(
           this.pickDateTime(
             rawNotice,
-            ['deadline-receipt-tender-date-lot', 'deadlineReceiptTenderDateLot'],
-            ['deadline-receipt-tender-time-lot', 'deadlineReceiptTenderTimeLot'],
+            [
+              'deadline-receipt-tender-date-lot',
+              'deadlineReceiptTenderDateLot',
+            ],
+            [
+              'deadline-receipt-tender-time-lot',
+              'deadlineReceiptTenderTimeLot',
+            ],
           ),
         ),
       deadlineReceiptTender: this.parseTenderDate(
@@ -146,8 +152,14 @@ export class TenderNormalizerService {
       questionsDeadline: this.parseTenderDate(
         this.pickDateTime(
           rawNotice,
-          ['deadline-receipt-answers-date-lot', 'deadlineReceiptAnswersDateLot'],
-          ['deadline-receipt-answers-time-lot', 'deadlineReceiptAnswersTimeLot'],
+          [
+            'deadline-receipt-answers-date-lot',
+            'deadlineReceiptAnswersDateLot',
+          ],
+          [
+            'deadline-receipt-answers-time-lot',
+            'deadlineReceiptAnswersTimeLot',
+          ],
         ),
       ),
       plannedStartDate: this.parseTenderDate(

@@ -5,6 +5,7 @@ import {
   Get,
   Inject,
   Post,
+  Req,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -22,6 +23,7 @@ import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/ni
 import { TenderGeneralAnalysisService } from '../tender-analysis/tender-general-analysis.service';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { TED_ELIGIBLE_COUNTRIES } from './utils';
+import { TenderWishlistService } from '@/resources/tender-wishlist/tender-wishlist.service';
 
 interface TedCountryResponse {
   code: string;
@@ -34,9 +36,9 @@ export class TedSearchController {
   constructor(
     private readonly tedSearchService: TedSearchService,
     @Inject(forwardRef(() => TenderGeneralAnalysisService))
-    private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
     @Inject(forwardRef(() => TendersService))
     private readonly tendersService: TendersService,
+    private readonly tenderWishlistService: TenderWishlistService,
   ) {}
 
   @Get('countries')
@@ -57,36 +59,38 @@ export class TedSearchController {
   })
   @ApiServiceUnavailableResponse({ description: 'TED API is unavailable' })
   async searchTenders(
+    @Req() req,
     @Body() body: TedTenderSearchRequestDto,
   ): Promise<TedSearchResponse> {
-    const updatedData = {
+    const resolvedDateSinceTodayFilters = resolveDeadlineRange({
       ...body,
-    };
+      noticeTypes: body.noticeTypes ?? TENDER_COMPETITION_NOTICE_TYPES,
+    });
 
-    updatedData.noticeTypes =
-      body.noticeTypes ?? TENDER_COMPETITION_NOTICE_TYPES;
-
-    const resolvedDateSinceTodayFilters = resolveDeadlineRange(updatedData);
-
-    const data = await this.tedSearchService.searchTenders(
+    const noticeData = await this.tedSearchService.searchTenders(
       resolvedDateSinceTodayFilters,
     );
-    // const data = await this.tedSearchService.searchLocalTenders(
-    //   resolvedDateSinceTodayFilters,
-    // );
 
-    const tendersWithBaseAnalysis =
-      await this.tendersService.upsertIfNeededMultipleTendersWithGeneralAnalysis(
-        data.notices ?? [],
-      );
+    const [tendersWithBaseAnalysis] = await Promise.all([
+      this.tendersService.upsertIfNeededMultipleTendersWithGeneralAnalysis(
+        noticeData.notices ?? [],
+      ),
+    ]);
+
+    const listTenders = tendersWithBaseAnalysis.map((tba) => {
+      const tender = 'toObject' in tba ? tba.toObject() : tba;
+
+      return this.tendersService.toWholeTenderListDto(tender);
+    });
 
     const normalized = await normalizeTenderSearchResponse({
-      ...data,
-      notices: tendersWithBaseAnalysis.map((tba) => {
-        const tender = 'toObject' in tba ? tba.toObject() : tba;
-
-        return this.tendersService.toWholeTenderListDto(tender);
-      }),
+      ...noticeData,
+      notices: req.user
+        ? await this.tenderWishlistService.getPopulatedTendersByWishlists(
+            listTenders,
+            req.user._id.toString(),
+          )
+        : listTenders,
     });
 
     return normalized;

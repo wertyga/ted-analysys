@@ -24,9 +24,9 @@ import {
   isTedNotice,
   isTedPublicationNumber,
 } from '@/utils';
-import { CPV_CODES_LIST_FIELDS } from '@/resources/cpv/cpv.service';
+import { tenderCpvPopulateFields } from '@/resources/tenders/utils/tender.utils';
 
-type TenderRecord = Tender & { _id?: unknown };
+type TenderRecord = Tender & { _id: unknown };
 export interface GatherActiveTendersResult {
   completed?: boolean;
   totalCount?: number;
@@ -49,12 +49,6 @@ export interface SaveNewTedTendersResult {
   skipped: number;
 }
 
-const tenderCpvPopulateFields = [
-  { path: 'classificationCpv', select: CPV_CODES_LIST_FIELDS },
-  { path: 'mainClassificationProc', select: CPV_CODES_LIST_FIELDS },
-  { path: 'mainClassificationLot', select: CPV_CODES_LIST_FIELDS },
-  { path: 'additionalClassificationLot', select: CPV_CODES_LIST_FIELDS },
-];
 export type TenderListDto = Omit<
   TenderDto,
   | 'links'
@@ -409,6 +403,7 @@ export class TendersService {
 
   mapTenderDocumentToDto(tender: TenderRecord): TenderDto {
     const dto: TenderDto = {
+      _id: tender._id?.toString() ?? '',
       id: tender.id,
       source: 'TED',
       sourceNoticeId: tender.sourceNoticeId,

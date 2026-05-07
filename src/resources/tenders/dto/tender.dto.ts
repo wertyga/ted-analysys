@@ -27,6 +27,8 @@ export class TenderEstimatedValueDto {
 }
 
 export class TenderDto {
+  _id: string;
+
   @ApiProperty({
     example: '756265-2023',
     description:
@@ -390,4 +392,10 @@ export class TenderDto {
     description: 'Generated tender analysis, when available.',
   })
   generalAnalysis?: TenderGeneralAnalysisDetailDto | null;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Whether the tender is in the current user wishlist.',
+  })
+  isInWishlist?: boolean;
 }
