@@ -1,0 +1,169 @@
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <style>
+      body {
+        text-align: center;
+        max-width: 600px;
+        width: 100%;
+        margin: 0 auto;
+        font-family: Montserrat, "sans-serif";
+      }
+
+      .container {
+        padding-left: 60px;
+        padding-right: 60px;
+      }
+      .container > * {
+        display: block;
+        width: 100%;
+      }
+
+      a {
+        color: #ff4605 !important;
+        text-decoration: none;
+        cursor: pointer !important;
+      }
+
+      .content {
+        text-align: center;
+        max-width: 600px;
+        width: 100%;
+        margin: 0 auto;
+        font-family: Roboto, RobotoDraft, Helvetica, Arial, "sans-serif";
+        color: #000;
+      }
+
+      h3 {
+        font-weight: 600;
+        font-size: 26px;
+        margin-bottom: 50px;
+        margin-top: 0 !important;
+      }
+
+      .logo {
+        margin: 0 auto 0 auto;
+        width: 100%;
+        max-width: 300px;
+      }
+
+      .request {
+        line-height: 24px;
+      }
+
+      .subtitle-2 {
+        font-size: 15px;
+        font-weight: 400;
+        color: #7b7c8c;
+      }
+
+      .buttonWrapper {
+        width: 100%;
+        max-width: 265px;
+        display: table;
+        margin: 0 auto;
+      }
+
+      .button {
+        background-color: #ff4605;
+        font-weight: 600 !important;
+        font-size: 14px;
+        color: #ffffff !important;
+        border-radius: 22px;
+        height: 48px;
+        display: table-cell;
+        text-align: center;
+        vertical-align: middle;
+        border: none;
+        outline: none;
+        cursor: pointer;
+        margin: 0 auto;
+      }
+
+      .mb-30 {
+        margin-bottom: 30px;
+      }
+
+      .subscribe-block__social > *:not(:last-child) {
+        margin-right: 10px;
+      }
+
+      .faq {
+        background-color: #FFF0EE;
+        padding-top: 28px;
+        padding-bottom: 28px;
+      }
+      .faq__title {
+        font-weight: 500;
+        font-size: 16px;
+        margin-bottom: 14px;
+        margin-top: 0;
+        color: #7b7c8c;
+      }
+
+      .footer {
+        background-color: #F7F7F7;
+        padding-top: 24px;
+        padding-bottom: 24px;
+        margin: 0;
+        font-size: 12px;
+        font-weight: 400;
+      }
+      .footer a {
+        text-decoration: underline;
+        color: #000 !important;
+      }
+
+      .code {
+        background-color: #F7F7F7;
+        width: 300px;
+        text-align: center;
+        padding: 20px 0;
+        margin: 30px auto;
+      }
+      .code a {
+        color: #000 !important;
+        font-size: 20px;
+      }
+
+      .ignore {
+        margin-bottom: 60px;
+      }
+
+      @media screen and (max-width: 500px) {
+        .container {
+          padding: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="content">
+      <img src="https://travelwithme.b-cdn.net/static/logo2.png" class="logo" />
+      <h3>Subscription Success</h3>
+      <div class="container mb-30">
+        <p class="subtitle-2 request">If you have requested a password reset, please use the confirmation code below to complete the process.</p>
+      </div>
+
+      <div class="buttonWrapper">
+        <a class="button mb-30" href="{{confirmLink}}">Confirm Email</a>
+      </div>
+
+      <p class="subtitle-2 ignore">If you did not make this request, please ignore this email.</p>
+
+      <div class="faq">
+        <p class="faq__title">Do you have any questions?</p>
+        <p class="subtitle-2">
+          You can quickly find the answer in the section <a href="https://www.underhood.space/faq/" target="_blank">FAQ</a>
+          or email us <a href="mailto: underhood.space@gmail.com">underhood.space@gmail.com.</a>
+        </p>
+      </div>
+
+      <p class="footer">
+        <a href="https://www.underhood.space/privacy/" target="_blank">Privacy Policy</a> and
+        <a href="https://www.underhood.space/terms/" target="_blank">Terms of Use.</a>
+        You have received this email because you are a user of the Travel With Me service
+      </p>
+    </div>
+  </body>
+</html>
