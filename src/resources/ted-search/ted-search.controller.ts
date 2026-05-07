@@ -35,8 +35,6 @@ interface TedCountryResponse {
 export class TedSearchController {
   constructor(
     private readonly tedSearchService: TedSearchService,
-    @Inject(forwardRef(() => TenderGeneralAnalysisService))
-    @Inject(forwardRef(() => TendersService))
     private readonly tendersService: TendersService,
     private readonly tenderWishlistService: TenderWishlistService,
   ) {}
