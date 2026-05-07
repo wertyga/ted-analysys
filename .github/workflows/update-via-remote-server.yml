@@ -1,0 +1,35 @@
+name: connect and build
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+
+  build:
+    if: github.ref == 'refs/heads/main'
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+    - name: build back-end
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SSH_IP }}
+        username: ${{ secrets.SSH_USER }}
+        password: ${{ secrets.SSH_PASSWORD }}
+        script: |
+          cd ~/ted-analysys && git pull && 
+          npm i && npm run build
+
+    - name: restart pm2 process
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SSH_IP }}
+        username: ${{ secrets.SSH_USER }}
+        password: ${{ secrets.SSH_PASSWORD }}
+        script: pm2 restart ted-analysys:3002
+
+
