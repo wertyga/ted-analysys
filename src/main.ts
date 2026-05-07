@@ -8,6 +8,14 @@ import { isDev } from './utils';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const port = process.env.PORT ?? 3000;
+  const corsOrigin = process.env.CORS_ORIGIN?.split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  app.enableCors({
+    origin: corsOrigin?.length ? corsOrigin : true,
+    credentials: true,
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
