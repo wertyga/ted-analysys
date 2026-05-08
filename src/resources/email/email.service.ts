@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import nodemailer, { type Transporter } from 'nodemailer';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { gfTime } from '@/goldfish';
 import { EMAIL_TEMPLATES } from './type';
@@ -11,19 +11,9 @@ type Options = {
   html?: string;
 };
 
-const NODEMAILER_CONFIG = {
-  host: 'smtp-relay.brevo.com',
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.MAIL_USERNAME,
-    pass: process.env.MAIL_PASSWORD,
-  },
-};
-
 @Injectable()
 export class EmailService {
-  private transporter: typeof nodemailer.createTransport;
+  private transporter: Transporter;
   private emailSentTimers: Record<
     string,
     { timer: NodeJS.Timeout; timeEnd: number }
@@ -32,7 +22,32 @@ export class EmailService {
 
   constructor() {
     this.emailSentTimers = {};
-    this.transporter = nodemailer.createTransport(NODEMAILER_CONFIG);
+    this.transporter = nodemailer.createTransport(this.getMailerConfig());
+  }
+
+  private getMailerConfig() {
+    const host = process.env.MAIL_SMPT_SERVER;
+    const port = Number(
+      process.env.MAIL_SMPT_PORT ?? process.env.MAIL_SMTP_PORT,
+    );
+    const user = process.env.MAIL_USERNAME;
+    const pass = process.env.MAIL_PASSWORD;
+
+    if (!host || !user || !pass) {
+      throw new Error(
+        'SMTP is not configured. Set MAIL_SMPT_SERVER, MAIL_SMPT_PORT, MAIL_USERNAME, and MAIL_PASSWORD.',
+      );
+    }
+
+    return {
+      host,
+      port,
+      secure: port === 465,
+      auth: {
+        user,
+        pass,
+      },
+    };
   }
 
   private _handleTimer(to: string, timeout = gfTime.minute * 2) {

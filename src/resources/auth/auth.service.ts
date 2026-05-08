@@ -5,7 +5,7 @@ import {
   UserDocument,
 } from '@/resources/user/user.types';
 import { UserModel } from '@/resources/user/user.schema';
-import { generateHash, generateToken } from '@/utils';
+import { generateHash, generateToken, logger } from '@/utils';
 import { CreateUserDto, OauthSignInDto, SignInUserDto } from './auth.dto';
 import { gfEmail, gfErrors } from '@/goldfish';
 import { EmailService } from '@/resources/email/email.service';
@@ -72,11 +72,16 @@ export class AuthService {
       ? gfEmail.registerSubject
       : gfEmail.recoverySubject;
 
-    await this.emailService.sendEmail({
-      to: email,
-      subject,
-      html,
-    });
+    try {
+      await this.emailService.sendEmail({
+        to: email,
+        subject,
+        html,
+      });
+    } catch (e) {
+      console.log({ e });
+      logger.error('sendConfirmLink', e);
+    }
   }
 
   async createNewUser(userPayload: CreateUserDto): Promise<UserDocument> {
