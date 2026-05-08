@@ -6,10 +6,8 @@ type MongoSort = Record<string, 1 | -1>;
 const LOCAL_SORT_FIELDS: Record<TedTenderSortColumn, string> = {
   [TedTenderSortColumn.PUBLICATION_DATE]: 'publicationDate',
   [TedTenderSortColumn.DEADLINE]: 'submissionDeadline',
-  [TedTenderSortColumn.NOTICE_TITLE]: 'title',
-  [TedTenderSortColumn.BUYER_NAME]: 'buyerName',
-  [TedTenderSortColumn.CREATED_AT]: 'createdAt',
-  [TedTenderSortColumn.UPDATED_AT]: 'updatedAt',
+  [TedTenderSortColumn.BUYER_COUNTRY]: 'buyerCountry',
+  [TedTenderSortColumn.BUDGET]: 'estimatedValue.amount',
 };
 
 export class TedSearchSorting {
@@ -23,7 +21,9 @@ export class TedSearchSorting {
     };
   }
 
-  private resolveSortField(sortColumn: TedTenderSortColumn | undefined): string {
+  private resolveSortField(
+    sortColumn: TedTenderSortColumn | undefined,
+  ): string {
     if (!sortColumn) {
       return 'publicationDate';
     }

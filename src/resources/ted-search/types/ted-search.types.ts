@@ -17,10 +17,8 @@ export enum TedSortOrder {
 export enum TedTenderSortColumn {
   PUBLICATION_DATE = 'publication-date',
   DEADLINE = 'deadline',
-  NOTICE_TITLE = 'notice-title',
-  BUYER_NAME = 'buyer-name',
-  CREATED_AT = 'created-at',
-  UPDATED_AT = 'updated-at',
+  BUYER_COUNTRY = 'buyer-country',
+  BUDGET = 'total-value',
 }
 
 export interface TedNotice {
