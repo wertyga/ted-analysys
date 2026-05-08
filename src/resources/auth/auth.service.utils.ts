@@ -3,7 +3,7 @@ import { USER_TYPE } from '@/resources/user/user.types';
 import { gfErrors } from '@/goldfish';
 
 export class AuthServiceUtils {
-  async checkIfUserExistsGuard(
+  async checkIfTempUserExistsGuard(
     fieldForCheck: Record<string, string>[],
     error: any = gfErrors.userExists(),
   ) {

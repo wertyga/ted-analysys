@@ -87,18 +87,17 @@ export class AuthController {
   async signUpUser(@Body() userPayload: CreateUserDto, @Req() req) {
     const { email } = userPayload;
 
-    await this.authService.utils.checkIfUserExistsGuard([
-      { email },
+    await this.authService.utils.checkIfTempUserExistsGuard([
       { tempEmail: email },
     ]);
 
-    const user = await this.authService.createNewUser(userPayload);
+    const user = await this.authService.upsertTempUser(userPayload);
 
     await this.authService.sendConfirmLink({
       email: user.tempEmail ?? '',
-      origin: getOrigin(req),
+      origin: process.env.SERVER_ORIGIN ?? '',
       replaceData: {
-        companyName: user.companyName,
+        companyName: user.tempEmail ?? '',
       },
       token: user.recoveryToken,
       redirectUrl: '/auth/confirm-email',
@@ -129,7 +128,7 @@ export class AuthController {
 
       html = getEmailTemplate(EMAIL_TEMPLATES.ConfirmedEmail)?.replace(
         '{{companyName}}',
-        user.companyName,
+        user.tempEmail ?? '',
       );
     }
 
@@ -211,7 +210,9 @@ export class AuthController {
       throw gfErrors.userNotFound();
     }
 
-    await this.authService.utils.checkIfUserExistsGuard([{ email: newEmail }]);
+    await this.authService.utils.checkIfTempUserExistsGuard([
+      { email: newEmail },
+    ]);
 
     req.user.tempEmail = newEmail;
     req.user.recoveryToken = generateToken(newEmail);

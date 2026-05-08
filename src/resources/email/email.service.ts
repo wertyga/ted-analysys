@@ -18,7 +18,7 @@ export class EmailService {
     string,
     { timer: NodeJS.Timeout; timeEnd: number }
   >;
-  private from: string = 'TryOn <no-reply@zws.ink>';
+  private from: string = 'AI Tenders <no-reply@zws.ink>';
 
   constructor() {
     this.emailSentTimers = {};

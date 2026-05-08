@@ -84,10 +84,14 @@ export class AuthService {
     }
   }
 
-  async createNewUser(userPayload: CreateUserDto): Promise<UserDocument> {
+  async upsertTempUser(userPayload: CreateUserDto): Promise<UserDocument> {
     const payload = this.constructCreateTempUserPayload(userPayload);
 
-    return UserModel.create(payload as any);
+    return UserModel.findOneAndUpdate(
+      { tempEmail: payload.tempEmail },
+      { $set: payload },
+      { upsert: true, returnDocument: 'after' },
+    );
   }
 
   async confirmUserEmail(recoveryToken: string) {
