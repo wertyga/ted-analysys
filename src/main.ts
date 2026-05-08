@@ -12,10 +12,7 @@ async function bootstrap() {
     .map((origin) => origin.trim())
     .filter(Boolean);
 
-  app.enableCors({
-    origin: corsOrigin?.length ? corsOrigin : true,
-    credentials: true,
-  });
+  app.enableCors();
 
   app.useGlobalPipes(
     new ValidationPipe({
