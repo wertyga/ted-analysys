@@ -50,6 +50,8 @@ export interface Tender {
   buyerCountry?: string;
   /** TED buyer-city: buyer city. */
   buyerCity?: string;
+  /** TED main-activity: buyer main activities. */
+  buyerMainActivities?: string[];
   /** TED buyer-email: buyer contact email. */
   buyerEmail?: string;
   /** TED buyer-internet-address: buyer website. */
@@ -156,6 +158,10 @@ const TenderSchema = new Schema<TenderDocument>(
     buyerIdentifier: String,
     buyerCountry: String,
     buyerCity: String,
+    buyerMainActivities: {
+      type: [String],
+      default: undefined,
+    },
     buyerEmail: String,
     buyerInternetAddress: String,
     buyerProfile: String,

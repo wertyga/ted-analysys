@@ -2,25 +2,43 @@ import { TedNoticeType } from '../../tenders/types';
 import { TedSortOrder, TedTenderSortColumn } from '../types/ted-search.types';
 import { buildAdaptiveCpvQuery } from './ted-cpv.builder';
 import {
+  BuyerMainActivity,
+  CurrencySign,
   normalizeTedCountryCodes,
-  TedEligibleCountryCode,
-} from '../utils/ted-countries';
+  type TedEligibleCountryCode,
+} from '@/resources/codelist';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsNumber, IsOptional, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  TedContractNature,
+  TedProcedureType,
+} from '@/resources/ted-search/dto/ted-tender-search-request.dto';
+import { resolveDeadlineRange } from '@/resources/ted-search/utils';
+import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 
 export interface TedTenderSearchFilters {
   text?: string;
-  title?: string;
-  description?: string;
   cpvCodes?: string[];
   buyerCountries?: TedEligibleCountryCode[];
+  buyerName?: string;
+  buyerIdentifier?: string;
+  buyerCity?: string;
+  buyerMainActivity?: BuyerMainActivity[];
   placeOfPerformance?: TedEligibleCountryCode[];
+  submissionLanguage?: string[];
   noticeTypes?: TedNoticeType[];
-  contractNature?: 'services' | 'supplies' | 'works';
+  procedureType?: TedProcedureType[];
+  contractNature?: TedContractNature[];
+  currency?: CurrencySign[];
   publicationDateFrom?: string;
   publicationDateTo?: string;
   submissionDeadlineFrom?: string;
   submissionDeadlineTo?: string;
   sortColumn?: TedTenderSortColumn;
   sortOrder?: TedSortOrder;
+  contractAwardFrom?: number;
+  contractAwardTo?: number;
 }
 
 export function quoteTedValue(value: string): string {
@@ -30,23 +48,52 @@ export function quoteTedValue(value: string): string {
 export function buildTedTenderSearchQuery(
   filters: TedTenderSearchFilters,
 ): string {
+  const {
+    text,
+    cpvCodes,
+    buyerName,
+    buyerIdentifier,
+    buyerCountries,
+    buyerCity,
+    buyerMainActivity,
+    placeOfPerformance,
+    submissionLanguage,
+    noticeTypes,
+    procedureType,
+    contractNature,
+    currency,
+    publicationDateFrom,
+    publicationDateTo,
+    submissionDeadlineFrom,
+    submissionDeadlineTo,
+    contractAwardFrom,
+    contractAwardTo,
+  } = resolveDeadlineRange(filters);
+
   const parts = [
-    buildTextPart('FT', filters.text),
-    buildTextPart('notice-title', filters.title),
-    buildTextPart('description-proc', filters.description),
-    buildAdaptiveCpvQuery(filters.cpvCodes),
-    buildCountryInPart('buyer-country', filters.buyerCountries),
-    buildCountryInPart('place-of-performance', filters.placeOfPerformance),
-    buildInPart('notice-type', filters.noticeTypes),
-    buildEqualsPart('contract-nature', filters.contractNature),
-    buildPublicationDatePart(
-      filters.publicationDateFrom,
-      filters.publicationDateTo,
+    buildTextPart('FT', text),
+    buildAdaptiveCpvQuery(cpvCodes),
+    buildTextPart('buyer-name', buyerName),
+    buildTextPart('buyer-identifier', buyerIdentifier),
+    buildCountryInPart('buyer-country', [...(buyerCountries ?? [])]),
+    buildTextPart('buyer-city', buyerCity),
+    buildInPart('main-activity', buyerMainActivity),
+    buildCountryInPart('place-of-performance', placeOfPerformance),
+    buildInPart('submission-language', submissionLanguage),
+    buildInPart('notice-type', noticeTypes),
+    buildInPart('procedure-type', procedureType),
+    buildInPart('contract-nature', contractNature),
+    buildInPart('total-value-cur', currency),
+    buildRangePart('total-value', contractAwardFrom, contractAwardTo),
+    buildDateRangePart(
+      'publication-date',
+      publicationDateFrom,
+      publicationDateTo,
     ),
     buildDateRangePart(
       'deadline-receipt-request',
-      filters.submissionDeadlineFrom,
-      filters.submissionDeadlineTo,
+      submissionDeadlineFrom,
+      submissionDeadlineTo,
     ),
   ].filter((part): part is string => part !== undefined);
 
@@ -80,7 +127,7 @@ function buildTextPart(
     return undefined;
   }
 
-  return `${field} ~ ${quoteTedValue(value)}`;
+  return `${field} ~ (${value})`;
 }
 
 function buildInPart(
@@ -120,26 +167,31 @@ function buildEqualsPart(
   return `${field}=${value.trim()}`;
 }
 
+function buildRangePart(
+  field: string,
+  left: number | undefined,
+  right: number | undefined,
+) {
+  if (left !== undefined && right !== undefined) {
+    return `${field} = (${left} <> ${right})`;
+  }
+
+  if (left !== undefined) {
+    return `${field} = (${left} <> 9999999999999)`;
+  }
+
+  if (right !== undefined) {
+    return `${field} = (0 <> ${right})`;
+  }
+
+  return undefined;
+}
+
 function buildPublicationDatePart(
   from: string | undefined,
   to: string | undefined,
 ): string | undefined {
-  const fromDate = from?.trim();
-  const toDate = to?.trim();
-
-  if (fromDate && toDate) {
-    return `publication-date >= ${fromDate} AND publication-date <= ${toDate}`;
-  }
-
-  if (fromDate) {
-    return `publication-date >= ${fromDate}`;
-  }
-
-  if (toDate) {
-    return `publication-date <= ${toDate}`;
-  }
-
-  return undefined;
+  return buildDateRangePart('publication-date', from, to);
 }
 
 function buildDateRangePart(
@@ -147,19 +199,20 @@ function buildDateRangePart(
   from?: string,
   to?: string,
 ): string | undefined {
-  const parts: string[] = [];
+  const fromDate = from?.trim();
+  const toDate = to?.trim();
 
-  if (from?.trim()) {
-    parts.push(`${field} >= ${from.trim()}`);
+  if (fromDate && toDate) {
+    return `${field} >=${fromDate}<=${toDate}`;
   }
 
-  if (to?.trim()) {
-    parts.push(`${field} <= ${to.trim()}`);
+  if (fromDate) {
+    return `${field} >=${fromDate}`;
   }
 
-  if (parts.length === 0) {
-    return undefined;
+  if (toDate) {
+    return `${field} <=${toDate}`;
   }
 
-  return parts.join(' AND ');
+  return undefined;
 }

@@ -1,5 +1,6 @@
 import { Document, Model, Types } from 'mongoose';
 import { TSerializeOptions } from '@/types';
+import type { CurrencySign } from '@/resources/codelist';
 
 export enum USER_TYPE {
   TEMPORARY = 'TEMPORARY',
@@ -11,7 +12,7 @@ export enum USER_TYPE {
 export type TTypicalContractSize = {
   min?: number;
   max?: number;
-  currency?: string;
+  currency?: CurrencySign;
 };
 
 export type TUser = {

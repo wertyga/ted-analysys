@@ -8,6 +8,7 @@ import {
 import { filterModel, generateHash } from '@/utils';
 import { TSerializeOptions } from '@/types';
 import { USER_LIST_FIELDS } from './user.dto';
+import { CurrencySign } from '@/resources/codelist';
 
 export const UserSchema = new Schema<UserType>(
   {
@@ -83,7 +84,11 @@ export const UserSchema = new Schema<UserType>(
     typicalContractSize: {
       min: { type: Number, default: undefined },
       max: { type: Number, default: undefined },
-      currency: { type: String, default: undefined },
+      currency: {
+        type: String,
+        enum: Object.values(CurrencySign),
+        default: undefined,
+      },
     },
   },
   { timestamps: true },

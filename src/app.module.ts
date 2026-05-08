@@ -13,6 +13,7 @@ import { TenderWishlistModule } from './resources/tender-wishlist/tender-wishlis
 import { AuthModule } from './resources/auth/auth.module';
 import { GetUserMiddleware } from './middlewares/auth.middleware';
 import { UsersModule } from './resources/user/users.module';
+import { CodelistModule } from './resources/codelist/codelist.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { UsersModule } from './resources/user/users.module';
     DeepSeekModule,
     AuthModule,
     UsersModule,
+    CodelistModule,
   ],
   controllers: [AppController],
   providers: [AppService],

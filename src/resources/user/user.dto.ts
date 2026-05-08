@@ -6,6 +6,7 @@ import { CpvCategoryResponseItem } from '@/resources/cpv/types';
 import {
   IsArray,
   IsBoolean,
+  IsEnum,
   IsNotEmpty,
   IsNumber,
   IsObject,
@@ -13,6 +14,7 @@ import {
   IsString,
   Min,
 } from 'class-validator';
+import { CurrencySign } from '@/resources/codelist';
 
 export const USER_LIST_FIELDS = 'companyName email avatar';
 export const USER_OWNER_FIELDS = 'companyName email avatar';
@@ -43,10 +45,10 @@ export class TypicalContractSizeDto {
   @IsNumber()
   max?: number;
 
-  @ApiPropertyOptional({ example: 'EUR' })
+  @ApiPropertyOptional({ enum: CurrencySign, example: CurrencySign.EUR })
   @IsOptional()
-  @IsString()
-  currency?: string;
+  @IsEnum(CurrencySign)
+  currency?: CurrencySign;
 }
 
 type UserListType = Pick<TUser, 'email' | 'companyName'>;

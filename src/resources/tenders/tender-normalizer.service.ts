@@ -115,6 +115,10 @@ export class TenderNormalizerService {
       ]),
       buyerCountry: this.pickText(rawNotice, ['buyer-country', 'buyerCountry']),
       buyerCity: this.pickText(rawNotice, ['buyer-city', 'buyerCity']),
+      buyerMainActivities: this.pickTextArray(rawNotice, [
+        'main-activity',
+        'mainActivity',
+      ]),
       buyerEmail: this.pickText(rawNotice, ['buyer-email', 'buyerEmail']),
       buyerInternetAddress: this.pickText(rawNotice, [
         'buyer-internet-address',

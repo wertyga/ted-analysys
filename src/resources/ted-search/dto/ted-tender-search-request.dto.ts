@@ -21,14 +21,37 @@ import {
   TedTenderSortColumn,
 } from '../types/ted-search.types';
 import {
+  BuyerMainActivity,
+  CurrencySign,
+  TED_ELIGIBLE_COUNTRIES,
   TED_ELIGIBLE_COUNTRY_CODES,
-  TedEligibleCountryCode,
-} from '../utils/ted-countries';
+  type TedEligibleCountryCode,
+} from '@/resources/codelist';
+import type { TedTenderSearchFilters } from '@/resources/ted-search/ted-builders';
 
 export enum TedContractNature {
   SERVICES = 'services',
   SUPPLIES = 'supplies',
   WORKS = 'works',
+}
+
+export enum TedProcedureType {
+  COMPETITIVE_DIALOGUE = 'comp-dial',
+  COMPETITIVE_TENDERING = 'comp-tend',
+  CONCESSION_AWARD_PROCEDURE = 'E',
+  CONCESSION_AWARD_WITHOUT_PRIOR_NOTICE = 'F',
+  CONTRACT_AWARD_WITHOUT_PRIOR_PUBLICATION = 'V',
+  DIRECT_AWARD = 'A',
+  INNOVATION_PARTNERSHIP = 'innovation',
+  NEGOTIATED_PROCEDURE = '4_6',
+  NEGOTIATED_WITH_CALL = 'neg-w-call',
+  NEGOTIATED_WITHOUT_CALL = 'neg-wo-call',
+  OPEN = 'open',
+  OTHER = '8_9_Z',
+  OTHER_MULTIPLE_STAGE = 'oth-mult',
+  OTHER_SINGLE_STAGE = 'oth-single',
+  EXPRESSION_INTEREST_RAIL = 'exp-int-rail',
+  RESTRICTED = 'restricted',
 }
 
 export enum TedDeadlineRange {
@@ -39,24 +62,12 @@ export enum TedDeadlineRange {
   CUSTOM = 'custom',
 }
 
-export class TedTenderSearchRequestDto {
+export class TedTenderSearchRequestDto implements TedTenderSearchFilters {
   @ApiPropertyOptional({ example: 'software development' })
   @IsOptional()
   @IsString()
   @IsNotEmpty()
-  text?: string;
-
-  @ApiPropertyOptional({ example: 'software' })
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  title?: string;
-
-  @ApiPropertyOptional({ example: 'cloud migration' })
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  description?: string;
+  text?: string; // ++
 
   @ApiPropertyOptional({ type: [String], example: ['72000000', '48000000'] })
   @IsOptional()
@@ -64,7 +75,7 @@ export class TedTenderSearchRequestDto {
   @ArrayNotEmpty()
   @IsString({ each: true })
   @IsNotEmpty({ each: true })
-  cpvCodes?: string[];
+  cpvCodes?: string[]; // ++
 
   @ApiPropertyOptional({
     enum: TED_ELIGIBLE_COUNTRY_CODES,
@@ -76,7 +87,36 @@ export class TedTenderSearchRequestDto {
   @ArrayNotEmpty()
   @Transform(({ value }) => normalizeCountryInput(value))
   @IsIn(TED_ELIGIBLE_COUNTRY_CODES, { each: true })
-  buyerCountries?: TedEligibleCountryCode[];
+  buyerCountries?: TedEligibleCountryCode[]; // ++
+
+  @ApiPropertyOptional({ example: 'Warsaw City Hall' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  buyerName?: string; // ++
+
+  @ApiPropertyOptional({ example: '12345' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  buyerIdentifier?: string; // ++
+
+  @ApiPropertyOptional({ example: 'warsaw' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  buyerCity?: string; // ++
+
+  @ApiPropertyOptional({
+    enum: BuyerMainActivity,
+    isArray: true,
+    example: [BuyerMainActivity.EDUCATION],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsEnum(BuyerMainActivity, { each: true })
+  buyerMainActivity?: BuyerMainActivity[]; // ++
 
   @ApiPropertyOptional({
     enum: TED_ELIGIBLE_COUNTRY_CODES,
@@ -88,7 +128,19 @@ export class TedTenderSearchRequestDto {
   @ArrayNotEmpty()
   @Transform(({ value }) => normalizeCountryInput(value))
   @IsIn(TED_ELIGIBLE_COUNTRY_CODES, { each: true })
-  placeOfPerformance?: TedEligibleCountryCode[];
+  placeOfPerformance?: TedEligibleCountryCode[]; // ++
+
+  @ApiPropertyOptional({
+    isArray: true,
+    example: ['ENG', 'POL'],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @Transform(({ value }) => normalizeStringCodeInput(value))
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  submissionLanguage?: string[]; // ++
 
   @ApiPropertyOptional({
     enum: TedNoticeType,
@@ -99,27 +151,53 @@ export class TedTenderSearchRequestDto {
   @IsArray()
   @ArrayNotEmpty()
   @IsEnum(TedNoticeType, { each: true })
-  noticeTypes?: TedNoticeType[];
+  noticeTypes?: TedNoticeType[]; // ++
+
+  @ApiPropertyOptional({
+    enum: TedProcedureType,
+    isArray: true,
+    example: [TedProcedureType.OPEN, TedProcedureType.RESTRICTED],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsEnum(TedProcedureType, { each: true })
+  procedureType?: TedProcedureType[];
 
   @ApiPropertyOptional({
     enum: TedContractNature,
-    example: TedContractNature.SERVICES,
+    isArray: true,
+    example: [TedContractNature.SERVICES],
   })
   @IsOptional()
-  @IsEnum(TedContractNature)
-  contractNature?: TedContractNature;
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsEnum(TedContractNature, { each: true })
+  contractNature?: TedContractNature[];
+
+  @ApiPropertyOptional({
+    enum: CurrencySign,
+    isArray: true,
+    example: [CurrencySign.EUR],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @Transform(({ value }) => normalizeCurrencyInput(value))
+  @IsEnum(CurrencySign, { each: true })
+  currency?: CurrencySign[]; // ++
 
   @ApiPropertyOptional({ example: '20260101', pattern: '^[0-9]{8}$' })
   @IsOptional()
   @IsString()
   @Matches(/^[0-9]{8}$/)
-  publicationDateFrom?: string;
+  publicationDateFrom?: string; // ++
 
   @ApiPropertyOptional({ example: '20261231', pattern: '^[0-9]{8}$' })
   @IsOptional()
   @IsString()
   @Matches(/^[0-9]{8}$/)
-  publicationDateTo?: string;
+  publicationDateTo?: string; // ++
 
   @ApiPropertyOptional({
     enum: TedDeadlineRange,
@@ -129,24 +207,24 @@ export class TedTenderSearchRequestDto {
   })
   @IsOptional()
   @IsEnum(TedDeadlineRange)
-  submissionDeadlineRange?: TedDeadlineRange = TedDeadlineRange.ANY_OPEN;
+  submissionDeadlineRange?: TedDeadlineRange = TedDeadlineRange.ANY_OPEN; // ++
 
   @ApiPropertyOptional({ example: '20260101', pattern: '^[0-9]{8}$' })
   @IsOptional()
   @IsString()
   @Matches(/^[0-9]{8}$/)
-  submissionDeadlineFrom?: string;
+  submissionDeadlineFrom?: string; // ++
 
   @ApiPropertyOptional({ example: '20261231', pattern: '^[0-9]{8}$' })
   @IsOptional()
   @IsString()
   @Matches(/^[0-9]{8}$/)
-  submissionDeadlineTo?: string;
+  submissionDeadlineTo?: string; // ++
 
   @ApiPropertyOptional({ enum: TedScope, example: TedScope.ACTIVE })
   @IsOptional()
   @IsEnum(TedScope)
-  scope?: TedScope;
+  scope?: TedScope; // ++
 
   @ApiPropertyOptional({ example: 20, minimum: 1, maximum: 100 })
   @IsOptional()
@@ -154,14 +232,14 @@ export class TedTenderSearchRequestDto {
   @IsInt()
   @Min(1)
   @Max(100)
-  limit?: number;
+  limit?: number; // ++
 
   @ApiPropertyOptional({ example: 1, minimum: 1 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  page?: number;
+  page?: number; // ++
 
   @ApiPropertyOptional({
     enum: TedTenderSortColumn,
@@ -174,26 +252,52 @@ export class TedTenderSearchRequestDto {
   @ApiPropertyOptional({ enum: TedSortOrder, example: TedSortOrder.DESC })
   @IsOptional()
   @IsEnum(TedSortOrder)
-  sortOrder?: TedSortOrder = TedSortOrder.DESC;
+  sortOrder?: TedSortOrder = TedSortOrder.DESC; // ++
 
-  @ApiPropertyOptional({ minimum: 0, maximum: 100, example: 60 })
+  @ApiPropertyOptional({ minimum: 0, example: 60 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  @Max(100)
-  opportunityScoreFrom?: number;
+  contractAwardFrom?: number; // ++
 
-  @ApiPropertyOptional({ minimum: 0, maximum: 100, example: 100 })
+  @ApiPropertyOptional({ minimum: 0, example: 100 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  @Max(100)
-  opportunityScoreTo?: number;
+  contractAwardTo?: number;
 }
 
 function normalizeCountryInput(value: unknown): unknown {
+  if (!Array.isArray(value)) {
+    return value;
+  }
+
+  return value.map((item: unknown) => {
+    if (typeof item === 'string') {
+      return item.trim().toUpperCase();
+    }
+
+    return item;
+  });
+}
+
+function normalizeCurrencyInput(value: unknown): unknown {
+  if (!Array.isArray(value)) {
+    return value;
+  }
+
+  return value.map((item: unknown) => {
+    if (typeof item === 'string') {
+      return item.trim().toUpperCase();
+    }
+
+    return item;
+  });
+}
+
+function normalizeStringCodeInput(value: unknown): unknown {
   if (!Array.isArray(value)) {
     return value;
   }

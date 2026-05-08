@@ -62,6 +62,7 @@ export class TedSearchService {
     'buyer-identifier',
     'buyer-country',
     'buyer-city',
+    'main-activity',
     'buyer-email',
     'buyer-internet-address',
     'buyer-profile',
@@ -139,19 +140,6 @@ export class TedSearchService {
 
     if (isDev) {
       this.logger.debug(`Local Search request: ${JSON.stringify(query)}`);
-    }
-
-    const opportunityScoreQuery =
-      this.filters.buildOpportunityScoreQuery(filters);
-
-    if (opportunityScoreQuery) {
-      return this.searchLocalTendersByAnalysisScore({
-        tenderQuery: query,
-        opportunityScoreQuery,
-        sort,
-        skip,
-        limit,
-      });
     }
 
     const [notices, totalCount] = await Promise.all([

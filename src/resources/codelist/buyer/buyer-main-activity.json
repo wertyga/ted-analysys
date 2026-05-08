@@ -1,0 +1,89 @@
+{
+  "isTreeView": false,
+  "results": [
+    {
+      "codes": ["airport"],
+      "label": "Airport-related activities"
+    },
+    {
+      "codes": ["defence"],
+      "label": "Defence"
+    },
+    {
+      "codes": ["econ-aff"],
+      "label": "Economic affairs"
+    },
+    {
+      "codes": ["education"],
+      "label": "Education"
+    },
+    {
+      "codes": ["electricity"],
+      "label": "Electricity-related activities"
+    },
+    {
+      "codes": ["env-pro"],
+      "label": "Environmental protection"
+    },
+    {
+      "codes": ["solid-fuel"],
+      "label": "Exploration or extraction of coal or other solid fuels"
+    },
+    {
+      "codes": ["gas-oil"],
+      "label": "Extraction of gas or oil"
+    },
+    {
+      "codes": ["gen-pub"],
+      "label": "General public services"
+    },
+    {
+      "codes": ["health"],
+      "label": "Health"
+    },
+    {
+      "codes": ["hc-am"],
+      "label": "Housing and community amenities"
+    },
+    {
+      "codes": ["8_9_Z"],
+      "label": "Other activities"
+    },
+    {
+      "codes": ["port"],
+      "label": "Port-related activities"
+    },
+    {
+      "codes": ["post"],
+      "label": "Postal services"
+    },
+    {
+      "codes": ["gas-heat"],
+      "label": "Production, transport or distribution of gas or heat"
+    },
+    {
+      "codes": ["pub-os"],
+      "label": "Public order and safety"
+    },
+    {
+      "codes": ["rail"],
+      "label": "Railway services"
+    },
+    {
+      "codes": ["rcr"],
+      "label": "Recreation, culture and religion"
+    },
+    {
+      "codes": ["soc-pro"],
+      "label": "Social protection"
+    },
+    {
+      "codes": ["urttb"],
+      "label": "Urban railway, tramway, trolleybus or bus services"
+    },
+    {
+      "codes": ["water"],
+      "label": "Water-related activities"
+    }
+  ]
+}

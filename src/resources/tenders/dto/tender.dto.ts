@@ -162,6 +162,13 @@ export class TenderDto {
   buyerCity?: string;
 
   @ApiPropertyOptional({
+    type: [String],
+    example: ['education'],
+    description: 'TED main-activity: buyer main activities.',
+  })
+  buyerMainActivities?: string[];
+
+  @ApiPropertyOptional({
     example: 'procurement@example.com',
     description: 'TED buyer-email: buyer contact email.',
   })

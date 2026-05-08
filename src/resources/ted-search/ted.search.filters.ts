@@ -20,31 +20,32 @@ export class TedSearchFilters {
       });
     }
 
-    if (filters.title?.trim()) {
-      parts.push({
-        $or: [
-          { title: this.buildTextRegex(filters.title) },
-          { titleProc: this.buildTextRegex(filters.title) },
-          { titleLot: this.buildTextRegex(filters.title) },
-        ],
-      });
-    }
-
-    if (filters.description?.trim()) {
-      parts.push({
-        $or: [
-          { description: this.buildTextRegex(filters.description) },
-          { descriptionLot: this.buildTextRegex(filters.description) },
-        ],
-      });
-    }
-
     if (filters.cpvCodes?.length) {
       parts.push({ cpvCodes: { $in: filters.cpvCodes } });
     }
 
-    if (filters.buyerCountries?.length) {
-      parts.push({ buyerCountry: { $in: filters.buyerCountries } });
+    const buyerCountries = [...(filters.buyerCountries ?? [])];
+
+    if (buyerCountries.length) {
+      parts.push({ buyerCountry: { $in: buyerCountries } });
+    }
+
+    if (filters.buyerName?.trim()) {
+      parts.push({ buyerName: this.buildTextRegex(filters.buyerName) });
+    }
+
+    if (filters.buyerIdentifier?.trim()) {
+      parts.push({
+        buyerIdentifier: this.buildTextRegex(filters.buyerIdentifier),
+      });
+    }
+
+    if (filters.buyerCity?.trim()) {
+      parts.push({ buyerCity: this.buildTextRegex(filters.buyerCity) });
+    }
+
+    if (filters.buyerMainActivity?.length) {
+      parts.push({ buyerMainActivities: { $in: filters.buyerMainActivity } });
     }
 
     if (filters.placeOfPerformance?.length) {
@@ -53,12 +54,33 @@ export class TedSearchFilters {
       });
     }
 
+    if (filters.submissionLanguage?.length) {
+      parts.push({ submissionLanguages: { $in: filters.submissionLanguage } });
+    }
+
     if (filters.noticeTypes?.length) {
       parts.push({ noticeType: { $in: filters.noticeTypes } });
     }
 
-    if (filters.contractNature) {
-      parts.push({ contractNature: filters.contractNature });
+    if (filters.procedureType?.length) {
+      parts.push({ procedureType: { $in: filters.procedureType } });
+    }
+
+    if (filters.contractNature?.length) {
+      parts.push({ contractNature: { $in: filters.contractNature } });
+    }
+
+    if (filters.currency?.length) {
+      parts.push({ 'estimatedValue.currency': { $in: filters.currency } });
+    }
+
+    const contractAwardFilter = this.buildNumberRangeFilter(
+      filters.contractAwardFrom,
+      filters.contractAwardTo,
+    );
+
+    if (contractAwardFilter) {
+      parts.push({ 'estimatedValue.amount': contractAwardFilter });
     }
 
     const publicationDateFilter = this.buildDateRangeFilter(
@@ -80,17 +102,6 @@ export class TedSearchFilters {
     }
 
     return parts.length === 1 ? parts[0] : { $and: parts };
-  }
-
-  buildOpportunityScoreQuery(
-    filters: TedTenderSearchRequestDto,
-  ): MongoFilter | undefined {
-    const filter = this.buildNumberRangeFilter(
-      filters.opportunityScoreFrom,
-      filters.opportunityScoreTo,
-    );
-
-    return filter ? { opportunityScore: filter } : undefined;
   }
 
   private buildDateRangeFilter(
