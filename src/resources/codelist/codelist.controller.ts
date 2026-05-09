@@ -8,6 +8,7 @@ import type {
   BuyerLegalTypeOption,
   BuyerMainActivityOption,
   CurrencyOption,
+  LanguageOption,
 } from '@/resources/codelist';
 
 @ApiTags('codelist')
@@ -49,5 +50,12 @@ export class CodelistController {
   })
   getBuyerMainActivities(): BuyerMainActivityOption[] {
     return this.codelistService.getBuyerMainActivities();
+  }
+
+  @Get('languages')
+  @ApiOperation({ summary: 'Get TED language codelist for frontend filters' })
+  @ApiOkResponse({ description: 'Tree of TED language codes and names' })
+  getLanguages(): LanguageOption[] {
+    return this.codelistService.getLanguages();
   }
 }

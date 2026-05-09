@@ -3,10 +3,12 @@ import {
   BUYER_LEGAL_TYPE_OPTIONS,
   BUYER_MAIN_ACTIVITY_OPTIONS,
   CURRENCY_OPTIONS,
+  LANGUAGE_OPTIONS,
   TED_ELIGIBLE_COUNTRIES,
   type BuyerLegalTypeOption,
   type BuyerMainActivityOption,
   type CurrencyOption,
+  type LanguageOption,
 } from '@/resources/codelist';
 
 export interface CodelistCountryOption {
@@ -32,5 +34,9 @@ export class CodelistService {
 
   getBuyerMainActivities(): BuyerMainActivityOption[] {
     return BUYER_MAIN_ACTIVITY_OPTIONS;
+  }
+
+  getLanguages(): LanguageOption[] {
+    return LANGUAGE_OPTIONS;
   }
 }
