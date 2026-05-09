@@ -21,13 +21,7 @@ export class TendersCronService {
   constructor(
     private readonly tedSearchService: TedSearchService,
     private readonly tendersService: TendersService,
-  ) {
-    if (!isDev) {
-      setTimeout(() => {
-        this.gatherRecentCompetitionTenders();
-      }, 2000);
-    }
-  }
+  ) {}
 
   @Cron(RECENT_TENDERS_CRON, {
     timeZone: 'Europe/Warsaw',
