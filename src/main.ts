@@ -50,23 +50,7 @@ async function bootstrap() {
       console.log(`Connected to ${process.env.DB_NAME} database`);
     });
 
-    (async function () {
-      const cpvs = await CpvCategoryModel.find({});
-      const tendersWithNulls = await TenderModel.find({
-        classificationCpv: { $elemMatch: { $eq: null } },
-      });
-
-      await Promise.all(
-        tendersWithNulls.map((tender) => {
-          const ids = (tender.cpvCodes ?? [])
-            .map((code) => cpvs.find((cpv) => cpv.code === code)?._id)
-            .filter(Boolean);
-          tender.classificationCpv = ids;
-
-          return tender.save();
-        }),
-      );
-    })();
+    (async function () {})();
   });
 }
 
