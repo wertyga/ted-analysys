@@ -8,27 +8,14 @@ import {
 } from './schemas';
 import { TenderGeneralAnalysisDetailDto } from './dto/tender-general-analysis.dto';
 import { TenderAnalysisService } from './tender-analysis.service';
-import { TenderDocument, TenderModel } from '../tenders/schemas';
-import {
-  TedNotice,
-  TedSearchResponse,
-} from '../ted-search/types/ted-search.types';
+import { TenderDocument } from '../tenders/schemas';
 import { TenderGeneralAnalysisBuilder } from './tender-general-analysis.builder';
-import { Tender } from '../tenders/schemas';
 import {
   GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
   GeneralTenderAnalysisInput,
 } from '@/openai/dto/openai-analysis.dto';
 import { createHash } from 'crypto';
-import {
-  extractPublicationNumberFromNotice,
-  getSafeErrorMessage,
-  isDuplicateKeyError,
-  valueToString,
-} from '@/utils';
-import { TendersService } from '@/resources/tenders/tenders.service';
-
-type TenderUpsertRecord = Tender & { _id: mongoose.Types.ObjectId };
+import { getSafeErrorMessage, isDuplicateKeyError } from '@/utils';
 
 @Injectable()
 export class TenderGeneralAnalysisService {
@@ -36,8 +23,6 @@ export class TenderGeneralAnalysisService {
     @Inject(forwardRef(() => TenderAnalysisService))
     private readonly tenderAnalysisService: TenderAnalysisService,
     private readonly analysisBuilder: TenderGeneralAnalysisBuilder,
-    @Inject(forwardRef(() => TendersService))
-    private readonly tendersService: TendersService,
   ) {}
 
   async fetchBaseAnalysis(

@@ -87,6 +87,28 @@ export abstract class BaseLlmAnalysisService {
     ].join('\n\n');
   }
 
+  async createGeneralJsonResponse(
+    prompt: string,
+    context: string,
+  ): Promise<unknown> {
+    const responseText = await this.createJsonResponse(
+      prompt,
+      context,
+      'general',
+    );
+
+    return this.parseJson(responseText);
+  }
+
+  async createDeepJsonResponse(
+    prompt: string,
+    context: string,
+  ): Promise<unknown> {
+    const responseText = await this.createJsonResponse(prompt, context, 'deep');
+
+    return this.parseJson(responseText);
+  }
+
   protected async createJsonResponse(
     prompt: string,
     context: string,

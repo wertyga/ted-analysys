@@ -15,6 +15,7 @@ import { AuthModule } from './resources/auth/auth.module';
 import { GetUserMiddleware } from './middlewares/auth.middleware';
 import { UsersModule } from './resources/user/users.module';
 import { CodelistModule } from './resources/codelist/codelist.module';
+import { CompanyFilterModule } from './resources/company-filter/company-filter.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { CodelistModule } from './resources/codelist/codelist.module';
     AuthModule,
     UsersModule,
     CodelistModule,
+    CompanyFilterModule,
   ],
   controllers: [AppController],
   providers: [AppService],

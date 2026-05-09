@@ -94,3 +94,69 @@ export function getSafeErrorMessage(error: unknown): string {
 
   return 'unknown error';
 }
+
+export function getString(
+  record: Record<string, unknown>,
+  key: string,
+  fallback = '',
+): string {
+  const value = record[key];
+
+  return typeof value === 'string' ? value : fallback;
+}
+
+export function getStringArray(
+  record: Record<string, unknown>,
+  key: string,
+  fallback: string[] = [],
+): string[] {
+  const value = record[key];
+
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : fallback;
+}
+
+export function getBoolean(
+  record: Record<string, unknown>,
+  key: string,
+  fallback = false,
+): boolean {
+  const value = record[key];
+
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+export function getNullableNumber(
+  value: unknown,
+  fallback: number | null = null,
+): number | null {
+  return value === null || typeof value === 'number' ? value : fallback;
+}
+
+export function getEnumOrNull<T extends Record<string, string>>(
+  value: unknown,
+  enumObject: T,
+  fallback: T[keyof T] | null = null,
+): T[keyof T] | null {
+  const allowed = new Set(Object.values(enumObject));
+
+  return typeof value === 'string' && allowed.has(value)
+    ? (value as T[keyof T])
+    : fallback;
+}
+
+export function getEnumArray<T extends Record<string, string>>(
+  value: unknown,
+  enumObject: T,
+  fallback: T[keyof T][] = [],
+): T[keyof T][] {
+  const allowed = new Set(Object.values(enumObject));
+
+  return Array.isArray(value)
+    ? value.filter(
+        (item): item is T[keyof T] =>
+          typeof item === 'string' && allowed.has(item),
+      )
+    : fallback;
+}
