@@ -45,9 +45,7 @@ export class TenderDeepAnalysisBuilder {
       id: String(source._id),
       companyName: source.companyName || undefined,
       country: source.country || undefined,
-      operatingRegions: Array.isArray(source.operatingRegions)
-        ? source.operatingRegions
-        : [],
+      operatingCountries: source.operatingCountries ?? [],
       companySize:
         typeof source.companySize === 'number' ? source.companySize : undefined,
       companyDescription: source.companyDescription || undefined,
@@ -261,7 +259,7 @@ export class TenderDeepAnalysisBuilder {
             id: String((input.company as any)._id),
             companyName: input.company.companyName,
             country: input.company.country,
-            operatingRegions: input.company.operatingRegions,
+            operatingCountries: input.company.operatingCountries,
             companySize: input.company.companySize,
             companyDescription: input.company.companyDescription,
             industries: normalizeForHash(input.company.industries),
@@ -509,9 +507,7 @@ function applyDocumentCounts(
     documentsTotalCount > documentsAnalyzedCount;
 }
 
-function isScoreBreakdownItem(
-  value: unknown,
-): value is {
+function isScoreBreakdownItem(value: unknown): value is {
   score: number;
   explanation?: string;
   evidence?: unknown;
@@ -577,7 +573,7 @@ function applyMissingCompanyInfo(
     missing.push('Company capabilities are missing.');
   }
 
-  if (input.company.operatingRegions.length === 0) {
+  if (input.company.operatingCountries.length === 0) {
     missing.push('Company operating regions are missing.');
   }
 
@@ -626,7 +622,7 @@ function applyGuardrails(
   }
 
   if (
-    input.company.operatingRegions.length === 0 &&
+    input.company.operatingCountries.length === 0 &&
     ((input.tender.placeOfPerformanceCountries?.length ?? 0) > 0 ||
       Boolean(input.tender.buyerCountry))
   ) {
@@ -793,7 +789,7 @@ function getCountryOverlap(
     ...(tender.buyerCountry ? [tender.buyerCountry] : []),
   ].map(normalizeComparable);
   const companyCountries = [
-    ...company.operatingRegions,
+    ...company.operatingCountries,
     ...(company.country ? [company.country] : []),
   ].map(normalizeComparable);
 

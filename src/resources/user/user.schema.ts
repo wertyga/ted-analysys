@@ -41,7 +41,7 @@ export const UserSchema = new Schema<UserType>(
     country: {
       type: String,
     },
-    operatingRegions: {
+    operatingCountries: {
       type: [String],
       default: [],
     },
@@ -64,6 +64,10 @@ export const UserSchema = new Schema<UserType>(
     languages: {
       type: [String],
       default: [],
+    },
+    minDaysBeforeDeadline: {
+      type: Number,
+      default: 7,
     },
     certifications: {
       type: [String],

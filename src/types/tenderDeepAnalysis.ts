@@ -412,7 +412,7 @@ export interface CompanyAnalysisDto {
   id: string;
   companyName?: string;
   country?: string;
-  operatingRegions: string[];
+  operatingCountries: string[];
   companySize?: number;
   companyDescription?: string;
   industries: CpvAnalysisRef[];
@@ -507,13 +507,7 @@ export interface TenderCompanyFitDerivedMetadata {
   hasSelectionCriteria: boolean;
   hasAwardCriteria: boolean;
   hasCpvCodes: boolean;
-  valueBand:
-    | 'micro'
-    | 'small'
-    | 'medium'
-    | 'large'
-    | 'enterprise'
-    | 'unknown';
+  valueBand: 'micro' | 'small' | 'medium' | 'large' | 'enterprise' | 'unknown';
   deadlineUrgency:
     | 'expired'
     | 'critical'

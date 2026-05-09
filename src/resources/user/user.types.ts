@@ -27,12 +27,13 @@ export type TUser = {
   status: USER_TYPE;
   companyName: string;
   country: string;
-  operatingRegions: string[];
+  operatingCountries: string[];
   companySize: number;
   companyDescription: string;
   industries: Types.ObjectId[];
   mainServices: Types.ObjectId[];
   languages: string[];
+  minDaysBeforeDeadline: number;
   certifications?: string[];
   capabilities?: string[];
   yearsOfExperience?: number;

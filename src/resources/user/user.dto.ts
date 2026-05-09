@@ -23,10 +23,11 @@ type CompanyProfileType = Pick<
   TUser,
   | 'companyName'
   | 'country'
-  | 'operatingRegions'
+  | 'operatingCountries'
   | 'companySize'
   | 'companyDescription'
   | 'languages'
+  | 'minDaysBeforeDeadline'
   | 'certifications'
   | 'capabilities'
   | 'yearsOfExperience'
@@ -77,7 +78,7 @@ export class UserDto extends UserOwnerDto implements CompanyProfileType {
   country: string;
 
   @ApiProperty({ type: [String], example: ['PLN', 'ENG'] })
-  operatingRegions: string[];
+  operatingCountries: string[];
 
   @ApiProperty({ example: 25, description: 'Number of people in the company' })
   companySize: number;
@@ -100,6 +101,9 @@ export class UserDto extends UserOwnerDto implements CompanyProfileType {
   @ApiProperty({ type: [String], example: ['ENG', 'PLN'] })
   languages: string[];
 
+  @ApiProperty({ example: 7 })
+  minDaysBeforeDeadline: number;
+
   @ApiPropertyOptional({ type: [String], example: ['ISO 9001', 'CE'] })
   certifications?: string[];
 
@@ -117,7 +121,6 @@ export class UserDto extends UserOwnerDto implements CompanyProfileType {
 
   @ApiPropertyOptional({ type: TypicalContractSizeDto })
   typicalContractSize?: TypicalContractSizeDto;
-
 }
 
 export class GetUsersRequestDto extends PaginationAndSortDto {}
@@ -141,7 +144,7 @@ export class UpdateUserDto {
   @ApiProperty({ type: [String], example: ['PLN', 'GR'] })
   @IsArray()
   @IsString({ each: true })
-  operatingRegions: string[];
+  operatingCountries: string[];
 
   @ApiProperty({ example: 25, description: 'Number of people in the company' })
   @IsNotEmpty()
@@ -177,6 +180,13 @@ export class UpdateUserDto {
   @IsString({ each: true })
   languages: string[];
 
+  @ApiPropertyOptional({ example: 7 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  minDaysBeforeDeadline?: number;
+
   @ApiPropertyOptional({ type: [String], example: ['ISO 9001', 'CE'] })
   @IsOptional()
   @IsArray()
@@ -206,7 +216,6 @@ export class UpdateUserDto {
   @IsOptional()
   @IsObject()
   typicalContractSize?: TypicalContractSizeDto;
-
 }
 
 export class UserAuthDto extends UserDto {
