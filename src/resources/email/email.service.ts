@@ -34,7 +34,7 @@ export class EmailService {
     const pass = process.env.MAIL_PASSWORD;
 
     if (!host || !user || !pass) {
-      throw new Error(
+      console.error(
         'SMTP is not configured. Set MAIL_SMPT_SERVER, MAIL_SMPT_PORT, MAIL_USERNAME, and MAIL_PASSWORD.',
       );
     }

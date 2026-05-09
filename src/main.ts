@@ -4,6 +4,9 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import mongooseConnect from './mongoose/mongoose';
 import { isDev } from './utils';
+import { CpvModule } from '@/resources/cpv/cpv.module';
+import { CpvCategoryModel } from '@/resources/cpv/schemas';
+import { TenderModel } from '@/resources/tenders/schemas';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -46,6 +49,25 @@ async function bootstrap() {
     mongooseConnect(() => {
       console.log(`Connected to ${process.env.DB_NAME} database`);
     });
+
+    (async function () {
+      const cpvs = await CpvCategoryModel.find({});
+      const tendersWithNulls = await TenderModel.find({
+        classificationCpv: { $elemMatch: { $eq: null } },
+      });
+
+      await Promise.all(
+        tendersWithNulls.map((tender) => {
+          const ids = (tender.cpvCodes ?? [])
+            .map((code) => cpvs.find((cpv) => cpv.code === code)?._id)
+            .filter(Boolean);
+          tender.classificationCpv = ids;
+
+          return tender.save();
+        }),
+      );
+    })();
   });
 }
+
 bootstrap();
