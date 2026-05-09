@@ -1,4 +1,4 @@
-export type TSerializeOptions = Partial<{
-  excludeFields: string;
-  includeFields: string;
+export type TSerializeOptions<T = any> = Partial<{
+  excludeFields: (keyof T)[];
+  includeFields: (keyof T)[];
 }>;

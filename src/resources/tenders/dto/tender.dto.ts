@@ -406,3 +406,32 @@ export class TenderDto {
   })
   isInWishlist?: boolean;
 }
+
+export type TenderDetailDto = Omit<TenderDto, 'cpvCodes'>;
+
+export type TenderListDto = Omit<
+  TenderDetailDto,
+  | 'links'
+  | 'sourceNoticeId'
+  | 'noticeVersion'
+  | 'titleProc'
+  | 'titleLot'
+  | 'descriptionLot'
+  | 'buyerIdentifier'
+  | 'buyerCity'
+  | 'buyerEmail'
+  | 'buyerInternetAddress'
+  | 'buyerProfile'
+  | 'dispatchDate'
+  | 'deadlineReceiptTender'
+  | 'durationPeriodValue'
+  | 'durationPeriodUnit'
+  | 'legalBasis'
+  | 'additionalClassificationLot'
+  | 'lotIdentifiers'
+  | 'internalLotIdentifiers'
+  | 'submissionUrls'
+  | 'selectionCriteria'
+  | 'awardCriteria'
+  | 'source'
+>;

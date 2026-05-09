@@ -60,43 +60,49 @@ export const getLimitAndSortCursor = (
   ).cursor;
 };
 
-export const filterModel = <T = any>(
-  document: Document,
-  {
-    excludeFields = '',
-    includeFields = '',
-  }: {
-    excludeFields?: string;
-    includeFields?: string;
-  } = {} as any,
-) => {
-  const serializedDocument = document?.toObject
-    ? document.toObject()
-    : document;
+type StringKeyOf<T> = Extract<keyof T, string>;
 
-  // Filter all fields that start with _ - private fields
-  for (let key in serializedDocument) {
+export const filterModel = <T extends Record<string, any>>(
+  document: T,
+  {
+    excludeFields,
+    includeFields,
+  }: {
+    excludeFields?: StringKeyOf<T>[];
+    includeFields?: StringKeyOf<T>[];
+  } = {},
+) => {
+  const serializedDocument =
+    'toObject' in document && typeof document.toObject === 'function'
+      ? { ...document.toObject() }
+      : { ...document };
+  serializedDocument._id = serializedDocument._id.toString();
+
+  for (const key in serializedDocument) {
     if (/^_/.test(key) && key !== '_id') {
       delete serializedDocument[key];
     }
   }
 
-  let result;
-  if (excludeFields || includeFields) {
-    if (excludeFields) {
-      result = { ...serializedDocument };
-      excludeFields.split(' ').forEach((field) => {
-        delete result[field];
-      });
-    } else {
-      result = { _id: serializedDocument._id };
-      includeFields.split(' ').forEach((field) => {
-        result[field] = serializedDocument[field];
-      });
-    }
+  if (!excludeFields && !includeFields) {
+    return serializedDocument;
   }
 
-  return (result || serializedDocument) as T;
+  if (excludeFields) {
+    excludeFields.forEach((field) => {
+      delete serializedDocument![field];
+    });
+
+    return serializedDocument;
+  } else {
+    const result = { _id: serializedDocument._id } as typeof serializedDocument;
+
+    includeFields?.forEach((field) => {
+      result[field] = serializedDocument[field];
+    });
+
+    return result;
+  }
 };
 
 export const isMongoId = (value: any) => value instanceof mongo.ObjectId;

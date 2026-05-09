@@ -1,5 +1,14 @@
 import { TenderDeepAnalysisResult, TenderDeepRecommendation } from '@/types';
 import mongoose, { Document, Model, Schema } from 'mongoose';
+import { filterModel } from '@/utils';
+import {
+  TenderDetailDto,
+  TenderListDto,
+} from '@/resources/tenders/dto/tender.dto';
+import {
+  TenderDocument,
+  TenderSerializable,
+} from '@/resources/tenders/schemas';
 
 export enum TenderDeepAnalysisStatus {
   PENDING = 'pending',
@@ -44,6 +53,10 @@ export interface TenderDeepAnalysis {
 }
 
 export type TenderDeepAnalysisDocument = TenderDeepAnalysis & Document;
+
+export interface TenderDeepModelType extends Model<TenderDeepAnalysisDocument> {
+  serializeDetail(tender: TenderDeepAnalysisDocument): TenderDeepAnalysis;
+}
 
 const TenderDeepAnalysisSchema = new Schema<TenderDeepAnalysisDocument>(
   {
@@ -127,11 +140,15 @@ TenderDeepAnalysisSchema.index(
   { unique: true },
 );
 
-export const TenderDeepAnalysisModel: Model<TenderDeepAnalysisDocument> =
-  (mongoose.models.TenderDeepAnalysis as
-    | Model<TenderDeepAnalysisDocument>
-    | undefined) ??
-  mongoose.model<TenderDeepAnalysisDocument>(
+function serializeDeepAnalysis(analysis: TenderDeepAnalysisDocument) {
+  return filterModel(analysis);
+}
+
+TenderDeepAnalysisSchema.statics.serializeDetail = serializeDeepAnalysis;
+
+export const TenderDeepAnalysisModel: TenderDeepModelType =
+  (mongoose.models.TenderDeepAnalysis as TenderDeepModelType | undefined) ??
+  mongoose.model<TenderDeepAnalysisDocument, TenderDeepModelType>(
     'TenderDeepAnalysis',
     TenderDeepAnalysisSchema,
   );

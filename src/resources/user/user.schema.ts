@@ -97,7 +97,7 @@ export const UserSchema = new Schema<UserType>(
 function serializeUser(
   user?: UserDocument,
   guest?: boolean,
-  options?: TSerializeOptions,
+  options?: TSerializeOptions<UserDocument>,
   isAdminFetch?: boolean,
 ) {
   if (!user) {
@@ -112,7 +112,7 @@ function serializeUser(
     status,
     oauthId,
     ...rest
-  } = filterModel('toObject' in user ? user.toObject() : user, options);
+  } = filterModel(user, options);
 
   const result = {
     ...rest,
@@ -141,7 +141,7 @@ UserSchema.statics.serializeUser = serializeUser;
 UserSchema.statics.serializeListUser = function (user: UserDocument) {
   return serializeUser(
     filterModel(user, {
-      includeFields: USER_LIST_FIELDS,
+      includeFields: USER_LIST_FIELDS.split(' ') as (keyof UserDocument)[],
     }),
     true,
   );

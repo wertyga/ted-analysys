@@ -40,7 +40,7 @@ import { EMAIL_TEMPLATES } from '@/resources/email/type';
 import { HttpErrorLoggingFilter } from '@/http-logger/HTTPLogger';
 import { AuthGuard } from '@/guards';
 
-export const AUTH_EXCLUDE_FIELDS = '';
+export const AUTH_EXCLUDE_FIELDS = [] as (keyof UserDocument)[];
 
 @ApiTags('Auth')
 @UseFilters(HttpErrorLoggingFilter)

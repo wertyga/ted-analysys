@@ -1,11 +1,4 @@
-import {
-  Body,
-  Controller,
-  forwardRef,
-  Inject,
-  Post,
-  Req,
-} from '@nestjs/common';
+import { Body, Controller, Post, Req } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -16,10 +9,9 @@ import {
 } from '@nestjs/swagger';
 import { TedTenderSearchRequestDto } from './dto/ted-tender-search-request.dto';
 import { TedSearchService } from './ted-search.service';
-import { normalizeTenderSearchResponse, resolveDeadlineRange } from './utils';
+import { normalizeTenderSearchResponse } from './utils';
 import { TedSearchResponse } from './types/ted-search.types';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
-import { TenderGeneralAnalysisService } from '../tender-analysis/tender-general-analysis.service';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { TenderWishlistService } from '@/resources/tender-wishlist/tender-wishlist.service';
 
@@ -49,28 +41,34 @@ export class TedSearchController {
       noticeTypes: body.noticeTypes ?? TENDER_COMPETITION_NOTICE_TYPES,
     });
 
-    const [tendersWithBaseAnalysis] = await Promise.all([
-      this.tendersService.upsertIfNeededMultipleTendersWithGeneralAnalysis(
+    const tendersWithBaseAnalysis =
+      await this.tendersService.upsertIfNeededMultipleTendersWithGeneralAnalysis(
         noticeData.notices ?? [],
-      ),
-    ]);
+      );
+
+    console.log({ tendersWithBaseAnalysis });
 
     const listTenders = tendersWithBaseAnalysis.map((tba) => {
-      const tender = 'toObject' in tba ? tba.toObject() : tba;
-
-      return this.tendersService.toWholeTenderListDto(tender);
+      return this.tendersService.toWholeTenderListDto(tba);
     });
 
-    const normalized = await normalizeTenderSearchResponse({
+    console.log({ listTenders });
+
+    const tendersWithWishLists = req.user
+      ? await this.tenderWishlistService.getPopulatedTendersByWishlists(
+          listTenders,
+          req.user._id.toString(),
+        )
+      : listTenders;
+
+    // const normalized = await normalizeTenderSearchResponse({
+    //   ...noticeData,
+    //   notices: tendersWithWishLists,
+    // });
+
+    return {
       ...noticeData,
-      notices: req.user
-        ? await this.tenderWishlistService.getPopulatedTendersByWishlists(
-            listTenders,
-            req.user._id.toString(),
-          )
-        : listTenders,
-    });
-
-    return normalized;
+      notices: tendersWithWishLists,
+    };
   }
 }

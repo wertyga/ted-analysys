@@ -1,15 +1,12 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import mongoose from 'mongoose';
 import {
-  TenderGeneralAnalysis,
   TenderGeneralAnalysisDocument,
   TenderGeneralAnalysisModel,
+  TenderGeneralAnalysisRecord,
   TenderGeneralAnalysisStatus,
 } from './schemas';
-import {
-  TenderGeneralAnalysisDetailDto,
-  TenderGeneralAnalysisListDto,
-} from './dto/tender-general-analysis.dto';
+import { TenderGeneralAnalysisDetailDto } from './dto/tender-general-analysis.dto';
 import { TenderAnalysisService } from './tender-analysis.service';
 import { TenderDocument, TenderModel } from '../tenders/schemas';
 import {
@@ -31,7 +28,6 @@ import {
 } from '@/utils';
 import { TendersService } from '@/resources/tenders/tenders.service';
 
-type TenderGeneralAnalysisRecord = TenderGeneralAnalysis & { _id?: unknown };
 type TenderUpsertRecord = Tender & { _id: mongoose.Types.ObjectId };
 
 @Injectable()
@@ -198,47 +194,7 @@ export class TenderGeneralAnalysisService {
       return null;
     }
 
-    return this.toDetailDto(analysis);
-  }
-
-  toListDto(
-    analysis?: TenderGeneralAnalysisRecord | null,
-  ): TenderGeneralAnalysisListDto | null {
-    if (!analysis) {
-      return null;
-    }
-
-    return {
-      status: analysis.status,
-      summary: analysis.summary,
-      complexityScore: analysis.complexityScore,
-      opportunityScore: analysis.opportunityScore,
-      generalRecommendation: analysis.generalRecommendation,
-      confidenceScore: analysis.confidenceScore,
-      updatedAt: analysis.updatedAt,
-    };
-  }
-
-  toDetailDto(
-    analysis: TenderGeneralAnalysisRecord | null,
-  ): TenderGeneralAnalysisDetailDto | null {
-    if (!analysis) {
-      return null;
-    }
-
-    const listDto = this.toListDto(analysis);
-
-    if (listDto === null) {
-      return null;
-    }
-
-    return {
-      ...listDto,
-      resultJson: analysis.resultJson,
-      ...(analysis.status === TenderGeneralAnalysisStatus.FAILED
-        ? { errorMessage: analysis.errorMessage }
-        : {}),
-    };
+    return TenderGeneralAnalysisModel.serializeDetail(analysis);
   }
 
   buildGeneralTenderAnalysisSourceHash(

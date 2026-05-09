@@ -9,10 +9,8 @@ import {
   TenderWithWishlist,
 } from '@/resources/tenders/schemas';
 import { isDuplicateKeyError } from '@/utils';
-import {
-  TenderListDto,
-  TendersService,
-} from '@/resources/tenders/tenders.service';
+import { TendersService } from '@/resources/tenders/tenders.service';
+import { TenderListDto } from '@/resources/tenders/dto/tender.dto';
 import { TenderWishlistItemModel } from './schemas';
 import { UserDocument } from '@/resources/user/user.types';
 import { CPV_CODES_LIST_FIELDS } from '@/resources/cpv/cpv.service';

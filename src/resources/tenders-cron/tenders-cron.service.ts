@@ -5,9 +5,8 @@ import { TedSearchService } from '@/resources/ted-search/ted-search.service';
 import { TedScope } from '@/resources/ted-search/types/ted-search.types';
 import { getTedDate, resolveDeadlineRange } from '@/resources/ted-search/utils';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
-import { isDev } from '@/utils';
-import { TendersService } from './tenders.service';
-import { logger } from '@/utils';
+import { TendersService } from '@/resources/tenders/tenders.service';
+import { isDev, logger } from '@/utils';
 
 const RECENT_TENDERS_CRON = '0 1 * * *';
 const RECENT_TENDERS_LOOKBACK_DAYS = 2;

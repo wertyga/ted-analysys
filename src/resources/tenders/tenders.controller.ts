@@ -1,19 +1,16 @@
 import { Controller, forwardRef, Get, Inject, Param, Req } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { TenderDto } from './dto/tender.dto';
-import {
-  TenderDocumentWithGeneralAnalysis,
-  TendersService,
-} from './tenders.service';
-import { TenderGeneralAnalysisService } from '@/resources/tender-analysis/tender-general-analysis.service';
+import { TenderDetailDto, TenderDto } from './dto/tender.dto';
+import { TendersService } from './tenders.service';
+import { TenderModel } from './schemas';
 import { TenderWishlistService } from '@/resources/tender-wishlist/tender-wishlist.service';
+import { TenderGeneralAnalysisModel } from '@/resources/tender-analysis/schemas';
 
 @ApiTags('tenders')
 @Controller('tenders')
 export class TendersController {
   constructor(
     private readonly tendersService: TendersService,
-    private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
     @Inject(forwardRef(() => TenderWishlistService))
     private readonly tenderWishlistService: TenderWishlistService,
   ) {}
@@ -24,7 +21,7 @@ export class TendersController {
   async findById(
     @Param('id') id: string,
     @Req() req,
-  ): Promise<TenderDocumentWithGeneralAnalysis> {
+  ): Promise<TenderDetailDto> {
     const tba = await this.tendersService.findByIdOrFetchFromTed(id);
     const tender = tba.toObject();
     const wishlistStatus = req.user
@@ -32,13 +29,13 @@ export class TendersController {
       : undefined;
 
     return {
-      ...this.tendersService.toDetailDto(tender),
+      ...TenderModel.serializeDetail(tender),
       ...(wishlistStatus
         ? { isInWishlist: wishlistStatus.isInWishlist }
         : undefined),
-      generalAnalysis: this.tenderGeneralAnalysisService.toDetailDto(
+      generalAnalysis: TenderGeneralAnalysisModel.serializeDetail(
         tender.generalAnalysis,
       ),
-    } as TenderDocumentWithGeneralAnalysis;
+    };
   }
 }

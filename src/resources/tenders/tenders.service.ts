@@ -13,8 +13,12 @@ import {
   TedSearchResponse,
 } from '../ted-search/types/ted-search.types';
 import { TenderGeneralAnalysisService } from '../tender-analysis/tender-general-analysis.service';
-import { TenderDto } from './dto/tender.dto';
-import { Tender, TenderDocument, TenderModel } from './schemas';
+import {
+  TenderGeneralAnalysis,
+  TenderGeneralAnalysisModel,
+} from '../tender-analysis/schemas';
+import { TenderListDto } from './dto/tender.dto';
+import { TenderDocument, TenderModel } from './schemas';
 import { TenderNormalizerService } from './tender-normalizer.service';
 import { TedPublicationNumbersSearchRequestDto } from '@/resources/ted-search/dto/ted-publication-numbers-search-request.dto';
 import {
@@ -26,7 +30,6 @@ import {
 } from '@/utils';
 import { tenderCpvPopulateFields } from '@/resources/tenders/utils/tender.utils';
 
-type TenderRecord = Tender & { _id: unknown };
 export interface GatherActiveTendersResult {
   completed?: boolean;
   totalCount?: number;
@@ -49,31 +52,6 @@ export interface SaveNewTedTendersResult {
   skipped: number;
 }
 
-export type TenderListDto = Omit<
-  TenderDto,
-  | 'links'
-  | 'sourceNoticeId'
-  | 'noticeVersion'
-  | 'titleProc'
-  | 'titleLot'
-  | 'descriptionLot'
-  | 'buyerIdentifier'
-  | 'buyerCity'
-  | 'buyerEmail'
-  | 'buyerInternetAddress'
-  | 'buyerProfile'
-  | 'dispatchDate'
-  | 'deadlineReceiptTender'
-  | 'durationPeriodValue'
-  | 'durationPeriodUnit'
-  | 'legalBasis'
-  | 'additionalClassificationLot'
-  | 'lotIdentifiers'
-  | 'internalLotIdentifiers'
-  | 'submissionUrls'
-  | 'selectionCriteria'
-  | 'awardCriteria'
->;
 export type TenderDocumentWithGeneralAnalysis = TenderDocument & {
   generalAnalysis?: TenderGeneralAnalysisDetailDto | null;
 };
@@ -255,7 +233,7 @@ export class TendersService {
 
     localTender.set(
       'generalAnalysis',
-      this.tenderGeneralAnalysisService.toDetailDto(generalAnalysis),
+      TenderGeneralAnalysisModel.serializeDetail(generalAnalysis),
       { strict: false },
     );
 
@@ -402,121 +380,16 @@ export class TendersService {
       .exec();
   }
 
-  mapTenderDocumentToDto(tender: TenderRecord): TenderDto {
-    const dto: TenderDto = {
-      _id: tender._id?.toString() ?? '',
-      id: tender.id,
-      source: 'TED',
-      sourceNoticeId: tender.sourceNoticeId,
-      publicationNumber: tender.publicationNumber,
-      noticeType: tender.noticeType,
-      noticeSubtype: tender.noticeSubtype,
-      noticeVersion: tender.noticeVersion,
-      procedureType: tender.procedureType,
-      title: tender.title,
-      titleProc: tender.titleProc,
-      titleLot: tender.titleLot,
-      description: tender.description,
-      descriptionLot: tender.descriptionLot,
-      estimatedValue: tender.estimatedValue,
-      noticeLanguage: tender.noticeLanguage,
-      submissionLanguages: tender.submissionLanguages,
-      buyerName: tender.buyerName,
-      buyerIdentifier: tender.buyerIdentifier,
-      buyerCountry: tender.buyerCountry,
-      buyerCity: tender.buyerCity,
-      buyerMainActivities: tender.buyerMainActivities,
-      buyerEmail: tender.buyerEmail,
-      buyerInternetAddress: tender.buyerInternetAddress,
-      buyerProfile: tender.buyerProfile,
-      publicationDate: tender.publicationDate,
-      dispatchDate: tender.dispatchDate,
-      submissionDeadline: tender.submissionDeadline,
-      deadlineReceiptTender: tender.deadlineReceiptTender,
-      questionsDeadline: tender.questionsDeadline,
-      plannedStartDate: tender.plannedStartDate,
-      plannedEndDate: tender.plannedEndDate,
-      durationPeriodValue: tender.durationPeriodValue,
-      durationPeriodUnit: tender.durationPeriodUnit,
-      contractNature: tender.contractNature,
-      legalBasis: tender.legalBasis,
-      isDps: tender.isDps,
-      isFrameworkAgreement: tender.isFrameworkAgreement,
-      isSmeSuitable: tender.isSmeSuitable,
-      electronicSubmission: tender.electronicSubmission,
-      mainClassificationProc:
-        tender.mainClassificationProc as TenderDto['mainClassificationProc'],
-      mainClassificationLot:
-        tender.mainClassificationLot as TenderDto['mainClassificationLot'],
-      additionalClassificationLot:
-        tender.additionalClassificationLot as TenderDto['additionalClassificationLot'],
-      placeOfPerformanceCountries: tender.placeOfPerformanceCountries,
-      placeOfPerformanceCities: tender.placeOfPerformanceCities,
-      lotIdentifiers: tender.lotIdentifiers,
-      internalLotIdentifiers: tender.internalLotIdentifiers,
-      documentUrls: tender.documentUrls,
-      submissionUrls: tender.submissionUrls,
-      euFundLot: tender.euFundLot,
-      selectionCriteria: tender.selectionCriteria,
-      awardCriteria: tender.awardCriteria,
-      classificationCpv:
-        tender.classificationCpv as TenderDto['classificationCpv'],
-      cpvCodes: tender.cpvCodes as TenderDto['cpvCodes'],
-      links: tender.links,
+  toWholeTenderListDto(
+    tender: TenderDocumentWithGeneralAnalysis,
+  ): TenderListDto {
+    const tenderList = TenderModel.serializeList(tender);
+
+    return {
+      ...tenderList,
+      generalAnalysis: TenderGeneralAnalysisModel.serializeList(
+        tenderList.generalAnalysis as TenderGeneralAnalysis,
+      ),
     };
-
-    return dto;
-  }
-
-  toListDto(tender: TenderRecord): TenderListDto {
-    const {
-      links,
-      rawData,
-      sourceNoticeId,
-      noticeVersion,
-      titleProc,
-      titleLot,
-      descriptionLot,
-      buyerIdentifier,
-      buyerCity,
-      buyerEmail,
-      buyerInternetAddress,
-      buyerProfile,
-      dispatchDate,
-      deadlineReceiptTender,
-      durationPeriodValue,
-      durationPeriodUnit,
-      legalBasis,
-      additionalClassificationLot,
-      lotIdentifiers,
-      internalLotIdentifiers,
-      submissionUrls,
-      selectionCriteria,
-      awardCriteria,
-      cpvCodes,
-      ...dto
-    } = this.mapTenderDocumentToDto(tender) as TenderDto & {
-      rawData?: unknown;
-    };
-
-    return dto;
-  }
-
-  toDetailDto(tender: TenderDocument) {
-    const { cpvCodes, rawData, ...dto } = this.mapTenderDocumentToDto(
-      tender,
-    ) as TenderDto & { rawData?: unknown };
-
-    return dto;
-  }
-
-  toWholeTenderListDto(tender: TenderDocument): TenderListDto {
-    const tenderList = this.toListDto(tender);
-
-    tenderList.generalAnalysis = this.tenderGeneralAnalysisService.toListDto(
-      (tender as any).generalAnalysis,
-    );
-
-    return tenderList;
   }
 }

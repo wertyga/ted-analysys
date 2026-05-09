@@ -1,4 +1,9 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
+import type {
+  TenderGeneralAnalysisDetailDto,
+  TenderGeneralAnalysisListDto,
+} from '../dto/tender-general-analysis.dto';
+import { filterModel } from '@/utils';
 
 export enum TenderGeneralAnalysisStatus {
   PENDING = 'PENDING',
@@ -71,6 +76,22 @@ export interface TenderGeneralAnalysis {
 }
 
 export type TenderGeneralAnalysisDocument = TenderGeneralAnalysis & Document;
+export type TenderGeneralAnalysisRecord = TenderGeneralAnalysis & {
+  _id?: unknown;
+};
+
+export type TenderGeneralAnalysisSerializable =
+  | TenderGeneralAnalysisDocument
+  | TenderGeneralAnalysisRecord;
+
+export interface TenderGeneralAnalysisModelType extends Model<TenderGeneralAnalysisDocument> {
+  serializeList(
+    analysis?: TenderGeneralAnalysisSerializable | null,
+  ): TenderGeneralAnalysisListDto | null;
+  serializeDetail(
+    analysis?: TenderGeneralAnalysisSerializable | null,
+  ): TenderGeneralAnalysisDetailDto | null;
+}
 
 const EstimatedValueSchema = new Schema<TenderEstimatedValue>(
   {
@@ -86,7 +107,10 @@ const EstimatedValueSchema = new Schema<TenderEstimatedValue>(
   { _id: false },
 );
 
-const TenderGeneralAnalysisSchema = new Schema<TenderGeneralAnalysisDocument>(
+const TenderGeneralAnalysisSchema = new Schema<
+  TenderGeneralAnalysisDocument,
+  TenderGeneralAnalysisModelType
+>(
   {
     tenderId: {
       type: String,
@@ -177,11 +201,49 @@ TenderGeneralAnalysisSchema.index({ complexityScore: -1 });
 TenderGeneralAnalysisSchema.index({ analysisDepth: 1 });
 TenderGeneralAnalysisSchema.index({ missingDocumentsWarning: 1 });
 
-export const TenderGeneralAnalysisModel: Model<TenderGeneralAnalysisDocument> =
+function serializeGeneralAnalysisList(
+  analysis?: TenderGeneralAnalysisSerializable | null,
+): TenderGeneralAnalysisListDto | null {
+  console.log('serializeGeneralAnalysisList', { analysis });
+  if (!analysis) {
+    return null;
+  }
+
+  return filterModel(analysis, {
+    includeFields: [
+      'status',
+      'summary',
+      'confidenceScore',
+      'opportunityScore',
+      'generalRecommendation',
+      'complexityScore',
+      'updatedAt',
+    ],
+  });
+}
+
+function serializeGeneralAnalysisDetail(
+  analysis?: TenderGeneralAnalysisSerializable | null,
+): TenderGeneralAnalysisDetailDto | null {
+  if (!analysis) {
+    return null;
+  }
+
+  return filterModel(analysis, {
+    excludeFields: ['sourceHash', 'promptVersion', 'model'],
+  });
+}
+
+TenderGeneralAnalysisSchema.statics.serializeList =
+  serializeGeneralAnalysisList;
+TenderGeneralAnalysisSchema.statics.serializeDetail =
+  serializeGeneralAnalysisDetail;
+
+export const TenderGeneralAnalysisModel: TenderGeneralAnalysisModelType =
   (mongoose.models.TenderGeneralAnalysis as
-    | Model<TenderGeneralAnalysisDocument>
+    | TenderGeneralAnalysisModelType
     | undefined) ??
-  mongoose.model<TenderGeneralAnalysisDocument>(
+  mongoose.model<TenderGeneralAnalysisDocument, TenderGeneralAnalysisModelType>(
     'TenderGeneralAnalysis',
     TenderGeneralAnalysisSchema,
   );

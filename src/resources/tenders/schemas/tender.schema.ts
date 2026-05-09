@@ -1,4 +1,10 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
+import { filterModel } from '@/utils';
+import {
+  TenderDetailDto,
+  TenderDto,
+  TenderListDto,
+} from '@/resources/tenders/dto/tender.dto';
 
 export type TenderDocumentsLinks = Record<
   'xml' | 'pdf' | 'pdfs' | 'html' | 'htmlDirect',
@@ -125,12 +131,19 @@ export interface Tender {
 }
 
 export type TenderDocument = Tender & Document;
+export type TenderRecord = Tender & { _id: unknown; rawData?: unknown };
+export type TenderSerializable = TenderDocument | TenderRecord;
+
+export interface TenderModelType extends Model<TenderDocument> {
+  serializeDetail(tender: TenderSerializable): TenderDetailDto;
+  serializeList(tender: TenderSerializable): TenderListDto;
+}
 
 export type TenderWithWishlist = Tender & {
   isInWishlist: boolean;
 };
 
-const TenderSchema = new Schema<TenderDocument>(
+const TenderSchema = new Schema<TenderDocument, TenderModelType>(
   {
     id: { type: String, required: true, unique: true, index: true },
     source: { type: String, required: true, index: true },
@@ -236,6 +249,52 @@ const TenderSchema = new Schema<TenderDocument>(
   },
 );
 
-export const TenderModel: Model<TenderDocument> =
-  (mongoose.models.Tender as Model<TenderDocument> | undefined) ??
-  mongoose.model<TenderDocument>('Tender', TenderSchema);
+function serializeTender(tender: TenderSerializable): TenderDto {
+  return filterModel(tender as TenderDocument, {
+    excludeFields: ['source', 'cpvCodes', 'rawData', 'links'],
+  }) as TenderDto;
+}
+
+TenderSchema.statics.serializeDetail = function (
+  tender: TenderSerializable,
+): TenderDetailDto {
+  return serializeTender(tender);
+};
+
+TenderSchema.statics.serializeList = function (
+  tender: TenderSerializable,
+): TenderListDto {
+  const {
+    links,
+    sourceNoticeId,
+    noticeVersion,
+    titleProc,
+    titleLot,
+    descriptionLot,
+    buyerIdentifier,
+    buyerCity,
+    buyerEmail,
+    buyerInternetAddress,
+    buyerProfile,
+    dispatchDate,
+    deadlineReceiptTender,
+    durationPeriodValue,
+    durationPeriodUnit,
+    legalBasis,
+    additionalClassificationLot,
+    lotIdentifiers,
+    internalLotIdentifiers,
+    submissionUrls,
+    selectionCriteria,
+    awardCriteria,
+    cpvCodes,
+    source,
+    ...rest
+  } = serializeTender(tender);
+  console.log({ rest });
+  return rest;
+};
+
+export const TenderModel: TenderModelType =
+  (mongoose.models.Tender as TenderModelType | undefined) ??
+  mongoose.model<TenderDocument, TenderModelType>('Tender', TenderSchema);
