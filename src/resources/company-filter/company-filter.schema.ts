@@ -15,6 +15,13 @@ export enum CompanyTenderFilterCpvMatchLevel {
   SPECIFIC = 'specific',
 }
 
+export enum CompanyTenderFilterGenerationStatus {
+  NOT_STARTED = 'not_started',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+}
+
 export interface CompanyTenderFilterCpvCode {
   category?: mongoose.Types.ObjectId | null;
   code: string;
@@ -46,6 +53,10 @@ export interface CompanyTenderFilter {
   publicProcurementExperience?: boolean | null;
   notificationThreshold: number;
   confirmedByUser: boolean;
+  generationStatus: CompanyTenderFilterGenerationStatus;
+  generationStartedAt?: Date | null;
+  generationFinishedAt?: Date | null;
+  generationError?: string | null;
   extractionWarnings: string[];
   createdAt?: Date;
   updatedAt?: Date;
@@ -184,6 +195,24 @@ export const CompanyTenderFilterSchema =
       confirmedByUser: {
         type: Boolean,
         default: false,
+      },
+      generationStatus: {
+        type: String,
+        enum: Object.values(CompanyTenderFilterGenerationStatus),
+        default: CompanyTenderFilterGenerationStatus.NOT_STARTED,
+        index: true,
+      },
+      generationStartedAt: {
+        type: Date,
+        default: null,
+      },
+      generationFinishedAt: {
+        type: Date,
+        default: null,
+      },
+      generationError: {
+        type: String,
+        default: null,
       },
       extractionWarnings: {
         type: [String],

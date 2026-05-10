@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 import { CurrencySign, Language } from '@/resources/codelist';
 import { CPV_CODES_LIST_FIELDS } from '@/resources/cpv/cpv.service';
@@ -9,14 +9,17 @@ import {
   getEnumArray,
   getEnumOrNull,
   getNullableNumber,
+  getSafeErrorMessage,
   getString,
   getStringArray,
+  isDuplicateKeyError,
   isRecord,
 } from '@/utils';
 import {
   CompanyTenderFilterCpvMatchLevel,
   CompanyTenderFilterCpvSource,
   CompanyTenderFilterDocument,
+  CompanyTenderFilterGenerationStatus,
   CompanyTenderFilterModel,
 } from './company-filter.schema';
 import { UserModel } from '@/resources/user/user.schema';
@@ -87,7 +90,50 @@ export class CompanyFilterService {
     filter: CompanyTenderFilterDocument;
     matches: TenderCompanyMatchDocument[];
   }> {
-    const filter = await this.generateAnalysisForCompany(user);
+    let filter: CompanyTenderFilterDocument;
+
+    try {
+      filter = await this.generateAnalysisForCompany(user);
+    } catch (error: unknown) {
+      if (error instanceof ConflictException) {
+        const existingFilter = await CompanyTenderFilterModel.findOne({
+          user: user._id,
+        })
+          .orFail()
+          .exec();
+
+        return { filter: existingFilter, matches: [] };
+      }
+
+      throw error;
+    }
+
+    return { filter, matches: [] };
+  }
+
+  async confirmCompanyTenderFilter(user: UserDocument): Promise<{
+    filter: CompanyTenderFilterDocument;
+    matches: TenderCompanyMatchDocument[];
+  }> {
+    const filter = await CompanyTenderFilterModel.findOneAndUpdate(
+      {
+        user: user._id,
+        generationStatus: CompanyTenderFilterGenerationStatus.COMPLETED,
+      },
+      {
+        $set: {
+          confirmedByUser: true,
+        },
+      },
+      { returnDocument: 'after' },
+    ).exec();
+
+    if (!filter) {
+      throw new NotFoundException(
+        'Completed company tender filter for current user not found',
+      );
+    }
+
     const matches =
       await this.tenderMatchingService.matchActiveRecentTendersWithCompanyFilter(
         filter,
@@ -100,45 +146,125 @@ export class CompanyFilterService {
     user: UserDocument,
   ): Promise<CompanyTenderFilterDocument> {
     const populatedUser = await this.getPopulatedUser(user);
+    await this.acquireGenerationLock(populatedUser);
     const payload = this.buildCompanyProfilePayload(populatedUser);
 
-    const result = await this.analyzeCompanyProfile(payload);
+    try {
+      const result = await this.analyzeCompanyProfile(payload);
 
-    return CompanyTenderFilterModel.findOneAndUpdate(
-      { user: populatedUser._id },
+      return CompanyTenderFilterModel.findOneAndUpdate(
+        { user: populatedUser._id },
+        {
+          $set: {
+            user: populatedUser._id,
+            summary: result.summary,
+            cpvCodes: result.additionalCpvSuggestions.map((suggestion) => ({
+              code: suggestion.code,
+              label: suggestion.label,
+              source: CompanyTenderFilterCpvSource.AI_SUGGESTION,
+              matchLevel: CompanyTenderFilterCpvMatchLevel.MEDIUM,
+              confidence: suggestion.confidence,
+              reason: suggestion.reason,
+            })),
+            targetCountries: result.targetCountries,
+            excludedCountries: [],
+            languages: result.languages,
+            contractNatures: result.contractNatures,
+            minBudget: result.minBudget,
+            maxBudget: result.maxBudget,
+            currency: result.currency,
+            allowUnknownBudget: result.allowUnknownBudget,
+            minDaysBeforeDeadline: result.minDaysBeforeDeadline,
+            requiredKeywords: result.requiredKeywords,
+            optionalKeywords: result.optionalKeywords,
+            excludedKeywords: result.excludedKeywords,
+            certifications: result.certifications,
+            capabilities: result.capabilities,
+            publicProcurementExperience: result.publicProcurementExperience,
+            notificationThreshold: result.notificationThreshold,
+            confirmedByUser: false,
+            generationStatus: CompanyTenderFilterGenerationStatus.COMPLETED,
+            generationFinishedAt: new Date(),
+            generationError: null,
+            extractionWarnings: result.extractionWarnings,
+          },
+        },
+        { returnDocument: 'after' },
+      ).orFail().exec();
+    } catch (error: unknown) {
+      await this.markGenerationFailed(populatedUser, error);
+      throw error;
+    }
+  }
+
+  private async acquireGenerationLock(
+    user: UserDocument,
+  ): Promise<CompanyTenderFilterDocument> {
+    const lockedFilter = await CompanyTenderFilterModel.findOneAndUpdate(
       {
-        $set: {
-          user: populatedUser._id,
-          summary: result.summary,
-          cpvCodes: result.additionalCpvSuggestions.map((suggestion) => ({
-            code: suggestion.code,
-            label: suggestion.label,
-            source: CompanyTenderFilterCpvSource.AI_SUGGESTION,
-            matchLevel: CompanyTenderFilterCpvMatchLevel.MEDIUM,
-            confidence: suggestion.confidence,
-            reason: suggestion.reason,
-          })),
-          targetCountries: result.targetCountries,
-          excludedCountries: [],
-          languages: result.languages,
-          contractNatures: result.contractNatures,
-          minBudget: result.minBudget,
-          maxBudget: result.maxBudget,
-          currency: result.currency,
-          allowUnknownBudget: result.allowUnknownBudget,
-          minDaysBeforeDeadline: result.minDaysBeforeDeadline,
-          requiredKeywords: result.requiredKeywords,
-          optionalKeywords: result.optionalKeywords,
-          excludedKeywords: result.excludedKeywords,
-          certifications: result.certifications,
-          capabilities: result.capabilities,
-          publicProcurementExperience: result.publicProcurementExperience,
-          notificationThreshold: result.notificationThreshold,
-          confirmedByUser: false,
-          extractionWarnings: result.extractionWarnings,
+        user: user._id,
+        generationStatus: {
+          $ne: CompanyTenderFilterGenerationStatus.IN_PROGRESS,
         },
       },
-      { returnDocument: 'after', upsert: true },
+      {
+        $set: {
+          generationStatus: CompanyTenderFilterGenerationStatus.IN_PROGRESS,
+          generationStartedAt: new Date(),
+          generationFinishedAt: null,
+          generationError: null,
+        },
+      },
+      { returnDocument: 'after' },
+    ).exec();
+
+    if (lockedFilter) {
+      return lockedFilter;
+    }
+
+    const existingFilter = await CompanyTenderFilterModel.findOne({
+      user: user._id,
+    }).exec();
+
+    if (existingFilter) {
+      throw new ConflictException(
+        'Company tender filter generation is already in progress',
+      );
+    }
+
+    try {
+      return await CompanyTenderFilterModel.create({
+        user: user._id,
+        confirmedByUser: false,
+        generationStatus: CompanyTenderFilterGenerationStatus.IN_PROGRESS,
+        generationStartedAt: new Date(),
+        generationFinishedAt: null,
+        generationError: null,
+      });
+    } catch (error: unknown) {
+      if (isDuplicateKeyError(error)) {
+        throw new ConflictException(
+          'Company tender filter generation is already in progress',
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  private async markGenerationFailed(
+    user: UserDocument,
+    error: unknown,
+  ): Promise<void> {
+    await CompanyTenderFilterModel.updateOne(
+      { user: user._id },
+      {
+        $set: {
+          generationStatus: CompanyTenderFilterGenerationStatus.FAILED,
+          generationFinishedAt: new Date(),
+          generationError: getSafeErrorMessage(error),
+        },
+      },
     ).exec();
   }
 

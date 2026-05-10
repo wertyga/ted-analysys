@@ -25,4 +25,15 @@ export class CompanyFilterController {
   createCompanyFilter(@Req() req) {
     return this.companyFilterService.generateAnalysisForCompany(req.user);
   }
+
+  @Post('confirm')
+  @ApiOperation({
+    summary: 'Confirm generated tender notification filters and run matching',
+  })
+  @ApiCreatedResponse({
+    description: 'Confirmed company tender filter and saved tender matches.',
+  })
+  confirmCompanyFilter(@Req() req) {
+    return this.companyFilterService.confirmCompanyTenderFilter(req.user);
+  }
 }
