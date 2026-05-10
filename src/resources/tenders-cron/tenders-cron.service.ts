@@ -12,7 +12,7 @@ import { TenderCompanyMatchDocument } from '@/resources/tender-matching/schemas/
 import { TenderMatchingService } from '@/resources/tender-matching/tender-matching.service';
 
 const RECENT_TENDERS_CRON = '0 1 * * *';
-export const RECENT_TENDERS_LOOKBACK_DAYS = 2;
+const RECENT_TENDERS_LOOKBACK_DAYS = 2;
 const RECENT_TENDERS_PAGE_LIMIT = 100;
 const RECENT_TENDERS_MAX_PAGES = 100;
 

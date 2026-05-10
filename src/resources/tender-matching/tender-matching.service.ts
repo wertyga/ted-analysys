@@ -17,7 +17,8 @@ import {
   TenderCompanyMatchDocument,
   TenderCompanyMatchModel,
 } from './schemas/tender-company-match.schema';
-import { RECENT_TENDERS_LOOKBACK_DAYS } from '@/resources/tenders-cron/tenders-cron.service';
+
+const RECENT_ACTIVE_TENDERS_LOOKBACK_DAYS = 2;
 
 @Injectable()
 export class TenderMatchingService {
@@ -158,7 +159,7 @@ export class TenderMatchingService {
   private async findActiveRecentTenders(): Promise<TenderDocument[]> {
     const publicationDateFrom = new Date();
     publicationDateFrom.setDate(
-      publicationDateFrom.getDate() - RECENT_TENDERS_LOOKBACK_DAYS,
+      publicationDateFrom.getDate() - RECENT_ACTIVE_TENDERS_LOOKBACK_DAYS,
     );
 
     return TenderModel.find({
