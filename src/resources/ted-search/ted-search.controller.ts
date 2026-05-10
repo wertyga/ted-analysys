@@ -46,13 +46,9 @@ export class TedSearchController {
         noticeData.notices ?? [],
       );
 
-    console.log({ tendersWithBaseAnalysis });
-
     const listTenders = tendersWithBaseAnalysis.map((tba) => {
       return this.tendersService.toWholeTenderListDto(tba);
     });
-
-    console.log({ listTenders });
 
     const tendersWithWishLists = req.user
       ? await this.tenderWishlistService.getPopulatedTendersByWishlists(
@@ -60,11 +56,6 @@ export class TedSearchController {
           req.user._id.toString(),
         )
       : listTenders;
-
-    // const normalized = await normalizeTenderSearchResponse({
-    //   ...noticeData,
-    //   notices: tendersWithWishLists,
-    // });
 
     return {
       ...noticeData,

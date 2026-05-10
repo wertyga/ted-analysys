@@ -4,9 +4,6 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import mongooseConnect from './mongoose/mongoose';
 import { isDev } from './utils';
-import { CpvModule } from '@/resources/cpv/cpv.module';
-import { CpvCategoryModel } from '@/resources/cpv/schemas';
-import { TenderModel } from '@/resources/tenders/schemas';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

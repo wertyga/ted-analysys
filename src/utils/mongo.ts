@@ -1,4 +1,4 @@
-import { Document, mongo, PipelineStage } from 'mongoose';
+import { mongo, Types } from 'mongoose';
 import { PaginationAndSortDto, SortDto } from '@/Dto';
 import { SORT_DIRECTION, SORT_TYPE } from '@/types';
 
@@ -106,6 +106,18 @@ export const filterModel = <T extends Record<string, any>>(
 };
 
 export const isMongoId = (value: any) => value instanceof mongo.ObjectId;
+
+export const toObjectId = (value: unknown): Types.ObjectId | null => {
+  if (value instanceof Types.ObjectId) {
+    return value;
+  }
+
+  if (typeof value === 'string' && Types.ObjectId.isValid(value)) {
+    return new Types.ObjectId(value);
+  }
+
+  return null;
+};
 
 // Check if field is _id, then return _id, but if the field is object - handle object
 export const serializeMongoObjectId = (
