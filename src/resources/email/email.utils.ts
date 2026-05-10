@@ -5,6 +5,7 @@ import * as path from 'path';
 const emailVariables = {
   companyName: '{{companyName}}',
   confirmLink: '{{confirmLink}}',
+  origin: '{{origin}}',
   recoveryToken: '{{recoveryToken}}',
 
   amount: '{{amount}}',
@@ -18,7 +19,7 @@ type TEmailTemplatesCompare = {
   [EMAIL_TEMPLATES.OauthRegistered]: 'companyName';
   [EMAIL_TEMPLATES.RestorePassword]: 'recoveryToken';
   [EMAIL_TEMPLATES.ConfirmEmail]: 'companyName' | 'confirmLink';
-  [EMAIL_TEMPLATES.ConfirmedEmail]: 'companyName';
+  [EMAIL_TEMPLATES.ConfirmedEmail]: 'companyName' | 'origin';
   [EMAIL_TEMPLATES.ErrorEmail]: undefined;
   [EMAIL_TEMPLATES.PaymentSuccess]:
     | 'companyName'

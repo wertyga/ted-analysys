@@ -7,7 +7,6 @@ import {
   Req,
   Res,
   UseFilters,
-  Headers,
   UseGuards,
 } from '@nestjs/common';
 import { join } from 'path';
@@ -35,7 +34,7 @@ import {
   SignInUserDto,
 } from './auth.dto';
 import { AuthService } from './auth.service';
-import { getEmailTemplate } from '@/resources/email/email.utils';
+import { replaceTemplateVars } from '@/resources/email/email.utils';
 import { EMAIL_TEMPLATES } from '@/resources/email/type';
 import { HttpErrorLoggingFilter } from '@/http-logger/HTTPLogger';
 import { AuthGuard } from '@/guards';
@@ -115,7 +114,7 @@ export class AuthController {
   async confirmEmail(
     @Query() { token }: ConfirmEmailDto,
     @Res() res,
-    @Headers() headers: Record<string, string>,
+    @Req() req,
   ) {
     const user = await this.authService.confirmUserEmail(token);
 
@@ -126,10 +125,10 @@ export class AuthController {
     } else {
       logger.info('CONFIRM_EMAIL', { email: user.email });
 
-      html = getEmailTemplate(EMAIL_TEMPLATES.ConfirmedEmail)?.replace(
-        '{{companyName}}',
-        user.tempEmail ?? '',
-      );
+      html = replaceTemplateVars(EMAIL_TEMPLATES.ConfirmedEmail, {
+        companyName: user.tempEmail ?? '',
+        origin: getOrigin(req),
+      });
     }
 
     res.send(html);

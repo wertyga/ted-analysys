@@ -74,6 +74,28 @@
       font-size: 20px;
     }
 
+    .buttonWrapper {
+      width: 100%;
+      max-width: 265px;
+      display: table;
+      margin: 50px auto 0 auto;
+    }
+
+    .button {
+      background-color: #036068;
+      font-weight: 600 !important;
+      font-size: 14px;
+      color: #ffffff !important;
+      border-radius: 22px;
+      height: 48px;
+      display: table-cell;
+      text-align: center;
+      vertical-align: middle;
+      border: none;
+      outline: none;
+      cursor: pointer;
+    }
+
     @media screen and (max-width: 500px) {
       .container {
         padding: 0;
@@ -89,6 +111,10 @@
   <div class="content">
     <h3>Hi <strong>{{companyName}}</strong>, <br /> your email has been confirmed.</h3>
     <p class="subtitle">Your AI Tenders account is ready. You can now search tenders, save opportunities, and review AI analysis results.</p>
+
+    <div class="buttonWrapper">
+      <a class="button" href="{{origin}}">Go to AI Tenders</a>
+    </div>
   </div>
 
   <p class="footer">
