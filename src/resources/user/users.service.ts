@@ -50,7 +50,7 @@ export class UsersService {
     }
 
     await user.save();
-    await this.companyFilterService.handleCompanyUpdated(user);
+    // await this.companyFilterService.handleCompanyUpdated(user);
 
     return user.populate(userCpvPopulateFields);
   }
