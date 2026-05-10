@@ -108,21 +108,49 @@ export class TenderNormalizerService {
         'submission-language',
         'submissionLanguage',
       ]),
-      buyerName: this.pickText(rawNotice, ['buyer-name', 'buyerName']),
+      buyerName: this.pickText(rawNotice, [
+        'buyer-name',
+        'buyerName',
+        'organisation-name-buyer',
+        'organisationNameBuyer',
+      ]),
       buyerIdentifier: this.pickText(rawNotice, [
         'buyer-identifier',
         'buyerIdentifier',
+        'organisation-identifier-buyer',
+        'organisationIdentifierBuyer',
       ]),
-      buyerCountry: this.pickText(rawNotice, ['buyer-country', 'buyerCountry']),
-      buyerCity: this.pickText(rawNotice, ['buyer-city', 'buyerCity']),
+      buyerCountry: this.pickText(rawNotice, [
+        'buyer-country',
+        'buyerCountry',
+        'organisation-country-buyer',
+        'organisationCountryBuyer',
+      ]),
+      buyerCity: this.pickText(rawNotice, [
+        'buyer-city',
+        'buyerCity',
+        'organisation-city-buyer',
+        'organisationCityBuyer',
+      ]),
       buyerMainActivities: this.pickTextArray(rawNotice, [
         'main-activity',
         'mainActivity',
+        'authority-main-activity',
+        'authorityMainActivity',
+        'entity-main-activity',
+        'entityMainActivity',
       ]),
-      buyerEmail: this.pickText(rawNotice, ['buyer-email', 'buyerEmail']),
+      buyerEmail: this.pickText(rawNotice, [
+        'buyer-email',
+        'buyerEmail',
+        'organisation-email-buyer',
+        'organisationEmailBuyer',
+      ]),
       buyerInternetAddress: this.pickText(rawNotice, [
         'buyer-internet-address',
         'buyerInternetAddress',
+        'organisation-internet-address-buyer',
+        'organisationInternetAddressBuyer',
       ]),
       buyerProfile: this.pickText(rawNotice, ['buyer-profile', 'buyerProfile']),
       publicationDate: this.parseTenderDate(
@@ -132,7 +160,9 @@ export class TenderNormalizerService {
         this.pickText(rawNotice, ['dispatch-date', 'dispatchDate']),
       ),
       submissionDeadline:
-        this.parseTenderDate(this.pickText(rawNotice, ['deadline'])) ??
+        this.parseTenderDate(
+          this.pickText(rawNotice, ['deadline-receipt-request']),
+        ) ??
         this.parseTenderDate(
           this.pickDateTime(
             rawNotice,
@@ -145,6 +175,9 @@ export class TenderNormalizerService {
               'deadlineReceiptTenderTimeLot',
             ],
           ),
+        ) ??
+        this.parseTenderDate(
+          this.pickText(rawNotice, ['deadline', 'deadlineDate']),
         ),
       deadlineReceiptTender: this.parseTenderDate(
         this.pickDateTime(
@@ -189,8 +222,21 @@ export class TenderNormalizerService {
       contractNature: this.pickText(rawNotice, [
         'contract-nature',
         'contractNature',
+        'contract-nature-main-proc',
+        'contractNatureMainProc',
+        'contract-nature-main-lot',
+        'contractNatureMainLot',
+        'contract-nature-main-part',
+        'contractNatureMainPart',
       ]),
-      legalBasis: this.pickText(rawNotice, ['legal-basis', 'legalBasis']),
+      legalBasis: this.pickText(rawNotice, [
+        'legal-basis',
+        'legalBasis',
+        'legal-basis-proc',
+        'legalBasisProc',
+        'legal-basis-notice',
+        'legalBasisNotice',
+      ]),
       isDps: this.systemCodeFlagFromValue(
         rawNotice['dps-usage-lot'] ?? rawNotice.dpsUsageLot,
       ),
@@ -267,11 +313,20 @@ export class TenderNormalizerService {
       cpvCodes: Array.from(
         new Set([
           ...(this.pickTextArray(rawNotice, ['classification-cpv']) ?? []),
-          ...(this.pickTextArray(rawNotice, ['main-classification-proc']) ??
-            []),
-          ...(this.pickTextArray(rawNotice, ['main-classification-lot']) ?? []),
+          ...(this.pickTextArray(rawNotice, [
+            'classificationCpv',
+          ]) ?? []),
+          ...(this.pickTextArray(rawNotice, [
+            'main-classification-proc',
+            'mainClassificationProc',
+          ]) ?? []),
+          ...(this.pickTextArray(rawNotice, [
+            'main-classification-lot',
+            'mainClassificationLot',
+          ]) ?? []),
           ...(this.pickTextArray(rawNotice, [
             'additional-classification-lot',
+            'additionalClassificationLot',
           ]) ?? []),
         ]),
       ) as TenderDto['cpvCodes'],
@@ -468,32 +523,39 @@ export class TenderNormalizerService {
   private pickEstimatedValue(
     raw: Record<string, unknown>,
   ): TenderDto['estimatedValue'] {
-    const procAmount = this.numberFromValue(
-      raw['estimated-value-proc'] ?? raw.estimatedValueProc,
-    );
-    const procCurrency = this.valueToText(
-      raw['estimated-value-cur-proc'] ?? raw.estimatedValueCurProc,
-    );
+    const candidates = [
+      [
+        ['estimated-value-proc', 'estimatedValueProc'],
+        ['estimated-value-cur-proc', 'estimatedValueCurProc'],
+      ],
+      [
+        ['estimated-value-lot', 'estimatedValueLot'],
+        ['estimated-value-cur-lot', 'estimatedValueCurLot'],
+      ],
+      [
+        ['estimated-value-glo', 'estimatedValueGlo'],
+        ['estimated-value-cur-glo', 'estimatedValueCurGlo'],
+      ],
+      [
+        ['estimated-value-part', 'estimatedValuePart'],
+        ['estimated-value-cur-part', 'estimatedValueCurPart'],
+      ],
+      [
+        ['total-value', 'totalValue'],
+        ['total-value-cur', 'totalValueCur'],
+      ],
+    ] as const;
 
-    if (procAmount !== undefined || procCurrency !== undefined) {
-      return {
-        amount: procAmount ?? null,
-        currency: procCurrency ?? null,
-      };
-    }
+    for (const [amountPaths, currencyPaths] of candidates) {
+      const amount = this.numberFromValue(this.pickText(raw, [...amountPaths]));
+      const currency = this.pickText(raw, [...currencyPaths]);
 
-    const lotAmount = this.numberFromValue(
-      raw['estimated-value-lot'] ?? raw.estimatedValueLot,
-    );
-    const lotCurrency = this.valueToText(
-      raw['estimated-value-cur-lot'] ?? raw.estimatedValueCurLot,
-    );
-
-    if (lotAmount !== undefined || lotCurrency !== undefined) {
-      return {
-        amount: lotAmount ?? null,
-        currency: lotCurrency ?? null,
-      };
+      if (amount !== undefined || currency !== undefined) {
+        return {
+          amount: amount ?? null,
+          currency: currency ?? null,
+        };
+      }
     }
 
     return undefined;
