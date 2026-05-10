@@ -6,10 +6,13 @@ import { TedScope } from '@/resources/ted-search/types/ted-search.types';
 import { getTedDate, resolveDeadlineRange } from '@/resources/ted-search/utils';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { TendersService } from '@/resources/tenders/tenders.service';
+import { TenderDocument } from '@/resources/tenders/schemas';
 import { isDev, logger } from '@/utils';
+import { TenderCompanyMatchDocument } from '@/resources/tender-matching/schemas/tender-company-match.schema';
+import { TenderMatchingService } from '@/resources/tender-matching/tender-matching.service';
 
 const RECENT_TENDERS_CRON = '0 1 * * *';
-const RECENT_TENDERS_LOOKBACK_DAYS = 2;
+export const RECENT_TENDERS_LOOKBACK_DAYS = 2;
 const RECENT_TENDERS_PAGE_LIMIT = 100;
 const RECENT_TENDERS_MAX_PAGES = 100;
 
@@ -21,6 +24,7 @@ export class TendersCronService {
   constructor(
     private readonly tedSearchService: TedSearchService,
     private readonly tendersService: TendersService,
+    private readonly tenderMatchingService: TenderMatchingService,
   ) {}
 
   @Cron(RECENT_TENDERS_CRON, {
@@ -39,11 +43,11 @@ export class TendersCronService {
 
       if (isDev) {
         this.logger.log(
-          `Recent TED tender gather completed: pages=${result.pagesFetched} fetched=${result.noticesFetched} saved=${result.saved} skipped=${result.skipped}`,
+          `Recent TED tender gather completed: pages=${result.pagesFetched} fetched=${result.noticesFetched} saved=${result.saved} updated=${result.updated} skipped=${result.skipped} matches=${result.matchesSaved}`,
         );
       }
       logger.info(
-        `Recent TED tender gather completed: pages=${result.pagesFetched} fetched=${result.noticesFetched} saved=${result.saved} skipped=${result.skipped}`,
+        `Recent TED tender gather completed: pages=${result.pagesFetched} fetched=${result.noticesFetched} saved=${result.saved} updated=${result.updated} skipped=${result.skipped} matches=${result.matchesSaved}`,
       );
     } catch (error: unknown) {
       this.logger.error(
@@ -60,13 +64,19 @@ export class TendersCronService {
     pagesFetched: number;
     noticesFetched: number;
     saved: number;
+    updated: number;
     skipped: number;
+    matchesSaved: number;
+    savedMatches: TenderCompanyMatchDocument[];
   }> {
     let page = 1;
     let pagesFetched = 0;
     let noticesFetched = 0;
     let saved = 0;
+    let updated = 0;
     let skipped = 0;
+    let matchesSaved = 0;
+    const savedMatches: TenderCompanyMatchDocument[] = [];
     let totalNoticeCount: number | undefined;
 
     while (page <= RECENT_TENDERS_MAX_PAGES) {
@@ -86,7 +96,15 @@ export class TendersCronService {
 
       const saveResult = await this.tendersService.saveNewTedTenders(notices);
       saved += saveResult.saved;
+      updated += saveResult.updated;
       skipped += saveResult.skipped;
+
+      const pageMatches = await this.matchChangedTenders(
+        saveResult.changedTenders,
+      );
+
+      savedMatches.push(...pageMatches);
+      matchesSaved += pageMatches.length;
 
       if (
         totalNoticeCount !== undefined &&
@@ -98,7 +116,27 @@ export class TendersCronService {
       page += 1;
     }
 
-    return { pagesFetched, noticesFetched, saved, skipped };
+    return {
+      pagesFetched,
+      noticesFetched,
+      saved,
+      updated,
+      skipped,
+      matchesSaved,
+      savedMatches,
+    };
+  }
+
+  private async matchChangedTenders(
+    tenders: TenderDocument[],
+  ): Promise<TenderCompanyMatchDocument[]> {
+    const matches = await Promise.all(
+      tenders.map((tender) =>
+        this.tenderMatchingService.matchTenderWithAllCompanyFilters(tender),
+      ),
+    );
+
+    return matches.flat();
   }
 
   private buildRecentCompetitionTenderFilters(page: number) {

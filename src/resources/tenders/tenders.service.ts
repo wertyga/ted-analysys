@@ -27,6 +27,7 @@ import {
   isRecord,
   isTedNotice,
   isTedPublicationNumber,
+  valueToString,
 } from '@/utils';
 import { tenderCpvPopulateFields } from '@/resources/tenders/utils/tender.utils';
 
@@ -49,7 +50,9 @@ export interface MigrateTenderDateFieldsResult {
 
 export interface SaveNewTedTendersResult {
   saved: number;
+  updated: number;
   skipped: number;
+  changedTenders: TenderDocument[];
 }
 
 export type TenderDocumentWithGeneralAnalysis = TenderDocument & {
@@ -183,28 +186,41 @@ export class TendersService {
     }
 
     if (noticesByPublicationNumber.size === 0) {
-      return { saved: 0, skipped: notices.length };
+      return {
+        saved: 0,
+        updated: 0,
+        skipped: notices.length,
+        changedTenders: [],
+      };
     }
 
     const publicationNumbers = Array.from(noticesByPublicationNumber.keys());
     const existingTenders = await TenderModel.find({
       id: { $in: publicationNumbers },
     })
-      .select('id publicationNumber')
-      .lean()
+      .select('id publicationNumber noticeVersion')
       .exec();
-    const existingPublicationNumbers = new Set(
+
+    const existingTendersByPublicationNumber = new Map(
       existingTenders.flatMap((tender) =>
-        [tender.id, tender.publicationNumber].filter(
-          (value): value is string => typeof value === 'string',
-        ),
+        [tender.id, tender.publicationNumber]
+          .filter((value): value is string => typeof value === 'string')
+          .map((publicationNumber) => [publicationNumber, tender] as const),
       ),
     );
     let saved = 0;
+    let updated = 0;
     let skipped = notices.length - noticesByPublicationNumber.size;
+    const changedTenders: TenderDocument[] = [];
 
     for (const [publicationNumber, notice] of noticesByPublicationNumber) {
-      if (existingPublicationNumbers.has(publicationNumber)) {
+      const existingTender =
+        existingTendersByPublicationNumber.get(publicationNumber);
+      const shouldUpdateExistingTender =
+        existingTender !== undefined &&
+        this.shouldUpdateTenderFromTedNotice(existingTender, notice);
+
+      if (existingTender !== undefined && !shouldUpdateExistingTender) {
         skipped += 1;
         continue;
       }
@@ -212,13 +228,33 @@ export class TendersService {
       const savedTender = await this.upsertTender(notice);
 
       if (savedTender) {
-        saved += 1;
+        changedTenders.push(savedTender);
+
+        if (existingTender) {
+          updated += 1;
+        } else {
+          saved += 1;
+        }
       } else {
         skipped += 1;
       }
     }
 
-    return { saved, skipped };
+    return { saved, updated, skipped, changedTenders };
+  }
+
+  private shouldUpdateTenderFromTedNotice(
+    tender: Pick<TenderDocument, 'noticeVersion'>,
+    notice: TedNotice,
+  ): boolean {
+    const noticeVersion = valueToString(
+      notice.noticeVersion ?? notice['notice-version'],
+    );
+
+    return (
+      areTedNoticeVersionsDifferent(tender.noticeVersion, notice) ||
+      (tender.noticeVersion === undefined && noticeVersion !== undefined)
+    );
   }
 
   async getLocalTenderWithBaseAnalysis(

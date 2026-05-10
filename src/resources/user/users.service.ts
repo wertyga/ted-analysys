@@ -5,6 +5,7 @@ import { getLimitAndSortCursor } from '@/utils';
 import { UserModel } from './user.schema';
 import { CpvCategoryModel } from '@/resources/cpv/schemas';
 import { CPV_CODES_LIST_FIELDS } from '@/resources/cpv/cpv.service';
+import { CompanyFilterService } from '@/resources/company-filter/company-filter.service';
 
 const userCpvPopulateFields = [
   { path: 'industries', select: CPV_CODES_LIST_FIELDS },
@@ -13,7 +14,7 @@ const userCpvPopulateFields = [
 
 @Injectable()
 export class UsersService {
-  constructor() {}
+  constructor(private readonly companyFilterService: CompanyFilterService) {}
 
   async getUsersList({
     sortDirection,
@@ -49,6 +50,7 @@ export class UsersService {
     }
 
     await user.save();
+    await this.companyFilterService.handleCompanyUpdated(user);
 
     return user.populate(userCpvPopulateFields);
   }

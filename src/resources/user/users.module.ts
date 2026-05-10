@@ -3,9 +3,10 @@ import { UsersController } from './users.controller';
 import { UsersAdmController } from './users.adm.controller';
 import { UsersService } from './users.service';
 import { UsersServiceUtils } from './users.service.utils';
+import { CompanyFilterModule } from '@/resources/company-filter/company-filter.module';
 
 @Module({
-  imports: [],
+  imports: [CompanyFilterModule],
   controllers: [UsersController, UsersAdmController],
   providers: [UsersService, UsersServiceUtils],
   exports: [UsersService, UsersServiceUtils],

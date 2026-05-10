@@ -21,6 +21,8 @@ import {
 } from './company-filter.schema';
 import { UserModel } from '@/resources/user/user.schema';
 import { COMPANY_TENDER_FILTER_SYSTEM_PROMPT } from './company-filter.prompt';
+import { TenderMatchingService } from '@/resources/tender-matching/tender-matching.service';
+import { TenderCompanyMatchDocument } from '@/resources/tender-matching/schemas/tender-company-match.schema';
 
 interface CompanyFilterCpvPayload {
   name?: string;
@@ -78,7 +80,21 @@ interface CompanyTenderFilterAiResult {
 export class CompanyFilterService {
   constructor(
     private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
+    private readonly tenderMatchingService: TenderMatchingService,
   ) {}
+
+  async handleCompanyUpdated(user: UserDocument): Promise<{
+    filter: CompanyTenderFilterDocument;
+    matches: TenderCompanyMatchDocument[];
+  }> {
+    const filter = await this.generateAnalysisForCompany(user);
+    const matches =
+      await this.tenderMatchingService.matchActiveRecentTendersWithCompanyFilter(
+        filter,
+      );
+
+    return { filter, matches };
+  }
 
   async generateAnalysisForCompany(
     user: UserDocument,
@@ -118,6 +134,7 @@ export class CompanyFilterService {
           capabilities: result.capabilities,
           publicProcurementExperience: result.publicProcurementExperience,
           notificationThreshold: result.notificationThreshold,
+          confirmedByUser: false,
           extractionWarnings: result.extractionWarnings,
         },
       },
