@@ -79,7 +79,6 @@ export class AuthService {
         html,
       });
     } catch (e) {
-      console.log({ e });
       logger.error('sendConfirmLink', e);
     }
   }

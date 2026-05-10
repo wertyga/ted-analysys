@@ -291,7 +291,7 @@ TenderSchema.statics.serializeList = function (
     source,
     ...rest
   } = serializeTender(tender);
-  console.log({ rest });
+
   return rest;
 };
 

@@ -9,7 +9,6 @@ import {
 } from '@nestjs/swagger';
 import { TedTenderSearchRequestDto } from './dto/ted-tender-search-request.dto';
 import { TedSearchService } from './ted-search.service';
-import { normalizeTenderSearchResponse } from './utils';
 import { TedSearchResponse } from './types/ted-search.types';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { TendersService } from '@/resources/tenders/tenders.service';

@@ -204,7 +204,6 @@ TenderGeneralAnalysisSchema.index({ missingDocumentsWarning: 1 });
 function serializeGeneralAnalysisList(
   analysis?: TenderGeneralAnalysisSerializable | null,
 ): TenderGeneralAnalysisListDto | null {
-  console.log('serializeGeneralAnalysisList', { analysis });
   if (!analysis) {
     return null;
   }
