@@ -7,9 +7,7 @@ import {
   UseFilters,
   UseGuards,
   Headers,
-  Res,
 } from '@nestjs/common';
-import { join } from 'path';
 import { AuthGuard } from '@/guards';
 import { UpdateUserDto, UserAuthDto } from './user.dto';
 import { UsersService } from './users.service';
@@ -24,16 +22,26 @@ import {
   ApiDefaultResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { TenderWishlistService } from '@/resources/tender-wishlist/tender-wishlist.service';
 
 @ApiTags('Users')
 @UseFilters(HttpErrorLoggingFilter)
 @Controller('/users')
 export class UsersController {
-  constructor(private usersService: UsersService) {}
+  constructor(
+    private usersService: UsersService,
+    private tenderWishlistService: TenderWishlistService,
+  ) {}
 
-  @Get('/update-test')
-  updateUserTest(@Res() res) {
-    return res.sendFile(join(process.cwd(), 'test-html', 'update-user.html'));
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard)
+  @Get('/meta-data')
+  async getUserMetaData(@Req() req) {
+    const wishlistCount = await this.tenderWishlistService.countUserTenders(
+      req.user,
+    );
+
+    return { wishlistCount };
   }
 
   @ApiBearerAuth()

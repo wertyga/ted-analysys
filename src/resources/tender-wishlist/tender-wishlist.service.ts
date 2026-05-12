@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
-import mongoose from 'mongoose';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   TenderDocument,
   TenderWithWishlist,
@@ -13,20 +8,18 @@ import { TendersService } from '@/resources/tenders/tenders.service';
 import { TenderListDto } from '@/resources/tenders/dto/tender.dto';
 import { TenderWishlistItemModel } from './schemas';
 import { UserDocument } from '@/resources/user/user.types';
-import { CPV_CODES_LIST_FIELDS } from '@/resources/cpv/cpv.service';
 import { tenderCpvPopulateFields } from '@/resources/tenders/utils/tender.utils';
 
 @Injectable()
 export class TenderWishlistService {
   constructor(private readonly tendersService: TendersService) {}
 
-  async addTender(user: unknown, tenderId: string) {
-    const userId = this.getUserObjectId(user);
+  async addTender(user: UserDocument, tenderId: string) {
     const tender = await this.findOrFetchTender(tenderId);
 
     try {
       await TenderWishlistItemModel.create({
-        user: userId,
+        user: user._id,
         tender: tender._id,
         tenderId: tender.id,
       });
@@ -62,21 +55,18 @@ export class TenderWishlistService {
     return tender;
   }
 
-  async removeTender(user: unknown, tenderId: string) {
-    const userId = this.getUserObjectId(user);
-
+  async removeTender(user: UserDocument, tenderId: string) {
     await TenderWishlistItemModel.deleteOne({
-      user: userId,
+      user: user._id,
       tenderId,
     }).exec();
 
     return { tenderId, isInWishlist: false };
   }
 
-  async getTenderStatus(user: unknown, tenderId: string) {
-    const userId = this.getUserObjectId(user);
+  async getTenderStatus(user: UserDocument, tenderId: string) {
     const item = await TenderWishlistItemModel.findOne({
-      user: userId,
+      user: user._id,
       tenderId,
     })
       .select('_id')
@@ -111,7 +101,7 @@ export class TenderWishlistService {
   }
 
   async listUserTenders(user: UserDocument, page = 1, limit = 20) {
-    const userId = this.getUserObjectId(user);
+    const userId = user._id;
     const normalizedPage = Math.max(1, page);
     const normalizedLimit = Math.min(Math.max(1, limit), 100);
     const skip = (normalizedPage - 1) * normalizedLimit;
@@ -136,32 +126,7 @@ export class TenderWishlistService {
     };
   }
 
-  private getUserObjectId(user: unknown): mongoose.Types.ObjectId {
-    const rawUserId = this.getRawUserId(user);
-
-    if (!rawUserId || !mongoose.Types.ObjectId.isValid(rawUserId)) {
-      throw new UnauthorizedException('User is required');
-    }
-
-    return new mongoose.Types.ObjectId(rawUserId);
-  }
-
-  private getRawUserId(user: unknown): string | undefined {
-    if (!user || typeof user !== 'object') {
-      return undefined;
-    }
-
-    const record = user as Record<string, unknown>;
-    const id = record._id ?? record.id;
-
-    if (typeof id === 'string') {
-      return id;
-    }
-
-    if (id instanceof mongoose.Types.ObjectId) {
-      return id.toString();
-    }
-
-    return undefined;
+  async countUserTenders(user: UserDocument) {
+    return TenderWishlistItemModel.countDocuments({ user: user._id }).exec();
   }
 }
