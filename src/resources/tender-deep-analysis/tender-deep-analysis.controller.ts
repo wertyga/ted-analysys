@@ -3,7 +3,9 @@ import {
   Get,
   NotFoundException,
   Param,
+  ParseIntPipe,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -11,6 +13,7 @@ import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { AuthGuard } from '@/guards';
@@ -55,5 +58,35 @@ export class TenderDeepAnalysisController {
     }
 
     return this.tenderDeepAnalysisService.toDetailDto(analysis);
+  }
+}
+
+@ApiTags('deep-analysis')
+@UseGuards(AuthGuard)
+@Controller('deep-analysis')
+export class UserTenderDeepAnalysisController {
+  constructor(
+    private readonly tenderDeepAnalysisService: TenderDeepAnalysisService,
+  ) {}
+
+  @Get()
+  @ApiOperation({
+    summary: 'Get current user deep analyses sorted by creation date',
+  })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 20 })
+  @ApiOkResponse({ description: 'Current user deep analyses' })
+  async listUserDeepAnalyses(
+    @Req() req,
+    @Query('page', new ParseIntPipe({ optional: true })) page = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit = 20,
+  ) {
+    const result = await this.tenderDeepAnalysisService.listByCompany({
+      companyId: String(req.user._id),
+      page,
+      limit,
+    });
+
+    return result;
   }
 }

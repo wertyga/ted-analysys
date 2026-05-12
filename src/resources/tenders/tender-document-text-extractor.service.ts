@@ -3,6 +3,7 @@ import * as cheerio from 'cheerio';
 import { createHash } from 'crypto';
 import { isTag, type AnyNode, type Element } from 'domhandler';
 import { PDFParse } from 'pdf-parse';
+import { Language } from '@/resources/codelist';
 
 export enum TenderSourceDocumentType {
   TED_XML_NOTICE = 'TED_XML_NOTICE',
@@ -58,71 +59,67 @@ const BEGINNING_CHARS_WHEN_TRUNCATED = 10_000;
 const TRUNCATION_MARKER = '[...document truncated for AI input...]';
 
 const LANGUAGE_ALIASES: Record<string, string> = {
-  en: 'ENG',
-  eng: 'ENG',
-  fi: 'FIN',
-  fin: 'FIN',
-  sv: 'SWE',
-  swe: 'SWE',
-  se: 'SWE',
-  de: 'DEU',
-  deu: 'DEU',
-  ger: 'DEU',
-  fr: 'FRA',
-  fra: 'FRA',
-  fre: 'FRA',
-  pl: 'POL',
-  pol: 'POL',
-  es: 'SPA',
-  spa: 'SPA',
-  it: 'ITA',
-  ita: 'ITA',
-  nl: 'NLD',
-  nld: 'NLD',
-  dut: 'NLD',
-  da: 'DAN',
-  dan: 'DAN',
-  et: 'EST',
-  est: 'EST',
-  lv: 'LAV',
-  lav: 'LAV',
-  lt: 'LIT',
-  lit: 'LIT',
-  cs: 'CES',
-  ces: 'CES',
-  cze: 'CES',
-  sk: 'SLK',
-  slk: 'SLK',
-  slo: 'SLK',
-  sl: 'SLV',
-  slv: 'SLV',
-  hu: 'HUN',
-  hun: 'HUN',
-  pt: 'POR',
-  por: 'POR',
-  ro: 'RON',
-  ron: 'RON',
-  rum: 'RON',
-  bg: 'BUL',
-  bul: 'BUL',
-  el: 'ELL',
-  ell: 'ELL',
-  gre: 'ELL',
-  hr: 'HRV',
-  hrv: 'HRV',
-  mt: 'MLT',
-  mlt: 'MLT',
-  ga: 'GLE',
-  gle: 'GLE',
-  mul: 'MUL',
+  en: Language.ENG,
+  eng: Language.ENG,
+  fi: Language.FIN,
+  fin: Language.FIN,
+  sv: Language.SWE,
+  swe: Language.SWE,
+  se: Language.SWE,
+  de: Language.DEU,
+  deu: Language.DEU,
+  ger: Language.DEU,
+  fr: Language.FRA,
+  fra: Language.FRA,
+  fre: Language.FRA,
+  pl: Language.POL,
+  pol: Language.POL,
+  es: Language.SPA,
+  spa: Language.SPA,
+  it: Language.ITA,
+  ita: Language.ITA,
+  nl: Language.NLD,
+  nld: Language.NLD,
+  dut: Language.NLD,
+  da: Language.DAN,
+  dan: Language.DAN,
+  et: Language.EST,
+  est: Language.EST,
+  lv: Language.LAV,
+  lav: Language.LAV,
+  lt: Language.LIT,
+  lit: Language.LIT,
+  cs: Language.CES,
+  ces: Language.CES,
+  cze: Language.CES,
+  sk: Language.SLK,
+  slk: Language.SLK,
+  slo: Language.SLK,
+  sl: Language.SLV,
+  slv: Language.SLV,
+  hu: Language.HUN,
+  hun: Language.HUN,
+  pt: Language.POR,
+  por: Language.POR,
+  ro: Language.RON,
+  ron: Language.RON,
+  rum: Language.RON,
+  bg: Language.BUL,
+  bul: Language.BUL,
+  el: Language.ELL,
+  ell: Language.ELL,
+  gre: Language.ELL,
+  hr: Language.HRV,
+  hrv: Language.HRV,
+  mt: Language.MLT,
+  mlt: Language.MLT,
+  ga: Language.GLE,
+  gle: Language.GLE,
+  mul: Language.MUL,
   unknown: 'UNKNOWN',
 };
 
-const TED_LANGUAGE_CODES = new Set(
-  Object.values(LANGUAGE_ALIASES).filter(
-    (code) => code !== 'MUL' && code !== 'UNKNOWN',
-  ),
-);
+const TED_LANGUAGE_CODES: Set<string> = new Set(Object.values(Language));
 
 const AI_RETENTION_KEYWORDS = [
   'eligibility',
@@ -486,7 +483,13 @@ export class TenderDocumentTextExtractorService {
       return undefined;
     }
 
-    return LANGUAGE_ALIASES[normalized] ?? undefined;
+    const alias = LANGUAGE_ALIASES[normalized];
+    if (alias) {
+      return alias;
+    }
+
+    const upperCode = normalized.toUpperCase();
+    return TED_LANGUAGE_CODES.has(upperCode) ? upperCode : undefined;
   }
 
   private getKnownInputLanguage(code?: string): string | undefined {

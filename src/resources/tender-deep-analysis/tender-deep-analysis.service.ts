@@ -3,7 +3,12 @@ import mongoose from 'mongoose';
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 import { getSafeErrorMessage, isDuplicateKeyError } from '@/utils';
 import { UserModel } from '../user/user.schema';
-import { TenderDocument, TenderModel } from '../tenders/schemas';
+import {
+  TenderDocument,
+  TenderModel,
+  TenderRecord,
+  TenderSerializable,
+} from '../tenders/schemas';
 import {
   TenderDeepAnalysis,
   TenderDeepAnalysisDocument,
@@ -20,8 +25,18 @@ import { TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION } from '@/openai/prompts/tender-
 import { TenderDeepDocumentInputService } from './tender-deep-document-input.service';
 import * as fs from 'node:fs';
 import { CPV_CODES_LIST_FIELDS } from '@/resources/cpv/cpv.service';
+import { TenderListDto } from '@/resources/tenders/dto/tender.dto';
 
-type TenderDeepAnalysisRecord = TenderDeepAnalysis & { _id?: unknown };
+type TenderDeepAnalysisRecord = TenderDeepAnalysis & {
+  _id?: unknown;
+  tender?: mongoose.Types.ObjectId | TenderRecord | TenderDocument;
+};
+type TenderDeepAnalysisWithTenderRecord = Omit<
+  TenderDeepAnalysisRecord,
+  'tender'
+> & {
+  tender?: TenderListDto | null;
+};
 
 @Injectable()
 export class TenderDeepAnalysisService {
@@ -71,7 +86,6 @@ export class TenderDeepAnalysisService {
       documentAnalyses: documentsInput.documentAnalyses,
       documentTextSnippets: documentsInput.documentTextSnippets,
     });
-    fs.writeFileSync('test.json', JSON.stringify(input));
 
     const sourceHash = this.deepAnalysisBuilder.buildSourceHash({
       tender,
@@ -169,23 +183,50 @@ export class TenderDeepAnalysisService {
       .exec();
   }
 
+  async listByCompany(params: {
+    companyId: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{
+    analyses: TenderDeepAnalysisWithTenderRecord[];
+    total: number;
+  }> {
+    const page = Math.max(1, params.page ?? 1);
+    const limit = Math.min(Math.max(1, params.limit ?? 20), 100);
+    const skip = (page - 1) * limit;
+
+    const [analyses, total] = await Promise.all([
+      TenderDeepAnalysisModel.find({ companyId: params.companyId })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('tender')
+        .lean<TenderDeepAnalysisRecord[]>()
+        .exec(),
+      TenderDeepAnalysisModel.countDocuments({
+        companyId: params.companyId,
+      }).exec(),
+    ]);
+
+    return {
+      analyses: analyses.map((analysis) => {
+        const { tender, ...rest } = analysis;
+
+        return {
+          ...rest,
+          tender: tender
+            ? TenderModel.serializeList(tender as TenderSerializable)
+            : null,
+        };
+      }),
+      total,
+    };
+  }
+
   toDetailDto(
     analysis?: TenderDeepAnalysisRecord | null,
   ): TenderDeepAnalysisRecord | null {
     return analysis ?? null;
-  }
-
-  private async getOrCreateCompletedGeneralAnalysis(
-    tender: TenderDocument,
-  ): Promise<TenderGeneralAnalysisDocument | null> {
-    const generalAnalysis =
-      await this.tenderGeneralAnalysisService.ensureAnalysisForTender(tender);
-
-    if (generalAnalysis.status === TenderGeneralAnalysisStatus.DONE) {
-      return generalAnalysis;
-    }
-
-    return generalAnalysis;
   }
 
   private async createProcessingAnalysis(params: {

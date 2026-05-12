@@ -86,8 +86,9 @@ export class AuthController {
   async signUpUser(@Body() userPayload: CreateUserDto, @Req() req) {
     const { email } = userPayload;
 
-    await this.authService.utils.checkIfTempUserExistsGuard([
+    await this.authService.utils.checkIfUserExistsGuard([
       { tempEmail: email },
+      { email },
     ]);
 
     const user = await this.authService.upsertTempUser(userPayload);
@@ -209,9 +210,7 @@ export class AuthController {
       throw gfErrors.userNotFound();
     }
 
-    await this.authService.utils.checkIfTempUserExistsGuard([
-      { email: newEmail },
-    ]);
+    await this.authService.utils.checkIfUserExistsGuard([{ email: newEmail }]);
 
     req.user.tempEmail = newEmail;
     req.user.recoveryToken = generateToken(newEmail);

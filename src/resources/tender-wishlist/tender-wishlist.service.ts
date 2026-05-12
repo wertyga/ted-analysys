@@ -8,7 +8,6 @@ import { TendersService } from '@/resources/tenders/tenders.service';
 import { TenderListDto } from '@/resources/tenders/dto/tender.dto';
 import { TenderWishlistItemModel } from './schemas';
 import { UserDocument } from '@/resources/user/user.types';
-import { tenderCpvPopulateFields } from '@/resources/tenders/utils/tender.utils';
 
 @Injectable()
 export class TenderWishlistService {
@@ -111,17 +110,26 @@ export class TenderWishlistService {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(normalizedLimit)
-        .populate({
-          path: 'tender',
-          populate: tenderCpvPopulateFields,
-        })
+        .select('tender')
         .lean()
         .exec(),
       TenderWishlistItemModel.countDocuments({ user: userId }).exec(),
     ]);
 
+    const tenderIds = items.map((item) => item.tender);
+
+    const tenders =
+      await this.tendersService.findMultipleLocalTendersWithBaseAnalysis({
+        _id: { $in: tenderIds },
+      });
+    const tendersById = new Map(
+      tenders.map((tender) => [tender._id.toString(), tender]),
+    );
+
     return {
-      tenders: items.map((item) => item.tender).filter(Boolean),
+      tenders: tenderIds
+        .map((tenderId) => tendersById.get(tenderId.toString()))
+        .filter(Boolean),
       total,
     };
   }

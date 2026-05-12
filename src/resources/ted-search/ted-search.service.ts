@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import { PipelineStage } from 'mongoose';
 import { TedSearchRequestDto } from './dto/ted-search-request.dto';
@@ -11,9 +11,10 @@ import {
   TedScope,
   TedSearchResponse,
 } from './types/ted-search.types';
-import { mapTedError, resolveDeadlineRange } from './utils';
+import { mapTedError } from './utils';
 import { TenderGeneralAnalysisModel } from '@/resources/tender-analysis/schemas';
 import { TenderModel } from '@/resources/tenders/schemas';
+import { TendersService } from '@/resources/tenders/tenders.service';
 import { isDev } from '@/utils';
 
 @Injectable()
@@ -32,6 +33,11 @@ export class TedSearchService {
   });
   private readonly retryDelaysMs = [500, 1500];
   private readonly rateLimitRetryDelayMs = 30000;
+
+  constructor(
+    @Inject(forwardRef(() => TendersService))
+    private readonly tendersService: TendersService,
+  ) {}
 
   private readonly searchTendersDefaultFields = [
     'notice-identifier',
@@ -143,57 +149,18 @@ export class TedSearchService {
     }
 
     const [notices, totalCount] = await Promise.all([
-      TenderModel.find(query).sort(sort).skip(skip).limit(limit).lean().exec(),
+      this.tendersService.findMultipleLocalTendersWithBaseAnalysis(query, {
+        sort,
+        skip,
+        limit,
+      }),
       TenderModel.countDocuments(query).exec(),
     ]);
 
     return {
-      notices,
-      totalNoticeCount: totalCount,
-    };
-  }
-
-  private async searchLocalTendersByAnalysisScore({
-    tenderQuery,
-    opportunityScoreQuery,
-    sort,
-    skip,
-    limit,
-  }: {
-    tenderQuery: Record<string, unknown>;
-    opportunityScoreQuery: Record<string, unknown>;
-    sort: Record<string, 1 | -1>;
-    skip: number;
-    limit: number;
-  }): Promise<TedSearchResponse> {
-    const pipeline: PipelineStage[] = [
-      { $match: opportunityScoreQuery },
-      {
-        $lookup: {
-          from: 'tenders',
-          localField: 'tender',
-          foreignField: '_id',
-          as: 'tender',
-        },
-      },
-      { $unwind: '$tender' },
-      { $replaceRoot: { newRoot: '$tender' } },
-      { $match: tenderQuery },
-      {
-        $facet: {
-          notices: [{ $sort: sort }, { $skip: skip }, { $limit: limit }],
-          total: [{ $count: 'count' }],
-        },
-      },
-    ];
-    const [result] = await TenderGeneralAnalysisModel.aggregate<{
-      notices: TedSearchResponse['notices'];
-      total: { count: number }[];
-    }>(pipeline).exec();
-    const totalCount = result?.total[0]?.count ?? 0;
-
-    return {
-      notices: result?.notices ?? [],
+      notices: notices.map((notice) =>
+        this.tendersService.toWholeTenderListDto(notice),
+      ),
       totalNoticeCount: totalCount,
     };
   }

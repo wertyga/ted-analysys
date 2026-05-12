@@ -71,11 +71,11 @@ export const UserSchema = new Schema<UserType>(
     },
     certifications: {
       type: [String],
-      default: undefined,
+      default: [],
     },
     capabilities: {
       type: [String],
-      default: undefined,
+      default: [],
     },
     yearsOfExperience: {
       type: Number,

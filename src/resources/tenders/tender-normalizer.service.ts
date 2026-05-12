@@ -313,9 +313,7 @@ export class TenderNormalizerService {
       cpvCodes: Array.from(
         new Set([
           ...(this.pickTextArray(rawNotice, ['classification-cpv']) ?? []),
-          ...(this.pickTextArray(rawNotice, [
-            'classificationCpv',
-          ]) ?? []),
+          ...(this.pickTextArray(rawNotice, ['classificationCpv']) ?? []),
           ...(this.pickTextArray(rawNotice, [
             'main-classification-proc',
             'mainClassificationProc',

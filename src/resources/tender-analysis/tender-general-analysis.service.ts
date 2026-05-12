@@ -107,8 +107,6 @@ export class TenderGeneralAnalysisService {
       const analysis = await TenderGeneralAnalysisModel.findOneAndUpdate(
         {
           tender: tenderObjectId,
-
-          tenderId: tender.id,
         },
         {
           $set: {

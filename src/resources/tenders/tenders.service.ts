@@ -30,6 +30,7 @@ import {
   valueToString,
 } from '@/utils';
 import { tenderCpvPopulateFields } from '@/resources/tenders/utils/tender.utils';
+import { SortOrder } from 'mongoose';
 
 export interface GatherActiveTendersResult {
   completed?: boolean;
@@ -274,6 +275,41 @@ export class TendersService {
     );
 
     return localTender.populate(tenderCpvPopulateFields);
+  }
+
+  async findMultipleLocalTendersWithBaseAnalysis(
+    tenderQuery: Record<string, unknown>,
+    options: {
+      sort?: Record<string, SortOrder>;
+      skip?: number;
+      limit?: number;
+    } = {},
+  ): Promise<TenderDocumentWithGeneralAnalysis[]> {
+    const localTenders = await TenderModel.find(tenderQuery)
+      .sort(options.sort ?? {})
+      .skip(options.skip ?? 0)
+      .limit(options.limit ?? 0)
+      .populate(tenderCpvPopulateFields)
+      .exec();
+    const generalAnalyses =
+      await this.tenderGeneralAnalysisService.ensureBaseAnalysisForMultipleTenders(
+        localTenders,
+      );
+    const generalAnalysesByTenderId = new Map(
+      generalAnalyses.map((analysis) => [analysis.tenderId, analysis]),
+    );
+
+    return localTenders.map((tender) => {
+      const generalAnalysis = generalAnalysesByTenderId.get(tender.id);
+
+      tender.set(
+        'generalAnalysis',
+        TenderGeneralAnalysisModel.serializeDetail(generalAnalysis),
+        { strict: false },
+      );
+
+      return tender;
+    });
   }
 
   async findByIdOrFetchFromTed(
