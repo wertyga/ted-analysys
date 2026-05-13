@@ -38,8 +38,10 @@ export class TenderGeneralAnalysisService {
 
       const result = execution.result;
 
-      return TenderGeneralAnalysisModel.findByIdAndUpdate(
-        baseTenderAnalysis._id,
+      return TenderGeneralAnalysisModel.findOneAndUpdate(
+        {
+          tenderId: tender.id,
+        },
         {
           $set: {
             status: TenderGeneralAnalysisStatus.DONE,
@@ -106,7 +108,7 @@ export class TenderGeneralAnalysisService {
     try {
       const analysis = await TenderGeneralAnalysisModel.findOneAndUpdate(
         {
-          tender: tenderObjectId,
+          tenderId: tender.id,
         },
         {
           $set: {
@@ -121,6 +123,7 @@ export class TenderGeneralAnalysisService {
 
       return analysis;
     } catch (error: unknown) {
+      console.log({ isDuplicateKeyError: isDuplicateKeyError(error) }, error);
       if (!isDuplicateKeyError(error)) {
         throw error;
       }
