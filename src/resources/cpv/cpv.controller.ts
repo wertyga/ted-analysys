@@ -5,6 +5,7 @@ import {
   Get,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -18,6 +19,7 @@ import { CpvCategoriesResponse, CpvCategorySyncResult } from './types';
 import { CpvService } from './cpv.service';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsArray, IsString } from 'class-validator';
+import { AdminAccessGuard } from '@/guards';
 
 class CpvDescendantsRequestDto {
   @ApiProperty({ type: [String], example: ['72000000', '48000000'] })
@@ -60,6 +62,13 @@ export class CpvController {
     return this.cpvService.getIndustries();
   }
 
+  @Get('activities')
+  @ApiOperation({ summary: 'List CPV industry codes with level more then 2' })
+  @ApiOkResponse({ type: CpvCategoriesResponse })
+  async getActivities(): Promise<CpvCategoriesResponse> {
+    return this.cpvService.getActivities();
+  }
+
   @Post('descendants')
   @ApiOperation({
     summary: 'List child CPV categories for the given CPV codes',
@@ -72,7 +81,7 @@ export class CpvController {
     return this.cpvService.findDescendants(codes);
   }
 
-  // TODO: AdminGuard
+  @UseGuards(AdminAccessGuard)
   @Post('update')
   @ApiOperation({
     summary: 'Refresh CPV categories from the official TED codelist',

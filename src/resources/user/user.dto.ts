@@ -222,3 +222,11 @@ export class UserAuthDto extends UserDto {
   @ApiProperty()
   token: string;
 }
+
+export class UserMetaResponse {
+  @ApiProperty()
+  wishlistCount: number;
+
+  @ApiProperty()
+  deepAnalysisCount: number;
+}

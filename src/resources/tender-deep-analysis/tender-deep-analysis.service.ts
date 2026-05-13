@@ -27,6 +27,7 @@ import { TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION } from '@/openai/prompts/tender-
 import { TenderDeepDocumentInputService } from './tender-deep-document-input.service';
 import { CompanyTenderFilterModel } from '@/resources/company-filter/company-filter.schema';
 import { TendersService } from '@/resources/tenders/tenders.service';
+import { QueryFilter } from 'mongoose';
 
 @Injectable()
 export class TenderDeepAnalysisService {
@@ -116,7 +117,8 @@ export class TenderDeepAnalysisService {
           documentationCompletenessScore:
             normalized.scores.documentationCompletenessScore,
           requirementsClarityScore: normalized.scores.requirementsClarityScore,
-          riskScore: normalized.scores.riskLevelScore ?? normalized.scores.riskScore,
+          riskScore:
+            normalized.scores.riskLevelScore ?? normalized.scores.riskScore,
           riskLevelScore: normalized.scores.riskLevelScore,
           riskFitScore: normalized.scores.riskFitScore,
           opportunityScore: normalized.scores.opportunityScore,
@@ -184,6 +186,9 @@ export class TenderDeepAnalysisService {
     if (!company) {
       throw new Error('Company not found');
     }
+    if (!companyAnalysis) {
+      throw new Error('Company analysis not found');
+    }
 
     const generalAnalysis =
       await this.tenderGeneralAnalysisService.getFinishedGeneralAnalysis(
@@ -237,25 +242,31 @@ export class TenderDeepAnalysisService {
     companyId: string;
     page?: number;
     limit?: number;
+    tenderIds?: string[];
   }): Promise<{
     analyses: TenderDeepAnalysisRecord[];
     total: number;
   }> {
+    const query: QueryFilter<TenderDeepAnalysisDocument> = {
+      company: params.companyId,
+    };
     const page = Math.max(1, params.page ?? 1);
     const limit = Math.min(Math.max(1, params.limit ?? 20), 100);
     const skip = (page - 1) * limit;
 
+    if (params.tenderIds?.length) {
+      query.tenderId = { $in: params.tenderIds };
+    }
+
     const [analyses, total] = await Promise.all([
-      TenderDeepAnalysisModel.find({ company: params.companyId })
+      TenderDeepAnalysisModel.find(query)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .populate(deepAnalysisPopulateFields)
         .lean<TenderDeepAnalysisRecord[]>()
         .exec(),
-      TenderDeepAnalysisModel.countDocuments({
-        company: params.companyId,
-      }).exec(),
+      TenderDeepAnalysisModel.countDocuments(query).exec(),
     ]);
 
     return { analyses, total };

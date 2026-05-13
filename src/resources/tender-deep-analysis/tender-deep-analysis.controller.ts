@@ -39,10 +39,10 @@ export class TenderDeepAnalysisController {
   ) {
     const analysis =
       await this.tenderDeepAnalysisService.analyzeTenderDeepCompanyFit({
-      tenderId,
-      companyId: String(req.user._id),
-      language,
-    });
+        tenderId,
+        companyId: String(req.user._id),
+        language,
+      });
 
     return TenderDeepAnalysisModel.serializeDetail(analysis);
   }
@@ -85,16 +85,19 @@ export class UserTenderDeepAnalysisController {
   })
   @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiQuery({ name: 'limit', required: false, example: 20 })
+  @ApiQuery({ name: 'tenderIds', required: false, example: ['272075-2026'] })
   @ApiOkResponse({ description: 'Current user deep analyses' })
   async listUserDeepAnalyses(
     @Req() req,
-    @Query('page', new ParseIntPipe({ optional: true })) page = 1,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit = 20,
+    @Query('page') page = 1,
+    @Query('limit') limit = 20,
+    @Query('tenderIds') tenderIds: string[] = [],
   ) {
     const result = await this.tenderDeepAnalysisService.listByCompany({
       companyId: String(req.user._id),
       page,
       limit,
+      tenderIds,
     });
 
     return {

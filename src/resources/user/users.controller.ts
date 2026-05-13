@@ -9,7 +9,7 @@ import {
   Headers,
 } from '@nestjs/common';
 import { AuthGuard } from '@/guards';
-import { UpdateUserDto, UserAuthDto } from './user.dto';
+import { UpdateUserDto, UserAuthDto, UserMetaResponse } from './user.dto';
 import { UsersService } from './users.service';
 import { UserModel } from './user.schema';
 import { filterModel } from '@/utils';
@@ -23,6 +23,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { TenderWishlistService } from '@/resources/tender-wishlist/tender-wishlist.service';
+import { TenderDeepAnalysisModel } from '@/resources/tender-deep-analysis/schemas';
 
 @ApiTags('Users')
 @UseFilters(HttpErrorLoggingFilter)
@@ -34,14 +35,16 @@ export class UsersController {
   ) {}
 
   @ApiBearerAuth()
+  @ApiDefaultResponse({ type: UserMetaResponse })
   @UseGuards(AuthGuard)
   @Get('/meta-data')
   async getUserMetaData(@Req() req) {
-    const wishlistCount = await this.tenderWishlistService.countUserTenders(
-      req.user,
-    );
+    const [wishlistCount, deepAnalysisCount] = await Promise.all([
+      this.tenderWishlistService.countUserTenders(req.user),
+      TenderDeepAnalysisModel.countDocuments({ company: req.user._id }),
+    ]);
 
-    return { wishlistCount };
+    return { wishlistCount, deepAnalysisCount };
   }
 
   @ApiBearerAuth()

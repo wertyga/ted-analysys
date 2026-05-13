@@ -261,6 +261,18 @@ export class CpvService {
     };
   }
 
+  async getActivities() {
+    const categories = await CpvCategoryModel.find({ level: { $ne: 2 } })
+      .select(CPV_CODES_LIST_FIELDS)
+      .sort({ code: 1 })
+      .lean();
+
+    return {
+      count: categories.length,
+      items: categories.map((category) => this.toResponseItem(category)),
+    };
+  }
+
   private stripHtml(value: string): string {
     return value.replace(/<[^>]*>/g, '');
   }
