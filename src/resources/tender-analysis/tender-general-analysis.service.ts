@@ -96,10 +96,14 @@ export class TenderGeneralAnalysisService {
     const hasDoneAnalysis =
       existingBaseAnalysis &&
       existingBaseAnalysis.resultJson &&
-      existingBaseAnalysis.status === TenderGeneralAnalysisStatus.DONE;
+      existingBaseAnalysis.status === TenderGeneralAnalysisStatus.DONE &&
+      existingBaseAnalysis.promptVersion ===
+        GENERAL_TENDER_ANALYSIS_PROMPT_VERSION;
 
     const isInProces =
-      existingBaseAnalysis?.status === TenderGeneralAnalysisStatus.PROCESSING;
+      existingBaseAnalysis?.status === TenderGeneralAnalysisStatus.PROCESSING &&
+      existingBaseAnalysis.promptVersion ===
+        GENERAL_TENDER_ANALYSIS_PROMPT_VERSION;
 
     if ((hasDoneAnalysis || isInProces) && !isForceBaseAnalysis) {
       return existingBaseAnalysis;
@@ -114,6 +118,7 @@ export class TenderGeneralAnalysisService {
           $set: {
             status: TenderGeneralAnalysisStatus.PROCESSING,
             tender: tenderObjectId,
+            promptVersion: GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
           },
         },
         { returnDocument: 'after', upsert: true },

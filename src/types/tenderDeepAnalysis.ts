@@ -48,7 +48,6 @@ export interface TenderDeepAnalysisResult {
     confidenceScore: number;
     recommendation: TenderDeepRecommendation;
     recommendationRationale: string;
-    scoreBreakdown: CompanyFitScoreBreakdown;
     strengths: string[];
     weaknesses: string[];
     gaps: CompanyFitGap[];
@@ -120,6 +119,9 @@ export interface TenderDeepAnalysisResult {
     estimatedPreparationComplexity: 'low' | 'medium' | 'high' | 'very_high';
   };
   scores: TenderDeepScores;
+  documentationScores?: TenderDeepDocumentationScores;
+  requirementsClarity?: TenderDeepRequirementsClarity;
+  decisionFactors?: TenderDeepDecisionFactors;
   confidence: TenderDeepConfidence;
   finalRecommendation: {
     value: TenderDeepRecommendation;
@@ -139,11 +141,15 @@ export interface TenderIntelligenceLot {
 
 export interface TenderDeepScores {
   fitScore: number;
+  totalWeight: number;
+  weightedSum: number;
+  scoreBreakdown: CompanyFitScoreBreakdownItem[];
   fitConfidenceScore: number;
   participationReadinessScore: number;
   documentationCompletenessScore: number;
   requirementsClarityScore: number;
   riskScore: number;
+  riskFitScore?: number;
   opportunityScore: number;
   companyCapabilityScore: number;
   eligibilityFitScore: number;
@@ -156,6 +162,44 @@ export interface TenderDeepConfidence {
   tenderDataConfidence: number;
   companyProfileConfidence: number;
   scoringConfidence: number;
+}
+
+export interface TenderDeepDocumentationScores {
+  noticeCoverageScore: number;
+  procurementPackageCoverageScore: number;
+  technicalSpecCoverageScore: number;
+  bidPreparationSufficiencyScore: number;
+  goNoGoDecisionSufficiencyScore: number;
+  overallDocumentationCompletenessScore: number;
+}
+
+export interface TenderDeepRequirementsClarity {
+  noticeLevelClarityScore: number;
+  technicalSpecificationClarityScore: number;
+  selectionCriteriaClarityScore: number;
+  goNoGoDecisionClarityScore: number;
+}
+
+export interface TenderDeepDecisionFactors {
+  criticalBlockers: Array<{
+    type:
+      | 'capability'
+      | 'certification'
+      | 'geography'
+      | 'eligibility'
+      | 'deadline'
+      | 'language'
+      | 'financial'
+      | 'legal'
+      | 'other';
+    severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+    description: string;
+    source?: 'company_fit' | 'risk' | 'bid_decision' | 'backend_guardrail';
+  }>;
+  missingDocumentsImpact?: {
+    impactOnBidPreparation: 'LOW' | 'MEDIUM' | 'HIGH';
+    impactOnGoNoGoDecision: 'LOW' | 'MEDIUM' | 'HIGH';
+  };
 }
 
 export type CompanyFitScoreKey =
@@ -176,6 +220,10 @@ export type CompanyFitScoreBreakdown = Record<
   CompanyFitScoreKey,
   FitCriterionScore
 >;
+
+export type CompanyFitScoreBreakdownItem = FitCriterionScore & {
+  criterion: CompanyFitScoreKey;
+};
 
 export interface TenderRequirement {
   id: string;

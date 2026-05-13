@@ -117,6 +117,7 @@ export class TenderDeepAnalysisService {
             normalized.scores.documentationCompletenessScore,
           requirementsClarityScore: normalized.scores.requirementsClarityScore,
           riskScore: normalized.scores.riskScore,
+          riskFitScore: normalized.scores.riskFitScore,
           opportunityScore: normalized.scores.opportunityScore,
           companyCapabilityScore: normalized.scores.companyCapabilityScore,
           eligibilityFitScore: normalized.scores.eligibilityFitScore,
@@ -282,6 +283,7 @@ export class TenderDeepAnalysisService {
 
       const isNeedToUpdateOrCreateProcessing =
         !deepAnalysis ||
+        deepAnalysis.promptVersion !== TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION ||
         deepAnalysis.status === TenderDeepAnalysisStatus.FAILED;
 
       if (isNeedToUpdateOrCreateProcessing) {
@@ -299,6 +301,7 @@ export class TenderDeepAnalysisService {
                 status: TenderDeepAnalysisStatus.PROCESSING,
                 promptVersion: TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION,
               },
+              $unset: { errorMessage: '' },
             },
             { returnDocument: 'after', upsert: true },
           ).populate(deepAnalysisPopulateFields);
@@ -312,6 +315,13 @@ export class TenderDeepAnalysisService {
       return { deepAnalysis, shouldStart: false };
     } catch (error: unknown) {
       if (!isDuplicateKeyError(error)) {
+        await this.markProcessingAnalysisFailed({
+          tenderId: tender.id,
+          companyId,
+          sourceHash,
+          error,
+        });
+
         throw error;
       }
 
@@ -328,6 +338,7 @@ export class TenderDeepAnalysisService {
       }
 
       const shouldStart =
+        duplicate.promptVersion !== TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION ||
         duplicate.status === TenderDeepAnalysisStatus.FAILED ||
         duplicate.status === TenderDeepAnalysisStatus.PENDING;
 
@@ -339,6 +350,7 @@ export class TenderDeepAnalysisService {
               status: TenderDeepAnalysisStatus.PROCESSING,
               promptVersion: TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION,
             },
+            $unset: { errorMessage: '' },
           },
           { returnDocument: 'after' },
         )
@@ -351,6 +363,36 @@ export class TenderDeepAnalysisService {
       }
 
       return { deepAnalysis: duplicate, shouldStart };
+    }
+  }
+
+  private async markProcessingAnalysisFailed({
+    tenderId,
+    companyId,
+    sourceHash,
+    error,
+  }: {
+    tenderId: string;
+    companyId: string;
+    sourceHash: string;
+    error: unknown;
+  }): Promise<void> {
+    try {
+      await TenderDeepAnalysisModel.updateOne(
+        {
+          tenderId,
+          company: companyId,
+          sourceHash,
+        },
+        {
+          $set: {
+            status: TenderDeepAnalysisStatus.FAILED,
+            errorMessage: getSafeErrorMessage(error),
+          },
+        },
+      ).exec();
+    } catch {
+      // Preserve the original error from the upsert path.
     }
   }
 

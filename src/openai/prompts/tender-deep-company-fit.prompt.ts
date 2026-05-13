@@ -1,7 +1,7 @@
 import { TenderDeepCompanyFitAnalysisInput } from '@/types';
 
 export const TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION =
-  'tender-deep-company-fit-v1.0.3';
+  'tender-deep-company-fit-v1.0.8';
 
 const MAX_JSON_CHARS = 60_000;
 const MAX_SNIPPETS_JSON_CHARS = 40_000;
@@ -109,6 +109,10 @@ export function buildTenderDeepCompanyFitUserPrompt(
     '',
     'For each criterion assign score from 0 to 100, set integer weight percentage, calculate weightedScore = score * weight / 100, explain the score, provide evidence, and list missing information.',
     'fitScore must be the weighted sum of scoreBreakdown weightedScore values. Do not set fitScore to 0 only because finalRecommendation is no_go or because a critical blocker exists.',
+    'Use only scores.scoreBreakdown as the canonical score breakdown. Do not put scopeFit, capabilityFit, cpvFit, geographicFit, languageFit, eligibilityFit, certificationFit, experienceFit, financialFit, commercialFit, deadlineFit, riskFit, or scoreBreakdown inside companyFitAnalysis.',
+    'If a criterion has enough structured evidence, score it directly. Do not leave languageFit, financialFit, or deadlineFit as a backend fallback when tender/company fields provide evidence.',
+    'If English is accepted by the tender and the company supports ENG/English, languageFit should normally be high, often 90-100.',
+    'If estimated value is missing but company typicalContractSize exists, financialFit should be neutral/low-confidence, normally 30-50, not automatically 0.',
     'Return a top-level confidence object with recommendationConfidence, tenderDataConfidence, companyProfileConfidence, and scoringConfidence. These fields measure different things and must not be collapsed into one score.',
     '',
     'Recommendation rules:',
@@ -137,6 +141,14 @@ export function buildTenderDeepCompanyFitUserPrompt(
     '- If publicProcurementExperience is false, treat it as a risk/weakness, but do not automatically set experienceFit to 0.',
     '- If deadline is expired, finalRecommendation.value must be "not_actionable".',
     '- Critical blockers affect recommendation and bid/no-bid decision, but must not overwrite the weighted fitScore. A no_go recommendation may still have a non-zero fitScore when geography, language, eligibility, deadline, or commercial factors are partially positive.',
+    '- Put critical blockers in top-level decisionFactors.criticalBlockers. Keep blocker wording consistent across bidNoBidDecision, riskAnalysis, and companyFitAnalysis if those legacy fields are present.',
+    '- Keep decisionFactors.criticalBlockers deduplicated to the main 4-5 blockers, grouped by eligibility, capability, certification, geography, financial/legal only when relevant.',
+    '- If procurement documents, technical specifications, SWZ/specification package, annexes, or selection criteria are not analyzed, missingDocumentsWarning must be true, even when the no_go decision is already clear. Use decisionFactors.missingDocumentsImpact.impactOnBidPreparation and impactOnGoNoGoDecision separately.',
+    '- documentationCompletenessScore must not be 0 when TED XML/PDF notices were analyzed. Use documentationScores to distinguish notice coverage, procurement package coverage, technical spec coverage, bid preparation sufficiency, go/no-go decision sufficiency, and overall completeness.',
+    '- In documentationAnalysis, distinguish noticeDocumentsAnalyzedCount, procurementDocumentsAnalyzedCount, and procurementDocumentsAvailable. TED XML/PDF notices are notice documents; buyer ZIP/specification package is procurement documentation.',
+    '- requirementsClarityScore must reflect partial clarity: notice-level requirements may be clear even when technical specs or selection criteria are missing.',
+    '- If procedure evidence conflicts, describe it as ambiguous. Do not state "with prior call" or "without prior call" as a settled fact unless all sources agree.',
+    '- Do not include stale numeric fit scores in finalRecommendation text. If you mention threshold, use the current fitScore or avoid embedding the number.',
     '- recommendationConfidence is confidence that the final recommendation is directionally right. It may be high for a clear no_go even when tenderDataConfidence or companyProfileConfidence are lower.',
     '- tenderDataConfidence is confidence in tender requirements/data completeness. Reduce it when procurement documents such as SWZ/specification were not analyzed or document coverage is incomplete.',
     '- companyProfileConfidence is confidence in the company evidence. Reduce it when capabilities, certifications, CPV industries/services, operating countries, languages, or typical contract size are missing, weak, or contradictory.',
