@@ -436,7 +436,6 @@ function ensureResultShape(
   result.schemaVersion ||= '1.0.0';
   result.language = input.outputLanguage ?? result.language ?? 'en';
   result.tenderId = input.tender.id;
-  result.companyId = input.company.id;
   result.tenderIntelligence ||=
     {} as TenderDeepAnalysisResult['tenderIntelligence'];
   applyTenderIntelligenceSourceFields(result, input);
@@ -620,7 +619,7 @@ function applyMissingCompanyInfo(
   }
 
   if (!input.company.capabilities || input.company.capabilities.length === 0) {
-    missing.push('Company capabilities are missing.');
+    missing.push('No company capabilities are declared.');
   }
 
   if (input.company.operatingCountries.length === 0) {
@@ -702,7 +701,7 @@ function applyGuardrails(
       category: 'certification',
       severity: 'high',
       description:
-        'Required tender certifications are present, but company certifications are missing or not provided.',
+        'Required tender certifications are present, but no company certifications are declared or provided.',
       mustResolveBeforeBid: true,
     });
   }

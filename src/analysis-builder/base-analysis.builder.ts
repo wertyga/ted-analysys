@@ -11,6 +11,10 @@ import {
   TenderDocumentTextExtractorService,
   TenderSourceDocumentType,
 } from '@/resources/tenders/tender-document-text-extractor.service';
+import {
+  fetchXmlContentFromNotice,
+  findXmlUrl,
+} from '@/resources/tenders/tender-normalizer-xml';
 
 interface TenderLinkDocumentCandidate {
   sourceUrl: string;
@@ -35,17 +39,35 @@ export class BaseAnalysisBuilder {
     tender: TenderDocument,
     whatNeedToTake: ('xml' | 'pdf' | 'pdfs' | 'html' | 'htmlDirect')[],
   ): Promise<DocumentInputAnalysis[]> {
+    const xmlDocument = whatNeedToTake.includes('xml')
+      ? await this.buildXmlDocument(tender)
+      : undefined;
     const candidates = this.extractDocumentCandidatesFromLinks(
       tender.links,
       whatNeedToTake,
-    );
+    ).filter((candidate) => {
+      return candidate.documentType !== TenderSourceDocumentType.TED_XML_NOTICE;
+    });
 
-    const documents: GeneralTenderAnalysisInput['documents'] = [];
-    for (const candidate of candidates.slice(0, MAX_ANALYSIS_DOCUMENTS)) {
+    // Disabled for now
+    // await this.saveXmlContentToTenderIfNeeded(
+    //   tender,
+    //   xmlDocument?.extractedText,
+    // );
+
+    const documents: GeneralTenderAnalysisInput['documents'] = xmlDocument
+      ? [xmlDocument]
+      : [];
+
+    for (const candidate of candidates.slice(
+      0,
+      MAX_ANALYSIS_DOCUMENTS - documents.length,
+    )) {
       try {
         const downloaded = await this.downloadTenderDocument(
           candidate.sourceUrl,
         );
+
         const extraction = await this.textExtractor.extractAndPrepareText({
           sourceUrl: candidate.sourceUrl,
           mimeType: downloaded.mimeType ?? candidate.mimeType,
@@ -75,6 +97,43 @@ export class BaseAnalysisBuilder {
     return documents;
   }
 
+  private async buildXmlDocument(
+    tender: TenderDocument,
+  ): Promise<DocumentInputAnalysis | undefined> {
+    const xmlContent =
+      tender.xmlContent || (await fetchXmlContentFromNotice(tender.links));
+    const xmlSourceUrl = findXmlUrl(tender.links);
+
+    if (!xmlContent || !xmlSourceUrl) {
+      return undefined;
+    }
+
+    try {
+      const extraction = await this.textExtractor.extractAndPrepareText({
+        sourceUrl: xmlSourceUrl,
+        mimeType: 'application/xml',
+        language: undefined,
+        documentType: TenderSourceDocumentType.TED_XML_NOTICE,
+        content: Buffer.from(xmlContent, 'utf8'),
+        buyerCountry: tender.buyerCountry,
+      });
+
+      if (extraction.aiText.length === 0) {
+        return undefined;
+      }
+
+      return {
+        id: xmlSourceUrl,
+        filename: xmlSourceUrl ? undefined : 'ted-notice.xml',
+        language: extraction.detectedLanguages?.[0] ?? null,
+        documentType: TenderSourceDocumentType.TED_XML_NOTICE,
+        extractedText: extraction.aiText,
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
   extractDocumentCandidatesFromLinks(
     links: TenderDocumentsLinks | undefined,
     whatNeedToTake: ('xml' | 'pdf' | 'pdfs' | 'html' | 'htmlDirect')[],
@@ -95,6 +154,32 @@ export class BaseAnalysisBuilder {
       Object.entries(data).find(([lang]) => /eng|en/i.test(lang))?.[1] ||
       Object.values(data)[0]
     );
+  }
+
+  private async saveXmlContentToTenderIfNeeded(
+    tender: TenderDocument,
+    parsedXmlContent?: string,
+  ): Promise<void> {
+    if (tender.xmlContent) {
+      return;
+    }
+
+    const xmlContent =
+      parsedXmlContent || (await fetchXmlContentFromNotice(tender.links));
+
+    if (!xmlContent) {
+      return;
+    }
+
+    try {
+      await tender.updateOne({
+        $set: {
+          xmlContent,
+        },
+      });
+    } catch {
+      // XML cache is an optimization; analysis can continue without it.
+    }
   }
 
   async downloadTenderDocument(

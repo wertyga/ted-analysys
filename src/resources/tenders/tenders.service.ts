@@ -18,7 +18,11 @@ import {
   TenderGeneralAnalysisModel,
 } from '../tender-analysis/schemas';
 import { TenderListDto } from './dto/tender.dto';
-import { TenderDocument, TenderModel } from './schemas';
+import {
+  TenderDocument,
+  TenderModel,
+  TENDER_XML_CACHE_SELECT,
+} from './schemas';
 import { TenderNormalizerService } from './tender-normalizer.service';
 import { TedPublicationNumbersSearchRequestDto } from '@/resources/ted-search/dto/ted-publication-numbers-search-request.dto';
 import {
@@ -158,7 +162,9 @@ export class TendersService {
         },
       },
       { returnDocument: 'after', upsert: true },
-    ).exec();
+    )
+      .select(TENDER_XML_CACHE_SELECT)
+      .exec();
 
     return tenderDoc.populate(tenderCpvPopulateFields);
   }
@@ -267,6 +273,14 @@ export class TendersService {
         localTender,
         isForceBaseAnalysis,
       );
+
+    // Disabled for now
+    // if (!localTender.xmlContent) {
+    //   const xmlContent = await fetchXmlContentFromNotice(localTender.links);
+    //   localTender.xmlContent = xmlContent ?? '';
+    //
+    //   await localTender.save();
+    // }
 
     localTender.set(
       'generalAnalysis',
@@ -423,7 +437,9 @@ export class TendersService {
     }
 
     let savedTender: TenderDocument | null | undefined =
-      await TenderModel.findOne({ id: publicationNumber });
+      await TenderModel.findOne({ id: publicationNumber })
+        .select(TENDER_XML_CACHE_SELECT)
+        .exec();
 
     if (!savedTender) {
       savedTender = await this.upsertTender(notice);
@@ -453,12 +469,9 @@ export class TendersService {
     const publicationNumber = id.trim();
 
     return TenderModel.findOne({
-      $or: [
-        { id: publicationNumber },
-        { publicationNumber },
-        { sourceNoticeId: publicationNumber },
-      ],
+      id: publicationNumber,
     })
+      .select(TENDER_XML_CACHE_SELECT)
       .populate(tenderCpvPopulateFields)
       .exec();
   }

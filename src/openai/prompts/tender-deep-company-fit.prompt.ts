@@ -1,7 +1,7 @@
 import { TenderDeepCompanyFitAnalysisInput } from '@/types';
 
 export const TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION =
-  'tender-deep-company-fit-v1.0.0';
+  'tender-deep-company-fit-v1.0.1';
 
 const MAX_JSON_CHARS = 60_000;
 const MAX_SNIPPETS_JSON_CHARS = 40_000;
@@ -32,6 +32,7 @@ export function buildTenderDeepCompanyFitSystemPrompt(): string {
     '- If information is missing, reflect it in missingCompanyInformation, missingTenderInformation, assumptions, and confidenceScore.',
     '- If a tender requirement is not explicitly present, do not mark it as mandatory.',
     '- If a company capability is not explicitly present, do not mark it as met.',
+    '- Empty company capabilities or certifications mean "not declared / no evidence provided"; they do not prove the company is technically incapable.',
     '- Do not assume capabilities from companyName alone.',
     '- Use companyDescription, industries, mainServices, capabilities, certifications, languages, operatingCountries, yearsOfExperience, publicProcurementExperience, and typicalContractSize as the main evidence for company fit.',
     '- If industries or mainServices contain only ids without names/codes, treat CPV/category evidence as weak and reduce confidence.',
@@ -123,6 +124,9 @@ export function buildTenderDeepCompanyFitUserPrompt(
     '- For tenderIntelligence.lots, write each lot title/summary in the requested language and store the source lot title in originalTitle when available. Preserve lot identifiers exactly.',
     '- Clarification questions must be written in the requested language; do not leave them in the tender source language unless the requested language is the same.',
     '- Do not assume capabilities from companyName alone.',
+    '- Interpret empty capabilities/certifications carefully: write "No declared food supply capabilities" or "No declared certifications" instead of absolute claims such as "Company cannot provide quality specification".',
+    '- A missing capability signal may justify low capabilityFit and no_go when there is no adjacent industry/service evidence, but frame the gap as lack of evidence, unless the tender explicitly excludes reseller, consortium, or subcontractor delivery.',
+    '- Do not rule out reseller, consortium, or subcontractor routes unless the tender explicitly prohibits them or required evidence is impossible to obtain.',
     '- If companyDescription is missing, reduce confidence.',
     '- If industries or mainServices are only ids without names/codes, treat CPV evidence as weak.',
     '- If company languages are missing, do not assume language fit.',

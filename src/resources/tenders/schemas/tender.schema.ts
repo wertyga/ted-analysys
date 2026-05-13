@@ -124,6 +124,8 @@ export interface Tender {
   cpvCodes?: unknown[];
   /** Raw TED links object, including notice/XML/HTML/document links when returned. */
   links?: TenderDocumentsLinks;
+  /** Cached TED XML notice content, used internally to avoid repeated XML downloads. */
+  xmlContent?: string;
   /** Full raw TED notice payload as returned by TED before local normalization. */
   rawData?: unknown;
   createdAt?: Date;
@@ -133,6 +135,8 @@ export interface Tender {
 export type TenderDocument = Tender & Document;
 export type TenderRecord = Tender & { _id: unknown; rawData?: unknown };
 export type TenderSerializable = TenderDocument | TenderRecord;
+
+export const TENDER_XML_CACHE_SELECT = '+xmlContent';
 
 export interface TenderModelType extends Model<TenderDocument> {
   serializeDetail(tender: TenderSerializable): TenderDetailDto;
@@ -241,6 +245,7 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
     },
     cpvCodes: { type: [Schema.Types.Mixed], default: undefined },
     links: Schema.Types.Mixed,
+    xmlContent: { type: String, select: false },
     rawData: { type: Schema.Types.Mixed, select: false },
   },
   {
@@ -251,7 +256,7 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
 
 function serializeTender(tender: TenderSerializable): TenderDto {
   return filterModel(tender as TenderDocument, {
-    excludeFields: ['source', 'cpvCodes', 'rawData', 'links'],
+    excludeFields: ['source', 'cpvCodes', 'rawData', 'links', 'xmlContent'],
   }) as TenderDto;
 }
 

@@ -9,7 +9,11 @@ import {
   tenderCpvPopulateFields,
 } from '@/utils';
 import { UserModel } from '../user/user.schema';
-import { TenderDocument, TenderModel } from '../tenders/schemas';
+import {
+  TenderDocument,
+  TenderModel,
+  TENDER_XML_CACHE_SELECT,
+} from '../tenders/schemas';
 import { TenderGeneralAnalysisDocument } from '../tender-analysis/schemas';
 import {
   TenderDeepAnalysisDocument,
@@ -56,7 +60,9 @@ export class TenderDeepAnalysisService {
 
     try {
       const [tender, company, companyAnalysis] = await Promise.all([
-        TenderModel.findOne({ id: tenderId }).populate(tenderCpvPopulateFields),
+        TenderModel.findOne({ id: tenderId })
+          .select(TENDER_XML_CACHE_SELECT)
+          .populate(tenderCpvPopulateFields),
         UserModel.findById(companyId).populate(companyCpvPopulateFields),
         CompanyTenderFilterModel.findOne({ user: companyId }),
       ]);

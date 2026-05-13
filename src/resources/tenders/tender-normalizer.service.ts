@@ -1,6 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import * as cheerio from 'cheerio';
-import { isTag, type AnyNode, type Element } from 'domhandler';
 import {
   fillClassificationCpvByCodes,
   tenderNormilizer,
@@ -8,19 +6,31 @@ import {
 import { TedNotice } from '../ted-search/types/ted-search.types';
 import { TenderDto } from './dto/tender.dto';
 import { extractPublicationNumberFromNotice, isRecord } from '@/utils';
-
-interface TextCandidate {
-  text: string;
-  language?: string;
-}
-
-interface EstimatedValueCandidate {
-  amount: number | null;
-  currency: string | null;
-}
+import {
+  extractFirstXmlChildTextByParent,
+  extractXmlAwardCriteria,
+  extractXmlChildTextsByParent,
+  extractXmlCpvCodes,
+  extractXmlDeadlinePeriod,
+  extractXmlDescriptionCandidates,
+  extractXmlEstimatedValue,
+  extractXmlPlannedDates,
+  extractXmlQuestionsDeadline,
+  extractXmlSubmissionLanguages,
+  extractXmlSubmissionMethod,
+  extractXmlUrlsByAncestor,
+  fetchXmlContentFromUrl,
+  findXmlUrl,
+  EstimatedValueCandidate,
+  TextCandidate,
+} from './tender-normalizer-xml';
 
 type NormalizedTenderDto = Omit<TenderDto, '_id'> & {
   rawData?: unknown;
+  xmlContent?: string;
+  xmlContentHash?: string;
+  xmlSourceUrl?: string;
+  xmlContentFetchedAt?: Date;
 };
 
 @Injectable()
@@ -29,15 +39,28 @@ export class TenderNormalizerService {
     rawNotice: TedNotice,
     rawIds = false,
   ): Promise<NormalizedTenderDto> {
+    // Disabled for now
+    // const xmlContent = await this.fetchXmlContentFromNotice(rawNotice);
+    // const normalizedTender = this.applyXmlFallbacks(
+    //   this.normalizeTedNotice(rawNotice),
+    //   xmlContent,
+    // );
+    // const tenderWithXmlContent = {
+    //   ...normalizedTender,
+    //   xmlContent,
+    // };
+
+    const normalizedTender = this.normalizeTedNotice(rawNotice);
+
     const {
       classificationCpv,
       mainClassificationProc,
       mainClassificationLot,
       additionalClassificationLot,
-    } = await fillClassificationCpvByCodes(tenderNormilizer(rawNotice));
+    } = await fillClassificationCpvByCodes(tenderNormilizer(normalizedTender));
 
     return {
-      ...this.normalizeTedNotice(rawNotice),
+      ...normalizedTender,
       classificationCpv: rawIds
         ? (classificationCpv?.map((category) => category._id) ?? [])
         : classificationCpv,
@@ -335,6 +358,106 @@ export class TenderNormalizerService {
     return dto;
   }
 
+  private applyXmlFallbacks(
+    dto: NormalizedTenderDto,
+    xml?: string,
+  ): NormalizedTenderDto {
+    if (xml === undefined) {
+      return dto;
+    }
+
+    const titleProc = extractFirstXmlChildTextByParent(
+      xml,
+      'ProcurementProject',
+      'Name',
+    );
+    const titleLot = extractXmlChildTextsByParent(
+      xml,
+      'ProcurementProjectLot',
+      'Name',
+    );
+    const descriptions = extractXmlDescriptionCandidates(xml).map(
+      (candidate) => candidate.text,
+    );
+    const estimatedValue = extractXmlEstimatedValue(xml);
+    const submissionDeadline = this.parseTenderDate(
+      extractXmlDeadlinePeriod(xml, 'TenderSubmissionDeadlinePeriod'),
+    );
+    const questionsDeadline = this.parseTenderDate(
+      extractXmlQuestionsDeadline(xml),
+    );
+    const plannedStartDate = this.parseTenderDate(
+      this.pickSortedValue(extractXmlPlannedDates(xml, 'StartDate'), 'asc'),
+    );
+    const plannedEndDate = this.parseTenderDate(
+      this.pickSortedValue(extractXmlPlannedDates(xml, 'EndDate'), 'desc'),
+    );
+    const submissionLanguages = extractXmlSubmissionLanguages(xml);
+    const cpvCodes = extractXmlCpvCodes(xml);
+    const documentUrls = extractXmlUrlsByAncestor(xml, [
+      'TenderingTerms',
+      'CallForTendersDocumentReference',
+      'AdditionalDocumentReference',
+    ]);
+    const submissionUrls = extractXmlUrlsByAncestor(xml, [
+      'TenderSubmission',
+      'TenderSubmissionDeadlinePeriod',
+      'SubmissionMethodDetails',
+    ]);
+    const awardCriteria = extractXmlAwardCriteria(xml);
+
+    return {
+      ...dto,
+      title: dto.title ?? titleProc ?? titleLot[0],
+      titleProc: dto.titleProc ?? titleProc,
+      titleLot: this.mergeTextArrays(dto.titleLot, titleLot),
+      description: dto.description ?? descriptions[0],
+      descriptionLot: this.mergeTextArrays(dto.descriptionLot, descriptions),
+      estimatedValue: dto.estimatedValue ?? estimatedValue,
+      submissionDeadline: submissionDeadline ?? dto.submissionDeadline,
+      deadlineReceiptTender: submissionDeadline ?? dto.deadlineReceiptTender,
+      questionsDeadline: questionsDeadline ?? dto.questionsDeadline,
+      plannedStartDate: plannedStartDate ?? dto.plannedStartDate,
+      plannedEndDate: plannedEndDate ?? dto.plannedEndDate,
+      submissionLanguages: this.mergeTextArrays(
+        dto.submissionLanguages,
+        submissionLanguages,
+      ),
+      electronicSubmission:
+        dto.electronicSubmission ?? extractXmlSubmissionMethod(xml),
+      documentUrls: this.mergeTextArrays(dto.documentUrls, documentUrls),
+      submissionUrls: this.mergeTextArrays(dto.submissionUrls, submissionUrls),
+      awardCriteria:
+        awardCriteria.length > 0 ? awardCriteria : dto.awardCriteria,
+      cpvCodes: this.mergeTextArrays(
+        dto.cpvCodes as string[] | undefined,
+        cpvCodes,
+      ) as TenderDto['cpvCodes'],
+      classificationCpv: this.mergeTextArrays(
+        dto.classificationCpv as string[] | undefined,
+        cpvCodes,
+      ) as TenderDto['classificationCpv'],
+      mainClassificationProc: this.mergeTextArrays(
+        dto.mainClassificationProc as string[] | undefined,
+        cpvCodes,
+      ) as TenderDto['mainClassificationProc'],
+    };
+  }
+
+  private async fetchXmlContentFromNotice(
+    rawNotice: TedNotice,
+  ): Promise<string> {
+    const sourceUrl = findXmlUrl(rawNotice.links);
+
+    try {
+      const content = await fetchXmlContentFromUrl(sourceUrl);
+
+      return content ?? '';
+    } catch {
+      return '';
+    }
+  }
+
   private pickText(
     raw: Record<string, unknown>,
     paths: string[],
@@ -459,7 +582,7 @@ export class TenderNormalizerService {
 
   private normalizeTenderDateText(value: string): string | undefined {
     const match = value.match(
-      /^(\d{4}-\d{2}-\d{2})(?:Z|[+-]\d{2}:\d{2})?(?:T(\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?)(?:Z|[+-]\d{2}:\d{2})?)?/,
+      /^(\d{4}-\d{2}-\d{2})(Z|[+-]\d{2}:\d{2})?(?:T(\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?)(Z|[+-]\d{2}:\d{2})?)?/,
     );
 
     if (!match) {
@@ -467,16 +590,20 @@ export class TenderNormalizerService {
     }
 
     const date = match[1];
-    const time = this.normalizeTenderTime(match[2]);
+    const dateOffset = match[2];
+    const time = this.normalizeTenderTime(match[3], match[4] ?? dateOffset);
 
     if (time) {
       return `${date}T${time}`;
     }
 
-    return `${date}T00:00:00.000Z`;
+    return `${date}T00:00:00.000${dateOffset ?? 'Z'}`;
   }
 
-  private normalizeTenderTime(value: string | undefined): string | undefined {
+  private normalizeTenderTime(
+    value: string | undefined,
+    offset?: string,
+  ): string | undefined {
     if (value === undefined) {
       return undefined;
     }
@@ -485,7 +612,7 @@ export class TenderNormalizerService {
     const seconds = baseTime.length === 5 ? `${baseTime}:00` : baseTime;
     const milliseconds = fraction ? fraction.slice(0, 3).padEnd(3, '0') : '000';
 
-    return `${seconds}.${milliseconds}Z`;
+    return `${seconds}.${milliseconds}${offset ?? 'Z'}`;
   }
 
   private toValidDate(value: string): Date | undefined {
@@ -516,6 +643,15 @@ export class TenderNormalizerService {
     const values = this.pickTextArray(raw, paths)?.sort() ?? [];
 
     return sort === 'asc' ? values[0] : values[values.length - 1];
+  }
+
+  private pickSortedValue(
+    values: string[],
+    sort: 'asc' | 'desc',
+  ): string | undefined {
+    const sorted = this.uniqueNonEmptyText(values).sort();
+
+    return sort === 'asc' ? sorted[0] : sorted[sorted.length - 1];
   }
 
   private pickEstimatedValue(
@@ -853,79 +989,6 @@ export class TenderNormalizerService {
     return text !== 'none';
   }
 
-  private extractPlannedDate(
-    rawNotice: TedNotice,
-    localName: 'StartDate' | 'EndDate',
-    sort: 'asc' | 'desc',
-  ): string | undefined {
-    const xml = this.findXmlContent(rawNotice);
-    const values =
-      xml === undefined ? [] : this.extractXmlPlannedDates(xml, localName);
-    const periods = this.collectDeepRecordValuesByLocalName(
-      rawNotice,
-      'PlannedPeriod',
-    );
-
-    for (const period of periods) {
-      const value = this.firstDirectText(period, localName);
-
-      if (value !== undefined) {
-        values.push(value);
-      }
-    }
-
-    const sorted = this.uniqueNonEmptyText(values).sort();
-
-    return sort === 'asc' ? sorted[0] : sorted[sorted.length - 1];
-  }
-
-  private findContractingSystemCode(
-    rawNotice: TedNotice,
-    listName: string,
-  ): string | undefined {
-    const xml = this.findXmlContent(rawNotice);
-
-    if (xml !== undefined) {
-      const xmlValue = this.extractXmlContractingSystemCode(xml, listName);
-
-      if (xmlValue !== undefined) {
-        return xmlValue;
-      }
-    }
-
-    for (const value of this.collectDeepValuesByLocalName(
-      rawNotice,
-      'ContractingSystemTypeCode',
-    )) {
-      const record = isRecord(value) ? value : undefined;
-      const codeListName =
-        record === undefined ? undefined : this.getListName(record);
-
-      if (codeListName?.toLowerCase() === listName.toLowerCase()) {
-        return this.valueToText(value);
-      }
-    }
-
-    return undefined;
-  }
-
-  private findSubmissionMethod(rawNotice: TedNotice): string | undefined {
-    for (const value of this.collectDeepValuesByLocalName(
-      rawNotice,
-      'SubmissionMethodCode',
-    )) {
-      const record = isRecord(value) ? value : undefined;
-      const listName =
-        record === undefined ? undefined : this.getListName(record);
-
-      if (listName?.toLowerCase() === 'esubmission') {
-        return this.valueToText(value);
-      }
-    }
-
-    return undefined;
-  }
-
   private combineDateAndTime(
     date: string | undefined,
     time: string | undefined,
@@ -1080,10 +1143,6 @@ export class TenderNormalizerService {
     return parts[parts.length - 1];
   }
 
-  private getElementLocalName(node: AnyNode): string {
-    return isTag(node) ? this.getLocalName(node.tagName) : '';
-  }
-
   private isLanguageCodeKey(key: string): boolean {
     return /^[A-Za-z]{2,3}$/.test(key);
   }
@@ -1092,330 +1151,16 @@ export class TenderNormalizerService {
     return key.startsWith('@') || key === '$' || key === 'attributes';
   }
 
-  private findXmlContent(rawNotice: TedNotice): string | undefined {
-    for (const key of ['xmlContent', 'xml', 'content', 'noticeXml']) {
-      const value = rawNotice[key];
-
-      if (typeof value === 'string' && value.includes('<')) {
-        return value;
-      }
-    }
-
-    return undefined;
-  }
-
-  private extractXmlDescriptionCandidates(xml: string): TextCandidate[] {
-    const $ = cheerio.load(xml, { xmlMode: true });
-    const candidates: TextCandidate[] = [];
-
-    $('*').each((_, element) => {
-      if (this.getElementLocalName(element).toLowerCase() !== 'description') {
-        return;
-      }
-
-      const parent = element.parent;
-
-      if (
-        parent === null ||
-        !isTag(parent) ||
-        this.getElementLocalName(parent).toLowerCase() !== 'procurementproject'
-      ) {
-        return;
-      }
-
-      const text = $(element).text().trim();
-
-      if (text.length === 0) {
-        return;
-      }
-
-      candidates.push({
-        text,
-        language:
-          this.getXmlAttr($, element, 'languageID') ??
-          this.getXmlAttr($, element, 'xml:lang') ??
-          this.getXmlAttr($, element, 'lang'),
-      });
-    });
-
-    return candidates;
-  }
-
-  private extractXmlEstimatedValue(
-    xml: string,
-  ): EstimatedValueCandidate | undefined {
-    const $ = cheerio.load(xml, { xmlMode: true });
-    const candidates: Array<EstimatedValueCandidate & { priority: number }> =
-      [];
-
-    $('*').each((_, element) => {
-      if (
-        this.getElementLocalName(element).toLowerCase() !==
-        'estimatedoverallcontractamount'
-      ) {
-        return;
-      }
-
-      const amount = this.numberFromValue($(element).text());
-
-      if (amount === undefined) {
-        return;
-      }
-
-      candidates.push({
-        amount,
-        currency: this.getXmlAttr($, element, 'currencyID') ?? null,
-        priority: this.getEstimatedValuePriority(element),
-      });
-    });
-
-    const selected = candidates.sort((left, right) => {
-      return left.priority - right.priority;
-    })[0];
-
-    if (selected === undefined) {
-      return undefined;
-    }
-
-    return {
-      amount: selected.amount,
-      currency: selected.currency,
-    };
-  }
-
-  private extractFirstXmlText(
-    xml: string,
-    localName: string,
-  ): string | undefined {
-    const $ = cheerio.load(xml, { xmlMode: true });
-
-    return this.firstXmlElementText($, localName);
-  }
-
-  private extractXmlSubmissionLanguages(xml: string): string[] {
-    const $ = cheerio.load(xml, { xmlMode: true });
-    const values: string[] = [];
-
-    $('*').each((_, element) => {
-      if (this.getElementLocalName(element).toLowerCase() !== 'id') {
-        return;
-      }
-
-      const parent = element.parent;
-
-      if (
-        parent !== null &&
-        isTag(parent) &&
-        this.getElementLocalName(parent).toLowerCase() === 'language'
-      ) {
-        values.push($(element).text());
-      }
-    });
-
-    return this.uniqueNonEmptyText(values);
-  }
-
-  private extractXmlQuestionsDeadline(xml: string): string | undefined {
-    const $ = cheerio.load(xml, { xmlMode: true });
-    let result: string | undefined;
-
-    $('*').each((_, element) => {
-      if (
-        result !== undefined ||
-        this.getElementLocalName(element).toLowerCase() !==
-          'additionalinformationrequestperiod'
-      ) {
-        return;
-      }
-
-      if (!isTag(element)) {
-        return;
-      }
-
-      result = this.combineDateAndTime(
-        this.firstXmlChildText($, element, 'EndDate'),
-        this.firstXmlChildText($, element, 'EndTime'),
-      );
-    });
-
-    return result;
-  }
-
-  private extractXmlPlannedDates(
-    xml: string,
-    localName: 'StartDate' | 'EndDate',
-  ): string[] {
-    const $ = cheerio.load(xml, { xmlMode: true });
-    const values: string[] = [];
-
-    $('*').each((_, element) => {
-      if (this.getElementLocalName(element).toLowerCase() !== 'plannedperiod') {
-        return;
-      }
-
-      if (!isTag(element)) {
-        return;
-      }
-
-      const value = this.firstXmlChildText($, element, localName);
-
-      if (value !== undefined) {
-        values.push(value);
-      }
-    });
-
-    return values;
-  }
-
-  private extractXmlContractingSystemCode(
-    xml: string,
-    listName: string,
-  ): string | undefined {
-    const $ = cheerio.load(xml, { xmlMode: true });
-    let result: string | undefined;
-
-    $('*').each((_, element) => {
-      if (
-        result !== undefined ||
-        this.getElementLocalName(element).toLowerCase() !==
-          'contractingsystemtypecode' ||
-        this.getXmlAttr($, element, 'listName')?.toLowerCase() !==
-          listName.toLowerCase()
-      ) {
-        return;
-      }
-
-      result = $(element).text().trim();
-    });
-
-    return result;
-  }
-
-  private extractXmlSubmissionMethod(xml: string): string | undefined {
-    const $ = cheerio.load(xml, { xmlMode: true });
-    let result: string | undefined;
-
-    $('*').each((_, element) => {
-      if (
-        result !== undefined ||
-        this.getElementLocalName(element).toLowerCase() !==
-          'submissionmethodcode' ||
-        this.getXmlAttr($, element, 'listName')?.toLowerCase() !== 'esubmission'
-      ) {
-        return;
-      }
-
-      result = $(element).text().trim();
-    });
-
-    return result;
-  }
-
-  private firstXmlElementText(
-    $: cheerio.CheerioAPI,
-    localName: string,
-  ): string | undefined {
-    let result: string | undefined;
-
-    $('*').each((_, element) => {
-      if (
-        result !== undefined ||
-        this.getElementLocalName(element).toLowerCase() !==
-          localName.toLowerCase()
-      ) {
-        return;
-      }
-
-      const text = $(element).text().trim();
-
-      if (text.length > 0) {
-        result = text;
-      }
-    });
-
-    return result;
-  }
-
-  private firstXmlChildText(
-    $: cheerio.CheerioAPI,
-    element: Element,
-    localName: string,
-  ): string | undefined {
-    let result: string | undefined;
-
-    $(element)
-      .children()
-      .each((_, child) => {
-        if (
-          result !== undefined ||
-          this.getElementLocalName(child).toLowerCase() !==
-            localName.toLowerCase()
-        ) {
-          return;
-        }
-
-        const text = $(child).text().trim();
-
-        if (text.length > 0) {
-          result = text;
-        }
-      });
-
-    return result;
-  }
-
-  private getEstimatedValuePriority(element: AnyNode): number {
-    if (!isTag(element)) {
-      return 2;
-    }
-
-    const parentName =
-      element.parent === null
-        ? ''
-        : this.getElementLocalName(element.parent).toLowerCase();
-
-    if (parentName === 'requestedtendertotal') {
-      return 0;
-    }
-
-    return this.hasXmlAncestor(element, 'ProcurementProjectLot') ? 2 : 1;
-  }
-
-  private hasXmlAncestor(element: AnyNode, localName: string): boolean {
-    let current = isTag(element) ? element.parent : null;
-
-    while (current !== null) {
-      if (
-        isTag(current) &&
-        this.getElementLocalName(current).toLowerCase() ===
-          localName.toLowerCase()
-      ) {
-        return true;
-      }
-
-      current = isTag(current) ? current.parent : null;
-    }
-
-    return false;
-  }
-
-  private getXmlAttr(
-    $: cheerio.CheerioAPI,
-    element: AnyNode,
-    name: string,
-  ): string | undefined {
-    const attributes = $(element).attr();
-
-    if (attributes === undefined) {
-      return undefined;
-    }
-
-    const lowerName = name.toLowerCase();
-    const entry = Object.entries(attributes).find(([key]) => {
-      return key.toLowerCase() === lowerName;
-    });
-
-    return entry?.[1];
+  private mergeTextArrays(
+    primary?: unknown[],
+    fallback?: unknown[],
+  ): string[] | undefined {
+    const values = this.uniqueNonEmptyText([
+      ...(primary ?? []),
+      ...(fallback ?? []),
+    ]);
+
+    return values.length > 0 ? values : undefined;
   }
 
   private createFallbackId(rawNotice: TedNotice): string {

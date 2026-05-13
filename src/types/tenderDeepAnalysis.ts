@@ -17,7 +17,6 @@ export interface TenderDeepAnalysisResult {
   schemaVersion: string;
   language: string;
   tenderId: string;
-  companyId: string;
   executiveSummary: string;
   tenderIntelligence: {
     title: string;

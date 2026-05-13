@@ -113,6 +113,7 @@ export class TenderGeneralAnalysisService {
         {
           $set: {
             status: TenderGeneralAnalysisStatus.PROCESSING,
+            tender: tenderObjectId,
           },
         },
         { returnDocument: 'after', upsert: true },
@@ -123,13 +124,11 @@ export class TenderGeneralAnalysisService {
 
       return analysis;
     } catch (error: unknown) {
-      console.log({ isDuplicateKeyError: isDuplicateKeyError(error) }, error);
       if (!isDuplicateKeyError(error)) {
         throw error;
       }
 
       const duplicate = await TenderGeneralAnalysisModel.findOne({
-        tender: tenderObjectId,
         tenderId: tender.id,
       }).exec();
 
