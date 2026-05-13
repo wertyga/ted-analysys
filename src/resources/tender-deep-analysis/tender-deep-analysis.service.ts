@@ -1,5 +1,4 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common';
-import mongoose from 'mongoose';
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 import {
   companyCpvPopulateFields,
@@ -12,33 +11,19 @@ import { UserModel } from '../user/user.schema';
 import {
   TenderDocument,
   TenderModel,
-  TenderRecord,
-  TenderSerializable,
 } from '../tenders/schemas';
+import { TenderGeneralAnalysisDocument } from '../tender-analysis/schemas';
 import {
-  TenderDeepAnalysis,
   TenderDeepAnalysisDocument,
   TenderDeepAnalysisModel,
+  TenderDeepAnalysisRecord,
   TenderDeepAnalysisStatus,
 } from './schemas';
-import { TenderGeneralAnalysisDocument } from '../tender-analysis/schemas';
 import { TenderGeneralAnalysisService } from '../tender-analysis/tender-general-analysis.service';
 import { TenderDeepAnalysisBuilder } from './tender-deep-analysis.builder';
 import { TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION } from '@/openai/prompts/tender-deep-company-fit.prompt';
 import { TenderDeepDocumentInputService } from './tender-deep-document-input.service';
-import { TenderListDto } from '@/resources/tenders/dto/tender.dto';
 import { CompanyTenderFilterModel } from '@/resources/company-filter/company-filter.schema';
-
-type TenderDeepAnalysisRecord = TenderDeepAnalysis & {
-  _id?: unknown;
-  tender?: mongoose.Types.ObjectId | TenderRecord | TenderDocument;
-};
-type TenderDeepAnalysisWithTenderRecord = Omit<
-  TenderDeepAnalysisRecord,
-  'tender'
-> & {
-  tender?: TenderListDto | null;
-};
 
 @Injectable()
 export class TenderDeepAnalysisService {
@@ -206,6 +191,7 @@ export class TenderDeepAnalysisService {
       status: TenderDeepAnalysisStatus.COMPLETED,
     })
       .sort({ analyzedAt: -1, updatedAt: -1 })
+      .populate(deepAnalysisPopulateFields)
       .lean<TenderDeepAnalysisRecord>()
       .exec();
   }
@@ -215,7 +201,7 @@ export class TenderDeepAnalysisService {
     page?: number;
     limit?: number;
   }): Promise<{
-    analyses: TenderDeepAnalysisWithTenderRecord[];
+    analyses: TenderDeepAnalysisRecord[];
     total: number;
   }> {
     const page = Math.max(1, params.page ?? 1);
@@ -227,7 +213,7 @@ export class TenderDeepAnalysisService {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate({ path: 'tender', populate: tenderCpvPopulateFields })
+        .populate(deepAnalysisPopulateFields)
         .lean<TenderDeepAnalysisRecord[]>()
         .exec(),
       TenderDeepAnalysisModel.countDocuments({
@@ -235,25 +221,7 @@ export class TenderDeepAnalysisService {
       }).exec(),
     ]);
 
-    return {
-      analyses: analyses.map((analysis) => {
-        const { tender, ...rest } = analysis;
-
-        return {
-          ...rest,
-          tender: tender
-            ? TenderModel.serializeList(tender as TenderSerializable)
-            : null,
-        };
-      }),
-      total,
-    };
-  }
-
-  toDetailDto(
-    analysis?: TenderDeepAnalysisRecord | null,
-  ): TenderDeepAnalysisRecord | null {
-    return analysis ?? null;
+    return { analyses, total };
   }
 
   private async upsertProcessingAnalysisIfNeeded({

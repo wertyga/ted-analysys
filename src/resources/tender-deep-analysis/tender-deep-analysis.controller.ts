@@ -18,6 +18,7 @@ import {
 } from '@nestjs/swagger';
 import { AuthGuard } from '@/guards';
 import { TenderDeepAnalysisService } from './tender-deep-analysis.service';
+import { TenderDeepAnalysisModel } from './schemas';
 
 @ApiTags('deep-analysis')
 @UseGuards(AuthGuard)
@@ -36,11 +37,14 @@ export class TenderDeepAnalysisController {
     @Req() req,
     @Query('language') language = 'en',
   ) {
-    return this.tenderDeepAnalysisService.analyzeTenderDeepCompanyFit({
+    const analysis =
+      await this.tenderDeepAnalysisService.analyzeTenderDeepCompanyFit({
       tenderId,
       companyId: String(req.user._id),
       language,
     });
+
+    return TenderDeepAnalysisModel.serializeDetail(analysis);
   }
 
   @Get()
@@ -63,7 +67,7 @@ export class TenderDeepAnalysisController {
       );
     }
 
-    return this.tenderDeepAnalysisService.toDetailDto(analysis);
+    return TenderDeepAnalysisModel.serializeDetail(analysis);
   }
 }
 
@@ -93,6 +97,11 @@ export class UserTenderDeepAnalysisController {
       limit,
     });
 
-    return result;
+    return {
+      ...result,
+      analyses: result.analyses.map((analysis) =>
+        TenderDeepAnalysisModel.serializeList(analysis),
+      ),
+    };
   }
 }

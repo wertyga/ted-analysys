@@ -1,14 +1,24 @@
 import { TenderDeepAnalysisResult, TenderDeepRecommendation } from '@/types';
 import mongoose, { Document, Model, Schema } from 'mongoose';
-import { filterModel } from '@/utils';
+import { filterModel, isPopulatedRecord } from '@/utils';
 import {
   TenderDetailDto,
   TenderListDto,
 } from '@/resources/tenders/dto/tender.dto';
 import {
   TenderDocument,
+  TenderModel,
+  TenderRecord,
   TenderSerializable,
 } from '@/resources/tenders/schemas';
+import { UserModel } from '@/resources/user/user.schema';
+import { UserDocument } from '@/resources/user/user.types';
+import {
+  TenderGeneralAnalysisDocument,
+  TenderGeneralAnalysisModel,
+  TenderGeneralAnalysisRecord,
+  TenderGeneralAnalysisSerializable,
+} from '@/resources/tender-analysis/schemas';
 
 export enum TenderDeepAnalysisStatus {
   PENDING = 'pending',
@@ -52,9 +62,46 @@ export interface TenderDeepAnalysis {
 }
 
 export type TenderDeepAnalysisDocument = TenderDeepAnalysis & Document;
+export type TenderDeepAnalysisRecord = TenderDeepAnalysis & {
+  _id?: unknown;
+  tender?: mongoose.Types.ObjectId | TenderRecord | TenderDocument;
+  company?: mongoose.Types.ObjectId | UserDocument;
+  generalAnalysis?:
+    | mongoose.Types.ObjectId
+    | TenderGeneralAnalysisRecord
+    | TenderGeneralAnalysisDocument;
+};
+export type TenderDeepAnalysisSerializable =
+  | TenderDeepAnalysisDocument
+  | TenderDeepAnalysisRecord;
+
+export type TenderDeepAnalysisDetailDto = Omit<
+  TenderDeepAnalysisRecord,
+  'tender' | 'company' | 'generalAnalysis'
+> & {
+  tender?: TenderDetailDto | null;
+  company?: ReturnType<typeof UserModel.serializeUser> | null;
+  generalAnalysis?: ReturnType<
+    typeof TenderGeneralAnalysisModel.serializeDetail
+  >;
+};
+
+export type TenderDeepAnalysisListDto = Omit<
+  TenderDeepAnalysisRecord,
+  'tender' | 'company' | 'generalAnalysis'
+> & {
+  tender?: TenderListDto | null;
+  company?: ReturnType<typeof UserModel.serializeUser> | null;
+  generalAnalysis?: ReturnType<typeof TenderGeneralAnalysisModel.serializeList>;
+};
 
 export interface TenderDeepModelType extends Model<TenderDeepAnalysisDocument> {
-  serializeDetail(tender: TenderDeepAnalysisDocument): TenderDeepAnalysis;
+  serializeDetail(
+    analysis?: TenderDeepAnalysisSerializable | null,
+  ): TenderDeepAnalysisDetailDto | null;
+  serializeList(
+    analysis?: TenderDeepAnalysisSerializable | null,
+  ): TenderDeepAnalysisListDto | null;
 }
 
 const TenderDeepAnalysisSchema = new Schema<TenderDeepAnalysisDocument>(
@@ -137,11 +184,60 @@ TenderDeepAnalysisSchema.index(
   { unique: true },
 );
 
-function serializeDeepAnalysis(analysis: TenderDeepAnalysisDocument) {
-  return filterModel(analysis);
+function serializeDeepAnalysisDetail(
+  analysis?: TenderDeepAnalysisSerializable | null,
+): TenderDeepAnalysisDetailDto | null {
+  if (!analysis) {
+    return null;
+  }
+
+  const { tender, company, generalAnalysis, promptVersion, model, ...rest } =
+    filterModel(analysis as TenderDeepAnalysisDocument) as TenderDeepAnalysisRecord;
+
+  return {
+    ...rest,
+    tender: isPopulatedRecord(tender)
+      ? TenderModel.serializeDetail(tender as TenderSerializable)
+      : null,
+    company: isPopulatedRecord(company)
+      ? UserModel.serializeUser(company as UserDocument, 'true')
+      : null,
+    generalAnalysis: isPopulatedRecord(generalAnalysis)
+      ? TenderGeneralAnalysisModel.serializeDetail(
+          generalAnalysis as TenderGeneralAnalysisSerializable,
+        )
+      : null,
+  };
 }
 
-TenderDeepAnalysisSchema.statics.serializeDetail = serializeDeepAnalysis;
+function serializeDeepAnalysisList(
+  analysis?: TenderDeepAnalysisSerializable | null,
+): TenderDeepAnalysisListDto | null {
+  if (!analysis) {
+    return null;
+  }
+
+  const { tender, company, generalAnalysis, promptVersion, model, ...rest } =
+    filterModel(analysis as TenderDeepAnalysisDocument) as TenderDeepAnalysisRecord;
+
+  return {
+    ...rest,
+    tender: isPopulatedRecord(tender)
+      ? TenderModel.serializeList(tender as TenderSerializable)
+      : null,
+    company: isPopulatedRecord(company)
+      ? UserModel.serializeUser(company as UserDocument, 'true')
+      : null,
+    generalAnalysis: isPopulatedRecord(generalAnalysis)
+      ? TenderGeneralAnalysisModel.serializeList(
+          generalAnalysis as TenderGeneralAnalysisSerializable,
+        )
+      : null,
+  };
+}
+
+TenderDeepAnalysisSchema.statics.serializeDetail = serializeDeepAnalysisDetail;
+TenderDeepAnalysisSchema.statics.serializeList = serializeDeepAnalysisList;
 
 export const TenderDeepAnalysisModel: TenderDeepModelType =
   (mongoose.models.TenderDeepAnalysis as TenderDeepModelType | undefined) ??

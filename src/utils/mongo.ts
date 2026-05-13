@@ -107,6 +107,12 @@ export const filterModel = <T extends Record<string, any>>(
 
 export const isMongoId = (value: any) => value instanceof mongo.ObjectId;
 
+export const isPopulatedRecord = (
+  value: unknown,
+): value is Record<string, unknown> => {
+  return Boolean(value) && typeof value === 'object' && !isMongoId(value);
+};
+
 export const toObjectId = (value: unknown): Types.ObjectId | null => {
   if (value instanceof Types.ObjectId) {
     return value;
