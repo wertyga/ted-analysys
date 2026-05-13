@@ -15,6 +15,7 @@ export type BidNoBidDecision =
 
 export interface TenderDeepAnalysisResult {
   schemaVersion: string;
+  language: string;
   tenderId: string;
   companyId: string;
   executiveSummary: string;
@@ -524,6 +525,7 @@ export interface TenderCompanyFitDerivedMetadata {
 }
 
 export interface TenderDeepCompanyFitAnalysisInput {
+  outputLanguage?: string;
   tender: TenderAnalysisTenderDto;
   generalAnalysis: unknown;
   company: CompanyAnalysisDto;

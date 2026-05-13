@@ -65,9 +65,11 @@ export class UsersService {
 
   private async resolveCpvCodeIds(codes: string[], fieldName: string) {
     const uniqueCodes = Array.from(new Set(codes));
+
     const categories = await CpvCategoryModel.find({
       code: { $in: uniqueCodes },
     }).select('_id code');
+
     const categoryByCode = new Map(
       categories.map((category) => [category.code, category]),
     );

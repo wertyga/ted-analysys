@@ -186,10 +186,12 @@ export class TenderDeepAnalysisBuilder {
     companyAnalysis?: unknown;
     documentAnalyses?: unknown[];
     documentTextSnippets?: unknown[];
+    outputLanguage?: string;
   }): TenderDeepCompanyFitAnalysisInput {
     const documentAnalyses = params.documentAnalyses ?? [];
 
     return {
+      outputLanguage: params.outputLanguage ?? 'en',
       tender: this.buildTenderDto(params.tender),
       generalAnalysis: params.generalAnalysis?.resultJson ?? null,
       company: params.company,
@@ -212,6 +214,7 @@ export class TenderDeepAnalysisBuilder {
     companyAnalysis?: unknown;
     documentAnalyses?: unknown[];
     documentTextSnippets?: unknown[];
+    outputLanguage?: string;
   }): string {
     const companyAnalysis = input.companyAnalysis as
       | { sourceHash?: unknown }
@@ -221,6 +224,7 @@ export class TenderDeepAnalysisBuilder {
       .update(
         JSON.stringify({
           promptVersion: TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION,
+          outputLanguage: input.outputLanguage ?? 'en',
           tender: {
             id: input.tender.id,
             noticeVersion: input.tender.noticeVersion,
@@ -430,6 +434,7 @@ function ensureResultShape(
   input: TenderDeepCompanyFitAnalysisInput,
 ): void {
   result.schemaVersion ||= '1.0.0';
+  result.language = input.outputLanguage ?? result.language ?? 'en';
   result.tenderId = input.tender.id;
   result.companyId = input.company.id;
   result.companyFitAnalysis ||=

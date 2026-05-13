@@ -5,3 +5,4 @@ export * from './string';
 export * from './url';
 export * from './checking';
 export * from './env';
+export * from './timer';

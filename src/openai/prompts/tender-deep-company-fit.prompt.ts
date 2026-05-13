@@ -45,6 +45,8 @@ export function buildTenderDeepCompanyFitUserPrompt(
 ): string {
   return [
     'Perform a Deep Tender Company Fit Analysis.',
+    `Return the analysis in ${input.outputLanguage ?? 'en'}.`,
+    `Set the top-level "language" field to "${input.outputLanguage ?? 'en'}".`,
     '',
     'Inputs:',
     '',

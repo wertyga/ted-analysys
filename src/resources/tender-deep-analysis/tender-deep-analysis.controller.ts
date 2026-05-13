@@ -29,11 +29,17 @@ export class TenderDeepAnalysisController {
 
   @Post()
   @ApiOperation({ summary: 'Run deep company-fit tender analysis' })
+  @ApiQuery({ name: 'language', required: false, example: 'en' })
   @ApiOkResponse({ description: 'Saved deep company-fit analysis' })
-  async analyze(@Param('tenderId') tenderId: string, @Req() req) {
+  async analyze(
+    @Param('tenderId') tenderId: string,
+    @Req() req,
+    @Query('language') language = 'en',
+  ) {
     return this.tenderDeepAnalysisService.analyzeTenderDeepCompanyFit({
       tenderId,
       companyId: String(req.user._id),
+      language,
     });
   }
 

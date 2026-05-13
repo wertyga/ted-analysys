@@ -21,7 +21,6 @@ export enum TenderDeepAnalysisStatus {
 export interface TenderDeepAnalysis {
   tenderId: string;
   tender: mongoose.Types.ObjectId;
-  companyId: string;
   company: mongoose.Types.ObjectId;
   generalAnalysis?: mongoose.Types.ObjectId;
   status: TenderDeepAnalysisStatus;
@@ -66,7 +65,6 @@ const TenderDeepAnalysisSchema = new Schema<TenderDeepAnalysisDocument>(
       ref: 'Tender',
       required: true,
     },
-    companyId: { type: String, required: true },
     company: {
       type: Schema.Types.ObjectId,
       ref: 'User',
@@ -130,13 +128,12 @@ TenderDeepAnalysisSchema.add({ model: String } as Record<string, unknown>);
 
 TenderDeepAnalysisSchema.index({ tenderId: 1 });
 TenderDeepAnalysisSchema.index({ tender: 1 });
-TenderDeepAnalysisSchema.index({ companyId: 1 });
 TenderDeepAnalysisSchema.index({ company: 1 });
-TenderDeepAnalysisSchema.index({ tenderId: 1, companyId: 1 });
 TenderDeepAnalysisSchema.index({ sourceHash: 1 });
 TenderDeepAnalysisSchema.index({ status: 1 });
+TenderDeepAnalysisSchema.index({ tenderId: 1, company: 1 });
 TenderDeepAnalysisSchema.index(
-  { tenderId: 1, companyId: 1, sourceHash: 1 },
+  { tenderId: 1, company: 1, sourceHash: 1 },
   { unique: true },
 );
 

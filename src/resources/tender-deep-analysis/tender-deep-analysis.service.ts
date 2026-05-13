@@ -15,17 +15,14 @@ import {
   TenderDeepAnalysisModel,
   TenderDeepAnalysisStatus,
 } from './schemas';
-import {
-  TenderGeneralAnalysisDocument,
-  TenderGeneralAnalysisStatus,
-} from '../tender-analysis/schemas';
+import { TenderGeneralAnalysisDocument } from '../tender-analysis/schemas';
 import { TenderGeneralAnalysisService } from '../tender-analysis/tender-general-analysis.service';
 import { TenderDeepAnalysisBuilder } from './tender-deep-analysis.builder';
 import { TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION } from '@/openai/prompts/tender-deep-company-fit.prompt';
 import { TenderDeepDocumentInputService } from './tender-deep-document-input.service';
-import * as fs from 'node:fs';
 import { CPV_CODES_LIST_FIELDS } from '@/resources/cpv/cpv.service';
 import { TenderListDto } from '@/resources/tenders/dto/tender.dto';
+import { CompanyTenderFilterModel } from '@/resources/company-filter/company-filter.schema';
 
 type TenderDeepAnalysisRecord = TenderDeepAnalysis & {
   _id?: unknown;
@@ -48,82 +45,64 @@ export class TenderDeepAnalysisService {
     private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
   ) {}
 
-  async analyzeTenderDeepCompanyFit(params: {
+  async createDeepAnalysis({
+    tenderId,
+    companyId,
+    outputLanguage,
+    localDeepAnalysis,
+  }: {
     tenderId: string;
     companyId: string;
-  }): Promise<TenderDeepAnalysisDocument> {
-    const tender = await TenderModel.findOne({ id: params.tenderId }).exec();
-
-    if (!tender) {
-      throw new Error('Tender not found');
-    }
-
-    const company = await UserModel.findById(params.companyId)
-      .populate('industries', CPV_CODES_LIST_FIELDS)
-      .populate('mainServices', CPV_CODES_LIST_FIELDS)
-      .exec();
-
-    if (!company) {
-      throw new Error('Company not found');
-    }
-
-    const generalAnalysis =
-      await this.tenderGeneralAnalysisService.getFinishedGeneralAnalysis(
-        tender,
-      );
-
-    const companyDto =
-      this.deepAnalysisBuilder.buildCompanyAnalysisDto(company);
-
-    const documentsInput =
-      await this.deepDocumentInputService.buildDeepDocumentInput(tender);
-
-    const input = this.deepAnalysisBuilder.buildInput({
-      tender,
-      generalAnalysis,
-      company: companyDto,
-      companyAnalysis: null,
-      documentAnalyses: documentsInput.documentAnalyses,
-      documentTextSnippets: documentsInput.documentTextSnippets,
-    });
-
-    const sourceHash = this.deepAnalysisBuilder.buildSourceHash({
-      tender,
-      company,
-      generalAnalysis,
-      companyAnalysis: null,
-      documentAnalyses: documentsInput.documentAnalyses,
-      documentTextSnippets: documentsInput.documentTextSnippets,
-    });
-
-    const existing = await TenderDeepAnalysisModel.findOne({
-      tenderId: tender.id,
-      companyId: String(company._id),
-      sourceHash,
-      status: TenderDeepAnalysisStatus.COMPLETED,
-    }).exec();
-    //
-    if (existing) {
-      return existing;
-    }
-
-    const analysis = await this.createProcessingAnalysis({
-      tender,
-      companyId: String(company._id),
-      companyObjectId: company._id as mongoose.Types.ObjectId,
-      generalAnalysis,
-      sourceHash,
-    });
-
+    outputLanguage?: string;
+    localDeepAnalysis: TenderDeepAnalysisDocument;
+  }): Promise<void> {
     try {
+      const [tender, company, companyAnalysis] = await Promise.all([
+        TenderModel.findOne({ id: tenderId }),
+        UserModel.findById(companyId)
+          .populate('industries', CPV_CODES_LIST_FIELDS)
+          .populate('mainServices', CPV_CODES_LIST_FIELDS),
+        CompanyTenderFilterModel.findOne({ user: companyId }),
+      ]);
+
+      if (!tender) {
+        throw new Error('Tender not found');
+      }
+      if (!company) {
+        throw new Error('Company not found');
+      }
+
+      // TODO: What if general analysis will be returned with FAILED status
+      const generalAnalysis =
+        await this.tenderGeneralAnalysisService.getFinishedGeneralAnalysis(
+          tender,
+        );
+
+      const companyDto =
+        this.deepAnalysisBuilder.buildCompanyAnalysisDto(company);
+
+      const documentsInput =
+        await this.deepDocumentInputService.buildDeepDocumentInput(tender);
+
+      const input = this.deepAnalysisBuilder.buildInput({
+        tender,
+        generalAnalysis,
+        company: companyDto,
+        companyAnalysis,
+        documentAnalyses: documentsInput.documentAnalyses,
+        documentTextSnippets: documentsInput.documentTextSnippets,
+        outputLanguage,
+      });
+
       const rawResult =
         await this.deepSeekAnalysisService.analyzeTenderDeepCompanyFit(input);
+
       const normalized = this.deepAnalysisBuilder.normalizeResult(
         rawResult,
         input,
       );
 
-      await analysis.updateOne({
+      await localDeepAnalysis.updateOne({
         $set: {
           status: TenderDeepAnalysisStatus.COMPLETED,
           resultJson: normalized,
@@ -153,20 +132,65 @@ export class TenderDeepAnalysisService {
         },
         $unset: { errorMessage: '' },
       });
-
-      return (await TenderDeepAnalysisModel.findById(
-        analysis._id,
-      ).exec()) as TenderDeepAnalysisDocument;
     } catch (error: unknown) {
-      await analysis.updateOne({
+      await localDeepAnalysis.updateOne({
         $set: {
           status: TenderDeepAnalysisStatus.FAILED,
           errorMessage: getSafeErrorMessage(error),
         },
       });
-
-      throw error;
     }
+  }
+
+  async analyzeTenderDeepCompanyFit(params: {
+    tenderId: string;
+    companyId: string;
+    language?: string;
+  }): Promise<TenderDeepAnalysisDocument> {
+    const [tender, companyAnalysis, company] = await Promise.all([
+      TenderModel.findOne({ id: params.tenderId }),
+      CompanyTenderFilterModel.findOne({ user: params.companyId }),
+      UserModel.findById(params.companyId),
+    ]);
+
+    if (!tender) {
+      throw new Error('Tender not found');
+    }
+    if (!company) {
+      throw new Error('Company not found');
+    }
+
+    const generalAnalysis =
+      await this.tenderGeneralAnalysisService.getFinishedGeneralAnalysis(
+        tender,
+      );
+
+    const sourceHash = this.deepAnalysisBuilder.buildSourceHash({
+      tender,
+      company,
+      generalAnalysis,
+      companyAnalysis,
+      outputLanguage: params.language,
+    });
+
+    const { deepAnalysis: localDeepAnalysis, shouldStart } =
+      await this.upsertProcessingAnalysisIfNeeded({
+        tender,
+        companyId: params.companyId,
+        generalAnalysis: generalAnalysis,
+        sourceHash,
+      });
+
+    if (shouldStart) {
+      this.createDeepAnalysis({
+        tenderId: params.tenderId,
+        companyId: params.companyId,
+        outputLanguage: params.language,
+        localDeepAnalysis,
+      });
+    }
+
+    return localDeepAnalysis;
   }
 
   async getLatestCompletedByTenderAndCompany(params: {
@@ -175,7 +199,7 @@ export class TenderDeepAnalysisService {
   }): Promise<TenderDeepAnalysisRecord | null> {
     return TenderDeepAnalysisModel.findOne({
       tenderId: params.tenderId,
-      companyId: params.companyId,
+      company: params.companyId,
       status: TenderDeepAnalysisStatus.COMPLETED,
     })
       .sort({ analyzedAt: -1, updatedAt: -1 })
@@ -196,7 +220,7 @@ export class TenderDeepAnalysisService {
     const skip = (page - 1) * limit;
 
     const [analyses, total] = await Promise.all([
-      TenderDeepAnalysisModel.find({ companyId: params.companyId })
+      TenderDeepAnalysisModel.find({ company: params.companyId })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -204,7 +228,7 @@ export class TenderDeepAnalysisService {
         .lean<TenderDeepAnalysisRecord[]>()
         .exec(),
       TenderDeepAnalysisModel.countDocuments({
-        companyId: params.companyId,
+        company: params.companyId,
       }).exec(),
     ]);
 
@@ -229,50 +253,97 @@ export class TenderDeepAnalysisService {
     return analysis ?? null;
   }
 
-  private async createProcessingAnalysis(params: {
+  private async upsertProcessingAnalysisIfNeeded({
+    tender,
+    generalAnalysis,
+    sourceHash,
+    companyId,
+  }: {
     tender: TenderDocument;
     companyId: string;
-    companyObjectId: mongoose.Types.ObjectId;
     generalAnalysis?: TenderGeneralAnalysisDocument | null;
     sourceHash: string;
-  }): Promise<TenderDeepAnalysisDocument> {
+  }): Promise<{
+    deepAnalysis: TenderDeepAnalysisDocument;
+    shouldStart: boolean;
+  }> {
     try {
-      return await TenderDeepAnalysisModel.create({
-        tenderId: params.tender.id,
-        tender: params.tender._id,
-        companyId: params.companyId,
-        company: params.companyObjectId,
-        generalAnalysis: params.generalAnalysis?._id,
-        status: TenderDeepAnalysisStatus.PROCESSING,
-        sourceHash: params.sourceHash,
-        promptVersion: TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION,
-        analysisDepth: 'deep_company_fit',
-      });
+      const deepAnalysis = await TenderDeepAnalysisModel.findOne({
+        tenderId: tender.id,
+        company: companyId,
+        sourceHash,
+      })
+        .populate('generalAnalysis')
+        .populate('tender')
+        .populate('company');
+
+      const isNeedToUpdateOrCreateProcessing =
+        !deepAnalysis ||
+        deepAnalysis.status === TenderDeepAnalysisStatus.FAILED;
+
+      if (isNeedToUpdateOrCreateProcessing) {
+        const deepAnalysisInProcess =
+          await TenderDeepAnalysisModel.findOneAndUpdate(
+            {
+              tenderId: tender.id,
+              company: companyId,
+              sourceHash,
+            },
+            {
+              $set: {
+                tender: tender._id,
+                generalAnalysis: generalAnalysis?._id,
+                status: TenderDeepAnalysisStatus.PROCESSING,
+                promptVersion: TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION,
+              },
+            },
+            { returnDocument: 'after', upsert: true },
+          );
+
+        return {
+          deepAnalysis: deepAnalysisInProcess,
+          shouldStart: true,
+        };
+      }
+
+      return { deepAnalysis, shouldStart: false };
     } catch (error: unknown) {
       if (!isDuplicateKeyError(error)) {
         throw error;
       }
 
-      const duplicate = await TenderDeepAnalysisModel.findOneAndUpdate(
-        {
-          tenderId: params.tender.id,
-          companyId: params.companyId,
-          sourceHash: params.sourceHash,
-        },
-        {
-          $set: {
-            status: TenderDeepAnalysisStatus.PROCESSING,
-            promptVersion: TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION,
-          },
-        },
-        { returnDocument: 'after' },
-      ).exec();
+      const duplicate = await TenderDeepAnalysisModel.findOne({
+        tenderId: tender.id,
+        company: companyId,
+        sourceHash: sourceHash,
+      }).exec();
 
       if (!duplicate) {
         throw error;
       }
 
-      return duplicate;
+      const shouldStart =
+        duplicate.status === TenderDeepAnalysisStatus.FAILED ||
+        duplicate.status === TenderDeepAnalysisStatus.PENDING;
+
+      if (shouldStart) {
+        const restarted = await TenderDeepAnalysisModel.findByIdAndUpdate(
+          duplicate._id,
+          {
+            $set: {
+              status: TenderDeepAnalysisStatus.PROCESSING,
+              promptVersion: TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION,
+            },
+          },
+          { returnDocument: 'after' },
+        ).exec();
+
+        if (restarted) {
+          return { deepAnalysis: restarted, shouldStart };
+        }
+      }
+
+      return { deepAnalysis: duplicate, shouldStart };
     }
   }
 }

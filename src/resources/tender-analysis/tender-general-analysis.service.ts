@@ -15,7 +15,7 @@ import {
   GeneralTenderAnalysisInput,
 } from '@/openai/dto/openai-analysis.dto';
 import { createHash } from 'crypto';
-import { getSafeErrorMessage, isDuplicateKeyError } from '@/utils';
+import { getSafeErrorMessage, isDuplicateKeyError, sleep } from '@/utils';
 
 @Injectable()
 export class TenderGeneralAnalysisService {
@@ -149,6 +149,8 @@ export class TenderGeneralAnalysisService {
       if (analysis.status === TenderGeneralAnalysisStatus.FAILED) {
         break;
       }
+
+      await sleep(1000);
     }
 
     return analysis;

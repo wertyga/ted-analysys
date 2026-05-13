@@ -33,7 +33,7 @@ export function valueToString(value: any): string | undefined {
 }
 
 export function isTedPublicationNumber(value: string): boolean {
-  return /^\d{5,8}-\d{4}$/.test(value);
+  return /^\d{4,8}-\d{4}$/.test(value);
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

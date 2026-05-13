@@ -3,6 +3,7 @@ export const TENDER_DEEP_COMPANY_FIT_JSON_SCHEMA = {
   additionalProperties: true,
   required: [
     'schemaVersion',
+    'language',
     'tenderId',
     'companyId',
     'executiveSummary',
@@ -22,6 +23,7 @@ export const TENDER_DEEP_COMPANY_FIT_JSON_SCHEMA = {
   ],
   properties: {
     schemaVersion: { type: 'string' },
+    language: { type: 'string' },
     tenderId: { type: 'string' },
     companyId: { type: 'string' },
     executiveSummary: { type: 'string' },
