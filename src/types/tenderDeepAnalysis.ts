@@ -20,11 +20,14 @@ export interface TenderDeepAnalysisResult {
   companyId: string;
   executiveSummary: string;
   tenderIntelligence: {
+    title: string;
+    originalTitle?: string;
     procurementObjective: string;
     buyerIntent: string;
     contractScopeSummary: string;
     expectedSupplierRole: string;
     lotsSummary: string;
+    lots?: TenderIntelligenceLot[];
     contractNature?: string;
     procedureType?: string;
     estimatedValue: {
@@ -124,6 +127,13 @@ export interface TenderDeepAnalysisResult {
     conditions: string[];
   };
   evidenceMap: EvidenceMapItem[];
+}
+
+export interface TenderIntelligenceLot {
+  id?: string;
+  title: string;
+  originalTitle?: string;
+  summary?: string;
 }
 
 export interface TenderDeepScores {

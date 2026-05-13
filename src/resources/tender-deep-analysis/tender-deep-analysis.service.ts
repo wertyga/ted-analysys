@@ -5,13 +5,11 @@ import {
   deepAnalysisPopulateFields,
   getSafeErrorMessage,
   isDuplicateKeyError,
+  logger,
   tenderCpvPopulateFields,
 } from '@/utils';
 import { UserModel } from '../user/user.schema';
-import {
-  TenderDocument,
-  TenderModel,
-} from '../tenders/schemas';
+import { TenderDocument, TenderModel } from '../tenders/schemas';
 import { TenderGeneralAnalysisDocument } from '../tender-analysis/schemas';
 import {
   TenderDeepAnalysisDocument,
@@ -24,6 +22,7 @@ import { TenderDeepAnalysisBuilder } from './tender-deep-analysis.builder';
 import { TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION } from '@/openai/prompts/tender-deep-company-fit.prompt';
 import { TenderDeepDocumentInputService } from './tender-deep-document-input.service';
 import { CompanyTenderFilterModel } from '@/resources/company-filter/company-filter.schema';
+import { TendersService } from '@/resources/tenders/tenders.service';
 
 @Injectable()
 export class TenderDeepAnalysisService {
@@ -31,6 +30,7 @@ export class TenderDeepAnalysisService {
     private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
     private readonly deepAnalysisBuilder: TenderDeepAnalysisBuilder,
     private readonly deepDocumentInputService: TenderDeepDocumentInputService,
+    private readonly tendersService: TendersService,
     @Inject(forwardRef(() => TenderGeneralAnalysisService))
     private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
   ) {}
@@ -46,6 +46,14 @@ export class TenderDeepAnalysisService {
     outputLanguage?: string;
     localDeepAnalysis: TenderDeepAnalysisDocument;
   }): Promise<void> {
+    await this.logDeepAnalysisEvent('TENDER_DEEP_ANALYSIS_STARTED', {
+      companyId,
+      tenderId,
+      outputLanguage: outputLanguage ?? 'en',
+      deepAnalysisId: String(localDeepAnalysis._id),
+      purpose: 'Create deep company-fit tender analysis',
+    });
+
     try {
       const [tender, company, companyAnalysis] = await Promise.all([
         TenderModel.findOne({ id: tenderId }).populate(tenderCpvPopulateFields),
@@ -120,12 +128,33 @@ export class TenderDeepAnalysisService {
         },
         $unset: { errorMessage: '' },
       });
+
+      await this.logDeepAnalysisEvent('TENDER_DEEP_ANALYSIS_COMPLETED', {
+        companyId,
+        tenderId,
+        outputLanguage: outputLanguage ?? 'en',
+        deepAnalysisId: String(localDeepAnalysis._id),
+        fitScore: normalized.scores.fitScore,
+        recommendation: normalized.finalRecommendation.value,
+        purpose: 'Complete deep company-fit tender analysis',
+      });
     } catch (error: unknown) {
+      const errorMessage = getSafeErrorMessage(error);
+
       await localDeepAnalysis.updateOne({
         $set: {
           status: TenderDeepAnalysisStatus.FAILED,
-          errorMessage: getSafeErrorMessage(error),
+          errorMessage,
         },
+      });
+
+      await this.logDeepAnalysisEvent('TENDER_DEEP_ANALYSIS_FAILED', {
+        companyId,
+        tenderId,
+        outputLanguage: outputLanguage ?? 'en',
+        deepAnalysisId: String(localDeepAnalysis._id),
+        errorMessage,
+        purpose: 'Create deep company-fit tender analysis',
       });
     }
   }
@@ -136,7 +165,7 @@ export class TenderDeepAnalysisService {
     language?: string;
   }): Promise<TenderDeepAnalysisDocument> {
     const [tender, companyAnalysis, company] = await Promise.all([
-      TenderModel.findOne({ id: params.tenderId }),
+      this.tendersService.findByTedIdOrCreateIfNeeded(params.tenderId),
       CompanyTenderFilterModel.findOne({ user: params.companyId }),
       UserModel.findById(params.companyId),
     ]);
@@ -316,6 +345,17 @@ export class TenderDeepAnalysisService {
       }
 
       return { deepAnalysis: duplicate, shouldStart };
+    }
+  }
+
+  private async logDeepAnalysisEvent(
+    message: string,
+    data: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      await logger.info(message, data);
+    } catch {
+      // Logging must not affect analysis processing.
     }
   }
 }

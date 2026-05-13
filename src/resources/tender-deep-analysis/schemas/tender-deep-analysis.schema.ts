@@ -191,8 +191,17 @@ function serializeDeepAnalysisDetail(
     return null;
   }
 
-  const { tender, company, generalAnalysis, promptVersion, model, ...rest } =
-    filterModel(analysis as TenderDeepAnalysisDocument) as TenderDeepAnalysisRecord;
+  const {
+    tender,
+    company,
+    generalAnalysis,
+    promptVersion,
+    model,
+    sourceHash,
+    ...rest
+  } = filterModel(
+    analysis as TenderDeepAnalysisDocument,
+  ) as TenderDeepAnalysisRecord;
 
   return {
     ...rest,
@@ -218,7 +227,9 @@ function serializeDeepAnalysisList(
   }
 
   const { tender, company, generalAnalysis, promptVersion, model, ...rest } =
-    filterModel(analysis as TenderDeepAnalysisDocument) as TenderDeepAnalysisRecord;
+    filterModel(
+      analysis as TenderDeepAnalysisDocument,
+    ) as TenderDeepAnalysisRecord;
 
   return {
     ...rest,

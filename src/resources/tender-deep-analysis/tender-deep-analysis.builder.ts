@@ -437,6 +437,9 @@ function ensureResultShape(
   result.language = input.outputLanguage ?? result.language ?? 'en';
   result.tenderId = input.tender.id;
   result.companyId = input.company.id;
+  result.tenderIntelligence ||=
+    {} as TenderDeepAnalysisResult['tenderIntelligence'];
+  applyTenderIntelligenceSourceFields(result, input);
   result.companyFitAnalysis ||=
     {} as TenderDeepAnalysisResult['companyFitAnalysis'];
   result.companyFitAnalysis.scoreBreakdown ||= {} as CompanyFitScoreBreakdown;
@@ -466,6 +469,48 @@ function ensureResultShape(
       missingInformation: [],
     };
   }
+}
+
+function applyTenderIntelligenceSourceFields(
+  result: TenderDeepAnalysisResult,
+  input: TenderDeepCompanyFitAnalysisInput,
+): void {
+  const originalTitle = input.tender.title ?? input.tender.titleProc;
+
+  result.tenderIntelligence.originalTitle ||= originalTitle;
+  result.tenderIntelligence.title ||= originalTitle ?? '';
+  result.tenderIntelligence.lotsSummary ||= '';
+
+  const sourceLotTitles = input.tender.titleLot ?? [];
+  const sourceLotIds = input.tender.lotIdentifiers ?? [];
+  const existingLots = Array.isArray(result.tenderIntelligence.lots)
+    ? result.tenderIntelligence.lots
+    : [];
+  const lotCount = Math.max(
+    existingLots.length,
+    sourceLotTitles.length,
+    sourceLotIds.length,
+  );
+
+  if (lotCount === 0) {
+    result.tenderIntelligence.lots = [];
+    return;
+  }
+
+  result.tenderIntelligence.lots = Array.from({ length: lotCount }).map(
+    (_, index) => {
+      const existing = existingLots[index];
+      const sourceTitle = sourceLotTitles[index];
+      const sourceId = sourceLotIds[index];
+
+      return {
+        id: existing?.id ?? sourceId,
+        title: existing?.title ?? sourceTitle ?? sourceId ?? '',
+        originalTitle: existing?.originalTitle ?? sourceTitle,
+        summary: existing?.summary,
+      };
+    },
+  );
 }
 
 function migrateLegacyScoreBreakdown(result: TenderDeepAnalysisResult): void {

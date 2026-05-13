@@ -312,6 +312,16 @@ export class TendersService {
     });
   }
 
+  async findByTedIdOrCreateIfNeeded(id: string) {
+    const localTender = await this.findLocalTender(id);
+
+    if (localTender) {
+      return localTender;
+    }
+
+    return this.findByIdOrFetchFromTed(id);
+  }
+
   async findByIdOrFetchFromTed(
     id: string,
   ): Promise<TenderDocumentWithGeneralAnalysis> {
@@ -415,17 +425,18 @@ export class TendersService {
     let savedTender: TenderDocument | null | undefined =
       await TenderModel.findOne({ id: publicationNumber });
 
-    const shouldUpsertTender =
-      !savedTender ||
-      areTedNoticeVersionsDifferent(savedTender.noticeVersion, notice);
-
-    if (shouldUpsertTender) {
+    if (!savedTender) {
       savedTender = await this.upsertTender(notice);
     }
 
     if (!savedTender) {
       throw new NotFoundException(`Tender ${publicationNumber} not found`);
     }
+
+    const shouldUpsertTender = areTedNoticeVersionsDifferent(
+      savedTender.noticeVersion,
+      notice,
+    );
 
     return this.getLocalTenderWithBaseAnalysis(savedTender, shouldUpsertTender);
   }
