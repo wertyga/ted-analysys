@@ -1,7 +1,13 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import mongoose from 'mongoose';
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
-import { getSafeErrorMessage, isDuplicateKeyError } from '@/utils';
+import {
+  companyCpvPopulateFields,
+  deepAnalysisPopulateFields,
+  getSafeErrorMessage,
+  isDuplicateKeyError,
+  tenderCpvPopulateFields,
+} from '@/utils';
 import { UserModel } from '../user/user.schema';
 import {
   TenderDocument,
@@ -20,7 +26,6 @@ import { TenderGeneralAnalysisService } from '../tender-analysis/tender-general-
 import { TenderDeepAnalysisBuilder } from './tender-deep-analysis.builder';
 import { TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION } from '@/openai/prompts/tender-deep-company-fit.prompt';
 import { TenderDeepDocumentInputService } from './tender-deep-document-input.service';
-import { CPV_CODES_LIST_FIELDS } from '@/resources/cpv/cpv.service';
 import { TenderListDto } from '@/resources/tenders/dto/tender.dto';
 import { CompanyTenderFilterModel } from '@/resources/company-filter/company-filter.schema';
 
@@ -58,10 +63,8 @@ export class TenderDeepAnalysisService {
   }): Promise<void> {
     try {
       const [tender, company, companyAnalysis] = await Promise.all([
-        TenderModel.findOne({ id: tenderId }),
-        UserModel.findById(companyId)
-          .populate('industries', CPV_CODES_LIST_FIELDS)
-          .populate('mainServices', CPV_CODES_LIST_FIELDS),
+        TenderModel.findOne({ id: tenderId }).populate(tenderCpvPopulateFields),
+        UserModel.findById(companyId).populate(companyCpvPopulateFields),
         CompanyTenderFilterModel.findOne({ user: companyId }),
       ]);
 
@@ -224,7 +227,7 @@ export class TenderDeepAnalysisService {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('tender')
+        .populate({ path: 'tender', populate: tenderCpvPopulateFields })
         .lean<TenderDeepAnalysisRecord[]>()
         .exec(),
       TenderDeepAnalysisModel.countDocuments({
@@ -272,10 +275,7 @@ export class TenderDeepAnalysisService {
         tenderId: tender.id,
         company: companyId,
         sourceHash,
-      })
-        .populate('generalAnalysis')
-        .populate('tender')
-        .populate('company');
+      }).populate(deepAnalysisPopulateFields);
 
       const isNeedToUpdateOrCreateProcessing =
         !deepAnalysis ||
@@ -298,7 +298,7 @@ export class TenderDeepAnalysisService {
               },
             },
             { returnDocument: 'after', upsert: true },
-          );
+          ).populate(deepAnalysisPopulateFields);
 
         return {
           deepAnalysis: deepAnalysisInProcess,
@@ -316,7 +316,9 @@ export class TenderDeepAnalysisService {
         tenderId: tender.id,
         company: companyId,
         sourceHash: sourceHash,
-      }).exec();
+      })
+        .populate(deepAnalysisPopulateFields)
+        .exec();
 
       if (!duplicate) {
         throw error;
@@ -336,7 +338,9 @@ export class TenderDeepAnalysisService {
             },
           },
           { returnDocument: 'after' },
-        ).exec();
+        )
+          .populate(deepAnalysisPopulateFields)
+          .exec();
 
         if (restarted) {
           return { deepAnalysis: restarted, shouldStart };

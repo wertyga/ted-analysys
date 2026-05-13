@@ -1,16 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { GetUsersRequestDto, UpdateUserDto } from './user.dto';
 import { TUser, USER_TYPE, UserDocument } from './user.types';
-import { getLimitAndSortCursor } from '@/utils';
+import { companyCpvPopulateFields, getLimitAndSortCursor } from '@/utils';
 import { UserModel } from './user.schema';
 import { CpvCategoryModel } from '@/resources/cpv/schemas';
-import { CPV_CODES_LIST_FIELDS } from '@/resources/cpv/cpv.service';
 import { CompanyFilterService } from '@/resources/company-filter/company-filter.service';
-
-const userCpvPopulateFields = [
-  { path: 'industries', select: CPV_CODES_LIST_FIELDS },
-  { path: 'mainServices', select: CPV_CODES_LIST_FIELDS },
-];
 
 @Injectable()
 export class UsersService {
@@ -52,7 +46,7 @@ export class UsersService {
     await user.save();
     // await this.companyFilterService.handleCompanyUpdated(user);
 
-    return user.populate(userCpvPopulateFields);
+    return user.populate(companyCpvPopulateFields);
   }
 
   async getUser(userId: string) {
@@ -60,7 +54,7 @@ export class UsersService {
       // @ts-ignore
       _id: userId,
       status: { $ne: USER_TYPE.TEMPORARY },
-    }).populate(userCpvPopulateFields);
+    }).populate(companyCpvPopulateFields);
   }
 
   private async resolveCpvCodeIds(codes: string[], fieldName: string) {

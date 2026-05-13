@@ -1,10 +1,14 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
-import { CurrencySign, Language } from '@/resources/codelist';
-import { CPV_CODES_LIST_FIELDS } from '@/resources/cpv/cpv.service';
+import { CurrencySign } from '@/resources/codelist';
 import { TedContractNature } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
 import { UserDocument } from '@/resources/user/user.types';
 import {
+  companyCpvPopulateFields,
   getBoolean,
   getEnumArray,
   getEnumOrNull,
@@ -190,7 +194,9 @@ export class CompanyFilterService {
           },
         },
         { returnDocument: 'after' },
-      ).orFail().exec();
+      )
+        .orFail()
+        .exec();
     } catch (error: unknown) {
       await this.markGenerationFailed(populatedUser, error);
       throw error;
@@ -270,10 +276,7 @@ export class CompanyFilterService {
 
   private async getPopulatedUser(user: UserDocument): Promise<UserDocument> {
     return UserModel.findById(user._id)
-      .populate([
-        { path: 'industries', select: CPV_CODES_LIST_FIELDS },
-        { path: 'mainServices', select: CPV_CODES_LIST_FIELDS },
-      ])
+      .populate(companyCpvPopulateFields)
       .orFail()
       .exec();
   }
