@@ -35,6 +35,7 @@ export interface CompanyTenderFilterCpvCode {
 export interface CompanyTenderFilter {
   user: mongoose.Types.ObjectId;
   summary?: string;
+  sourceHash: string;
   cpvCodes: CompanyTenderFilterCpvCode[];
   targetCountries: string[];
   excludedCountries: string[];
@@ -115,6 +116,10 @@ export const CompanyTenderFilterSchema =
         unique: true,
       },
       summary: {
+        type: String,
+        default: '',
+      },
+      sourceHash: {
         type: String,
         default: '',
       },

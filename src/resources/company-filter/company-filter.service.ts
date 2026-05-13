@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 import { CurrencySign } from '@/resources/codelist';
 import { TedContractNature } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
@@ -148,114 +149,149 @@ export class CompanyFilterService {
 
   async generateAnalysisForCompany(
     user: UserDocument,
+    isForceUpdate?: boolean,
   ): Promise<CompanyTenderFilterDocument> {
     const populatedUser = await this.getPopulatedUser(user);
-    await this.acquireGenerationLock(populatedUser);
-    const payload = this.buildCompanyProfilePayload(populatedUser);
+    const { shouldBeUpdated, companyAnalysis } =
+      await this.upsertCompanyAnalysisAsyncIfNeeded(
+        populatedUser,
+        isForceUpdate,
+      );
 
-    try {
-      const result = await this.analyzeCompanyProfile(payload);
+    if (shouldBeUpdated || isForceUpdate) {
+      const payload = this.buildCompanyProfilePayload(populatedUser);
 
-      return CompanyTenderFilterModel.findOneAndUpdate(
-        { user: populatedUser._id },
-        {
-          $set: {
-            user: populatedUser._id,
-            summary: result.summary,
-            cpvCodes: result.additionalCpvSuggestions.map((suggestion) => ({
-              code: suggestion.code,
-              label: suggestion.label,
-              source: CompanyTenderFilterCpvSource.AI_SUGGESTION,
-              matchLevel: CompanyTenderFilterCpvMatchLevel.MEDIUM,
-              confidence: suggestion.confidence,
-              reason: suggestion.reason,
-            })),
-            targetCountries: result.targetCountries,
-            excludedCountries: [],
-            languages: result.languages,
-            contractNatures: result.contractNatures,
-            minBudget: result.minBudget,
-            maxBudget: result.maxBudget,
-            currency: result.currency,
-            allowUnknownBudget: result.allowUnknownBudget,
-            minDaysBeforeDeadline: result.minDaysBeforeDeadline,
-            requiredKeywords: result.requiredKeywords,
-            optionalKeywords: result.optionalKeywords,
-            excludedKeywords: result.excludedKeywords,
-            certifications: result.certifications,
-            capabilities: result.capabilities,
-            publicProcurementExperience: result.publicProcurementExperience,
-            notificationThreshold: result.notificationThreshold,
-            confirmedByUser: false,
-            generationStatus: CompanyTenderFilterGenerationStatus.COMPLETED,
-            generationFinishedAt: new Date(),
-            generationError: null,
-            extractionWarnings: result.extractionWarnings,
-          },
-        },
-        { returnDocument: 'after' },
-      )
-        .orFail()
-        .exec();
-    } catch (error: unknown) {
-      await this.markGenerationFailed(populatedUser, error);
-      throw error;
+      try {
+        this.analyzeCompanyProfile(payload).then((result) => {
+          return CompanyTenderFilterModel.findByIdAndUpdate(
+            companyAnalysis._id,
+            {
+              $set: {
+                summary: result.summary,
+                cpvCodes: result.additionalCpvSuggestions.map((suggestion) => ({
+                  code: suggestion.code,
+                  label: suggestion.label,
+                  source: CompanyTenderFilterCpvSource.AI_SUGGESTION,
+                  matchLevel: CompanyTenderFilterCpvMatchLevel.MEDIUM,
+                  confidence: suggestion.confidence,
+                  reason: suggestion.reason,
+                })),
+                targetCountries: result.targetCountries,
+                excludedCountries: [],
+                languages: result.languages,
+                contractNatures: result.contractNatures,
+                minBudget: result.minBudget,
+                maxBudget: result.maxBudget,
+                currency: result.currency,
+                allowUnknownBudget: result.allowUnknownBudget,
+                minDaysBeforeDeadline: result.minDaysBeforeDeadline,
+                requiredKeywords: result.requiredKeywords,
+                optionalKeywords: result.optionalKeywords,
+                excludedKeywords: result.excludedKeywords,
+                certifications: result.certifications,
+                capabilities: result.capabilities,
+                publicProcurementExperience: result.publicProcurementExperience,
+                notificationThreshold: result.notificationThreshold,
+                confirmedByUser: false,
+                generationStatus: CompanyTenderFilterGenerationStatus.COMPLETED,
+                generationFinishedAt: new Date(),
+                generationError: null,
+                extractionWarnings: result.extractionWarnings,
+              },
+            },
+            { returnDocument: 'after' },
+          )
+            .orFail()
+            .exec();
+        });
+      } catch (error: unknown) {
+        await this.markGenerationFailed(populatedUser, error);
+      }
     }
+
+    return companyAnalysis;
   }
 
-  private async acquireGenerationLock(
+  async upsertCompanyAnalysisAsyncIfNeeded(
     user: UserDocument,
-  ): Promise<CompanyTenderFilterDocument> {
-    const lockedFilter = await CompanyTenderFilterModel.findOneAndUpdate(
+    isForceUpdate?: boolean,
+  ): Promise<{
+    companyAnalysis: CompanyTenderFilterDocument;
+    shouldBeUpdated: boolean;
+  }> {
+    const existing = await CompanyTenderFilterModel.findOne({ user: user._id });
+    const currentHash = this.calculateHash(user);
+
+    if (
+      existing &&
+      existing.sourceHash === currentHash &&
+      existing.generationStatus ===
+        CompanyTenderFilterGenerationStatus.COMPLETED &&
+      !isForceUpdate
+    ) {
+      return { companyAnalysis: existing, shouldBeUpdated: false };
+    }
+
+    if (
+      existing &&
+      existing.sourceHash === currentHash &&
+      existing.generationStatus ===
+        CompanyTenderFilterGenerationStatus.IN_PROGRESS &&
+      !isForceUpdate
+    ) {
+      return { companyAnalysis: existing, shouldBeUpdated: false };
+    }
+
+    const analysis = await CompanyTenderFilterModel.findOneAndUpdate(
       {
         user: user._id,
-        generationStatus: {
-          $ne: CompanyTenderFilterGenerationStatus.IN_PROGRESS,
-        },
       },
       {
         $set: {
+          confirmedByUser: false,
           generationStatus: CompanyTenderFilterGenerationStatus.IN_PROGRESS,
           generationStartedAt: new Date(),
           generationFinishedAt: null,
           generationError: null,
+          sourceHash: currentHash,
+        },
+        $setOnInsert: {
+          user: user._id,
         },
       },
-      { returnDocument: 'after' },
-    ).exec();
+      { returnDocument: 'after', upsert: true },
+    );
 
-    if (lockedFilter) {
-      return lockedFilter;
-    }
+    return { companyAnalysis: analysis, shouldBeUpdated: true };
+  }
 
-    const existingFilter = await CompanyTenderFilterModel.findOne({
-      user: user._id,
-    }).exec();
-
-    if (existingFilter) {
-      throw new ConflictException(
-        'Company tender filter generation is already in progress',
-      );
-    }
-
-    try {
-      return await CompanyTenderFilterModel.create({
-        user: user._id,
-        confirmedByUser: false,
-        generationStatus: CompanyTenderFilterGenerationStatus.IN_PROGRESS,
-        generationStartedAt: new Date(),
-        generationFinishedAt: null,
-        generationError: null,
-      });
-    } catch (error: unknown) {
-      if (isDuplicateKeyError(error)) {
-        throw new ConflictException(
-          'Company tender filter generation is already in progress',
-        );
-      }
-
-      throw error;
-    }
+  calculateHash(user: UserDocument): string {
+    return createHash('sha256')
+      .update(
+        JSON.stringify({
+          companyName: user.companyName,
+          country: user.country,
+          operatingCountries: user.operatingCountries ?? [],
+          companySize: user.companySize,
+          companyDescription: user.companyDescription,
+          industries: normalizeCpvForHash(user.industries),
+          mainServices: normalizeCpvForHash(user.mainServices),
+          languages: user.languages ?? [],
+          certifications: user.certifications ?? [],
+          capabilities: user.capabilities ?? [],
+          yearsOfExperience: user.yearsOfExperience,
+          publicProcurementExperience: user.publicProcurementExperience,
+          typicalContractSize: user.typicalContractSize
+            ? {
+                min: user.typicalContractSize.min,
+                max: user.typicalContractSize.max,
+                currency: user.typicalContractSize.currency,
+              }
+            : undefined,
+          minDaysBeforeDeadline: user.minDaysBeforeDeadline,
+        }),
+      )
+      .digest('hex');
   }
 
   private async markGenerationFailed(
@@ -447,4 +483,16 @@ export class CompanyFilterService {
 
     return Math.min(100, Math.max(0, value));
   }
+}
+
+function normalizeCpvForHash(values: unknown): unknown[] {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  return values.map((item: any) => {
+    return {
+      code: item.code,
+    };
+  });
 }
