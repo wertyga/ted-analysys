@@ -149,6 +149,7 @@ export interface TenderDeepScores {
   documentationCompletenessScore: number;
   requirementsClarityScore: number;
   riskScore: number;
+  riskLevelScore?: number;
   riskFitScore?: number;
   opportunityScore: number;
   companyCapabilityScore: number;

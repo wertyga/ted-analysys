@@ -116,7 +116,8 @@ export class TenderDeepAnalysisService {
           documentationCompletenessScore:
             normalized.scores.documentationCompletenessScore,
           requirementsClarityScore: normalized.scores.requirementsClarityScore,
-          riskScore: normalized.scores.riskScore,
+          riskScore: normalized.scores.riskLevelScore ?? normalized.scores.riskScore,
+          riskLevelScore: normalized.scores.riskLevelScore,
           riskFitScore: normalized.scores.riskFitScore,
           opportunityScore: normalized.scores.opportunityScore,
           companyCapabilityScore: normalized.scores.companyCapabilityScore,
