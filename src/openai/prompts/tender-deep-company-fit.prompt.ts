@@ -1,7 +1,7 @@
 import { TenderDeepCompanyFitAnalysisInput } from '@/types';
 
 export const TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION =
-  'tender-deep-company-fit-v1.0.1';
+  'tender-deep-company-fit-v1.0.3';
 
 const MAX_JSON_CHARS = 60_000;
 const MAX_SNIPPETS_JSON_CHARS = 40_000;
@@ -29,7 +29,7 @@ export function buildTenderDeepCompanyFitSystemPrompt(): string {
     '- Do not invent company capabilities, certifications, references, languages, countries, or financial capacity.',
     '- Do not invent tender requirements.',
     '- Clearly distinguish explicit facts from assumptions.',
-    '- If information is missing, reflect it in missingCompanyInformation, missingTenderInformation, assumptions, and confidenceScore.',
+    '- If information is missing, reflect it in missingCompanyInformation, missingTenderInformation, assumptions, and the relevant confidence fields.',
     '- If a tender requirement is not explicitly present, do not mark it as mandatory.',
     '- If a company capability is not explicitly present, do not mark it as met.',
     '- Empty company capabilities or certifications mean "not declared / no evidence provided"; they do not prove the company is technically incapable.',
@@ -108,6 +108,8 @@ export function buildTenderDeepCompanyFitUserPrompt(
     '- riskFit: 2',
     '',
     'For each criterion assign score from 0 to 100, set integer weight percentage, calculate weightedScore = score * weight / 100, explain the score, provide evidence, and list missing information.',
+    'fitScore must be the weighted sum of scoreBreakdown weightedScore values. Do not set fitScore to 0 only because finalRecommendation is no_go or because a critical blocker exists.',
+    'Return a top-level confidence object with recommendationConfidence, tenderDataConfidence, companyProfileConfidence, and scoringConfidence. These fields measure different things and must not be collapsed into one score.',
     '',
     'Recommendation rules:',
     '- strong_go: fitScore >= 80 and no critical blockers',
@@ -134,6 +136,11 @@ export function buildTenderDeepCompanyFitUserPrompt(
     '- If company typicalContractSize is missing, do not assume financial fit.',
     '- If publicProcurementExperience is false, treat it as a risk/weakness, but do not automatically set experienceFit to 0.',
     '- If deadline is expired, finalRecommendation.value must be "not_actionable".',
+    '- Critical blockers affect recommendation and bid/no-bid decision, but must not overwrite the weighted fitScore. A no_go recommendation may still have a non-zero fitScore when geography, language, eligibility, deadline, or commercial factors are partially positive.',
+    '- recommendationConfidence is confidence that the final recommendation is directionally right. It may be high for a clear no_go even when tenderDataConfidence or companyProfileConfidence are lower.',
+    '- tenderDataConfidence is confidence in tender requirements/data completeness. Reduce it when procurement documents such as SWZ/specification were not analyzed or document coverage is incomplete.',
+    '- companyProfileConfidence is confidence in the company evidence. Reduce it when capabilities, certifications, CPV industries/services, operating countries, languages, or typical contract size are missing, weak, or contradictory.',
+    '- scoringConfidence is confidence in the numeric scoring. It should reflect tenderDataConfidence, companyProfileConfidence, and evidence quality.',
     '- Evidence must reference one of: structured_ted, tender_document, general_analysis, company_profile, derived, missing.',
     '- Scores must be integers from 0 to 100.',
     '- Return JSON only matching TenderDeepAnalysisResult.',

@@ -306,18 +306,12 @@ export class TenderDeepAnalysisBuilder {
     applyGuardrails(result, input);
     applyScoreBreakdown(result);
 
-    result.scores.fitScore = result.companyFitAnalysis.fitScore;
-    result.scores.fitConfidenceScore = clampRound(
-      result.companyFitAnalysis.confidenceScore,
-    );
-    result.companyFitAnalysis.confidenceScore =
-      result.scores.fitConfidenceScore;
-
     const recommendation = calculateFinalRecommendation(result, input);
     result.finalRecommendation.value = recommendation;
     result.companyFitAnalysis.recommendation = recommendation;
     result.bidNoBidDecision.decision =
       mapRecommendationToBidDecision(recommendation);
+    applyConfidence(result, input);
 
     result.scores.participationReadinessScore = clampRound(
       result.scores.participationReadinessScore,
@@ -455,6 +449,9 @@ function ensureResultShape(
   result.documentationAnalysis ||=
     {} as TenderDeepAnalysisResult['documentationAnalysis'];
   result.scores ||= {} as TenderDeepAnalysisResult['scores'];
+  result.confidence ||= {} as TenderDeepAnalysisResult['confidence'];
+  result.finalRecommendation ||=
+    {} as TenderDeepAnalysisResult['finalRecommendation'];
   migrateLegacyScoreBreakdown(result);
   applyDocumentCounts(result, input);
 
@@ -581,11 +578,16 @@ function normalizeStringList(value: unknown): string[] {
 }
 
 function applyScoreBreakdown(result: TenderDeepAnalysisResult): void {
+  const fallbackFitScore = getFallbackFitScore(result);
   let fitScore = 0;
 
   for (const key of SCORE_KEYS) {
     const item = result.companyFitAnalysis.scoreBreakdown[key];
-    item.score = clampRound(item.score);
+    item.score = clampRound(
+      typeof item.score === 'number'
+        ? item.score
+        : deriveScoreFromWeightedScore(item.weightedScore, key),
+    );
     item.weight = COMPANY_FIT_WEIGHTS[key];
     item.weightedScore = roundScore((item.score * item.weight) / 100);
     item.evidence = Array.isArray(item.evidence) ? item.evidence : [];
@@ -595,8 +597,184 @@ function applyScoreBreakdown(result: TenderDeepAnalysisResult): void {
     fitScore += item.weightedScore;
   }
 
-  result.companyFitAnalysis.fitScore = clampRound(fitScore);
+  const weightedFitScore = clampScore(roundScore(fitScore));
+  result.companyFitAnalysis.fitScore =
+    weightedFitScore > 0 ? weightedFitScore : fallbackFitScore;
   result.scores.fitScore = result.companyFitAnalysis.fitScore;
+}
+
+function getFallbackFitScore(result: TenderDeepAnalysisResult): number {
+  const candidates = [
+    result.companyFitAnalysis.fitScore,
+    result.scores.fitScore,
+    (result.companyFitAnalysis as unknown as { scoreTotal?: unknown })
+      .scoreTotal,
+    (result.scores as unknown as { scoreTotal?: unknown }).scoreTotal,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'number' && candidate > 0) {
+      return clampScore(candidate);
+    }
+  }
+
+  return 0;
+}
+
+function deriveScoreFromWeightedScore(
+  weightedScore: unknown,
+  key: CompanyFitScoreKey,
+): number | undefined {
+  if (typeof weightedScore !== 'number' || weightedScore <= 0) {
+    return undefined;
+  }
+
+  return (weightedScore * 100) / COMPANY_FIT_WEIGHTS[key];
+}
+
+function applyConfidence(
+  result: TenderDeepAnalysisResult,
+  input: TenderDeepCompanyFitAnalysisInput,
+): void {
+  const existing = result.confidence;
+  const recommendationConfidence = getRecommendationConfidence(result, input);
+  const tenderDataConfidence =
+    existing.tenderDataConfidence > 0
+      ? clampRound(existing.tenderDataConfidence)
+      : calculateTenderDataConfidence(input);
+  const companyProfileConfidence =
+    existing.companyProfileConfidence > 0
+      ? clampRound(existing.companyProfileConfidence)
+      : calculateCompanyProfileConfidence(result, input);
+  const scoringConfidence =
+    existing.scoringConfidence > 0
+      ? clampRound(existing.scoringConfidence)
+      : calculateScoringConfidence(
+          recommendationConfidence,
+          tenderDataConfidence,
+          companyProfileConfidence,
+          result,
+        );
+
+  result.confidence = {
+    recommendationConfidence,
+    tenderDataConfidence,
+    companyProfileConfidence,
+    scoringConfidence,
+  };
+  result.finalRecommendation.confidenceScore = recommendationConfidence;
+  result.scores.fitConfidenceScore = scoringConfidence;
+  result.companyFitAnalysis.confidenceScore = scoringConfidence;
+}
+
+function getRecommendationConfidence(
+  result: TenderDeepAnalysisResult,
+  input: TenderDeepCompanyFitAnalysisInput,
+): number {
+  const explicitConfidence =
+    result.finalRecommendation.confidenceScore ??
+    (result.finalRecommendation as unknown as { confidence?: unknown })
+      .confidence ??
+    result.confidence.recommendationConfidence;
+
+  if (typeof explicitConfidence === 'number' && explicitConfidence > 0) {
+    return clampRound(explicitConfidence);
+  }
+
+  const blockers = result.companyFitAnalysis.criticalBlockers ?? [];
+  const hasUnresolvedBlocker = blockers.some(
+    (blocker) => blocker.canBeResolved === false,
+  );
+
+  if (input.derived.isDeadlineExpired || hasUnresolvedBlocker) {
+    return 95;
+  }
+
+  if (result.finalRecommendation.value === 'no_go') {
+    return result.scores.fitScore < 30 ? 90 : 85;
+  }
+
+  return clampRound(result.companyFitAnalysis.confidenceScore || 80);
+}
+
+function calculateTenderDataConfidence(
+  input: TenderDeepCompanyFitAnalysisInput,
+): number {
+  const totalDocuments = input.derived.documentUrlsCount;
+  const analyzedDocuments = input.derived.documentsAnalyzedCount;
+
+  if (totalDocuments > 0 && analyzedDocuments === 0) {
+    return 60;
+  }
+
+  if (totalDocuments > analyzedDocuments) {
+    return 70;
+  }
+
+  if (analyzedDocuments > 0) {
+    return 85;
+  }
+
+  return 70;
+}
+
+function calculateCompanyProfileConfidence(
+  result: TenderDeepAnalysisResult,
+  input: TenderDeepCompanyFitAnalysisInput,
+): number {
+  let confidence = 85;
+
+  if (!input.company.companyDescription) confidence -= 10;
+  if (!input.company.capabilities || input.company.capabilities.length === 0) {
+    confidence -= 10;
+  }
+  if (
+    input.company.industries.length === 0 &&
+    input.company.mainServices.length === 0
+  ) {
+    confidence -= 20;
+  } else if (hasOnlyWeakCpvRefs(input.company)) {
+    confidence -= 15;
+  }
+  if (input.company.operatingCountries.length === 0) confidence -= 5;
+  if (input.company.languages.length === 0) confidence -= 5;
+  if (!hasTypicalContractSize(input.company)) confidence -= 5;
+  if (input.derived.preliminarySignals.cpvOverlap === false) confidence -= 10;
+
+  confidence -= Math.min(
+    10,
+    result.companyFitAnalysis.missingCompanyInformation.length * 2,
+  );
+
+  return clampRound(confidence);
+}
+
+function calculateScoringConfidence(
+  recommendationConfidence: number,
+  tenderDataConfidence: number,
+  companyProfileConfidence: number,
+  result: TenderDeepAnalysisResult,
+): number {
+  const evidencePenalty =
+    result.companyFitAnalysis.missingTenderInformation.length > 0 ? 5 : 0;
+
+  return clampRound(
+    recommendationConfidence * 0.25 +
+      tenderDataConfidence * 0.35 +
+      companyProfileConfidence * 0.35 +
+      clampRound(result.documentationAnalysis.documentationCompletenessScore) *
+        0.05 -
+      evidencePenalty,
+  );
+}
+
+function hasOnlyWeakCpvRefs(company: CompanyAnalysisDto): boolean {
+  const refs = [...company.industries, ...company.mainServices];
+
+  return (
+    refs.length > 0 &&
+    refs.every((ref) => !ref.code && !ref.name && !ref.description)
+  );
 }
 
 function applyMissingCompanyInfo(
@@ -992,7 +1170,19 @@ function addUnique(values: string[], value: string): void {
 function clampRound(value: unknown): number {
   return Math.max(
     0,
-    Math.min(100, Math.round(typeof value === 'number' ? value : 0)),
+    Math.min(
+      100,
+      Math.round(
+        typeof value === 'number' && Number.isFinite(value) ? value : 0,
+      ),
+    ),
+  );
+}
+
+function clampScore(value: unknown): number {
+  return Math.max(
+    0,
+    Math.min(100, typeof value === 'number' && Number.isFinite(value) ? value : 0),
   );
 }
 

@@ -120,10 +120,12 @@ export interface TenderDeepAnalysisResult {
     estimatedPreparationComplexity: 'low' | 'medium' | 'high' | 'very_high';
   };
   scores: TenderDeepScores;
+  confidence: TenderDeepConfidence;
   finalRecommendation: {
     value: TenderDeepRecommendation;
     rationale: string;
     conditions: string[];
+    confidenceScore?: number;
   };
   evidenceMap: EvidenceMapItem[];
 }
@@ -147,6 +149,13 @@ export interface TenderDeepScores {
   eligibilityFitScore: number;
   commercialFitScore: number;
   deadlineFitScore: number;
+}
+
+export interface TenderDeepConfidence {
+  recommendationConfidence: number;
+  tenderDataConfidence: number;
+  companyProfileConfidence: number;
+  scoringConfidence: number;
 }
 
 export type CompanyFitScoreKey =
