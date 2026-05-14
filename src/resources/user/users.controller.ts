@@ -62,6 +62,10 @@ export class UsersController {
   @ApiDefaultResponse({ type: UserAuthDto })
   @Get('/self')
   async getSelfUser(@Req() req, @Headers() headers: Record<string, string>) {
+    if (!req.user) {
+      return null;
+    }
+
     const user = await this.usersService.getUser(req.user._id.toString());
 
     return {
