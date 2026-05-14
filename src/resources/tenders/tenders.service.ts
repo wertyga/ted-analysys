@@ -23,6 +23,7 @@ import {
   TenderDocument,
   TenderModel,
   TENDER_XML_CACHE_SELECT,
+  TenderWithWishlist,
 } from './schemas';
 import { TenderNormalizerService } from './tender-normalizer.service';
 import { TedPublicationNumbersSearchRequestDto } from '@/resources/ted-search/dto/ted-publication-numbers-search-request.dto';
@@ -36,6 +37,10 @@ import {
 } from '@/utils';
 import { tenderCpvPopulateFields } from '@/resources/tenders/utils/tender.utils';
 import { SortOrder } from 'mongoose';
+import {
+  TenderDeepAnalysisDocument,
+  TenderDeepAnalysisModel,
+} from '@/resources/tender-deep-analysis/schemas';
 
 export interface GatherActiveTendersResult {
   completed?: boolean;
@@ -495,6 +500,31 @@ export class TendersService {
         tenderList.generalAnalysis as TenderGeneralAnalysis,
       ),
     };
+  }
+
+  async fillUpTenderByDeepAnalysisStatus(
+    tenders: (TenderListDto | TenderWithWishlist)[],
+    userId: string,
+  ) {
+    const deepAnalysisMap: Map<string, TenderDeepAnalysisDocument> =
+      await TenderDeepAnalysisModel.find({
+        company: userId,
+      })
+        .select('status tenderId')
+        .then((analysis) => {
+          const map = new Map();
+
+          analysis.forEach((analyse) => {
+            map.set(analyse.tenderId, analyse);
+          });
+
+          return map;
+        });
+
+    tenders.forEach((tender) => {
+      (tender as any).deepAnalysisStatus =
+        deepAnalysisMap.get(tender.id)?.status ?? null;
+    });
   }
 
   private buildTenderSourceHash(tender: Record<string, unknown>): string {

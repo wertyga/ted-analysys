@@ -7,15 +7,25 @@ import { buildTedTenderSearchQuery } from './ted-builders';
 import { TedSearchFilters } from './ted.search.filters';
 import { TedSearchSorting } from './ted.search.sorting';
 import {
+  TedNotice,
   TedPaginationMode,
   TedScope,
   TedSearchResponse,
 } from './types/ted-search.types';
 import { mapTedError } from './utils';
 import { TenderGeneralAnalysisModel } from '@/resources/tender-analysis/schemas';
-import { TenderModel } from '@/resources/tenders/schemas';
+import {
+  TenderDocument,
+  TenderModel,
+  TenderWithWishlist,
+} from '@/resources/tenders/schemas';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { isDev } from '@/utils';
+import { TenderListDto } from '@/resources/tenders/dto/tender.dto';
+import {
+  TenderDeepAnalysisDocument,
+  TenderDeepAnalysisModel,
+} from '@/resources/tender-deep-analysis/schemas';
 
 @Injectable()
 export class TedSearchService {

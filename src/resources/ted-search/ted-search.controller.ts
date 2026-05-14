@@ -57,6 +57,13 @@ export class TedSearchController {
         )
       : listTenders;
 
+    if (req.user) {
+      await this.tendersService.fillUpTenderByDeepAnalysisStatus(
+        tendersWithWishLists,
+        req.user._id.toString(),
+      );
+    }
+
     return {
       ...noticeData,
       notices: tendersWithWishLists,

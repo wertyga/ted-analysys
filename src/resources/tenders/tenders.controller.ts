@@ -1,4 +1,11 @@
-import { Controller, forwardRef, Get, Inject, Param, Req } from '@nestjs/common';
+import {
+  Controller,
+  forwardRef,
+  Get,
+  Inject,
+  Param,
+  Req,
+} from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { TenderDetailDto, TenderDto } from './dto/tender.dto';
 import { TendersService } from './tenders.service';
