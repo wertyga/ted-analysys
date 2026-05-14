@@ -17,6 +17,7 @@ import { UsersModule } from './resources/user/users.module';
 import { CodelistModule } from './resources/codelist/codelist.module';
 import { CompanyFilterModule } from './resources/company-filter/company-filter.module';
 import { TenderMatchingModule } from './resources/tender-matching/tender-matching.module';
+import { CompanyProfileDocumentsModule } from './resources/company-profile-documents/company-profile-documents.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { TenderMatchingModule } from './resources/tender-matching/tender-matchin
     CodelistModule,
     CompanyFilterModule,
     TenderMatchingModule,
+    CompanyProfileDocumentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

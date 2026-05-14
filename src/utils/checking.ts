@@ -117,6 +117,69 @@ export function getStringArray(
     : fallback;
 }
 
+export function getOptionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+export function getNormalizedStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      value
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+export function getCpvCodeArray(value: unknown): string[] {
+  return getNormalizedStringArray(value).filter((code) =>
+    /^\d{8}$/.test(code),
+  );
+}
+
+export function getOptionalPositiveNumber(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return undefined;
+  }
+
+  return Math.round(value);
+}
+
+export function getOptionalNonNegativeNumber(
+  value: unknown,
+): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    return undefined;
+  }
+
+  return Math.round(value);
+}
+
+export function setIfPresent(
+  target: Record<string, unknown>,
+  key: string,
+  value: unknown,
+): void {
+  if (value !== undefined && value !== null && value !== '') {
+    target[key] = value;
+  }
+}
+
+export function setArrayIfPresent(
+  target: Record<string, unknown>,
+  key: string,
+  value: unknown[] | undefined,
+): void {
+  if (value && value.length > 0) {
+    target[key] = value;
+  }
+}
+
 export function getBoolean(
   record: Record<string, unknown>,
   key: string,

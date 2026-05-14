@@ -112,6 +112,20 @@ export class CpvService {
       .filter((item): item is CpvCategoryResponseItem => item !== undefined);
   }
 
+  async resolveCodeIds(codes: string[]): Promise<string[]> {
+    const normalizedCodes = this.normalizeCodes(codes);
+
+    if (normalizedCodes.length === 0) {
+      return [];
+    }
+
+    const items = await CpvCategoryModel.find({
+      code: { $in: normalizedCodes },
+    }).select('_id code');
+
+    return items.map((code) => code._id.toString());
+  }
+
   async findDescendantCodes(codes: string[]): Promise<string[]> {
     const normalizedCodes = this.normalizeCodes(codes);
 

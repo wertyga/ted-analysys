@@ -185,10 +185,14 @@ export class TenderGeneralAnalysisService {
   async ensureBaseAnalysisForMultipleTenders(
     tenders: TenderDocument[],
   ): Promise<TenderGeneralAnalysisDocument[]> {
-    return Promise.all(
+    const results = await Promise.allSettled(
       tenders.map(async (tender) => {
         return this.ensureAnalysisForTender(tender);
       }),
+    );
+
+    return results.flatMap((result) =>
+      result.status === 'fulfilled' ? [result.value] : [],
     );
   }
 

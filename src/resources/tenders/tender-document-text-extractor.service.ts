@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import * as cheerio from 'cheerio';
 import { createHash } from 'crypto';
 import { isTag, type AnyNode, type Element } from 'domhandler';
+import * as mammoth from 'mammoth';
 import { PDFParse } from 'pdf-parse';
 import { Language } from '@/resources/codelist';
 
@@ -41,7 +42,7 @@ interface PrepareTextForAiOptions {
   maxCharsPerDocument?: number;
 }
 
-type SupportedDocumentKind = 'pdf' | 'xml' | 'html' | 'text';
+type SupportedDocumentKind = 'pdf' | 'docx' | 'xml' | 'html' | 'text';
 
 interface XmlReadableTenderTextOptions {
   preferredLanguages: string[];
@@ -197,6 +198,18 @@ export class TenderDocumentTextExtractorService {
         input.language,
       ]);
       isMultilingual = this.resolveIsMultilingual(input, detectedLanguages);
+    } else if (documentKind === 'docx') {
+      const docxResult = await this.extractDocxText(input.content);
+
+      rawText = docxResult.text;
+      warnings.push(...docxResult.warnings);
+      if (!rawText.trim()) {
+        warnings.push('No text extracted from DOCX.');
+      }
+      detectedLanguages = this.mergeLanguages(detectedLanguages, [
+        input.language,
+      ]);
+      isMultilingual = this.resolveIsMultilingual(input, detectedLanguages);
     } else if (documentKind === 'xml') {
       const xml = this.contentToString(input.content);
       const xmlResult = this.xmlToReadableTenderText(xml, {
@@ -262,6 +275,15 @@ export class TenderDocumentTextExtractorService {
     }
 
     if (
+      mimeType ===
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      filename.endsWith('.docx') ||
+      sourceUrl.endsWith('.docx')
+    ) {
+      return 'docx';
+    }
+
+    if (
       mimeType === 'application/xml' ||
       mimeType === 'text/xml' ||
       filename.endsWith('.xml') ||
@@ -308,6 +330,21 @@ export class TenderDocumentTextExtractorService {
     } finally {
       await parser.destroy();
     }
+  }
+
+  private async extractDocxText(
+    content: Buffer | string,
+  ): Promise<{ text: string; warnings: string[] }> {
+    if (!Buffer.isBuffer(content)) {
+      throw new Error('DOCX extraction requires Buffer content.');
+    }
+
+    const result = await mammoth.extractRawText({ buffer: content });
+
+    return {
+      text: result.value ?? '',
+      warnings: result.messages.map((message) => message.message),
+    };
   }
 
   private htmlToReadableText(html: string): string {

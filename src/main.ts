@@ -3,7 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import mongooseConnect from './mongoose/mongoose';
-import { isDev } from './utils';
+import { HttpErrorLoggingFilter } from '@/http-logger/HTTPLogger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -23,6 +23,7 @@ async function bootstrap() {
       whitelist: true,
     }),
   );
+  app.useGlobalFilters(new HttpErrorLoggingFilter());
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('TED Tender Search API')

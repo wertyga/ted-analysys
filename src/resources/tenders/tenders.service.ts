@@ -2,6 +2,7 @@ import {
   forwardRef,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { createHash } from 'crypto';
@@ -72,6 +73,8 @@ export type TenderDocumentWithGeneralAnalysis = TenderDocument & {
 
 @Injectable()
 export class TendersService {
+  private readonly logger = new Logger(TendersService.name);
+
   tenderDefaultFields = [
     'notice-identifier',
     'publication-number',
@@ -471,11 +474,25 @@ export class TendersService {
   }
 
   async upsertIfNeededMultipleTendersWithGeneralAnalysis(notices: TedNotice[]) {
-    return Promise.all(
+    const results = await Promise.allSettled(
       notices.map((notice) =>
         this.upsertIfNeededTenderWithGeneralAnalysis(notice),
       ),
     );
+
+    return results.flatMap((result, index) => {
+      if (result.status === 'fulfilled') {
+        return [result.value];
+      }
+
+      this.logger.warn(
+        `Skipping TED notice after local upsert failed: index=${index} error=${
+          result.reason instanceof Error ? result.reason.message : 'unknown error'
+        }`,
+      );
+
+      return [];
+    });
   }
 
   async findLocalTender(id: string): Promise<TenderDocument | null> {
