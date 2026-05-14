@@ -221,95 +221,6 @@ export class TenderDeepAnalysisBuilder {
     };
   }
 
-  buildSourceHash(input: {
-    tender: Tender;
-    company: UserDocument;
-    generalAnalysis?: TenderGeneralAnalysis | null;
-    companyAnalysis?: unknown;
-    documentAnalyses?: unknown[];
-    documentTextSnippets?: unknown[];
-    outputLanguage?: string;
-  }): string {
-    const companyAnalysis = input.companyAnalysis as
-      | { sourceHash?: unknown }
-      | undefined;
-
-    return createHash('sha256')
-      .update(
-        JSON.stringify({
-          promptVersion: TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION,
-          outputLanguage: input.outputLanguage ?? 'en',
-          tender: {
-            id: input.tender.id,
-            noticeVersion: input.tender.noticeVersion,
-            title: input.tender.title,
-            titleProc: input.tender.titleProc,
-            titleLot: input.tender.titleLot,
-            description: input.tender.description,
-            descriptionLot: input.tender.descriptionLot,
-            estimatedValue: input.tender.estimatedValue,
-            noticeLanguage: input.tender.noticeLanguage,
-            submissionLanguages: input.tender.submissionLanguages,
-            buyerName: input.tender.buyerName,
-            buyerCountry: input.tender.buyerCountry,
-            publicationDate: input.tender.publicationDate,
-            submissionDeadline: input.tender.submissionDeadline,
-            questionsDeadline: input.tender.questionsDeadline,
-            plannedStartDate: input.tender.plannedStartDate,
-            plannedEndDate: input.tender.plannedEndDate,
-            contractNature: input.tender.contractNature,
-            procedureType: input.tender.procedureType,
-            isDps: input.tender.isDps,
-            isFrameworkAgreement: input.tender.isFrameworkAgreement,
-            isSmeSuitable: input.tender.isSmeSuitable,
-            electronicSubmission: input.tender.electronicSubmission,
-            cpvCodes: input.tender.cpvCodes,
-            placeOfPerformanceCountries:
-              input.tender.placeOfPerformanceCountries,
-            placeOfPerformanceCities: input.tender.placeOfPerformanceCities,
-            lotIdentifiers: input.tender.lotIdentifiers,
-            documentUrls: input.tender.documentUrls,
-            submissionUrls: input.tender.submissionUrls,
-            selectionCriteria: input.tender.selectionCriteria,
-            awardCriteria: input.tender.awardCriteria,
-          },
-          company: {
-            id: String((input.company as any)._id),
-            companyName: input.company.companyName,
-            country: input.company.country,
-            operatingCountries: input.company.operatingCountries,
-            companySize: input.company.companySize,
-            companyDescription: input.company.companyDescription,
-            industries: normalizeForHash(input.company.industries),
-            mainServices: normalizeForHash(input.company.mainServices),
-            languages: input.company.languages,
-            certifications: input.company.certifications,
-            capabilities: input.company.capabilities,
-            yearsOfExperience: input.company.yearsOfExperience,
-            publicProcurementExperience:
-              input.company.publicProcurementExperience,
-            typicalContractSize: input.company.typicalContractSize,
-          },
-          generalAnalysisSourceHash: input.generalAnalysis?.sourceHash,
-          companyAnalysisSourceHash: companyAnalysis?.sourceHash,
-          documentAnalyses: input.documentAnalyses?.map((doc: any) => ({
-            id: doc?._id,
-            sourceUrl: doc?.sourceUrl,
-            sourceHash: doc?.sourceHash,
-            textHash: doc?.textHash,
-            updatedAt: doc?.updatedAt,
-          })),
-          documentTextSnippets: input.documentTextSnippets?.map((doc: any) => ({
-            sourceUrl: doc?.sourceUrl,
-            textHash: doc?.textHash,
-            filename: doc?.filename,
-            documentType: doc?.documentType,
-          })),
-        }),
-      )
-      .digest('hex');
-  }
-
   normalizeResult(
     result: TenderDeepAnalysisResult,
     input: TenderDeepCompanyFitAnalysisInput,
@@ -399,25 +310,6 @@ export function normalizeCpvRefs(values: unknown): CpvAnalysisRef[] {
 
     return { id: String(item) };
   });
-}
-
-export function normalizeForHash(values: unknown): unknown {
-  if (Array.isArray(values)) {
-    return values.map(normalizeForHash);
-  }
-
-  if (!values || typeof values !== 'object') {
-    return values;
-  }
-
-  const item = values as any;
-
-  return {
-    id: item._id || item.id ? String(item._id || item.id) : undefined,
-    code: item.code || item.cpvCode || item.value || undefined,
-    name: item.name || item.title || item.label || undefined,
-    description: item.description || undefined,
-  };
 }
 
 export function calculateFinalRecommendation(
@@ -566,7 +458,8 @@ function migrateLegacyScoreBreakdown(result: TenderDeepAnalysisResult): void {
     const scoresBreakdownItem = scoreBreakdownItems.find((item) => {
       return isRecord(item) && item.criterion === key;
     });
-    const legacyScore = directCompanyScore ?? scoresBreakdownItem ?? mutable.scores[key];
+    const legacyScore =
+      directCompanyScore ?? scoresBreakdownItem ?? mutable.scores[key];
 
     if (isScoreBreakdownItem(legacyScore)) {
       scoreBreakdown[key] = {
@@ -741,7 +634,9 @@ function deriveScoreFromWeightedScore(
   return (weightedScore * 100) / COMPANY_FIT_WEIGHTS[key];
 }
 
-function removeDuplicateScoreBreakdowns(result: TenderDeepAnalysisResult): void {
+function removeDuplicateScoreBreakdowns(
+  result: TenderDeepAnalysisResult,
+): void {
   const mutable = result as MutableDeepResult;
 
   delete mutable.companyFitAnalysis.scoreBreakdown;
@@ -795,7 +690,10 @@ function applyEvidenceBasedScoreFallbacks(
 ): void {
   const scoreBreakdown = getScoreBreakdownRecord(result);
 
-  if (isDefaultedScore(scoreBreakdown.languageFit) && hasLanguageOverlap(input)) {
+  if (
+    isDefaultedScore(scoreBreakdown.languageFit) &&
+    hasLanguageOverlap(input)
+  ) {
     scoreBreakdown.languageFit.score = 100;
     scoreBreakdown.languageFit.explanation =
       'English is accepted for submission and the company supports English.';
@@ -884,7 +782,10 @@ function applyDecisionFactors(
     });
   }
 
-  if (!input.company.certifications || input.company.certifications.length === 0) {
+  if (
+    !input.company.certifications ||
+    input.company.certifications.length === 0
+  ) {
     addDecisionBlocker(blockers, {
       type: 'certification',
       severity: 'CRITICAL',
@@ -907,7 +808,8 @@ function applyDecisionFactors(
     addDecisionBlocker(blockers, {
       type: 'capability',
       severity: 'CRITICAL',
-      description: 'Company CPV/profile does not overlap with the tender scope.',
+      description:
+        'Company CPV/profile does not overlap with the tender scope.',
       source: 'backend_guardrail',
     });
   }
@@ -1007,7 +909,9 @@ function applyDocumentationAndClarity(
   };
 
   const noticeLevelClarityScore = 75;
-  const technicalSpecificationClarityScore = hasMissingProcurementDocs ? 20 : 65;
+  const technicalSpecificationClarityScore = hasMissingProcurementDocs
+    ? 20
+    : 65;
   const selectionCriteriaClarityScore =
     hasMissingProcurementDocs || hasSelectionCriteriaGap(result, input)
       ? 25
@@ -1230,10 +1134,17 @@ function extractTextList(value: unknown): string[] {
 }
 
 function addDecisionBlocker(
-  blockers: NonNullable<TenderDeepAnalysisResult['decisionFactors']>['criticalBlockers'],
-  blocker: NonNullable<TenderDeepAnalysisResult['decisionFactors']>['criticalBlockers'][number],
+  blockers: NonNullable<
+    TenderDeepAnalysisResult['decisionFactors']
+  >['criticalBlockers'],
+  blocker: NonNullable<
+    TenderDeepAnalysisResult['decisionFactors']
+  >['criticalBlockers'][number],
 ): void {
-  if (typeof blocker.description !== 'string' || blocker.description.trim() === '') {
+  if (
+    typeof blocker.description !== 'string' ||
+    blocker.description.trim() === ''
+  ) {
     return;
   }
 
@@ -1253,28 +1164,44 @@ function addDecisionBlocker(
 }
 
 function compactDecisionBlockers(
-  blockers: NonNullable<TenderDeepAnalysisResult['decisionFactors']>['criticalBlockers'],
-): NonNullable<TenderDeepAnalysisResult['decisionFactors']>['criticalBlockers'] {
+  blockers: NonNullable<
+    TenderDeepAnalysisResult['decisionFactors']
+  >['criticalBlockers'],
+): NonNullable<
+  TenderDeepAnalysisResult['decisionFactors']
+>['criticalBlockers'] {
   const byType = new Map<
-    NonNullable<TenderDeepAnalysisResult['decisionFactors']>['criticalBlockers'][number]['type'],
-    NonNullable<TenderDeepAnalysisResult['decisionFactors']>['criticalBlockers'][number]
+    NonNullable<
+      TenderDeepAnalysisResult['decisionFactors']
+    >['criticalBlockers'][number]['type'],
+    NonNullable<
+      TenderDeepAnalysisResult['decisionFactors']
+    >['criticalBlockers'][number]
   >();
 
   for (const blocker of blockers) {
-    if (typeof blocker.description !== 'string' || blocker.description.trim() === '') {
+    if (
+      typeof blocker.description !== 'string' ||
+      blocker.description.trim() === ''
+    ) {
       continue;
     }
 
     const current = byType.get(blocker.type);
 
-    if (!current || severityRank(blocker.severity) > severityRank(current.severity)) {
+    if (
+      !current ||
+      severityRank(blocker.severity) > severityRank(current.severity)
+    ) {
       byType.set(blocker.type, blocker);
     }
   }
 
   const canonicalDescriptions: Partial<
     Record<
-      NonNullable<TenderDeepAnalysisResult['decisionFactors']>['criticalBlockers'][number]['type'],
+      NonNullable<
+        TenderDeepAnalysisResult['decisionFactors']
+      >['criticalBlockers'][number]['type'],
       string
     >
   > = {
@@ -1287,7 +1214,9 @@ function compactDecisionBlockers(
     geography: 'No operating presence in the tender performance country.',
   };
   const order: Array<
-    NonNullable<TenderDeepAnalysisResult['decisionFactors']>['criticalBlockers'][number]['type']
+    NonNullable<
+      TenderDeepAnalysisResult['decisionFactors']
+    >['criticalBlockers'][number]['type']
   > = ['eligibility', 'capability', 'certification', 'geography', 'financial'];
 
   return order
@@ -1318,7 +1247,10 @@ function severityRank(severity: string): number {
 }
 
 function cleanupCompanyFitAnalysis(result: TenderDeepAnalysisResult): void {
-  const mutable = result.companyFitAnalysis as unknown as Record<string, unknown>;
+  const mutable = result.companyFitAnalysis as unknown as Record<
+    string,
+    unknown
+  >;
 
   for (const key of [
     'strengths',
@@ -1370,7 +1302,10 @@ function getUserFacingScoreExplanation(
 }
 
 function applyCompanyFitSummaryFields(result: TenderDeepAnalysisResult): void {
-  const mutable = result.companyFitAnalysis as unknown as Record<string, unknown>;
+  const mutable = result.companyFitAnalysis as unknown as Record<
+    string,
+    unknown
+  >;
   const messages = getLocalizedMessages(result.language);
 
   if (!Array.isArray(mutable.strengths) || mutable.strengths.length === 0) {
@@ -1381,7 +1316,10 @@ function applyCompanyFitSummaryFields(result: TenderDeepAnalysisResult): void {
     mutable.weaknesses = messages.weaknesses;
   }
 
-  if (!Array.isArray(mutable.capabilityGaps) || mutable.capabilityGaps.length === 0) {
+  if (
+    !Array.isArray(mutable.capabilityGaps) ||
+    mutable.capabilityGaps.length === 0
+  ) {
     mutable.capabilityGaps = messages.capabilityGaps;
   }
 
@@ -1442,8 +1380,7 @@ function getLocalizedMessages(language?: string): {
           'Branchen und Hauptleistungen des Unternehmens fehlen oder sind nicht gepflegt.',
         'Company operating regions are missing.':
           'Die Einsatzregionen des Unternehmens fehlen.',
-        'Company languages are missing.':
-          'Die Unternehmenssprachen fehlen.',
+        'Company languages are missing.': 'Die Unternehmenssprachen fehlen.',
         'Typical contract size is missing.':
           'Die typische Auftragsgroesse fehlt.',
       },
@@ -1509,39 +1446,37 @@ function getLocalizedMessages(language?: string): {
     ],
     missingCompanyInformation: {},
     scoreExplanations: {
-    scopeFit:
-      'Tender scope is industrial/nuclear repair and maintenance; company profile indicates software development only.',
-    capabilityFit:
-      'No declared company capability in industrial, mechanical, or nuclear maintenance.',
-    cpvFit:
-      'Tender CPV is repair and maintenance services; company CPV/profile does not overlap with that scope.',
-    geographicFit:
-      'Tender performance is in Slovenia; company operating countries do not include Slovenia.',
-    languageFit:
-      'English is accepted for submission and the company supports English.',
-    eligibilityFit:
-      'Procedure access and selection criteria appear restricted or unclear; invitation/qualification status is not evidenced.',
-    certificationFit:
-      'No declared certifications or site-access clearances for nuclear or industrial maintenance work.',
-    experienceFit:
-      'No relevant industrial or nuclear maintenance references are declared.',
-    financialFit:
-      'Estimated value is missing; company typical contract range is declared, but reliable comparison is not possible.',
-    commercialFit:
-      'Commercial fit is poor because the company cannot credibly deliver the tender scope.',
-    deadlineFit:
-      'Submission deadline is not expired and timing is usable for a prepared bidder, but other blockers dominate.',
-    riskFit:
-      'Risk fit is poor because capability, certification, geography, and eligibility blockers are material.',
+      scopeFit:
+        'Tender scope is industrial/nuclear repair and maintenance; company profile indicates software development only.',
+      capabilityFit:
+        'No declared company capability in industrial, mechanical, or nuclear maintenance.',
+      cpvFit:
+        'Tender CPV is repair and maintenance services; company CPV/profile does not overlap with that scope.',
+      geographicFit:
+        'Tender performance is in Slovenia; company operating countries do not include Slovenia.',
+      languageFit:
+        'English is accepted for submission and the company supports English.',
+      eligibilityFit:
+        'Procedure access and selection criteria appear restricted or unclear; invitation/qualification status is not evidenced.',
+      certificationFit:
+        'No declared certifications or site-access clearances for nuclear or industrial maintenance work.',
+      experienceFit:
+        'No relevant industrial or nuclear maintenance references are declared.',
+      financialFit:
+        'Estimated value is missing; company typical contract range is declared, but reliable comparison is not possible.',
+      commercialFit:
+        'Commercial fit is poor because the company cannot credibly deliver the tender scope.',
+      deadlineFit:
+        'Submission deadline is not expired and timing is usable for a prepared bidder, but other blockers dominate.',
+      riskFit:
+        'Risk fit is poor because capability, certification, geography, and eligibility blockers are material.',
     },
   };
 }
 
 function syncDocumentationScores(result: TenderDeepAnalysisResult): void {
-  const documentationAnalysis = result.documentationAnalysis as unknown as Record<
-    string,
-    unknown
-  >;
+  const documentationAnalysis =
+    result.documentationAnalysis as unknown as Record<string, unknown>;
 
   documentationAnalysis.documentationScores = result.documentationScores;
   delete documentationAnalysis.missingDocumentsImpact;
@@ -1573,7 +1508,10 @@ function normalizeRiskSeverityLabels(result: TenderDeepAnalysisResult): void {
   normalizeSeverityLabelsInObject(result.decisionFactors, result.language);
 }
 
-function normalizeSeverityLabelsInObject(value: unknown, language?: string): void {
+function normalizeSeverityLabelsInObject(
+  value: unknown,
+  language?: string,
+): void {
   if (Array.isArray(value)) {
     for (const item of value) {
       normalizeSeverityLabelsInObject(item, language);
@@ -1676,7 +1614,9 @@ function normalizeRequirementsClarityFields(
 
 function mapCompanyBlockerType(
   type: string,
-): NonNullable<TenderDeepAnalysisResult['decisionFactors']>['criticalBlockers'][number]['type'] {
+): NonNullable<
+  TenderDeepAnalysisResult['decisionFactors']
+>['criticalBlockers'][number]['type'] {
   if (/capability|scope|reference/.test(type)) return 'capability';
   if (/certification/.test(type)) return 'certification';
   if (/geograph/.test(type)) return 'geography';
@@ -1690,7 +1630,9 @@ function mapCompanyBlockerType(
 
 function mapRiskBlockerType(
   type: string,
-): NonNullable<TenderDeepAnalysisResult['decisionFactors']>['criticalBlockers'][number]['type'] {
+): NonNullable<
+  TenderDeepAnalysisResult['decisionFactors']
+>['criticalBlockers'][number]['type'] {
   if (/company_fit|scope/.test(type)) return 'capability';
   if (/mandatory|eligibility/.test(type)) return 'eligibility';
   if (/language/.test(type)) return 'language';
@@ -2131,7 +2073,10 @@ function clampRound(value: unknown): number {
 function clampScore(value: unknown): number {
   return Math.max(
     0,
-    Math.min(100, typeof value === 'number' && Number.isFinite(value) ? value : 0),
+    Math.min(
+      100,
+      typeof value === 'number' && Number.isFinite(value) ? value : 0,
+    ),
   );
 }
 

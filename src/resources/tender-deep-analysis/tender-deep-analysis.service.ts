@@ -14,7 +14,10 @@ import {
   TenderModel,
   TENDER_XML_CACHE_SELECT,
 } from '../tenders/schemas';
-import { TenderGeneralAnalysisDocument } from '../tender-analysis/schemas';
+import {
+  TenderGeneralAnalysis,
+  TenderGeneralAnalysisDocument,
+} from '../tender-analysis/schemas';
 import {
   TenderDeepAnalysisDocument,
   TenderDeepAnalysisModel,
@@ -28,6 +31,7 @@ import { TenderDeepDocumentInputService } from './tender-deep-document-input.ser
 import { CompanyTenderFilterModel } from '@/resources/company-filter/company-filter.schema';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { QueryFilter } from 'mongoose';
+import { createHash } from 'crypto';
 
 @Injectable()
 export class TenderDeepAnalysisService {
@@ -174,17 +178,13 @@ export class TenderDeepAnalysisService {
     companyId: string;
     language?: string;
   }): Promise<TenderDeepAnalysisDocument> {
-    const [tender, companyAnalysis, company] = await Promise.all([
+    const [tender, companyAnalysis] = await Promise.all([
       this.tendersService.findByTedIdOrCreateIfNeeded(params.tenderId),
       CompanyTenderFilterModel.findOne({ user: params.companyId }),
-      UserModel.findById(params.companyId),
     ]);
 
     if (!tender) {
       throw new Error('Tender not found');
-    }
-    if (!company) {
-      throw new Error('Company not found');
     }
     if (!companyAnalysis) {
       throw new Error('Company analysis not found');
@@ -195,9 +195,7 @@ export class TenderDeepAnalysisService {
         tender,
       );
 
-    const sourceHash = this.deepAnalysisBuilder.buildSourceHash({
-      tender,
-      company,
+    const sourceHash = this.buildSourceHash({
       generalAnalysis,
       companyAnalysis,
       outputLanguage: params.language,
@@ -417,5 +415,23 @@ export class TenderDeepAnalysisService {
     } catch {
       // Logging must not affect analysis processing.
     }
+  }
+
+  buildSourceHash(input: {
+    generalAnalysis?: TenderGeneralAnalysis | null;
+    companyAnalysis?: { sourceHash?: unknown } | null;
+    outputLanguage?: string;
+  }): string {
+    return createHash('sha256')
+      .update(
+        JSON.stringify({
+          model: this.deepSeekAnalysisService.getDeepAnalysisModel(),
+          promptVersion: TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION,
+          outputLanguage: input.outputLanguage ?? 'en',
+          generalAnalysisSourceHash: input.generalAnalysis?.sourceHash,
+          companyAnalysisSourceHash: input.companyAnalysis?.sourceHash,
+        }),
+      )
+      .digest('hex');
   }
 }
