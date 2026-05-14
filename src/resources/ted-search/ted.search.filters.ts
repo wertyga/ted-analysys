@@ -101,6 +101,10 @@ export class TedSearchFilters {
       parts.push({ submissionDeadline: submissionDeadlineFilter });
     }
 
+    if (filters.tenderIds?.length) {
+      parts.push({ id: { $in: filters.tenderIds } });
+    }
+
     return parts.length === 1 ? parts[0] : { $and: parts };
   }
 

@@ -67,7 +67,7 @@ export class TedTenderSearchRequestDto implements TedTenderSearchFilters {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
-  text?: string; // ++
+  text?: string;
 
   @ApiPropertyOptional({ type: [String], example: ['72000000', '48000000'] })
   @IsOptional()
@@ -75,7 +75,7 @@ export class TedTenderSearchRequestDto implements TedTenderSearchFilters {
   @ArrayNotEmpty()
   @IsString({ each: true })
   @IsNotEmpty({ each: true })
-  cpvCodes?: string[]; // ++
+  cpvCodes?: string[];
 
   @ApiPropertyOptional({
     enum: TED_ELIGIBLE_COUNTRY_CODES,
@@ -267,6 +267,10 @@ export class TedTenderSearchRequestDto implements TedTenderSearchFilters {
   @IsNumber()
   @Min(0)
   contractAwardTo?: number;
+
+  @ApiPropertyOptional()
+  @IsArray()
+  tenderIds?: string[];
 }
 
 function normalizeCountryInput(value: unknown): unknown {
