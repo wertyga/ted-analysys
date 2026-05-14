@@ -38,10 +38,8 @@ async function bootstrap() {
   SwaggerModule.setup('swagger', app, swaggerDocument);
 
   await app.listen(port, () => {
-    if (isDev) {
-      console.log(`Server ran on :${port}`);
-      console.log(`Swagger docs: http://localhost:${port}/swagger`);
-    }
+    console.log(`Server ran on :${port}`);
+    console.log(`Swagger docs: http://localhost:${port}/swagger`);
 
     mongooseConnect(() => {
       console.log(`Connected to ${process.env.DB_NAME} database`);
