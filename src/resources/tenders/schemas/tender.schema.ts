@@ -128,6 +128,8 @@ export interface Tender {
   xmlContent?: string;
   /** Full raw TED notice payload as returned by TED before local normalization. */
   rawData?: unknown;
+  /** Hash of the normalized tender source fields used to detect tender changes. */
+  sourceHash: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -247,6 +249,7 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
     links: Schema.Types.Mixed,
     xmlContent: { type: String, select: false },
     rawData: { type: Schema.Types.Mixed, select: false },
+    sourceHash: { type: String, required: true, index: true },
   },
   {
     collection: 'tenders',
@@ -256,7 +259,14 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
 
 function serializeTender(tender: TenderSerializable): TenderDto {
   return filterModel(tender as TenderDocument, {
-    excludeFields: ['source', 'cpvCodes', 'rawData', 'links', 'xmlContent'],
+    excludeFields: [
+      'source',
+      'cpvCodes',
+      'rawData',
+      'links',
+      'xmlContent',
+      'sourceHash',
+    ],
   }) as TenderDto;
 }
 

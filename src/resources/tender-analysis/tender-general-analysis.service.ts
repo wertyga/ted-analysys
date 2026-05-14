@@ -10,10 +10,7 @@ import { TenderGeneralAnalysisDetailDto } from './dto/tender-general-analysis.dt
 import { TenderAnalysisService } from './tender-analysis.service';
 import { TenderDocument } from '../tenders/schemas';
 import { TenderGeneralAnalysisBuilder } from './tender-general-analysis.builder';
-import {
-  GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
-  GeneralTenderAnalysisInput,
-} from '@/openai/dto/openai-analysis.dto';
+import { GENERAL_TENDER_ANALYSIS_PROMPT_VERSION } from '@/openai/dto/openai-analysis.dto';
 import { createHash } from 'crypto';
 import { getSafeErrorMessage, isDuplicateKeyError, sleep } from '@/utils';
 
@@ -35,6 +32,8 @@ export class TenderGeneralAnalysisService {
 
       const execution =
         await this.tenderAnalysisService.analyzeTenderGeneral(analysisInput);
+      const sourceHash =
+        this.tenderAnalysisService.getBaseAnalysisSourceHash(tender);
 
       const result = execution.result;
 
@@ -60,7 +59,7 @@ export class TenderGeneralAnalysisService {
             documentsAnalyzedCount: result.documentsAnalyzedCount,
             missingDocumentsWarning: result.missingDocumentsWarning,
 
-            sourceHash: execution.sourceHash,
+            sourceHash,
             promptVersion: execution.promptVersion,
             model: execution.model,
           },
@@ -88,22 +87,22 @@ export class TenderGeneralAnalysisService {
     isForceBaseAnalysis = false,
   ): Promise<TenderGeneralAnalysisDocument> {
     const tenderObjectId = tender._id as mongoose.Types.ObjectId;
+    const sourceHash =
+      this.tenderAnalysisService.getBaseAnalysisSourceHash(tender);
 
     const existingBaseAnalysis = await TenderGeneralAnalysisModel.findOne({
       tenderId: tender.id,
     }).exec();
 
+    const isHashEqual = existingBaseAnalysis?.sourceHash === sourceHash;
     const hasDoneAnalysis =
-      existingBaseAnalysis &&
-      existingBaseAnalysis.resultJson &&
+      existingBaseAnalysis?.resultJson &&
       existingBaseAnalysis.status === TenderGeneralAnalysisStatus.DONE &&
-      existingBaseAnalysis.promptVersion ===
-        GENERAL_TENDER_ANALYSIS_PROMPT_VERSION;
+      isHashEqual;
 
     const isInProces =
       existingBaseAnalysis?.status === TenderGeneralAnalysisStatus.PROCESSING &&
-      existingBaseAnalysis.promptVersion ===
-        GENERAL_TENDER_ANALYSIS_PROMPT_VERSION;
+      isHashEqual;
 
     if ((hasDoneAnalysis || isInProces) && !isForceBaseAnalysis) {
       return existingBaseAnalysis;
@@ -119,6 +118,7 @@ export class TenderGeneralAnalysisService {
             status: TenderGeneralAnalysisStatus.PROCESSING,
             tender: tenderObjectId,
             promptVersion: GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
+            sourceHash,
           },
         },
         { returnDocument: 'after', upsert: true },
@@ -190,22 +190,17 @@ export class TenderGeneralAnalysisService {
   }
 
   buildGeneralTenderAnalysisSourceHash(
-    input: GeneralTenderAnalysisInput,
+    tender: Pick<TenderDocument, 'sourceHash'>,
     providerName: string,
+    model: string,
   ): string {
     return createHash('sha256')
       .update(
         JSON.stringify({
           promptVersion: GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
           provider: providerName,
-          tender: input.tender,
-          documents: input.documents.map((document) => ({
-            id: document.id,
-            filename: document.filename,
-            language: document.language,
-            documentType: document.documentType,
-            extractedText: document.extractedText,
-          })),
+          tenderSourceHash: tender.sourceHash,
+          model,
         }),
       )
       .digest('hex');

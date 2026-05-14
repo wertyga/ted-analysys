@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { TedSearchService } from '../ted-search/ted-search.service';
 import { TenderGeneralAnalysisDetailDto } from '../tender-analysis/dto/tender-general-analysis.dto';
 import {
@@ -150,6 +151,13 @@ export class TendersService {
       notice,
       true,
     );
+    const tenderSource = {
+      ...dto,
+      id: publicationNumber,
+      source: 'TED',
+      publicationNumber,
+    };
+    const sourceHash = this.buildTenderSourceHash(tenderSource);
 
     const tenderDoc = await TenderModel.findOneAndUpdate(
       { id: publicationNumber },
@@ -159,6 +167,7 @@ export class TendersService {
           id: publicationNumber,
           source: 'TED',
           publicationNumber,
+          sourceHash,
         },
       },
       { returnDocument: 'after', upsert: true },
@@ -441,18 +450,17 @@ export class TendersService {
         .select(TENDER_XML_CACHE_SELECT)
         .exec();
 
-    if (!savedTender) {
+    const shouldUpsertTender =
+      !savedTender ||
+      areTedNoticeVersionsDifferent(savedTender.noticeVersion, notice);
+
+    if (shouldUpsertTender) {
       savedTender = await this.upsertTender(notice);
     }
 
     if (!savedTender) {
       throw new NotFoundException(`Tender ${publicationNumber} not found`);
     }
-
-    const shouldUpsertTender = areTedNoticeVersionsDifferent(
-      savedTender.noticeVersion,
-      notice,
-    );
 
     return this.getLocalTenderWithBaseAnalysis(savedTender, shouldUpsertTender);
   }
@@ -487,5 +495,21 @@ export class TendersService {
         tenderList.generalAnalysis as TenderGeneralAnalysis,
       ),
     };
+  }
+
+  private buildTenderSourceHash(tender: Record<string, unknown>): string {
+    const {
+      rawData,
+      xmlContent,
+      xmlContentHash,
+      xmlSourceUrl,
+      xmlContentFetchedAt,
+      sourceHash,
+      ...sourceFields
+    } = tender;
+
+    return createHash('sha256')
+      .update(JSON.stringify(sourceFields))
+      .digest('hex');
   }
 }

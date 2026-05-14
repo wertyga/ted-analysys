@@ -7,10 +7,10 @@ import {
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 import { TenderGeneralAnalysisService } from '@/resources/tender-analysis/tender-general-analysis.service';
 import { isDev } from '@/utils';
+import { TenderDocument } from '../tenders/schemas';
 
 export interface TenderAnalysisExecutionResult {
   result: GeneralTenderAnalysisResult;
-  sourceHash: string;
   promptVersion: string;
   model: string;
 }
@@ -25,30 +25,28 @@ export class TenderAnalysisService {
     private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
   ) {}
 
-  getBaseAnalysisSourceHash(input: GeneralTenderAnalysisInput): string {
+  getBaseAnalysisSourceHash(tender: TenderDocument): string {
     return this.tenderGeneralAnalysisService.buildGeneralTenderAnalysisSourceHash(
-      input,
+      tender,
       'deepseek',
+      this.deepSeekAnalysisService.getGeneralAnalysisModel(),
     );
   }
 
   async analyzeTenderGeneral(
     input: GeneralTenderAnalysisInput,
   ): Promise<TenderAnalysisExecutionResult> {
-    const sourceHash = this.getBaseAnalysisSourceHash(input);
-
     const result =
       await this.deepSeekAnalysisService.analyzeTenderGeneral(input);
 
     if (isDev) {
       this.logger.debug(
-        `General tender analysis completed: tender=${input.tender.id} sourceHash=${sourceHash}`,
+        `General tender analysis completed: tender=${input.tender.id}`,
       );
     }
 
     return {
       result,
-      sourceHash,
       promptVersion: GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
       model: this.deepSeekAnalysisService.getGeneralAnalysisModel(),
     };
