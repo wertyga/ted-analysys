@@ -1,4 +1,5 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 import {
   companyCpvPopulateFields,
@@ -17,6 +18,7 @@ import {
 import {
   TenderGeneralAnalysis,
   TenderGeneralAnalysisDocument,
+  TenderGeneralAnalysisRecord,
 } from '../tender-analysis/schemas';
 import {
   TenderDeepAnalysisDocument,
@@ -29,9 +31,9 @@ import { TenderDeepAnalysisBuilder } from './tender-deep-analysis.builder';
 import { TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION } from '@/openai/prompts/tender-deep-company-fit.prompt';
 import { TenderDeepDocumentInputService } from './tender-deep-document-input.service';
 import { CompanyTenderFilterModel } from '@/resources/company-filter/company-filter.schema';
+import { CompanyFilterService } from '@/resources/company-filter/company-filter.service';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { QueryFilter } from 'mongoose';
-import { createHash } from 'crypto';
 
 @Injectable()
 export class TenderDeepAnalysisService {
@@ -40,6 +42,7 @@ export class TenderDeepAnalysisService {
     private readonly deepAnalysisBuilder: TenderDeepAnalysisBuilder,
     private readonly deepDocumentInputService: TenderDeepDocumentInputService,
     private readonly tendersService: TendersService,
+    private readonly companyFilterService: CompanyFilterService,
     @Inject(forwardRef(() => TenderGeneralAnalysisService))
     private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
   ) {}
@@ -64,12 +67,11 @@ export class TenderDeepAnalysisService {
     });
 
     try {
-      const [tender, company, companyAnalysis] = await Promise.all([
+      const [tender, company] = await Promise.all([
         TenderModel.findOne({ id: tenderId })
           .select(TENDER_XML_CACHE_SELECT)
           .populate(tenderCpvPopulateFields),
         UserModel.findById(companyId).populate(companyCpvPopulateFields),
-        CompanyTenderFilterModel.findOne({ user: companyId }),
       ]);
 
       if (!tender) {
@@ -79,11 +81,10 @@ export class TenderDeepAnalysisService {
         throw new Error('Company not found');
       }
 
-      // TODO: What if general analysis will be returned with FAILED status
-      const generalAnalysis =
-        await this.tenderGeneralAnalysisService.getFinishedGeneralAnalysis(
-          tender,
-        );
+      const [generalAnalysis, companyAnalysis] = await Promise.all([
+        this.tenderGeneralAnalysisService.getFinishedGeneralAnalysis(tender),
+        this.companyFilterService.getFinishedCompanyAnalysis(company),
+      ]);
 
       const companyDto =
         this.deepAnalysisBuilder.buildCompanyAnalysisDto(company);
@@ -178,26 +179,26 @@ export class TenderDeepAnalysisService {
     companyId: string;
     language?: string;
   }): Promise<TenderDeepAnalysisDocument> {
-    const [tender, companyAnalysis] = await Promise.all([
+    const [tender, company] = await Promise.all([
       this.tendersService.findByTedIdOrCreateIfNeeded(params.tenderId),
-      CompanyTenderFilterModel.findOne({ user: params.companyId }),
+      UserModel.findById(params.companyId),
     ]);
 
     if (!tender) {
       throw new Error('Tender not found');
     }
-    if (!companyAnalysis) {
-      throw new Error('Company analysis not found');
+    if (!company) {
+      throw new Error('Company not found');
     }
 
-    const generalAnalysis =
-      await this.tenderGeneralAnalysisService.getFinishedGeneralAnalysis(
-        tender,
-      );
+    const [generalAnalysis, companyAnalysis] = await Promise.all([
+      this.tenderGeneralAnalysisService.ensureAnalysisForTender(tender),
+      this.companyFilterService.generateAnalysisForCompany(company),
+    ]);
 
     const sourceHash = this.buildSourceHash({
-      generalAnalysis,
-      companyAnalysis,
+      generalAnalysisSourceHash: generalAnalysis.sourceHash,
+      companyAnalysisSourceHash: companyAnalysis.sourceHash,
       outputLanguage: params.language,
     });
 
@@ -205,7 +206,7 @@ export class TenderDeepAnalysisService {
       await this.upsertProcessingAnalysisIfNeeded({
         tender,
         companyId: params.companyId,
-        generalAnalysis: generalAnalysis,
+        generalAnalysisId: generalAnalysis._id.toString(),
         sourceHash,
       });
 
@@ -256,7 +257,7 @@ export class TenderDeepAnalysisService {
       query.tenderId = { $in: params.tenderIds };
     }
 
-    const [analyses, total] = await Promise.all([
+    const [analyses, total, companyAnalysis] = await Promise.all([
       TenderDeepAnalysisModel.find(query)
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -265,20 +266,49 @@ export class TenderDeepAnalysisService {
         .lean<TenderDeepAnalysisRecord[]>()
         .exec(),
       TenderDeepAnalysisModel.countDocuments(query).exec(),
+      CompanyTenderFilterModel.findOne({ user: params.companyId }).exec(),
     ]);
 
-    return { analyses, total };
+    const analysesWithOutDate = analyses.map((analysis) => {
+      const generalAnalysis = analysis.generalAnalysis as
+        | TenderGeneralAnalysisDocument
+        | TenderGeneralAnalysisRecord
+        | undefined;
+
+      const isHashValid =
+        !!generalAnalysis?.sourceHash && !!companyAnalysis?.sourceHash;
+
+      if (!isHashValid) {
+        return {
+          ...analysis,
+          isOutDate: false,
+        };
+      }
+
+      const currentSourceHash = this.buildSourceHash({
+        generalAnalysisSourceHash: generalAnalysis.sourceHash,
+        companyAnalysisSourceHash: companyAnalysis.sourceHash,
+        outputLanguage: getDeepAnalysisOutputLanguage(analysis),
+      });
+
+      return {
+        ...analysis,
+        isOutDate: analysis.sourceHash !== currentSourceHash,
+      };
+    });
+
+    return { analyses: analysesWithOutDate, total };
   }
 
   private async upsertProcessingAnalysisIfNeeded({
     tender,
-    generalAnalysis,
+    generalAnalysisId,
     sourceHash,
     companyId,
   }: {
     tender: TenderDocument;
     companyId: string;
-    generalAnalysis?: TenderGeneralAnalysisDocument | null;
+    generalAnalysisId: string;
     sourceHash: string;
   }): Promise<{
     deepAnalysis: TenderDeepAnalysisDocument;
@@ -307,7 +337,7 @@ export class TenderDeepAnalysisService {
             {
               $set: {
                 tender: tender._id,
-                generalAnalysis: generalAnalysis?._id,
+                generalAnalysis: generalAnalysisId,
                 status: TenderDeepAnalysisStatus.PROCESSING,
                 promptVersion: TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION,
               },
@@ -418,8 +448,8 @@ export class TenderDeepAnalysisService {
   }
 
   buildSourceHash(input: {
-    generalAnalysis?: TenderGeneralAnalysis | null;
-    companyAnalysis?: { sourceHash?: unknown } | null;
+    generalAnalysisSourceHash: string;
+    companyAnalysisSourceHash: string;
     outputLanguage?: string;
   }): string {
     return createHash('sha256')
@@ -428,10 +458,20 @@ export class TenderDeepAnalysisService {
           model: this.deepSeekAnalysisService.getDeepAnalysisModel(),
           promptVersion: TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION,
           outputLanguage: input.outputLanguage ?? 'en',
-          generalAnalysisSourceHash: input.generalAnalysis?.sourceHash,
-          companyAnalysisSourceHash: input.companyAnalysis?.sourceHash,
+          generalAnalysisSourceHash: input.generalAnalysisSourceHash,
+          companyAnalysisSourceHash: input.companyAnalysisSourceHash,
         }),
       )
       .digest('hex');
   }
+}
+
+function getDeepAnalysisOutputLanguage(
+  analysis: TenderDeepAnalysisRecord,
+): string | undefined {
+  const resultJson = analysis.resultJson as { language?: unknown } | undefined;
+
+  return typeof resultJson?.language === 'string'
+    ? resultJson.language
+    : undefined;
 }

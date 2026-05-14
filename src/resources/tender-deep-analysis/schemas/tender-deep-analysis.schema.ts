@@ -73,6 +73,7 @@ export type TenderDeepAnalysisRecord = TenderDeepAnalysis & {
     | mongoose.Types.ObjectId
     | TenderGeneralAnalysisRecord
     | TenderGeneralAnalysisDocument;
+  isOutDate?: boolean;
 };
 export type TenderDeepAnalysisSerializable =
   | TenderDeepAnalysisDocument

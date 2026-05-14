@@ -1,4 +1,9 @@
-import { forwardRef, Inject, Injectable } from '@nestjs/common';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  RequestTimeoutException,
+} from '@nestjs/common';
 import mongoose from 'mongoose';
 import {
   TenderGeneralAnalysisDocument,
@@ -13,6 +18,9 @@ import { TenderGeneralAnalysisBuilder } from './tender-general-analysis.builder'
 import { GENERAL_TENDER_ANALYSIS_PROMPT_VERSION } from '@/openai/dto/openai-analysis.dto';
 import { createHash } from 'crypto';
 import { getSafeErrorMessage, isDuplicateKeyError, sleep } from '@/utils';
+
+const ANALYSIS_WAIT_TIMEOUT_MS = 10 * 60 * 1000;
+const ANALYSIS_WAIT_INTERVAL_MS = 1000;
 
 @Injectable()
 export class TenderGeneralAnalysisService {
@@ -147,17 +155,28 @@ export class TenderGeneralAnalysisService {
 
   async getFinishedGeneralAnalysis(tender: TenderDocument) {
     let analysis = await this.ensureAnalysisForTender(tender);
+    const waitUntil = Date.now() + ANALYSIS_WAIT_TIMEOUT_MS;
 
     while (analysis.status !== TenderGeneralAnalysisStatus.DONE) {
+      if (Date.now() >= waitUntil) {
+        throw new RequestTimeoutException(
+          `General analysis for tender ${tender.id} was not finished within 10 minutes`,
+        );
+      }
+
       analysis = (await TenderGeneralAnalysisModel.findById(
         analysis._id,
       )) as TenderGeneralAnalysisDocument;
 
       if (analysis.status === TenderGeneralAnalysisStatus.FAILED) {
-        break;
+        throw new Error(
+          `General analysis for tender ${tender.id} failed: ${
+            analysis.errorMessage ?? 'unknown error'
+          }`,
+        );
       }
 
-      await sleep(1000);
+      await sleep(ANALYSIS_WAIT_INTERVAL_MS);
     }
 
     return analysis;

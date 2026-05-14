@@ -65,7 +65,7 @@ export interface TenderGeneralAnalysis {
   documentsAnalyzedCount?: number;
   missingDocumentsWarning?: boolean;
 
-  sourceHash?: string;
+  sourceHash: string;
   promptVersion?: string;
   model?: string;
   errorMessage?: string;

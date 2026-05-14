@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  RequestTimeoutException,
 } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
@@ -19,6 +20,7 @@ import {
   getStringArray,
   isDuplicateKeyError,
   isRecord,
+  sleep,
 } from '@/utils';
 import {
   CompanyTenderFilterCpvMatchLevel,
@@ -31,6 +33,9 @@ import { UserModel } from '@/resources/user/user.schema';
 import { COMPANY_TENDER_FILTER_SYSTEM_PROMPT } from './company-filter.prompt';
 import { TenderMatchingService } from '@/resources/tender-matching/tender-matching.service';
 import { TenderCompanyMatchDocument } from '@/resources/tender-matching/schemas/tender-company-match.schema';
+
+const COMPANY_FILTER_WAIT_TIMEOUT_MS = 10 * 60 * 1000;
+const COMPANY_FILTER_WAIT_INTERVAL_MS = 1000;
 
 interface CompanyFilterCpvPayload {
   name?: string;
@@ -162,51 +167,99 @@ export class CompanyFilterService {
       const payload = this.buildCompanyProfilePayload(populatedUser);
 
       try {
-        this.analyzeCompanyProfile(payload).then((result) => {
-          return CompanyTenderFilterModel.findByIdAndUpdate(
-            companyAnalysis._id,
-            {
-              $set: {
-                summary: result.summary,
-                cpvCodes: result.additionalCpvSuggestions.map((suggestion) => ({
-                  code: suggestion.code,
-                  label: suggestion.label,
-                  source: CompanyTenderFilterCpvSource.AI_SUGGESTION,
-                  matchLevel: CompanyTenderFilterCpvMatchLevel.MEDIUM,
-                  confidence: suggestion.confidence,
-                  reason: suggestion.reason,
-                })),
-                targetCountries: result.targetCountries,
-                excludedCountries: [],
-                languages: result.languages,
-                contractNatures: result.contractNatures,
-                minBudget: result.minBudget,
-                maxBudget: result.maxBudget,
-                currency: result.currency,
-                allowUnknownBudget: result.allowUnknownBudget,
-                minDaysBeforeDeadline: result.minDaysBeforeDeadline,
-                requiredKeywords: result.requiredKeywords,
-                optionalKeywords: result.optionalKeywords,
-                excludedKeywords: result.excludedKeywords,
-                certifications: result.certifications,
-                capabilities: result.capabilities,
-                publicProcurementExperience: result.publicProcurementExperience,
-                notificationThreshold: result.notificationThreshold,
-                confirmedByUser: false,
-                generationStatus: CompanyTenderFilterGenerationStatus.COMPLETED,
-                generationFinishedAt: new Date(),
-                generationError: null,
-                extractionWarnings: result.extractionWarnings,
+        this.analyzeCompanyProfile(payload)
+          .then((result) => {
+            return CompanyTenderFilterModel.findByIdAndUpdate(
+              companyAnalysis._id,
+              {
+                $set: {
+                  summary: result.summary,
+                  cpvCodes: result.additionalCpvSuggestions.map(
+                    (suggestion) => ({
+                      code: suggestion.code,
+                      label: suggestion.label,
+                      source: CompanyTenderFilterCpvSource.AI_SUGGESTION,
+                      matchLevel: CompanyTenderFilterCpvMatchLevel.MEDIUM,
+                      confidence: suggestion.confidence,
+                      reason: suggestion.reason,
+                    }),
+                  ),
+                  targetCountries: result.targetCountries,
+                  excludedCountries: [],
+                  languages: result.languages,
+                  contractNatures: result.contractNatures,
+                  minBudget: result.minBudget,
+                  maxBudget: result.maxBudget,
+                  currency: result.currency,
+                  allowUnknownBudget: result.allowUnknownBudget,
+                  minDaysBeforeDeadline: result.minDaysBeforeDeadline,
+                  requiredKeywords: result.requiredKeywords,
+                  optionalKeywords: result.optionalKeywords,
+                  excludedKeywords: result.excludedKeywords,
+                  certifications: result.certifications,
+                  capabilities: result.capabilities,
+                  publicProcurementExperience:
+                    result.publicProcurementExperience,
+                  notificationThreshold: result.notificationThreshold,
+                  confirmedByUser: false,
+                  generationStatus:
+                    CompanyTenderFilterGenerationStatus.COMPLETED,
+                  generationFinishedAt: new Date(),
+                  generationError: null,
+                  extractionWarnings: result.extractionWarnings,
+                },
               },
-            },
-            { returnDocument: 'after' },
-          )
-            .orFail()
-            .exec();
-        });
+              { returnDocument: 'after' },
+            )
+              .orFail()
+              .exec();
+          })
+          .catch((error: unknown) =>
+            this.markGenerationFailed(populatedUser, error),
+          );
       } catch (error: unknown) {
         await this.markGenerationFailed(populatedUser, error);
       }
+    }
+
+    return companyAnalysis;
+  }
+
+  async getFinishedCompanyAnalysis(
+    user: UserDocument,
+  ): Promise<CompanyTenderFilterDocument> {
+    let companyAnalysis = await this.generateAnalysisForCompany(user);
+    const waitUntil = Date.now() + COMPANY_FILTER_WAIT_TIMEOUT_MS;
+
+    while (
+      companyAnalysis.generationStatus !==
+        CompanyTenderFilterGenerationStatus.COMPLETED &&
+      companyAnalysis.generationStatus !==
+        CompanyTenderFilterGenerationStatus.FAILED
+    ) {
+      if (Date.now() >= waitUntil) {
+        throw new RequestTimeoutException(
+          'Company tender filter analysis was not finished within 10 minutes',
+        );
+      }
+
+      companyAnalysis = (await CompanyTenderFilterModel.findById(
+        companyAnalysis._id,
+      )
+        .orFail()
+        .exec()) as CompanyTenderFilterDocument;
+
+      await sleep(COMPANY_FILTER_WAIT_INTERVAL_MS);
+    }
+
+    if (
+      companyAnalysis.generationStatus === CompanyTenderFilterGenerationStatus.FAILED
+    ) {
+      throw new Error(
+        `Company tender filter analysis failed: ${
+          companyAnalysis.generationError ?? 'unknown error'
+        }`,
+      );
     }
 
     return companyAnalysis;
