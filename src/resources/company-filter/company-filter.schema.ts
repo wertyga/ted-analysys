@@ -1,6 +1,7 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
 import { CurrencySign, Language } from '@/resources/codelist';
 import { TedContractNature } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
+import { filterModel } from '@/utils';
 
 export enum CompanyTenderFilterCpvSource {
   INDUSTRY = 'industry',
@@ -64,6 +65,12 @@ export interface CompanyTenderFilter {
 }
 
 export type CompanyTenderFilterDocument = CompanyTenderFilter & Document;
+
+export interface CompanyTenderFilterModelType extends Model<CompanyTenderFilterDocument> {
+  serializeDetail(
+    doc?: CompanyTenderFilterDocument | null,
+  ): Partial<CompanyTenderFilterDocument> | null;
+}
 
 const CompanyTenderFilterCpvCodeSchema = new Schema<CompanyTenderFilterCpvCode>(
   {
@@ -230,11 +237,23 @@ export const CompanyTenderFilterSchema =
     },
   );
 
-export const CompanyTenderFilterModel: Model<CompanyTenderFilterDocument> =
+function serializeDetail(doc?: CompanyTenderFilterDocument) {
+  if (!doc) {
+    return doc;
+  }
+
+  const rest = filterModel(doc, { excludeFields: ['sourceHash'] });
+
+  return rest;
+}
+
+CompanyTenderFilterSchema.statics.serializeDetail = serializeDetail;
+
+export const CompanyTenderFilterModel: CompanyTenderFilterModelType =
   (mongoose.models.CompanyTenderFilter as
-    | Model<CompanyTenderFilterDocument>
+    | CompanyTenderFilterModelType
     | undefined) ??
-  mongoose.model<CompanyTenderFilterDocument>(
+  mongoose.model<CompanyTenderFilterDocument, CompanyTenderFilterModelType>(
     'CompanyTenderFilter',
     CompanyTenderFilterSchema,
   );

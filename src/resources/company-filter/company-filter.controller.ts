@@ -7,6 +7,7 @@ import {
 } from '@nestjs/swagger';
 import { AuthGuard } from '@/guards';
 import { CompanyFilterService } from './company-filter.service';
+import { CompanyTenderFilterModel } from '@/resources/company-filter/company-filter.schema';
 
 @ApiTags('company-filter')
 @ApiBearerAuth()
@@ -22,8 +23,12 @@ export class CompanyFilterController {
   @ApiCreatedResponse({
     description: 'Generated company tender filter.',
   })
-  createCompanyFilter(@Req() req) {
-    return this.companyFilterService.generateAnalysisForCompany(req.user);
+  async createCompanyFilter(@Req() req) {
+    const data = await this.companyFilterService.generateAnalysisForCompany(
+      req.user,
+    );
+
+    return CompanyTenderFilterModel.serializeDetail(data);
   }
 
   @Post('confirm')

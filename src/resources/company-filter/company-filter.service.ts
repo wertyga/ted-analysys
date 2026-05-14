@@ -222,23 +222,14 @@ export class CompanyFilterService {
     const existing = await CompanyTenderFilterModel.findOne({ user: user._id });
     const currentHash = this.calculateHash(user);
 
-    if (
-      existing &&
-      existing.sourceHash === currentHash &&
-      existing.generationStatus ===
-        CompanyTenderFilterGenerationStatus.COMPLETED &&
-      !isForceUpdate
-    ) {
-      return { companyAnalysis: existing, shouldBeUpdated: false };
-    }
+    const areHashEquals = existing && existing.sourceHash === currentHash;
+    const saveStatus =
+      existing?.generationStatus ===
+        CompanyTenderFilterGenerationStatus.COMPLETED ||
+      existing?.generationStatus ===
+        CompanyTenderFilterGenerationStatus.IN_PROGRESS;
 
-    if (
-      existing &&
-      existing.sourceHash === currentHash &&
-      existing.generationStatus ===
-        CompanyTenderFilterGenerationStatus.IN_PROGRESS &&
-      !isForceUpdate
-    ) {
+    if (areHashEquals && saveStatus && !isForceUpdate) {
       return { companyAnalysis: existing, shouldBeUpdated: false };
     }
 
