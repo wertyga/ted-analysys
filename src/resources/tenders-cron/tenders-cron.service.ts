@@ -60,9 +60,8 @@ export class TendersCronService {
           `Recent TED tender gather completed: pages=${result.pagesFetched} fetched=${result.noticesFetched} saved=${result.saved} updated=${result.updated} skipped=${result.skipped} matches=${result.matchesSaved}`,
         );
       }
-      logger.info(
-        `Recent TED tender gather completed: pages=${result.pagesFetched} fetched=${result.noticesFetched} saved=${result.saved} updated=${result.updated} skipped=${result.skipped} matches=${result.matchesSaved}`,
-      );
+
+      await logger.info('TED_COLLECTED', result);
     } catch (error: unknown) {
       this.logger.error(
         `Recent TED tender gather failed: ${

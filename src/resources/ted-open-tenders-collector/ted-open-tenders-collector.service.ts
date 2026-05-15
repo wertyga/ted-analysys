@@ -9,7 +9,7 @@ import { getTedDate } from '@/resources/ted-search/utils';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { TenderDocument } from '@/resources/tenders/schemas';
 import { TendersService } from '@/resources/tenders/tenders.service';
-import { isRecord } from '@/utils';
+import { isRecord, logger } from '@/utils';
 
 const DEFAULT_PAGE_LIMIT = 100;
 const DEFAULT_MAX_PAGES = 1000;
@@ -27,7 +27,6 @@ export interface TedOpenTendersCollectorResult {
   saved: number;
   updated: number;
   skipped: number;
-  changedTenders: TenderDocument[];
   totalNoticeCount?: number;
   resumeIterationNextToken?: string;
 }
@@ -43,11 +42,12 @@ export class TedOpenTendersCollectorService {
   ): Promise<TedOpenTendersCollectorResult> {
     const pageLimit = options.pageLimit ?? DEFAULT_PAGE_LIMIT;
     const maxPages = options.maxPages ?? DEFAULT_MAX_PAGES;
-    const changedTenders: TenderDocument[] = [];
+
     const query = buildTedTenderSearchQuery({
       noticeTypes: TENDER_COMPETITION_NOTICE_TYPES,
       submissionDeadlineFrom: getTedDate(),
     });
+
     let iterationNextToken = options.iterationNextToken?.trim() || undefined;
     let pagesFetched = 0;
     let noticesFetched = 0;
@@ -83,7 +83,6 @@ export class TedOpenTendersCollectorService {
       saved += saveResult.saved;
       updated += saveResult.updated;
       skipped += saveResult.skipped;
-      changedTenders.push(...saveResult.changedTenders);
 
       if (saveResult.changedTenders.length > 0) {
         await options.onChangedTenders?.(saveResult.changedTenders);
@@ -94,13 +93,22 @@ export class TedOpenTendersCollectorService {
       }
     }
 
+    await logger.info('TED_COLLECTED', {
+      pagesFetched,
+      noticesFetched,
+      saved,
+      updated,
+      skipped,
+      totalNoticeCount,
+      resumeIterationNextToken: iterationNextToken,
+    });
+
     return {
       pagesFetched,
       noticesFetched,
       saved,
       updated,
       skipped,
-      changedTenders,
       totalNoticeCount,
       resumeIterationNextToken: iterationNextToken,
     };
