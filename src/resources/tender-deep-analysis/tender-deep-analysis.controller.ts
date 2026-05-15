@@ -53,13 +53,13 @@ export class TenderDeepAnalysisController {
   @ApiNotFoundResponse({ description: 'Deep analysis not found' })
   async getLatest(@Param('tenderId') tenderId: string, @Req() req) {
     const companyId = String(req.user._id);
-    const analysis =
-      await this.tenderDeepAnalysisService.getLatestCompletedByTenderAndCompany(
-        {
-          tenderId,
-          companyId,
-        },
-      );
+
+    const analysis = await this.tenderDeepAnalysisService.getDeppAnalysisTender(
+      {
+        tenderId,
+        companyId,
+      },
+    );
 
     if (!analysis) {
       throw new NotFoundException(

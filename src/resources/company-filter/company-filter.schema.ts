@@ -206,7 +206,7 @@ export const CompanyTenderFilterSchema =
       },
       confirmedByUser: {
         type: Boolean,
-        default: false,
+        default: true,
       },
       generationStatus: {
         type: String,

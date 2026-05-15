@@ -222,16 +222,14 @@ export class TenderDeepAnalysisService {
     return localDeepAnalysis;
   }
 
-  async getLatestCompletedByTenderAndCompany(params: {
+  async getDeppAnalysisTender(params: {
     tenderId: string;
     companyId: string;
   }): Promise<TenderDeepAnalysisRecord | null> {
     return TenderDeepAnalysisModel.findOne({
       tenderId: params.tenderId,
       company: params.companyId,
-      status: TenderDeepAnalysisStatus.COMPLETED,
     })
-      .sort({ analyzedAt: -1, updatedAt: -1 })
       .populate(deepAnalysisPopulateFields)
       .lean<TenderDeepAnalysisRecord>()
       .exec();
