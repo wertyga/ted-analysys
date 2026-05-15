@@ -25,13 +25,7 @@ import {
   TextCandidate,
 } from './tender-normalizer-xml';
 
-type NormalizedTenderDto = Omit<TenderDto, '_id'> & {
-  rawData?: unknown;
-  xmlContent?: string;
-  xmlContentHash?: string;
-  xmlSourceUrl?: string;
-  xmlContentFetchedAt?: Date;
-};
+export type NormalizedTenderDto = Omit<TenderDto, '_id'>;
 
 @Injectable()
 export class TenderNormalizerService {
@@ -39,17 +33,6 @@ export class TenderNormalizerService {
     rawNotice: TedNotice,
     rawIds = false,
   ): Promise<NormalizedTenderDto> {
-    // Disabled for now
-    // const xmlContent = await this.fetchXmlContentFromNotice(rawNotice);
-    // const normalizedTender = this.applyXmlFallbacks(
-    //   this.normalizeTedNotice(rawNotice),
-    //   xmlContent,
-    // );
-    // const tenderWithXmlContent = {
-    //   ...normalizedTender,
-    //   xmlContent,
-    // };
-
     const normalizedTender = this.normalizeTedNotice(rawNotice);
 
     const {
@@ -95,7 +78,6 @@ export class TenderNormalizerService {
 
     const dto: NormalizedTenderDto = {
       id: publicationNumber ?? this.createFallbackId(rawNotice),
-      source: 'TED',
       sourceNoticeId: this.pickText(rawNotice, [
         'notice-identifier',
         'noticeIdentifier',
@@ -352,7 +334,6 @@ export class TenderNormalizerService {
         ]),
       ) as TenderDto['cpvCodes'],
       links: rawNotice.links,
-      rawData: rawNotice,
     };
 
     return dto;

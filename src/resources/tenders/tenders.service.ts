@@ -20,13 +20,11 @@ import {
   TenderGeneralAnalysisModel,
 } from '../tender-analysis/schemas';
 import { TenderListDto } from './dto/tender.dto';
+import { TenderDocument, TenderModel, TenderWithWishlist } from './schemas';
 import {
-  TenderDocument,
-  TenderModel,
-  TENDER_XML_CACHE_SELECT,
-  TenderWithWishlist,
-} from './schemas';
-import { TenderNormalizerService } from './tender-normalizer.service';
+  NormalizedTenderDto,
+  TenderNormalizerService,
+} from './tender-normalizer.service';
 import { TedPublicationNumbersSearchRequestDto } from '@/resources/ted-search/dto/ted-publication-numbers-search-request.dto';
 import {
   areTedNoticeVersionsDifferent,
@@ -159,33 +157,23 @@ export class TendersService {
       return undefined;
     }
 
-    const dto = await this.tenderNormalizer.normalizeTedNoticeWithCpvCodes(
-      notice,
-      true,
-    );
-    const tenderSource = {
-      ...dto,
-      id: publicationNumber,
-      source: 'TED',
-      publicationNumber,
-    };
-    const sourceHash = this.buildTenderSourceHash(tenderSource);
+    const normalizedTenderDto =
+      await this.tenderNormalizer.normalizeTedNoticeWithCpvCodes(notice, true);
+
+    const sourceHash = this.buildTenderSourceHash(normalizedTenderDto);
 
     const tenderDoc = await TenderModel.findOneAndUpdate(
       { id: publicationNumber },
       {
         $set: {
-          ...dto,
+          ...normalizedTenderDto,
           id: publicationNumber,
-          source: 'TED',
           publicationNumber,
           sourceHash,
         },
       },
-      { returnDocument: 'after', upsert: true },
-    )
-      .select(TENDER_XML_CACHE_SELECT)
-      .exec();
+      { returnDocument: 'after', upsert: true, strict: false },
+    ).exec();
 
     return tenderDoc.populate(tenderCpvPopulateFields);
   }
@@ -226,7 +214,7 @@ export class TendersService {
     const existingTenders = await TenderModel.find({
       id: { $in: publicationNumbers },
     })
-      .select('id publicationNumber noticeVersion')
+      .select('id publicationNumber noticeVersion sourceHash')
       .exec();
 
     const existingTendersByPublicationNumber = new Map(
@@ -244,11 +232,12 @@ export class TendersService {
     for (const [publicationNumber, notice] of noticesByPublicationNumber) {
       const existingTender =
         existingTendersByPublicationNumber.get(publicationNumber);
+
       const shouldUpdateExistingTender =
-        existingTender !== undefined &&
+        !!existingTender &&
         this.shouldUpdateTenderFromTedNotice(existingTender, notice);
 
-      if (existingTender !== undefined && !shouldUpdateExistingTender) {
+      if (existingTender && !shouldUpdateExistingTender) {
         skipped += 1;
         continue;
       }
@@ -272,17 +261,15 @@ export class TendersService {
   }
 
   private shouldUpdateTenderFromTedNotice(
-    tender: Pick<TenderDocument, 'noticeVersion'>,
+    tender: TenderDocument,
     notice: TedNotice,
   ): boolean {
-    const noticeVersion = valueToString(
-      notice.noticeVersion ?? notice['notice-version'],
-    );
+    const normalizedTenderDto =
+      this.tenderNormalizer.normalizeTedNotice(notice);
 
-    return (
-      areTedNoticeVersionsDifferent(tender.noticeVersion, notice) ||
-      (tender.noticeVersion === undefined && noticeVersion !== undefined)
-    );
+    const sourceHash = this.buildTenderSourceHash(normalizedTenderDto);
+
+    return tender.sourceHash !== sourceHash;
   }
 
   async getLocalTenderWithBaseAnalysis(
@@ -294,14 +281,6 @@ export class TendersService {
         localTender,
         isForceBaseAnalysis,
       );
-
-    // Disabled for now
-    // if (!localTender.xmlContent) {
-    //   const xmlContent = await fetchXmlContentFromNotice(localTender.links);
-    //   localTender.xmlContent = xmlContent ?? '';
-    //
-    //   await localTender.save();
-    // }
 
     localTender.set(
       'generalAnalysis',
@@ -458,9 +437,7 @@ export class TendersService {
     }
 
     let savedTender: TenderDocument | null | undefined =
-      await TenderModel.findOne({ id: publicationNumber })
-        .select(TENDER_XML_CACHE_SELECT)
-        .exec();
+      await TenderModel.findOne({ id: publicationNumber }).exec();
 
     const shouldUpsertTender =
       !savedTender ||
@@ -507,7 +484,6 @@ export class TendersService {
     return TenderModel.findOne({
       id: publicationNumber,
     })
-      .select(TENDER_XML_CACHE_SELECT)
       .populate(tenderCpvPopulateFields)
       .exec();
   }
@@ -592,19 +568,9 @@ export class TendersService {
     });
   }
 
-  private buildTenderSourceHash(tender: Record<string, unknown>): string {
-    const {
-      rawData,
-      xmlContent,
-      xmlContentHash,
-      xmlSourceUrl,
-      xmlContentFetchedAt,
-      sourceHash,
-      ...sourceFields
-    } = tender;
-
+  private buildTenderSourceHash(normalizedTender: NormalizedTenderDto): string {
     return createHash('sha256')
-      .update(JSON.stringify(sourceFields))
+      .update(JSON.stringify(normalizedTender))
       .digest('hex');
   }
 }

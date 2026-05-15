@@ -506,7 +506,6 @@ export interface CpvAnalysisRef {
 
 export interface TenderAnalysisTenderDto {
   id: string;
-  source: string;
   publicationNumber?: string;
   sourceNoticeId?: string;
   noticeType?: string;

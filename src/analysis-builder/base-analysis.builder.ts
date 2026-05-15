@@ -100,8 +100,7 @@ export class BaseAnalysisBuilder {
   private async buildXmlDocument(
     tender: TenderDocument,
   ): Promise<DocumentInputAnalysis | undefined> {
-    const xmlContent =
-      tender.xmlContent || (await fetchXmlContentFromNotice(tender.links));
+    const xmlContent = await fetchXmlContentFromNotice(tender.links);
     const xmlSourceUrl = findXmlUrl(tender.links);
 
     if (!xmlContent || !xmlSourceUrl) {
@@ -154,32 +153,6 @@ export class BaseAnalysisBuilder {
       Object.entries(data).find(([lang]) => /eng|en/i.test(lang))?.[1] ||
       Object.values(data)[0]
     );
-  }
-
-  private async saveXmlContentToTenderIfNeeded(
-    tender: TenderDocument,
-    parsedXmlContent?: string,
-  ): Promise<void> {
-    if (tender.xmlContent) {
-      return;
-    }
-
-    const xmlContent =
-      parsedXmlContent || (await fetchXmlContentFromNotice(tender.links));
-
-    if (!xmlContent) {
-      return;
-    }
-
-    try {
-      await tender.updateOne({
-        $set: {
-          xmlContent,
-        },
-      });
-    } catch {
-      // XML cache is an optimization; analysis can continue without it.
-    }
   }
 
   async downloadTenderDocument(

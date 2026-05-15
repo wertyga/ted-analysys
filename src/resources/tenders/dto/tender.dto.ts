@@ -36,9 +36,6 @@ export class TenderDto {
   })
   id!: string;
 
-  @ApiProperty({ example: 'TED', description: 'Source system name.' })
-  source!: 'TED';
-
   @ApiPropertyOptional({
     example: 'abc123-2024',
     description:
@@ -433,5 +430,4 @@ export type TenderListDto = Omit<
   | 'submissionUrls'
   | 'selectionCriteria'
   | 'awardCriteria'
-  | 'source'
 >;

@@ -10,7 +10,6 @@ import { TenderDocument, TenderModel } from '@/resources/tenders/schemas';
 import { isDev, logger } from '@/utils';
 import { TenderCompanyMatchDocument } from '@/resources/tender-matching/schemas/tender-company-match.schema';
 import { TenderMatchingService } from '@/resources/tender-matching/tender-matching.service';
-import fs from 'node:fs';
 
 const RECENT_TENDERS_CRON = '0 1 * * *';
 const RECENT_TENDERS_LOOKBACK_DAYS = 2;

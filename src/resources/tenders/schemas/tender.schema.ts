@@ -15,8 +15,6 @@ export interface Tender {
   _id: string;
   /** Local canonical id. For TED tenders this is the publication number. */
   id: string;
-  /** Source system name. Currently always TED. */
-  source: string;
   /** TED/eForms notice-identifier: unique notice id in the source system. */
   sourceNoticeId?: string;
   /** TED/OJ publication number, e.g. 756265-2023. Useful for display and manual search. */
@@ -124,10 +122,6 @@ export interface Tender {
   cpvCodes?: unknown[];
   /** Raw TED links object, including notice/XML/HTML/document links when returned. */
   links?: TenderDocumentsLinks;
-  /** Cached TED XML notice content, used internally to avoid repeated XML downloads. */
-  xmlContent?: string;
-  /** Full raw TED notice payload as returned by TED before local normalization. */
-  rawData?: unknown;
   /** Hash of the normalized tender source fields used to detect tender changes. */
   sourceHash: string;
   createdAt?: Date;
@@ -135,10 +129,8 @@ export interface Tender {
 }
 
 export type TenderDocument = Tender & Document;
-export type TenderRecord = Tender & { _id: unknown; rawData?: unknown };
+export type TenderRecord = Tender & { _id: unknown };
 export type TenderSerializable = TenderDocument | TenderRecord;
-
-export const TENDER_XML_CACHE_SELECT = '+xmlContent';
 
 export interface TenderModelType extends Model<TenderDocument> {
   serializeDetail(tender: TenderSerializable): TenderDetailDto;
@@ -152,7 +144,6 @@ export type TenderWithWishlist = Tender & {
 const TenderSchema = new Schema<TenderDocument, TenderModelType>(
   {
     id: { type: String, required: true, unique: true, index: true },
-    source: { type: String, required: true, index: true },
     sourceNoticeId: { type: String, index: true },
     publicationNumber: { type: String, index: true },
     noticeType: String,
@@ -247,8 +238,6 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
     },
     cpvCodes: { type: [Schema.Types.Mixed], default: undefined },
     links: Schema.Types.Mixed,
-    xmlContent: { type: String, select: false },
-    rawData: { type: Schema.Types.Mixed, select: false },
     sourceHash: { type: String, required: true, index: true },
   },
   {
@@ -260,11 +249,8 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
 function serializeTender(tender: TenderSerializable): TenderDto {
   return filterModel(tender as TenderDocument, {
     excludeFields: [
-      'source',
       'cpvCodes',
-      'rawData',
       'links',
-      'xmlContent',
       'sourceHash',
     ],
   }) as TenderDto;
@@ -303,7 +289,6 @@ TenderSchema.statics.serializeList = function (
     selectionCriteria,
     awardCriteria,
     cpvCodes,
-    source,
     ...rest
   } = serializeTender(tender);
 
