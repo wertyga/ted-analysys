@@ -42,6 +42,10 @@ import {
   TenderDeepAnalysisDocument,
   TenderDeepAnalysisModel,
 } from '@/resources/tender-deep-analysis/schemas';
+import {
+  TenderWishlistItemDocument,
+  TenderWishlistItemModel,
+} from '@/resources/tender-wishlist/schemas';
 
 export interface GatherActiveTendersResult {
   completed?: boolean;
@@ -487,7 +491,9 @@ export class TendersService {
 
       this.logger.warn(
         `Skipping TED notice after local upsert failed: index=${index} error=${
-          result.reason instanceof Error ? result.reason.message : 'unknown error'
+          result.reason instanceof Error
+            ? result.reason.message
+            : 'unknown error'
         }`,
       );
 
@@ -519,28 +525,70 @@ export class TendersService {
     };
   }
 
-  async fillUpTenderByDeepAnalysisStatus(
-    tenders: (TenderListDto | TenderWithWishlist)[],
-    userId: string,
-  ) {
-    const deepAnalysisMap: Map<string, TenderDeepAnalysisDocument> =
+  async fillUpTenderByDeepAnalysisStatus<
+    T extends { id: string; deepAnalysisStatus?: string | null },
+  >(tenders: T[], userId?: string) {
+    const deepAnalysisMap: Map<string, TenderDeepAnalysisDocument> = new Map();
+
+    if (userId) {
       await TenderDeepAnalysisModel.find({
         company: userId,
       })
         .select('status tenderId')
         .then((analysis) => {
-          const map = new Map();
-
           analysis.forEach((analyse) => {
-            map.set(analyse.tenderId, analyse);
+            deepAnalysisMap.set(analyse.tenderId, analyse);
           });
-
-          return map;
         });
+    }
 
-    tenders.forEach((tender) => {
-      (tender as any).deepAnalysisStatus =
-        deepAnalysisMap.get(tender.id)?.status ?? null;
+    tenders.forEach((tender: any) => {
+      const deepAnalysisStatus = deepAnalysisMap.get(tender.id)?.status ?? null;
+
+      tender.deepAnalysisStatus = deepAnalysisStatus;
+    });
+  }
+
+  async fillUpTenderListByDeepAnalysisAndWishListStatus<
+    T extends {
+      id: string;
+      deepAnalysisStatus?: string | null;
+      isInWishlist?: boolean;
+    },
+  >(tenders: T[], userId?: string) {
+    const deepAnalysisMap: Map<string, TenderDeepAnalysisDocument> = new Map();
+    const wishListMap: Map<string, TenderWishlistItemDocument> = new Map();
+
+    if (userId) {
+      await Promise.all([
+        TenderDeepAnalysisModel.find({
+          company: userId,
+          tenderId: { $in: tenders.map(({ id }) => id) },
+        })
+          .select('status tenderId')
+          .lean(),
+        TenderWishlistItemModel.find({
+          user: userId,
+          tenderId: { $in: tenders.map(({ id }) => id) },
+        })
+          .select('tenderId')
+          .lean(),
+      ]).then(([analysis, wishlist]) => {
+        analysis.forEach((analyse) => {
+          deepAnalysisMap.set(analyse.tenderId, analyse);
+        });
+        wishlist.forEach((wishItem) => {
+          wishListMap.set(wishItem.tenderId, wishItem);
+        });
+      });
+    }
+
+    tenders.forEach((tender: any) => {
+      const deepAnalysisStatus = deepAnalysisMap.get(tender.id)?.status ?? null;
+      const isInWishlist = !!wishListMap.get(tender.id);
+
+      tender.deepAnalysisStatus = deepAnalysisStatus;
+      tender.isInWishlist = isInWishlist;
     });
   }
 

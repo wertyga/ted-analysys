@@ -31,15 +31,18 @@ export class TendersController {
   ): Promise<TenderDetailDto> {
     const tba = await this.tendersService.findByIdOrFetchFromTed(id);
     const tender = tba.toObject();
-    const wishlistStatus = req.user
-      ? await this.tenderWishlistService.getTenderStatus(req.user, tender.id)
-      : undefined;
+
+    const tenderSerialized = TenderModel.serializeDetail(tender);
+
+    if (req.user) {
+      await this.tendersService.fillUpTenderListByDeepAnalysisAndWishListStatus(
+        [tenderSerialized],
+        req.user._id.toString(),
+      );
+    }
 
     return {
-      ...TenderModel.serializeDetail(tender),
-      ...(wishlistStatus
-        ? { isInWishlist: wishlistStatus.isInWishlist }
-        : undefined),
+      ...tenderSerialized,
       generalAnalysis: TenderGeneralAnalysisModel.serializeDetail(
         tender.generalAnalysis,
       ),

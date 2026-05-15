@@ -78,27 +78,6 @@ export class TenderWishlistService {
     };
   }
 
-  async getPopulatedTendersByWishlists(
-    tenders: (TenderDocument | TenderListDto)[],
-    userId: string,
-  ): Promise<TenderWithWishlist[]> {
-    const ids = tenders.map((t) => t._id.toString());
-
-    const wishTendersIds = await TenderWishlistItemModel.find({
-      user: userId,
-      tender: { $in: ids },
-    })
-      .lean()
-      .then((items) => items.map((t) => t.tender.toString()));
-
-    return tenders.map((tender) => {
-      return {
-        ...('toObject' in tender ? tender.toObject() : tender),
-        isInWishlist: wishTendersIds.includes(tender._id.toString()),
-      };
-    });
-  }
-
   async listUserTenders(user: UserDocument, page = 1, limit = 20) {
     const userId = user._id;
     const normalizedPage = Math.max(1, page);

@@ -50,23 +50,16 @@ export class TedSearchController {
       return this.tendersService.toWholeTenderListDto(tba);
     });
 
-    const tendersWithWishLists = req.user
-      ? await this.tenderWishlistService.getPopulatedTendersByWishlists(
-          listTenders,
-          req.user._id.toString(),
-        )
-      : listTenders;
-
     if (req.user) {
-      await this.tendersService.fillUpTenderByDeepAnalysisStatus(
-        tendersWithWishLists,
+      await this.tendersService.fillUpTenderListByDeepAnalysisAndWishListStatus(
+        listTenders,
         req.user._id.toString(),
       );
     }
 
     return {
       ...noticeData,
-      notices: tendersWithWishLists,
+      notices: listTenders,
     };
   }
 
@@ -84,23 +77,16 @@ export class TedSearchController {
     });
     const localTenders = (noticeData.notices ?? []) as TenderListDto[];
 
-    const tendersWithWishLists = req.user
-      ? await this.tenderWishlistService.getPopulatedTendersByWishlists(
-          localTenders,
-          req.user._id.toString(),
-        )
-      : localTenders;
-
     if (req.user) {
-      await this.tendersService.fillUpTenderByDeepAnalysisStatus(
-        tendersWithWishLists,
+      await this.tendersService.fillUpTenderListByDeepAnalysisAndWishListStatus(
+        localTenders,
         req.user._id.toString(),
       );
     }
 
     return {
       ...noticeData,
-      notices: tendersWithWishLists,
+      notices: localTenders,
     };
   }
 }

@@ -49,13 +49,20 @@ export class TenderWishlistController {
       limit,
     );
 
+    const tendersDtos = wishlist.tenders.map((tender) =>
+      this.tendersService.toWholeTenderListDto(tender as any),
+    );
+
+    if (req.user) {
+      await this.tendersService.fillUpTenderByDeepAnalysisStatus(
+        tendersDtos,
+        req.user._id.toString(),
+      );
+    }
+
     return {
       ...wishlist,
-      tenders: wishlist.tenders.map((tender) =>
-        this.tendersService.toWholeTenderListDto(
-          tender as unknown as TenderDocument,
-        ),
-      ),
+      tenders: tendersDtos,
     };
   }
 

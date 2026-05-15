@@ -269,6 +269,7 @@ export class TedTenderSearchRequestDto implements TedTenderSearchFilters {
   contractAwardTo?: number;
 
   @ApiPropertyOptional()
+  @IsOptional()
   @IsArray()
   tenderIds?: string[];
 }

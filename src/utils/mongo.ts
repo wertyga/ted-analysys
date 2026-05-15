@@ -73,9 +73,7 @@ export const filterModel = <T extends Record<string, any>>(
   } = {},
 ) => {
   const serializedDocument =
-    'toObject' in document && typeof document.toObject === 'function'
-      ? { ...document.toObject() }
-      : { ...document };
+    'toObject' in document ? document.toObject() : document;
   serializedDocument._id = serializedDocument._id.toString();
 
   for (const key in serializedDocument) {
