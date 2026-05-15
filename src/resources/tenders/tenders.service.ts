@@ -569,8 +569,8 @@ export class TendersService {
   }
 
   private buildTenderSourceHash(normalizedTender: NormalizedTenderDto): string {
-    return createHash('sha256')
-      .update(JSON.stringify(normalizedTender))
-      .digest('hex');
+    const { classificationCpv, ...rest } = normalizedTender;
+
+    return createHash('sha256').update(JSON.stringify(rest)).digest('hex');
   }
 }

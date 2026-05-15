@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req } from '@nestjs/common';
+import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -14,6 +14,7 @@ import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/ni
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { TenderWishlistService } from '@/resources/tender-wishlist/tender-wishlist.service';
 import { TenderListDto } from '@/resources/tenders/dto/tender.dto';
+import { AdminAccessGuard } from '@/guards';
 
 @ApiTags('ted')
 @Controller('ted')
@@ -24,7 +25,8 @@ export class TedSearchController {
     private readonly tenderWishlistService: TenderWishlistService,
   ) {}
 
-  @Post('search')
+  @UseGuards(AdminAccessGuard)
+  @Post('/ted/search')
   @ApiOperation({ summary: 'Search TED tenders by structured filters' })
   @ApiBody({ type: TedTenderSearchRequestDto })
   @ApiOkResponse({ description: 'TED Search API response' })
@@ -63,7 +65,7 @@ export class TedSearchController {
     };
   }
 
-  @Post('search/local')
+  @Post(['search/local', 'search'])
   @ApiOperation({ summary: 'Search local tenders by structured filters' })
   @ApiBody({ type: TedTenderSearchRequestDto })
   @ApiOkResponse({ description: 'Local tenders search response' })
