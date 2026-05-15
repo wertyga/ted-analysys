@@ -6,10 +6,11 @@ import { TedScope } from '@/resources/ted-search/types/ted-search.types';
 import { getTedDate, resolveDeadlineRange } from '@/resources/ted-search/utils';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { TendersService } from '@/resources/tenders/tenders.service';
-import { TenderDocument } from '@/resources/tenders/schemas';
+import { TenderDocument, TenderModel } from '@/resources/tenders/schemas';
 import { isDev, logger } from '@/utils';
 import { TenderCompanyMatchDocument } from '@/resources/tender-matching/schemas/tender-company-match.schema';
 import { TenderMatchingService } from '@/resources/tender-matching/tender-matching.service';
+import fs from 'node:fs';
 
 const RECENT_TENDERS_CRON = '0 1 * * *';
 const RECENT_TENDERS_LOOKBACK_DAYS = 2;
@@ -25,7 +26,16 @@ export class TendersCronService {
     private readonly tedSearchService: TedSearchService,
     private readonly tendersService: TendersService,
     private readonly tenderMatchingService: TenderMatchingService,
-  ) {}
+  ) {
+    // this.testFn();
+  }
+
+  async testFn() {
+    const tender = await TenderModel.findOne({});
+    await this.matchChangedTenders([tender as any]);
+
+    console.log('DONE');
+  }
 
   @Cron(RECENT_TENDERS_CRON, {
     timeZone: 'Europe/Warsaw',

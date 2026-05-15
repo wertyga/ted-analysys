@@ -11,7 +11,6 @@ import { TedContractNature } from '@/resources/ted-search/dto/ted-tender-search-
 import { UserDocument } from '@/resources/user/user.types';
 import {
   companyCpvPopulateFields,
-  getBoolean,
   getEnumArray,
   getEnumOrNull,
   getNullableNumber,
@@ -19,6 +18,7 @@ import {
   getString,
   getStringArray,
   isDuplicateKeyError,
+  isPopulatedRecord,
   isRecord,
   sleep,
 } from '@/utils';
@@ -33,6 +33,7 @@ import { UserModel } from '@/resources/user/user.schema';
 import { COMPANY_TENDER_FILTER_SYSTEM_PROMPT } from './company-filter.prompt';
 import { TenderMatchingService } from '@/resources/tender-matching/tender-matching.service';
 import { TenderCompanyMatchDocument } from '@/resources/tender-matching/schemas/tender-company-match.schema';
+import { CpvCategoryModel } from '@/resources/cpv/schemas';
 
 const COMPANY_FILTER_WAIT_TIMEOUT_MS = 10 * 60 * 1000;
 const COMPANY_FILTER_WAIT_INTERVAL_MS = 1000;
@@ -45,7 +46,7 @@ interface CompanyFilterCpvPayload {
 interface CompanyTenderFilterAiPayload {
   companyName?: string;
   country?: string;
-  operatingRegions: string[];
+  operatingCountries: string[];
   companySize?: number;
   companyDescription?: string;
   industries: CompanyFilterCpvPayload[];
@@ -168,22 +169,18 @@ export class CompanyFilterService {
 
       try {
         this.analyzeCompanyProfile(payload)
-          .then((result) => {
+          .then(async (result) => {
+            const cpvCodes = await this.buildCompanyTenderFilterCpvCodes(
+              populatedUser,
+              result.additionalCpvSuggestions,
+            );
+
             return CompanyTenderFilterModel.findByIdAndUpdate(
               companyAnalysis._id,
               {
                 $set: {
                   summary: result.summary,
-                  cpvCodes: result.additionalCpvSuggestions.map(
-                    (suggestion) => ({
-                      code: suggestion.code,
-                      label: suggestion.label,
-                      source: CompanyTenderFilterCpvSource.AI_SUGGESTION,
-                      matchLevel: CompanyTenderFilterCpvMatchLevel.MEDIUM,
-                      confidence: suggestion.confidence,
-                      reason: suggestion.reason,
-                    }),
-                  ),
+                  cpvCodes,
                   targetCountries: result.targetCountries,
                   excludedCountries: [],
                   languages: result.languages,
@@ -191,7 +188,6 @@ export class CompanyFilterService {
                   minBudget: result.minBudget,
                   maxBudget: result.maxBudget,
                   currency: result.currency,
-                  allowUnknownBudget: result.allowUnknownBudget,
                   minDaysBeforeDeadline: result.minDaysBeforeDeadline,
                   requiredKeywords: result.requiredKeywords,
                   optionalKeywords: result.optionalKeywords,
@@ -201,7 +197,7 @@ export class CompanyFilterService {
                   publicProcurementExperience:
                     result.publicProcurementExperience,
                   notificationThreshold: result.notificationThreshold,
-                  confirmedByUser: false,
+                  confirmedByUser: true,
                   generationStatus:
                     CompanyTenderFilterGenerationStatus.COMPLETED,
                   generationFinishedAt: new Date(),
@@ -253,7 +249,8 @@ export class CompanyFilterService {
     }
 
     if (
-      companyAnalysis.generationStatus === CompanyTenderFilterGenerationStatus.FAILED
+      companyAnalysis.generationStatus ===
+      CompanyTenderFilterGenerationStatus.FAILED
     ) {
       throw new Error(
         `Company tender filter analysis failed: ${
@@ -292,7 +289,7 @@ export class CompanyFilterService {
       },
       {
         $set: {
-          confirmedByUser: false,
+          confirmedByUser: true,
           generationStatus: CompanyTenderFilterGenerationStatus.IN_PROGRESS,
           generationStartedAt: new Date(),
           generationFinishedAt: null,
@@ -383,24 +380,27 @@ export class CompanyFilterService {
       JSON.stringify(
         {
           summary: 'string',
-          targetCountries: 'user.operatingCountries',
-          languages: 'user.languages',
-          contractNatures: Object.values(TedContractNature),
+          targetCountries: 'copy from user.operatingCountries only',
+          languages: 'copy from user.languages only',
+          contractNatures: ['services'],
           minBudget: null,
           maxBudget: null,
           currency: null,
-          allowUnknownBudget: true,
-          minDaysBeforeDeadline: 'user.minDaysBeforeDeadline',
-          requiredKeywords: ['string'],
+          allowUnknownBudget: this.getAllowUnknownBudgetFromBudget(
+            payload.typicalContractSize?.min,
+            payload.typicalContractSize?.max,
+          ),
+          minDaysBeforeDeadline: null,
+          requiredKeywords: [],
           optionalKeywords: ['string'],
           excludedKeywords: ['string'],
-          certifications: ['string'],
-          capabilities: ['string'],
+          certifications: 'copy from user.certifications only',
+          capabilities: 'copy from user.capabilities only',
           publicProcurementExperience: null,
           notificationThreshold: 65,
           additionalCpvSuggestions: [
             {
-              code: 'string',
+              code: '8-digit CPV code not already present in industries/mainServices',
               label: 'string',
               confidence: 80,
               reason: 'string',
@@ -420,7 +420,7 @@ export class CompanyFilterService {
     return {
       companyName: user.companyName,
       country: user.country,
-      operatingRegions: user.operatingCountries ?? [],
+      operatingCountries: user.operatingCountries ?? [],
       companySize: user.companySize,
       companyDescription: user.companyDescription,
       industries: user.industries as any,
@@ -457,16 +457,20 @@ export class CompanyFilterService {
       payload.typicalContractSize?.currency === undefined
         ? null
         : getEnumOrNull(value.currency, CurrencySign);
+    const allowUnknownBudget = this.getAllowUnknownBudgetFromBudget(
+      minBudget,
+      maxBudget,
+    );
 
     return {
       summary: getString(value, 'summary'),
-      targetCountries: payload.operatingRegions,
+      targetCountries: payload.operatingCountries,
       languages: payload.languages,
       contractNatures: getEnumArray(value.contractNatures, TedContractNature),
       minBudget,
       maxBudget,
       currency,
-      allowUnknownBudget: getBoolean(value, 'allowUnknownBudget', true),
+      allowUnknownBudget,
       minDaysBeforeDeadline: payload.minDaysBeforeDeadline,
       requiredKeywords: getStringArray(value, 'requiredKeywords'),
       optionalKeywords: getStringArray(value, 'optionalKeywords'),
@@ -494,6 +498,98 @@ export class CompanyFilterService {
     }
 
     return value;
+  }
+
+  private getAllowUnknownBudgetFromBudget(
+    minBudget: number | null | undefined,
+    maxBudget: number | null | undefined,
+  ): boolean {
+    return minBudget == null && maxBudget == null;
+  }
+
+  private async buildCompanyTenderFilterCpvCodes(
+    user: UserDocument,
+    suggestions: CompanyTenderFilterAiResult['additionalCpvSuggestions'],
+  ): Promise<CompanyTenderFilterDocument['cpvCodes']> {
+    const seenCodes = new Set<string>();
+    const cpvCodes: CompanyTenderFilterDocument['cpvCodes'] = [];
+
+    const addUserCpvCodes = (
+      values: unknown,
+      source:
+        | CompanyTenderFilterCpvSource.INDUSTRY
+        | CompanyTenderFilterCpvSource.MAIN_SERVICE,
+    ) => {
+      if (!Array.isArray(values)) {
+        return;
+      }
+
+      values.forEach((value) => {
+        if (!isPopulatedRecord(value)) {
+          return;
+        }
+
+        const code = typeof value.code === 'string' ? value.code.trim() : '';
+
+        if (!code || seenCodes.has(code)) {
+          return;
+        }
+
+        seenCodes.add(code);
+        cpvCodes.push({
+          category: value._id as any,
+          code,
+          label: typeof value.name === 'string' ? value.name : '',
+          source,
+          matchLevel:
+            source === CompanyTenderFilterCpvSource.INDUSTRY
+              ? CompanyTenderFilterCpvMatchLevel.BROAD
+              : CompanyTenderFilterCpvMatchLevel.SPECIFIC,
+          confidence: 100,
+          reason:
+            source === CompanyTenderFilterCpvSource.INDUSTRY
+              ? 'Selected in company industries'
+              : 'Selected in company main services',
+        });
+      });
+    };
+
+    addUserCpvCodes(user.industries, CompanyTenderFilterCpvSource.INDUSTRY);
+    addUserCpvCodes(
+      user.mainServices,
+      CompanyTenderFilterCpvSource.MAIN_SERVICE,
+    );
+
+    const newSuggestionCodes = suggestions
+      .map((suggestion) => suggestion.code)
+      .filter((code) => !seenCodes.has(code));
+    const suggestionCategories = await CpvCategoryModel.find({
+      code: { $in: newSuggestionCodes },
+    })
+      .select('code')
+      .exec();
+    const suggestionCategoryByCode = new Map(
+      suggestionCategories.map((category) => [category.code, category._id]),
+    );
+
+    suggestions.forEach((suggestion) => {
+      if (seenCodes.has(suggestion.code)) {
+        return;
+      }
+
+      seenCodes.add(suggestion.code);
+      cpvCodes.push({
+        category: suggestionCategoryByCode.get(suggestion.code) ?? null,
+        code: suggestion.code,
+        label: suggestion.label,
+        source: CompanyTenderFilterCpvSource.AI_SUGGESTION,
+        matchLevel: CompanyTenderFilterCpvMatchLevel.MEDIUM,
+        confidence: suggestion.confidence,
+        reason: suggestion.reason,
+      });
+    });
+
+    return cpvCodes;
   }
 
   private getCpvSuggestions(

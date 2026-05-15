@@ -17,6 +17,7 @@ import {
   TenderCompanyMatchDocument,
   TenderCompanyMatchModel,
 } from './schemas/tender-company-match.schema';
+import * as fs from 'node:fs';
 
 const RECENT_ACTIVE_TENDERS_LOOKBACK_DAYS = 2;
 
@@ -27,15 +28,6 @@ export class TenderMatchingService {
     filter: CompanyTenderFilterForMatching,
   ): TenderCompanyMatchResult {
     return matchTenderWithCompanyFilter(mapTenderForMatching(tender), filter);
-  }
-
-  async processTender(tenderId: string): Promise<TenderCompanyMatchDocument[]> {
-    const [tender, companyFilters] = await Promise.all([
-      this.findTender(tenderId),
-      CompanyTenderFilterModel.find({ confirmedByUser: true }),
-    ]);
-
-    return this.matchTenderWithFilters(tender, companyFilters);
   }
 
   async matchActiveRecentTendersWithCompanyFilter(
@@ -100,7 +92,14 @@ export class TenderMatchingService {
       return undefined;
     }
 
-    return this.saveMatch(tenderId, companyId, filterId, result);
+    const savedMatch = await this.saveMatch(
+      tenderId,
+      companyId,
+      filterId,
+      result,
+    );
+
+    return savedMatch;
   }
 
   async processTenderForCompany(

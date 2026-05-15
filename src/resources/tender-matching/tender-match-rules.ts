@@ -8,6 +8,7 @@ import {
   TenderMatchDecision,
   HardMatchStatus,
 } from './tender-match.types';
+import fs from 'node:fs';
 
 const MAX_SCORE = 100;
 
@@ -179,8 +180,11 @@ export function matchBudget(
   tender: TenderForMatching,
   filter: CompanyTenderFilterForMatching,
 ): RuleMatchResult {
+  const allowUnknownBudget =
+    filter.minBudget == null && filter.maxBudget == null;
+
   if (tender.estimatedValue === null || tender.estimatedValue === undefined) {
-    if (!filter.allowUnknownBudget) {
+    if (!allowUnknownBudget) {
       return {
         rejected: true,
         score: 0,
@@ -262,11 +266,50 @@ export function matchContractNature(
   }
 
   return {
-    rejected: false,
-    score: -5,
-    reasons: [],
-    risks: [`Contract nature may not match: ${contractNature}`],
+    rejected: true,
+    score: 0,
+    reasons: [`Contract nature mismatch: ${contractNature}`],
+    risks: [],
   };
+}
+
+export function matchLanguages(
+  tenderLanguages: string[] | undefined,
+  filterLanguages: string[] | undefined,
+): RuleMatchResult {
+  const normalizedFilterLanguages = normalizeLanguageList(filterLanguages);
+
+  if (normalizedFilterLanguages.length === 0) {
+    return { rejected: false, score: 0, reasons: [], risks: [] };
+  }
+
+  const normalizedTenderLanguages = normalizeLanguageList(tenderLanguages);
+
+  if (normalizedTenderLanguages.length === 0) {
+    return {
+      rejected: false,
+      score: 0,
+      reasons: [],
+      risks: ['Tender language is missing'],
+    };
+  }
+
+  const hasMatchingLanguage = normalizedTenderLanguages.some((language) =>
+    normalizedFilterLanguages.includes(language),
+  );
+
+  if (!hasMatchingLanguage) {
+    return {
+      rejected: true,
+      score: 0,
+      reasons: [
+        `Tender language may not match company languages: ${normalizedTenderLanguages.join(', ')}`,
+      ],
+      risks: [],
+    };
+  }
+
+  return { rejected: false, score: 5, reasons: [], risks: [] };
 }
 
 export function matchRequiredKeywords(
@@ -349,37 +392,42 @@ export function matchTenderWithCompanyFilter(
   );
 
   if (excludedKeywordMatch.rejected) {
-    return hardReject(
-      excludedKeywordMatch.reasons,
-      [],
-      [...(excludedKeywordMatch.keywordHits ?? [])],
-    );
+    reasons.push(...excludedKeywordMatch.reasons);
+    for (const keywordHit of excludedKeywordMatch.keywordHits ?? []) {
+      keywordHits.add(keywordHit);
+    }
   }
 
   const cpvMatch = matchCpv(tender.cpvCodes, filter.cpvCodes);
 
   if (!cpvMatch.matched) {
-    return hardReject(['No CPV match'], [], []);
+    reasons.push('No CPV match');
+  } else {
+    score += cpvMatch.score;
   }
-
-  score += cpvMatch.score;
 
   const orderedRules: RuleMatchResult[] = [
     matchCountry(tender, filter),
     matchDeadline(tender.deadlineAt, filter.minDaysBeforeDeadline, now),
     matchBudget(tender, filter),
     matchContractNature(tender.contractNature, filter.contractNatures),
+    matchLanguages(tender.languages, filter.languages),
     matchRequiredKeywords(tenderText, filter.requiredKeywords),
     scoreOptionalKeywords(tenderText, filter.optionalKeywords),
   ];
 
   for (const ruleResult of orderedRules) {
     if (ruleResult.rejected) {
-      return hardReject(ruleResult.reasons, risks, Array.from(keywordHits));
+      reasons.push(...ruleResult.reasons);
+
+      for (const keywordHit of ruleResult.keywordHits ?? []) {
+        keywordHits.add(keywordHit);
+      }
+
+      continue;
     }
 
     score += ruleResult.score;
-    reasons.push(...ruleResult.reasons);
     risks.push(...ruleResult.risks);
 
     for (const keywordHit of ruleResult.keywordHits ?? []) {
@@ -387,16 +435,27 @@ export function matchTenderWithCompanyFilter(
     }
   }
 
+  if (reasons.length > 0) {
+    return hardReject(
+      uniqueStrings(reasons),
+      uniqueStrings(risks),
+      Array.from(keywordHits),
+    );
+  }
+
   const clampedScore = clampScore(score);
   const decision = getDecision(clampedScore);
   const matched = clampedScore >= 60;
+  const resultReasons = matched
+    ? reasons
+    : [...reasons, `Hard match score below threshold: ${clampedScore}`];
 
   return {
     matched,
     status: matched ? HardMatchStatus.MATCHED : HardMatchStatus.REJECTED,
     score: clampedScore,
     decision,
-    reasons,
+    reasons: uniqueStrings(resultReasons),
     risks,
     keywordHits: Array.from(keywordHits),
   };
@@ -467,4 +526,20 @@ function normalizeCountry(country: string | null | undefined): string {
 
 function normalizeCurrency(currency: string): string {
   return currency.trim().toUpperCase();
+}
+
+function normalizeLanguageList(values: string[] | undefined): string[] {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  return uniqueStrings(
+    values
+      .map((value) => value.trim().toUpperCase())
+      .filter((value) => value.length > 0 && value !== 'MUL'),
+  );
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)));
 }

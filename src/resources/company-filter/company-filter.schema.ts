@@ -45,7 +45,6 @@ export interface CompanyTenderFilter {
   minBudget?: number | null;
   maxBudget?: number | null;
   currency?: CurrencySign | null;
-  allowUnknownBudget: boolean;
   minDaysBeforeDeadline: number;
   requiredKeywords: string[];
   optionalKeywords: string[];
@@ -164,10 +163,6 @@ export const CompanyTenderFilterSchema =
         type: String,
         enum: [...Object.values(CurrencySign), null],
         default: null,
-      },
-      allowUnknownBudget: {
-        type: Boolean,
-        default: true,
       },
       minDaysBeforeDeadline: {
         type: Number,

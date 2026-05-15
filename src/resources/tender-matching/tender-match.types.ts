@@ -75,7 +75,6 @@ export interface CompanyTenderFilterForMatching {
   minBudget?: number | null;
   maxBudget?: number | null;
   currency?: string | null;
-  allowUnknownBudget: boolean;
   minDaysBeforeDeadline: number;
   requiredKeywords: string[];
   optionalKeywords: string[];
