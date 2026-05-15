@@ -10,6 +10,7 @@ import { TenderDocument, TenderModel } from '@/resources/tenders/schemas';
 import { isDev, logger } from '@/utils';
 import { TenderCompanyMatchDocument } from '@/resources/tender-matching/schemas/tender-company-match.schema';
 import { TenderMatchingService } from '@/resources/tender-matching/tender-matching.service';
+import { TedOpenTendersCollectorService } from '@/resources/ted-open-tenders-collector/ted-open-tenders-collector.service';
 
 const RECENT_TENDERS_CRON = '0 1 * * *';
 const RECENT_TENDERS_LOOKBACK_DAYS = 2;
@@ -26,14 +27,18 @@ export class TendersCronService {
     private readonly tendersService: TendersService,
     private readonly tenderMatchingService: TenderMatchingService,
   ) {
-    // this.testFn();
+    if (process.env.NEED_TOGATHER_TED_BASE) {
+      setTimeout(() => {
+        this.collectAllTendersFromTED();
+      }, 2000);
+    }
   }
 
-  async testFn() {
-    const tender = await TenderModel.findOne({});
-    await this.matchChangedTenders([tender as any]);
-
-    console.log('DONE');
+  async collectAllTendersFromTED() {
+    await new TedOpenTendersCollectorService(
+      this.tedSearchService,
+      this.tendersService,
+    ).collectOpenTendersFromTed();
   }
 
   @Cron(RECENT_TENDERS_CRON, {
@@ -150,7 +155,8 @@ export class TendersCronService {
 
   private buildRecentCompetitionTenderFilters(page: number) {
     const today = new Date();
-    const publicationDateFrom = new Date(today);
+    const publicationDateFrom = new Date();
+
     publicationDateFrom.setDate(
       publicationDateFrom.getDate() - RECENT_TENDERS_LOOKBACK_DAYS,
     );
