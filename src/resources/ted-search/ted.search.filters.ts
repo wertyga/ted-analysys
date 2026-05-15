@@ -1,82 +1,105 @@
 import { TedTenderSearchRequestDto } from './dto/ted-tender-search-request.dto';
+import { normalizeTedCountryCodes } from '@/resources/codelist';
+import {
+  getNarrowerCodes,
+  normalizeCpvCodes,
+} from './ted-builders/ted-cpv.builder';
+import { resolveDeadlineRange } from './utils';
 
 type MongoFilter = Record<string, unknown>;
 
 export class TedSearchFilters {
   buildLocalTenderQuery(filters: TedTenderSearchRequestDto): MongoFilter {
+    const resolvedFilters = resolveDeadlineRange(filters);
     const parts: MongoFilter[] = [];
 
-    if (filters.text?.trim()) {
+    if (resolvedFilters.text?.trim()) {
       parts.push({
         $or: [
-          { title: this.buildTextRegex(filters.text) },
-          { titleProc: this.buildTextRegex(filters.text) },
-          { titleLot: this.buildTextRegex(filters.text) },
-          { description: this.buildTextRegex(filters.text) },
-          { descriptionLot: this.buildTextRegex(filters.text) },
-          { buyerName: this.buildTextRegex(filters.text) },
-          { publicationNumber: this.buildTextRegex(filters.text) },
+          { title: this.buildTextRegex(resolvedFilters.text) },
+          { titleProc: this.buildTextRegex(resolvedFilters.text) },
+          { titleLot: this.buildTextRegex(resolvedFilters.text) },
+          { description: this.buildTextRegex(resolvedFilters.text) },
+          { descriptionLot: this.buildTextRegex(resolvedFilters.text) },
+          { buyerName: this.buildTextRegex(resolvedFilters.text) },
+          { publicationNumber: this.buildTextRegex(resolvedFilters.text) },
         ],
       });
     }
 
-    if (filters.cpvCodes?.length) {
-      parts.push({ cpvCodes: { $in: filters.cpvCodes } });
+    const cpvCodes = getNarrowerCodes(
+      normalizeCpvCodes(resolvedFilters.cpvCodes ?? []),
+    );
+
+    if (cpvCodes.length) {
+      parts.push({ cpvCodes: { $in: cpvCodes } });
     }
 
-    const buyerCountries = [...(filters.buyerCountries ?? [])];
+    const buyerCountries = normalizeTedCountryCodes(
+      resolvedFilters.buyerCountries,
+    );
 
     if (buyerCountries.length) {
       parts.push({ buyerCountry: { $in: buyerCountries } });
     }
 
-    if (filters.buyerName?.trim()) {
-      parts.push({ buyerName: this.buildTextRegex(filters.buyerName) });
+    if (resolvedFilters.buyerName?.trim()) {
+      parts.push({ buyerName: this.buildTextRegex(resolvedFilters.buyerName) });
     }
 
-    if (filters.buyerIdentifier?.trim()) {
+    if (resolvedFilters.buyerIdentifier?.trim()) {
       parts.push({
-        buyerIdentifier: this.buildTextRegex(filters.buyerIdentifier),
+        buyerIdentifier: this.buildTextRegex(resolvedFilters.buyerIdentifier),
       });
     }
 
-    if (filters.buyerCity?.trim()) {
-      parts.push({ buyerCity: this.buildTextRegex(filters.buyerCity) });
+    if (resolvedFilters.buyerCity?.trim()) {
+      parts.push({ buyerCity: this.buildTextRegex(resolvedFilters.buyerCity) });
     }
 
-    if (filters.buyerMainActivity?.length) {
-      parts.push({ buyerMainActivities: { $in: filters.buyerMainActivity } });
-    }
-
-    if (filters.placeOfPerformance?.length) {
+    if (resolvedFilters.buyerMainActivity?.length) {
       parts.push({
-        placeOfPerformanceCountries: { $in: filters.placeOfPerformance },
+        buyerMainActivities: { $in: resolvedFilters.buyerMainActivity },
       });
     }
 
-    if (filters.submissionLanguage?.length) {
-      parts.push({ submissionLanguages: { $in: filters.submissionLanguage } });
+    const placeOfPerformance = normalizeTedCountryCodes(
+      resolvedFilters.placeOfPerformance,
+    );
+
+    if (placeOfPerformance.length) {
+      parts.push({
+        placeOfPerformanceCountries: { $in: placeOfPerformance },
+      });
     }
 
-    if (filters.noticeTypes?.length) {
-      parts.push({ noticeType: { $in: filters.noticeTypes } });
+    if (resolvedFilters.submissionLanguage?.length) {
+      parts.push({
+        submissionLanguages: { $in: resolvedFilters.submissionLanguage },
+      });
     }
 
-    if (filters.procedureType?.length) {
-      parts.push({ procedureType: { $in: filters.procedureType } });
+    if (resolvedFilters.noticeTypes?.length) {
+      parts.push({ noticeType: { $in: resolvedFilters.noticeTypes } });
     }
 
-    if (filters.contractNature?.length) {
-      parts.push({ contractNature: { $in: filters.contractNature } });
+    if (resolvedFilters.procedureType?.length) {
+      parts.push({ procedureType: { $in: resolvedFilters.procedureType } });
     }
 
-    if (filters.currency?.length) {
-      parts.push({ 'estimatedValue.currency': { $in: filters.currency } });
+    if (resolvedFilters.contractNature?.length) {
+      parts.push({ contractNature: { $in: resolvedFilters.contractNature } });
+    }
+
+    if (resolvedFilters.currency?.length) {
+      parts.push({
+        'estimatedValue.currency': { $in: resolvedFilters.currency },
+      });
     }
 
     const contractAwardFilter = this.buildNumberRangeFilter(
-      filters.contractAwardFrom,
-      filters.contractAwardTo,
+      resolvedFilters.contractAwardFrom,
+      resolvedFilters.contractAwardTo,
     );
 
     if (contractAwardFilter) {
@@ -84,8 +107,8 @@ export class TedSearchFilters {
     }
 
     const publicationDateFilter = this.buildDateRangeFilter(
-      filters.publicationDateFrom,
-      filters.publicationDateTo,
+      resolvedFilters.publicationDateFrom,
+      resolvedFilters.publicationDateTo,
     );
 
     if (publicationDateFilter) {
@@ -93,16 +116,20 @@ export class TedSearchFilters {
     }
 
     const submissionDeadlineFilter = this.buildDateRangeFilter(
-      filters.submissionDeadlineFrom,
-      filters.submissionDeadlineTo,
+      resolvedFilters.submissionDeadlineFrom,
+      resolvedFilters.submissionDeadlineTo,
     );
 
     if (submissionDeadlineFilter) {
       parts.push({ submissionDeadline: submissionDeadlineFilter });
     }
 
-    if (filters.tenderIds?.length) {
-      parts.push({ id: { $in: filters.tenderIds } });
+    if (resolvedFilters.tenderIds?.length) {
+      parts.push({ id: { $in: resolvedFilters.tenderIds } });
+    }
+
+    if (parts.length === 0) {
+      return {};
     }
 
     return parts.length === 1 ? parts[0] : { $and: parts };
