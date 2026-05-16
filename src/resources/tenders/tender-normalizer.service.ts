@@ -554,7 +554,7 @@ export class TenderNormalizerService {
 
     const normalized = this.normalizeTenderDateText(trimmed);
 
-    if (normalized !== undefined) {
+    if (normalized) {
       return this.toValidDate(normalized);
     }
 
@@ -665,15 +665,19 @@ export class TenderNormalizerService {
       const amount = this.numberFromValue(this.pickText(raw, [...amountPaths]));
       const currency = this.pickText(raw, [...currencyPaths]);
 
-      if (amount !== undefined || currency !== undefined) {
+      if (!!amount || currency) {
         return {
-          amount: amount ?? null,
+          amount: this.normalizeEstimatedAmount(amount),
           currency: currency ?? null,
         };
       }
     }
 
     return undefined;
+  }
+
+  private normalizeEstimatedAmount(amount: number | undefined): number | null {
+    return amount && amount > 0 ? amount : null;
   }
 
   private pickCriteria(
@@ -874,56 +878,6 @@ export class TenderNormalizerService {
     )?.text;
   }
 
-  private valueToEstimatedValue(
-    value: unknown,
-  ): EstimatedValueCandidate | undefined {
-    if (value === undefined || value === null) {
-      return undefined;
-    }
-
-    if (typeof value === 'number' || typeof value === 'string') {
-      const amount = this.numberFromValue(value);
-
-      return amount === undefined ? undefined : { amount, currency: null };
-    }
-
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        const candidate = this.valueToEstimatedValue(item);
-
-        if (candidate !== undefined) {
-          return candidate;
-        }
-      }
-    }
-
-    if (isRecord(value)) {
-      const amount =
-        this.numberFromValue(value.amount) ??
-        this.numberFromValue(value.value) ??
-        this.numberFromValue(value['#text']) ??
-        this.numberFromValue(value._);
-
-      if (amount === undefined) {
-        return undefined;
-      }
-
-      return {
-        amount,
-        currency:
-          this.valueToText(
-            value.currency ??
-              value.currencyID ??
-              value.currencyId ??
-              value['@currencyID'] ??
-              value['@_currencyID'],
-          ) ?? null,
-      };
-    }
-
-    return undefined;
-  }
-
   private numberFromValue(value: unknown): number | undefined {
     const text = this.valueToText(value)?.replace(/\s/g, '').replace(',', '.');
 
@@ -995,106 +949,6 @@ export class TenderNormalizerService {
           ),
       ),
     );
-  }
-
-  private firstTextByLocalName(
-    value: unknown,
-    localName: string,
-  ): string | undefined {
-    for (const item of this.collectDeepValuesByLocalName(value, localName)) {
-      const text = this.valueToText(item);
-
-      if (text !== undefined && text.trim().length > 0) {
-        return text.trim();
-      }
-    }
-
-    return undefined;
-  }
-
-  private firstDirectText(
-    record: Record<string, unknown>,
-    localName: string,
-  ): string | undefined {
-    for (const value of this.getDirectValuesByLocalName(record, localName)) {
-      const text = this.valueToText(value);
-
-      if (text !== undefined && text.trim().length > 0) {
-        return text.trim();
-      }
-    }
-
-    return undefined;
-  }
-
-  private collectDeepRecordValuesByLocalName(
-    value: unknown,
-    localName: string,
-  ): Record<string, unknown>[] {
-    return this.collectDeepValuesByLocalName(value, localName).filter(
-      (item): item is Record<string, unknown> => isRecord(item),
-    );
-  }
-
-  private collectDeepValuesByLocalName(
-    value: unknown,
-    localName: string,
-  ): unknown[] {
-    const values: unknown[] = [];
-    this.collectDeepValuesByLocalNameInto(value, localName, values);
-
-    return values;
-  }
-
-  private collectDeepValuesByLocalNameInto(
-    value: unknown,
-    localName: string,
-    values: unknown[],
-  ): void {
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        this.collectDeepValuesByLocalNameInto(item, localName, values);
-      }
-
-      return;
-    }
-
-    if (!isRecord(value)) {
-      return;
-    }
-
-    for (const [key, nestedValue] of Object.entries(value)) {
-      if (this.getLocalName(key).toLowerCase() === localName.toLowerCase()) {
-        if (Array.isArray(nestedValue)) {
-          values.push(...nestedValue);
-        } else {
-          values.push(nestedValue);
-        }
-      }
-
-      this.collectDeepValuesByLocalNameInto(nestedValue, localName, values);
-    }
-  }
-
-  private getDirectValuesByLocalName(
-    record: Record<string, unknown>,
-    localName: string,
-  ): unknown[] {
-    const values: unknown[] = [];
-
-    for (const [key, value] of Object.entries(record)) {
-      if (this.getLocalName(key).toLowerCase() !== localName.toLowerCase()) {
-        continue;
-      }
-
-      if (Array.isArray(value)) {
-        values.push(...value);
-      } else {
-        values.push(value);
-      }
-    }
-
-    return values;
   }
 
   private getLanguage(record: Record<string, unknown>): string | undefined {

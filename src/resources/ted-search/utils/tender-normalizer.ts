@@ -140,7 +140,7 @@ function normalizeValue(
   }
 
   if (!isRecord(value)) {
-    if (isBuyerCountryKey(sourceKey) && value !== undefined && value !== null) {
+    if (isBuyerCountryKey(sourceKey) && value) {
       const text = toCountryCode(value);
 
       return text === undefined ? [] : Array.from(new Set([text]));

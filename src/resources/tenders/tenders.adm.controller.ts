@@ -103,7 +103,7 @@ export class TendersAdmController {
           const publicationNumber = extractPublicationNumberFromNotice(notice);
 
           return (
-            publicationNumber !== undefined &&
+            publicationNumber &&
             !existingPublicationNumbers.has(publicationNumber)
           );
         });

@@ -28,10 +28,6 @@ export class CurrencyExchangeRatesService {
   private readonly logger = new Logger(CurrencyExchangeRatesService.name);
   private isSyncing = false;
 
-  constructor() {
-    this.syncLatestRatesCron();
-  }
-
   @Cron(CURRENCY_EXCHANGE_RATES_CRON, {
     timeZone: 'Europe/Warsaw',
   })
@@ -130,15 +126,14 @@ export class CurrencyExchangeRatesService {
     currency: CurrencySign,
     date?: Date,
   ): Promise<CurrencyExchangeRateDocument | null> {
-    const query =
-      date !== undefined
-        ? {
-            currency,
-            date: { $lte: startOfUtcDay(date) },
-          }
-        : {
-            currency,
-          };
+    const query = date
+      ? {
+          currency,
+          date: { $lte: startOfUtcDay(date) },
+        }
+      : {
+          currency,
+        };
 
     return CurrencyExchangeRateModel.findOne(query).sort({ date: -1 }).exec();
   }

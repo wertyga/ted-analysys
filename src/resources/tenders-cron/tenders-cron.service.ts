@@ -42,13 +42,7 @@ export class TendersCronService {
     private readonly tedSearchService: TedSearchService,
     private readonly tendersService: TendersService,
     private readonly tenderMatchingService: TenderMatchingService,
-  ) {
-    if (process.env.NEED_TOGATHER_TED_BASE) {
-      setTimeout(() => {
-        this.gatherAllCompetitionTenders();
-      }, 2000);
-    }
-  }
+  ) {}
 
   @Cron(ALL_COMPETITION_TENDERS_CRON, {
     timeZone: 'Europe/Warsaw',

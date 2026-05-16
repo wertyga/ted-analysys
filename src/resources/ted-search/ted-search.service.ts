@@ -1,36 +1,24 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosError, AxiosInstance } from 'axios';
-import { PipelineStage } from 'mongoose';
 import { TedSearchRequestDto } from './dto/ted-search-request.dto';
 import { TedTenderSearchRequestDto } from './dto/ted-tender-search-request.dto';
 import { buildTedTenderSearchQuery } from './ted-builders';
 import { TedSearchFilters } from './ted.search.filters';
 import { TedSearchSorting } from './ted.search.sorting';
 import {
-  TedNotice,
   TedPaginationMode,
   TedScope,
   TedSearchResponse,
 } from './types/ted-search.types';
 import { mapTedError } from './utils';
-import { TenderGeneralAnalysisModel } from '@/resources/tender-analysis/schemas';
-import {
-  TenderDocument,
-  TenderModel,
-  TenderWithWishlist,
-} from '@/resources/tenders/schemas';
+import { TenderModel } from '@/resources/tenders/schemas';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { isDev } from '@/utils';
-import { TenderListDto } from '@/resources/tenders/dto/tender.dto';
-import {
-  TenderDeepAnalysisDocument,
-  TenderDeepAnalysisModel,
-} from '@/resources/tender-deep-analysis/schemas';
+import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rates/currency-exchange-rates.service';
 
 @Injectable()
 export class TedSearchService {
   private readonly logger = new Logger(TedSearchService.name);
-  private readonly filters = new TedSearchFilters();
   private readonly sorting = new TedSearchSorting();
   private readonly baseUrl = 'https://api.ted.europa.eu';
   private readonly http: AxiosInstance = axios.create({
@@ -47,7 +35,12 @@ export class TedSearchService {
   constructor(
     @Inject(forwardRef(() => TendersService))
     private readonly tendersService: TendersService,
-  ) {}
+    private readonly currencyExchangeRatesService: CurrencyExchangeRatesService,
+  ) {
+    this.filters = new TedSearchFilters(this.currencyExchangeRatesService);
+  }
+
+  private readonly filters: TedSearchFilters;
 
   private readonly searchTendersDefaultFields = [
     'notice-identifier',
@@ -150,7 +143,7 @@ export class TedSearchService {
   ): Promise<TedSearchResponse> {
     const limit = filters.limit ?? 20;
     const page = filters.page ?? 1;
-    const query = this.filters.buildLocalTenderQuery(filters);
+    const query = await this.filters.buildLocalTenderQuery(filters);
     const sort = this.sorting.buildLocalTenderSort(filters);
     const skip = (page - 1) * limit;
 

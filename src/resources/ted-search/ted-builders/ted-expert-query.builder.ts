@@ -95,7 +95,7 @@ export function buildTedTenderSearchQuery(
       submissionDeadlineFrom,
       submissionDeadlineTo,
     ),
-  ].filter((part): part is string => part !== undefined);
+  ].filter((part): part is string => !!part);
 
   const query =
     parts.length === 0
@@ -172,15 +172,15 @@ function buildRangePart(
   left: number | undefined,
   right: number | undefined,
 ) {
-  if (left !== undefined && right !== undefined) {
+  if (left && right) {
     return `${field} = (${left} <> ${right})`;
   }
 
-  if (left !== undefined) {
+  if (left) {
     return `${field} = (${left} <> 9999999999999)`;
   }
 
-  if (right !== undefined) {
+  if (right) {
     return `${field} = (0 <> ${right})`;
   }
 

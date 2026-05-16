@@ -2,7 +2,9 @@ import { getNullableNumber, isRecord, valueToString } from '@/utils';
 import { TenderDocument } from '@/resources/tenders/schemas';
 import { TenderForMatching } from './tender-match.types';
 
-export function mapTenderForMatching(tender: TenderDocument): TenderForMatching {
+export function mapTenderForMatching(
+  tender: TenderDocument,
+): TenderForMatching {
   const estimatedValue = readEstimatedValue(tender);
 
   return {
@@ -40,15 +42,21 @@ function readEstimatedValue(tender: TenderDocument): {
 } {
   if (isRecord(tender.estimatedValue)) {
     return {
-      amount: readNumber(tender.estimatedValue.amount),
+      amount: readEstimatedAmount(tender.estimatedValue.amount),
       currency: readString(tender.estimatedValue.currency),
     };
   }
 
   return {
-    amount: readNumber(tender.estimatedValue),
+    amount: readEstimatedAmount(tender.estimatedValue),
     currency: null,
   };
+}
+
+function readEstimatedAmount(value: unknown): number | null | undefined {
+  const amount = readNumber(value);
+
+  return !!amount ? amount : null;
 }
 
 function readString(value: unknown): string | undefined {

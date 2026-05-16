@@ -1,15 +1,22 @@
 import { TedTenderSearchRequestDto } from './dto/ted-tender-search-request.dto';
-import { normalizeTedCountryCodes } from '@/resources/codelist';
+import { CurrencySign, normalizeTedCountryCodes } from '@/resources/codelist';
 import {
   getNarrowerCodes,
   normalizeCpvCodes,
 } from './ted-builders/ted-cpv.builder';
 import { resolveDeadlineRange } from './utils';
+import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rates/currency-exchange-rates.service';
 
 type MongoFilter = Record<string, unknown>;
 
 export class TedSearchFilters {
-  buildLocalTenderQuery(filters: TedTenderSearchRequestDto): MongoFilter {
+  constructor(
+    private readonly currencyExchangeRatesService: CurrencyExchangeRatesService,
+  ) {}
+
+  async buildLocalTenderQuery(
+    filters: TedTenderSearchRequestDto,
+  ): Promise<MongoFilter> {
     const resolvedFilters = resolveDeadlineRange(filters);
     const parts: MongoFilter[] = [];
 
@@ -91,19 +98,11 @@ export class TedSearchFilters {
       parts.push({ contractNature: { $in: resolvedFilters.contractNature } });
     }
 
-    if (resolvedFilters.currency?.length) {
-      parts.push({
-        'estimatedValue.currency': { $in: resolvedFilters.currency },
-      });
-    }
-
-    const contractAwardFilter = this.buildNumberRangeFilter(
-      resolvedFilters.contractAwardFrom,
-      resolvedFilters.contractAwardTo,
-    );
+    const contractAwardFilter =
+      await this.buildContractAwardFilter(resolvedFilters);
 
     if (contractAwardFilter) {
-      parts.push({ 'estimatedValue.amount': contractAwardFilter });
+      parts.push(contractAwardFilter);
     }
 
     const publicationDateFilter = this.buildDateRangeFilter(
@@ -121,7 +120,13 @@ export class TedSearchFilters {
     );
 
     if (submissionDeadlineFilter) {
-      parts.push({ submissionDeadline: submissionDeadlineFilter });
+      parts.push({
+        $or: [
+          { submissionDeadline: submissionDeadlineFilter },
+          { submissionDeadline: null },
+          { submissionDeadline: { $exists: false } },
+        ],
+      });
     }
 
     if (resolvedFilters.tenderIds?.length) {
@@ -188,5 +193,79 @@ export class TedSearchFilters {
 
   private escapeRegex(value: string): string {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private async buildContractAwardFilter(
+    filters: TedTenderSearchRequestDto,
+  ): Promise<MongoFilter | undefined> {
+    const hasRange =
+      filters.contractAwardFrom !== undefined ||
+      filters.contractAwardTo !== undefined;
+
+    if (!hasRange) {
+      if (filters.currency?.length) {
+        return { 'estimatedValue.currency': { $in: filters.currency } };
+      }
+
+      return undefined;
+    }
+
+    if (!filters.currency?.length) {
+      const amountFilter = this.buildNumberRangeFilter(
+        filters.contractAwardFrom,
+        filters.contractAwardTo,
+      );
+
+      return amountFilter
+        ? { 'estimatedValue.amount': amountFilter }
+        : undefined;
+    }
+
+    const eurRanges = await Promise.all(
+      filters.currency.map((currency) =>
+        this.buildEurRangeForCurrency(
+          currency,
+          filters.contractAwardFrom,
+          filters.contractAwardTo,
+        ),
+      ),
+    );
+    const validRanges = eurRanges.filter(
+      (range): range is MongoFilter => !!range,
+    );
+
+    if (validRanges.length === 0) {
+      return { _id: { $exists: false } };
+    }
+
+    return {
+      $or: [
+        ...(validRanges.length === 1 ? validRanges : [{ $or: validRanges }]),
+        { estimatedValueEur: null },
+        { estimatedValueEur: { $exists: false } },
+      ],
+    };
+  }
+
+  private async buildEurRangeForCurrency(
+    currency: CurrencySign,
+    from?: number,
+    to?: number,
+  ): Promise<MongoFilter | undefined> {
+    const [fromEur, toEur] = await Promise.all([
+      from === undefined
+        ? Promise.resolve(undefined)
+        : this.currencyExchangeRatesService.convertToEur(from, currency),
+      to === undefined
+        ? Promise.resolve(undefined)
+        : this.currencyExchangeRatesService.convertToEur(to, currency),
+    ]);
+
+    const filter = this.buildNumberRangeFilter(
+      fromEur ?? undefined,
+      toEur ?? undefined,
+    );
+
+    return filter ? { estimatedValueEur: filter } : undefined;
   }
 }

@@ -119,6 +119,13 @@ export class TenderDto {
   estimatedValue?: TenderEstimatedValueDto;
 
   @ApiPropertyOptional({
+    example: 1250000,
+    description:
+      'Estimated value converted to EUR using stored daily exchange rates.',
+  })
+  estimatedValueEur?: number | null;
+
+  @ApiPropertyOptional({
     example: 'ENG',
     description:
       'TED official-language: official notice/procedure/document language.',

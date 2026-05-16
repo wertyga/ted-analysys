@@ -7,12 +7,14 @@ import { TendersAdmController } from './tenders.adm.controller';
 import { TendersController } from './tenders.controller';
 import { TendersService } from './tenders.service';
 import { TenderWishlistModule } from '@/resources/tender-wishlist/tender-wishlist.module';
+import { CurrencyExchangeRatesModule } from '@/resources/currency-exchange-rates/currency-exchange-rates.module';
 
 @Module({
   imports: [
     forwardRef(() => TedSearchModule),
     forwardRef(() => TenderAnalysisModule),
     forwardRef(() => TenderWishlistModule),
+    CurrencyExchangeRatesModule,
   ],
   controllers: [TendersController, TendersAdmController],
   providers: [

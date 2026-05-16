@@ -155,10 +155,9 @@ export class TenderDeepAnalysisBuilder {
     const isDeadlineExpired =
       params.tender.submissionDeadline !== undefined &&
       params.tender.submissionDeadline.getTime() < now.getTime();
-    const isQuestionsDeadlineExpired =
-      params.tender.questionsDeadline === undefined
-        ? null
-        : params.tender.questionsDeadline.getTime() < now.getTime();
+    const isQuestionsDeadlineExpired = params.tender.questionsDeadline
+      ? params.tender.questionsDeadline.getTime() < now.getTime()
+      : null;
     const documentUrlsCount = params.tender.documentUrls?.length ?? 0;
 
     return {
@@ -707,11 +706,10 @@ function applyEvidenceBasedScoreFallbacks(
     scoreBreakdown.financialFit.score = input.tender.estimatedValue?.amount
       ? 50
       : 40;
-    scoreBreakdown.financialFit.explanation =
-      input.tender.estimatedValue?.amount === undefined ||
-      input.tender.estimatedValue?.amount === null
-        ? 'Estimated value is missing. Company typical contract range is declared, but no reliable comparison is possible.'
-        : 'Company typical contract range is declared, but financial fit remains uncertain.';
+    scoreBreakdown.financialFit.explanation = input.tender.estimatedValue
+      ?.amount
+      ? 'Company typical contract range is declared, but financial fit remains uncertain.'
+      : 'Estimated value is missing. Company typical contract range is declared, but no reliable comparison is possible.';
     scoreBreakdown.financialFit.evidence = ['company_profile', 'missing'];
     scoreBreakdown.financialFit.missingInformation = ['estimated_tender_value'];
   }

@@ -44,6 +44,8 @@ import {
   TenderWishlistItemDocument,
   TenderWishlistItemModel,
 } from '@/resources/tender-wishlist/schemas';
+import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rates/currency-exchange-rates.service';
+import { CurrencySign } from '@/resources/codelist';
 
 export interface GatherActiveTendersResult {
   completed?: boolean;
@@ -146,6 +148,7 @@ export class TendersService {
     @Inject(forwardRef(() => TedSearchService))
     private readonly tedSearchService: TedSearchService,
     private readonly tenderNormalizer: TenderNormalizerService,
+    private readonly currencyExchangeRatesService: CurrencyExchangeRatesService,
     @Inject(forwardRef(() => TenderGeneralAnalysisService))
     private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
   ) {}
@@ -159,6 +162,8 @@ export class TendersService {
 
     const normalizedTenderDto =
       await this.tenderNormalizer.normalizeTedNoticeWithCpvCodes(notice, true);
+    const estimatedValueEur =
+      await this.calculateEstimatedValueEur(normalizedTenderDto);
 
     const sourceHash = this.buildTenderSourceHash(normalizedTenderDto);
 
@@ -169,6 +174,7 @@ export class TendersService {
           ...normalizedTenderDto,
           id: publicationNumber,
           publicationNumber,
+          estimatedValueEur,
           sourceHash,
         },
       },
@@ -176,6 +182,40 @@ export class TendersService {
     ).exec();
 
     return tenderDoc.populate(tenderCpvPopulateFields);
+  }
+
+  async calculateEstimatedValueEur(
+    tender: Pick<
+      TenderDocument | NormalizedTenderDto,
+      'estimatedValue' | 'publicationDate'
+    >,
+  ): Promise<number | null> {
+    const amount = tender.estimatedValue?.amount;
+    const currency = tender.estimatedValue?.currency;
+
+    if (
+      typeof amount !== 'number' ||
+      !Number.isFinite(amount) ||
+      amount <= 0 ||
+      typeof currency !== 'string'
+    ) {
+      return null;
+    }
+
+    const normalizedCurrency = currency.trim().toUpperCase() as CurrencySign;
+
+    if (!Object.values(CurrencySign).includes(normalizedCurrency)) {
+      return null;
+    }
+
+    const estimatedValueEur =
+      await this.currencyExchangeRatesService.convertToEur(
+        amount,
+        normalizedCurrency,
+        tender.publicationDate,
+      );
+
+    return estimatedValueEur === null ? null : Math.round(estimatedValueEur);
   }
 
   async upsertMultipleTenders(notices: TedNotice[]): Promise<TenderDocument[]> {

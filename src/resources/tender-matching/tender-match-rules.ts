@@ -180,19 +180,7 @@ export function matchBudget(
   tender: TenderForMatching,
   filter: CompanyTenderFilterForMatching,
 ): RuleMatchResult {
-  const allowUnknownBudget =
-    filter.minBudget == null && filter.maxBudget == null;
-
-  if (tender.estimatedValue === null || tender.estimatedValue === undefined) {
-    if (!allowUnknownBudget) {
-      return {
-        rejected: true,
-        score: 0,
-        reasons: ['Budget is missing'],
-        risks: [],
-      };
-    }
-
+  if (!tender.estimatedValue) {
     return {
       rejected: false,
       score: 0,
@@ -214,7 +202,7 @@ export function matchBudget(
     };
   }
 
-  if (filter.minBudget !== null && filter.minBudget !== undefined) {
+  if (filter.minBudget) {
     if (tender.estimatedValue < filter.minBudget) {
       return {
         rejected: true,
@@ -225,7 +213,7 @@ export function matchBudget(
     }
   }
 
-  if (filter.maxBudget !== null && filter.maxBudget !== undefined) {
+  if (filter.maxBudget) {
     if (tender.estimatedValue > filter.maxBudget) {
       return {
         rejected: true,

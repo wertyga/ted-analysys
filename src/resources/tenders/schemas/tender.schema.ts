@@ -42,6 +42,8 @@ export interface Tender {
     amount: number | null;
     currency: string | null;
   };
+  /** Estimated value converted to EUR using stored daily exchange rates. */
+  estimatedValueEur?: number | null;
   /** TED official-language: official notice/procedure/document language. */
   noticeLanguage?: string;
   /** TED submission-language: languages allowed for tender submission. */
@@ -159,6 +161,7 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
       amount: { type: Number, default: null },
       currency: { type: String, default: null },
     },
+    estimatedValueEur: { type: Number, default: null, index: true },
     noticeLanguage: String,
     submissionLanguages: {
       type: [String],
@@ -248,11 +251,7 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
 
 function serializeTender(tender: TenderSerializable): TenderDto {
   return filterModel(tender as TenderDocument, {
-    excludeFields: [
-      'cpvCodes',
-      'links',
-      'sourceHash',
-    ],
+    excludeFields: ['cpvCodes', 'links', 'sourceHash'],
   }) as TenderDto;
 }
 

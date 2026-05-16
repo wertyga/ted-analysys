@@ -173,10 +173,6 @@ export class CompanyProfileDocumentsService {
       currency,
     };
 
-    return result.min !== undefined ||
-      result.max !== undefined ||
-      result.currency !== undefined
-      ? result
-      : undefined;
+    return result.min || result.max || result.currency ? result : undefined;
   }
 }

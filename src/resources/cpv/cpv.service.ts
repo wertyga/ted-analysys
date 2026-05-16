@@ -109,7 +109,7 @@ export class CpvService {
 
     return normalizedCodes
       .map((code) => byCode.get(code))
-      .filter((item): item is CpvCategoryResponseItem => item !== undefined);
+      .filter((item): item is CpvCategoryResponseItem => !!item);
   }
 
   async resolveCodeIds(codes: string[]): Promise<string[]> {
