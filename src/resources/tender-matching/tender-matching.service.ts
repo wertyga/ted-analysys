@@ -48,7 +48,6 @@ export class TenderMatchingService {
   async rematchActiveCompetitionTendersAfterCompanyProfileUpdated(
     filter: CompanyTenderFilterForMatching,
   ): Promise<TenderCompanyMatchDocument[]> {
-    console.log('rematchActiveCompetitionTendersAfterCompanyProfileUpdated');
     const savedMatches: TenderCompanyMatchDocument[] = [];
     let lastTenderId: Types.ObjectId | undefined;
 
@@ -69,7 +68,7 @@ export class TenderMatchingService {
           );
         }),
       );
-      console.log({ matches });
+
       savedMatches.push(
         ...(matches.filter(Boolean) as TenderCompanyMatchDocument[]),
       );
