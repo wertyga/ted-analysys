@@ -4,18 +4,13 @@ import {
   TenderDocumentTextExtractorService,
   TenderSourceDocumentType,
 } from '@/resources/tenders/tender-document-text-extractor.service';
-import { UserModel } from '@/resources/user/user.schema';
-import { UserDocument } from '@/resources/user/user.types';
 import {
-  companyCpvPopulateFields,
   getCpvCodeArray,
   getNormalizedStringArray,
   getOptionalNonNegativeNumber,
   getOptionalPositiveNumber,
   getOptionalString,
   isRecord,
-  setArrayIfPresent,
-  setIfPresent,
 } from '@/utils';
 import { CpvService } from '@/resources/cpv/cpv.service';
 import { CurrencySign } from '@/resources/codelist';
@@ -37,8 +32,7 @@ export class CompanyProfileDocumentsService {
     private readonly cpvService: CpvService,
   ) {}
 
-  async uploadAndApplyProfile(
-    userId: string,
+  async uploadAndExtractProfile(
     files: CompanyProfileDocumentFile[],
   ): Promise<CompanyProfileDocumentUploadResult> {
     if (!files?.length) {
@@ -51,7 +45,6 @@ export class CompanyProfileDocumentsService {
       );
     }
 
-    const user = await UserModel.findById(userId).orFail().exec();
     const extractedDocuments = await Promise.all(
       files.map((file) => this.extractDocument(file)),
     );
@@ -59,23 +52,19 @@ export class CompanyProfileDocumentsService {
     const aiResult = await this.extractProfileWithAi(extractedDocuments);
 
     const profile = this.normalizeProfile(aiResult);
+
     const [industries, mainServices] = await Promise.all([
       this.cpvService.resolveCodeIds(profile.industries ?? []),
       this.cpvService.resolveCodeIds(profile.mainServices ?? []),
     ]);
 
-    await this.applyProfileToUser(user, profile, {
-      industries: industries,
-      mainServices: mainServices,
-    });
-
-    const populatedUser = await UserModel.findById(user._id)
-      .populate(companyCpvPopulateFields)
-      .orFail()
-      .exec();
-
     return {
-      user: populatedUser,
+      profile,
+      resolvedProfile: {
+        ...profile,
+        industries,
+        mainServices,
+      },
       documents: extractedDocuments.map(({ file, extraction }) => ({
         filename: file.originalname,
         mimeType: file.mimetype,
@@ -164,56 +153,6 @@ export class CompanyProfileDocumentsService {
           : undefined,
       typicalContractSize: this.typicalContractSize(value.typicalContractSize),
     };
-  }
-
-  private async applyProfileToUser(
-    user: UserDocument,
-    profile: CompanyProfileAiResult,
-    cpv: {
-      industries: unknown[];
-      mainServices: unknown[];
-    },
-  ): Promise<void> {
-    const updates: Record<string, unknown> = {};
-
-    setIfPresent(updates, 'companyName', profile.companyName);
-    setIfPresent(updates, 'country', profile.country);
-    setArrayIfPresent(
-      updates,
-      'operatingCountries',
-      profile.operatingCountries,
-    );
-    setIfPresent(updates, 'companySize', profile.companySize);
-    setIfPresent(updates, 'companyDescription', profile.companyDescription);
-    setArrayIfPresent(updates, 'languages', profile.languages);
-    setIfPresent(
-      updates,
-      'minDaysBeforeDeadline',
-      profile.minDaysBeforeDeadline,
-    );
-    setArrayIfPresent(updates, 'certifications', profile.certifications);
-    setArrayIfPresent(updates, 'capabilities', profile.capabilities);
-    setIfPresent(updates, 'yearsOfExperience', profile.yearsOfExperience);
-    setIfPresent(
-      updates,
-      'publicProcurementExperience',
-      profile.publicProcurementExperience,
-    );
-
-    if (profile.typicalContractSize) {
-      updates.typicalContractSize = profile.typicalContractSize;
-    }
-
-    if (cpv.industries.length > 0) {
-      updates.industries = cpv.industries;
-    }
-
-    if (cpv.mainServices.length > 0) {
-      updates.mainServices = cpv.mainServices;
-    }
-
-    user.set(updates);
-    await user.save();
   }
 
   private typicalContractSize(

@@ -11,6 +11,7 @@ import { isDev, logger } from '@/utils';
 import { TenderCompanyMatchDocument } from '@/resources/tender-matching/schemas/tender-company-match.schema';
 import { TenderMatchingService } from '@/resources/tender-matching/tender-matching.service';
 import { TedOpenTendersCollectorService } from '@/resources/ted-open-tenders-collector/ted-open-tenders-collector.service';
+import { TenderMatchSource } from '@/resources/tender-matching/tender-match.types';
 
 const RECENT_TENDERS_CRON = '0 1 * * *';
 const ALL_COMPETITION_TENDERS_CRON = '0 3 * * *';
@@ -194,7 +195,10 @@ export class TendersCronService {
   ): Promise<TenderCompanyMatchDocument[]> {
     const matches = await Promise.all(
       tenders.map((tender) =>
-        this.tenderMatchingService.matchTenderWithAllCompanyFilters(tender),
+        this.tenderMatchingService.matchTenderWithAllCompanyFilters(
+          tender,
+          TenderMatchSource.TENDER_UPDATED,
+        ),
       ),
     );
 

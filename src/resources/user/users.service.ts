@@ -4,12 +4,9 @@ import { TUser, USER_TYPE, UserDocument } from './user.types';
 import { companyCpvPopulateFields, getLimitAndSortCursor } from '@/utils';
 import { UserModel } from './user.schema';
 import { CpvCategoryModel } from '@/resources/cpv/schemas';
-import { CompanyFilterService } from '@/resources/company-filter/company-filter.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly companyFilterService: CompanyFilterService) {}
-
   async getUsersList({
     sortDirection,
     sortBy,
@@ -44,7 +41,6 @@ export class UsersService {
     }
 
     await user.save();
-    // await this.companyFilterService.handleCompanyUpdated(user);
 
     return user.populate(companyCpvPopulateFields);
   }

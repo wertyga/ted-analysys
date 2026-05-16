@@ -3,6 +3,7 @@ import { QueryFilter, Types, UpdateQuery } from 'mongoose';
 import { CompanyTenderFilterModel } from '@/resources/company-filter/company-filter.schema';
 import { TenderDocument, TenderModel } from '@/resources/tenders/schemas';
 import { toObjectId } from '@/utils';
+import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { mapTenderForMatching } from './tender-for-matching.mapper';
 import { matchTenderWithCompanyFilter } from './tender-match-rules';
 import {
@@ -11,15 +12,15 @@ import {
   HardMatchStatus,
   NotificationStatus,
   TenderCompanyMatchResult,
+  TenderMatchSource,
 } from './tender-match.types';
 import {
-  TenderCompanyMatch,
   TenderCompanyMatchDocument,
   TenderCompanyMatchModel,
 } from './schemas/tender-company-match.schema';
-import * as fs from 'node:fs';
 
 const RECENT_ACTIVE_TENDERS_LOOKBACK_DAYS = 2;
+const ACTIVE_COMPETITION_TENDERS_MATCH_BATCH_SIZE = 100;
 
 @Injectable()
 export class TenderMatchingService {
@@ -32,40 +33,72 @@ export class TenderMatchingService {
 
   async matchActiveRecentTendersWithCompanyFilter(
     filter: CompanyTenderFilterForMatching,
+    source: TenderMatchSource,
   ): Promise<TenderCompanyMatchDocument[]> {
-    const companyId = toObjectId(filter.user);
-
-    if (!companyId) {
-      return [];
-    }
-
     const tenders = await this.findActiveRecentTenders();
     const matches = await Promise.all(
       tenders.map((tender) =>
-        this.matchTenderWithCompanyFilter(tender, filter, companyId),
+        this.matchTenderWithCompanyFilter(tender, filter, source),
       ),
     );
 
     return matches.filter(Boolean) as TenderCompanyMatchDocument[];
   }
 
+  async rematchActiveCompetitionTendersAfterCompanyProfileUpdated(
+    filter: CompanyTenderFilterForMatching,
+  ): Promise<TenderCompanyMatchDocument[]> {
+    console.log('rematchActiveCompetitionTendersAfterCompanyProfileUpdated');
+    const savedMatches: TenderCompanyMatchDocument[] = [];
+    let lastTenderId: Types.ObjectId | undefined;
+
+    while (true) {
+      const tenders =
+        await this.findActiveCompetitionTendersBatch(lastTenderId);
+
+      if (tenders.length === 0) {
+        break;
+      }
+
+      const matches = await Promise.all(
+        tenders.map(async (tender) => {
+          return this.matchTenderWithCompanyFilter(
+            tender,
+            filter,
+            TenderMatchSource.COMPANY_PROFILE_UPDATED,
+          );
+        }),
+      );
+      console.log({ matches });
+      savedMatches.push(
+        ...(matches.filter(Boolean) as TenderCompanyMatchDocument[]),
+      );
+
+      lastTenderId = toObjectId(tenders[tenders.length - 1]._id) ?? undefined;
+    }
+
+    return savedMatches;
+  }
+
   async matchTenderWithAllCompanyFilters(
     tender: TenderDocument,
+    source: TenderMatchSource,
   ): Promise<TenderCompanyMatchDocument[]> {
     const companyFilters = await CompanyTenderFilterModel.find({
       confirmedByUser: true,
     }).exec();
 
-    return this.matchTenderWithFilters(tender, companyFilters);
+    return this.matchTenderWithFilters(tender, companyFilters, source);
   }
 
   private async matchTenderWithFilters(
     tender: TenderDocument,
     companyFilters: CompanyTenderFilterForMatching[],
+    source: TenderMatchSource,
   ): Promise<TenderCompanyMatchDocument[]> {
     const matches = await Promise.all(
       companyFilters.map((filter) =>
-        this.matchTenderWithCompanyFilter(tender, filter),
+        this.matchTenderWithCompanyFilter(tender, filter, source),
       ),
     );
 
@@ -75,9 +108,9 @@ export class TenderMatchingService {
   private async matchTenderWithCompanyFilter(
     tender: TenderDocument,
     filter: CompanyTenderFilterForMatching,
-    resolvedCompanyId?: Types.ObjectId,
+    source: TenderMatchSource,
   ): Promise<TenderCompanyMatchDocument | undefined> {
-    const companyId = resolvedCompanyId ?? toObjectId(filter.user);
+    const companyId = toObjectId(filter.user);
 
     if (!companyId) {
       return undefined;
@@ -88,7 +121,8 @@ export class TenderMatchingService {
     const filterId = toObjectId(filter._id);
 
     if (result.status !== HardMatchStatus.MATCHED) {
-      await this.deleteMatch(tenderId, companyId);
+      await this.markMatchedMatchStale(tenderId, companyId, source);
+
       return undefined;
     }
 
@@ -118,18 +152,47 @@ export class TenderMatchingService {
     }).exec();
   }
 
-  private async deleteMatch(
+  private async findActiveCompetitionTendersBatch(
+    lastTenderId?: Types.ObjectId,
+  ): Promise<TenderDocument[]> {
+    const query: QueryFilter<TenderDocument> = {
+      noticeType: { $in: TENDER_COMPETITION_NOTICE_TYPES },
+      submissionDeadline: { $gte: new Date() },
+    };
+
+    if (lastTenderId) {
+      (query as Record<string, unknown>)._id = { $gt: lastTenderId };
+    }
+
+    return TenderModel.find(query)
+      .sort({ _id: 1 })
+      .limit(ACTIVE_COMPETITION_TENDERS_MATCH_BATCH_SIZE)
+      .exec();
+  }
+
+  private async markMatchedMatchStale(
     tenderId: Types.ObjectId | null,
     companyId: Types.ObjectId,
+    staleReason: TenderMatchSource,
   ): Promise<TenderCompanyMatchDocument | null> {
     if (!tenderId) {
       return null;
     }
 
-    return TenderCompanyMatchModel.findOneAndDelete({
-      tender: tenderId,
-      company: companyId,
-    }).exec();
+    return TenderCompanyMatchModel.findOneAndUpdate(
+      {
+        tender: tenderId,
+        company: companyId,
+        hardMatchStatus: HardMatchStatus.MATCHED,
+      },
+      {
+        $set: {
+          hardMatchStatus: HardMatchStatus.STALE,
+          staleReason,
+        },
+      },
+      { returnDocument: 'after' },
+    ).exec();
   }
 
   private async saveMatch(
@@ -163,6 +226,9 @@ export class TenderMatchingService {
         aiFitScore: null,
         aiFitDecision: null,
         notificationStatus: NotificationStatus.NOT_CREATED,
+      },
+      $unset: {
+        staleReason: '',
       },
     };
 

@@ -20,6 +20,7 @@ import {
   isDuplicateKeyError,
   isPopulatedRecord,
   isRecord,
+  logger,
   sleep,
 } from '@/utils';
 import {
@@ -33,6 +34,7 @@ import { UserModel } from '@/resources/user/user.schema';
 import { COMPANY_TENDER_FILTER_SYSTEM_PROMPT } from './company-filter.prompt';
 import { TenderMatchingService } from '@/resources/tender-matching/tender-matching.service';
 import { TenderCompanyMatchDocument } from '@/resources/tender-matching/schemas/tender-company-match.schema';
+import { TenderMatchSource } from '@/resources/tender-matching/tender-match.types';
 import { CpvCategoryModel } from '@/resources/cpv/schemas';
 
 const COMPANY_FILTER_WAIT_TIMEOUT_MS = 10 * 60 * 1000;
@@ -148,6 +150,7 @@ export class CompanyFilterService {
     const matches =
       await this.tenderMatchingService.matchActiveRecentTendersWithCompanyFilter(
         filter,
+        TenderMatchSource.COMPANY_PROFILE_UPDATED,
       );
 
     return { filter, matches };
@@ -175,40 +178,54 @@ export class CompanyFilterService {
               result.additionalCpvSuggestions,
             );
 
-            return CompanyTenderFilterModel.findByIdAndUpdate(
-              companyAnalysis._id,
-              {
-                $set: {
-                  summary: result.summary,
-                  cpvCodes,
-                  targetCountries: result.targetCountries,
-                  excludedCountries: [],
-                  languages: result.languages,
-                  contractNatures: result.contractNatures,
-                  minBudget: result.minBudget,
-                  maxBudget: result.maxBudget,
-                  currency: result.currency,
-                  minDaysBeforeDeadline: result.minDaysBeforeDeadline,
-                  requiredKeywords: result.requiredKeywords,
-                  optionalKeywords: result.optionalKeywords,
-                  excludedKeywords: result.excludedKeywords,
-                  certifications: result.certifications,
-                  capabilities: result.capabilities,
-                  publicProcurementExperience:
-                    result.publicProcurementExperience,
-                  notificationThreshold: result.notificationThreshold,
-                  confirmedByUser: true,
-                  generationStatus:
-                    CompanyTenderFilterGenerationStatus.COMPLETED,
-                  generationFinishedAt: new Date(),
-                  generationError: null,
-                  extractionWarnings: result.extractionWarnings,
+            const updatedFilter =
+              await CompanyTenderFilterModel.findByIdAndUpdate(
+                companyAnalysis._id,
+                {
+                  $set: {
+                    summary: result.summary,
+                    cpvCodes,
+                    targetCountries: result.targetCountries,
+                    excludedCountries: [],
+                    languages: result.languages,
+                    contractNatures: result.contractNatures,
+                    minBudget: result.minBudget,
+                    maxBudget: result.maxBudget,
+                    currency: result.currency,
+                    minDaysBeforeDeadline: result.minDaysBeforeDeadline,
+                    requiredKeywords: result.requiredKeywords,
+                    optionalKeywords: result.optionalKeywords,
+                    excludedKeywords: result.excludedKeywords,
+                    certifications: result.certifications,
+                    capabilities: result.capabilities,
+                    publicProcurementExperience:
+                      result.publicProcurementExperience,
+                    notificationThreshold: result.notificationThreshold,
+                    confirmedByUser: true,
+                    generationStatus:
+                      CompanyTenderFilterGenerationStatus.COMPLETED,
+                    generationFinishedAt: new Date(),
+                    generationError: null,
+                    extractionWarnings: result.extractionWarnings,
+                  },
                 },
-              },
-              { returnDocument: 'after' },
-            )
-              .orFail()
-              .exec();
+                { returnDocument: 'after' },
+              )
+                .orFail()
+                .exec();
+
+            this.tenderMatchingService
+              .rematchActiveCompetitionTendersAfterCompanyProfileUpdated(
+                updatedFilter,
+              )
+              .catch((error: unknown) =>
+                logger.info('TENDER_MATCHING_PROFILE_UPDATE_FAILED', {
+                  companyId: String(populatedUser._id),
+                  error: getSafeErrorMessage(error),
+                }),
+              );
+
+            return updatedFilter;
           })
           .catch((error: unknown) =>
             this.markGenerationFailed(populatedUser, error),

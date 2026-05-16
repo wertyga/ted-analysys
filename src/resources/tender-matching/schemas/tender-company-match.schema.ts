@@ -3,6 +3,7 @@ import {
   AiFitDecision,
   AiFitStatus,
   HardMatchStatus,
+  MatchStaleReason,
   NotificationStatus,
   TenderMatchDecision,
 } from '../tender-match.types';
@@ -21,6 +22,7 @@ export interface TenderCompanyMatch {
   aiFitScore: number | null;
   aiFitDecision: AiFitDecision | null;
   notificationStatus: NotificationStatus;
+  staleReason?: MatchStaleReason | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -93,6 +95,11 @@ export const TenderCompanyMatchSchema = new Schema<TenderCompanyMatchDocument>(
       enum: NotificationStatus,
       default: NotificationStatus.NOT_CREATED,
     },
+    staleReason: {
+      type: String,
+      enum: [...Object.values(MatchStaleReason), null],
+      default: null,
+    },
   },
   {
     collection: 'tender_company_matches',
@@ -101,6 +108,7 @@ export const TenderCompanyMatchSchema = new Schema<TenderCompanyMatchDocument>(
 );
 
 TenderCompanyMatchSchema.index({ tender: 1, company: 1 }, { unique: true });
+TenderCompanyMatchSchema.index({ hardMatchStatus: 1 });
 
 export const TenderCompanyMatchModel: Model<TenderCompanyMatchDocument> =
   (mongoose.models.TenderCompanyMatch as

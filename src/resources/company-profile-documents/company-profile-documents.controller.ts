@@ -31,7 +31,7 @@ export class CompanyProfileDocumentsController {
 
   @Post('upload')
   @ApiOperation({
-    summary: 'Upload company documents and fill current user profile fields',
+    summary: 'Upload company documents and extract company profile fields',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -49,7 +49,7 @@ export class CompanyProfileDocumentsController {
       required: ['documents'],
     },
   })
-  @ApiOkResponse({ description: 'Updated current user profile' })
+  @ApiOkResponse({ description: 'Extracted company profile fields' })
   @UseInterceptors(
     FilesInterceptor('documents', 10, {
       limits: {
@@ -65,9 +65,6 @@ export class CompanyProfileDocumentsController {
       throw new BadRequestException('At least one document is required');
     }
 
-    return this.companyProfileDocumentsService.uploadAndApplyProfile(
-      String(req.user._id),
-      files,
-    );
+    return this.companyProfileDocumentsService.uploadAndExtractProfile(files);
   }
 }

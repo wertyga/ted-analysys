@@ -10,6 +10,17 @@ export enum TenderMatchDecision {
 export enum HardMatchStatus {
   MATCHED = 'matched',
   REJECTED = 'rejected',
+  STALE = 'stale',
+}
+
+export enum MatchStaleReason {
+  COMPANY_PROFILE_UPDATED = 'company_profile_updated',
+  TENDER_UPDATED = 'tender_updated',
+}
+
+export enum TenderMatchSource {
+  COMPANY_PROFILE_UPDATED = 'company_profile_updated',
+  TENDER_UPDATED = 'tender_updated',
 }
 
 export enum AiFitStatus {

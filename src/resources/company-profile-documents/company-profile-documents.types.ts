@@ -1,5 +1,4 @@
 import { CurrencySign } from '@/resources/codelist';
-import { UserDocument } from '@/resources/user/user.types';
 
 export interface CompanyProfileDocumentFile {
   originalname: string;
@@ -30,7 +29,14 @@ export interface CompanyProfileAiResult {
 }
 
 export interface CompanyProfileDocumentUploadResult {
-  user: UserDocument;
+  profile: CompanyProfileAiResult;
+  resolvedProfile: Omit<
+    CompanyProfileAiResult,
+    'industries' | 'mainServices'
+  > & {
+    industries?: string[];
+    mainServices?: string[];
+  };
   documents: Array<{
     filename: string;
     mimeType: string;
