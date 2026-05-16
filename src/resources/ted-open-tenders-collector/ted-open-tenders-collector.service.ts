@@ -9,10 +9,10 @@ import { getTedDate } from '@/resources/ted-search/utils';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { TenderDocument } from '@/resources/tenders/schemas';
 import { TendersService } from '@/resources/tenders/tenders.service';
-import { isRecord, logger } from '@/utils';
+import { isRecord } from '@/utils';
 
 const DEFAULT_PAGE_LIMIT = 100;
-const DEFAULT_MAX_PAGES = 1000;
+const DEFAULT_MAX_PAGES = 10000;
 
 export interface TedOpenTendersCollectorOptions {
   pageLimit?: number;
@@ -92,16 +92,6 @@ export class TedOpenTendersCollectorService {
         break;
       }
     }
-
-    await logger.info('TED_COLLECTED', {
-      pagesFetched,
-      noticesFetched,
-      saved,
-      updated,
-      skipped,
-      totalNoticeCount,
-      resumeIterationNextToken: iterationNextToken,
-    });
 
     return {
       pagesFetched,

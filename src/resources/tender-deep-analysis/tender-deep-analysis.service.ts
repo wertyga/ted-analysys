@@ -193,6 +193,7 @@ export class TenderDeepAnalysisService {
     const sourceHash = this.buildSourceHash({
       generalAnalysisSourceHash: generalAnalysis.sourceHash,
       companyAnalysisSourceHash: companyAnalysis.sourceHash,
+      tenderSourceHash: tender.sourceHash,
       outputLanguage: params.language,
     });
 
@@ -249,47 +250,51 @@ export class TenderDeepAnalysisService {
       query.tenderId = { $in: params.tenderIds };
     }
 
-    const [analyses, total, companyAnalysis] = await Promise.all([
-      TenderDeepAnalysisModel.find(query)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .populate(deepAnalysisPopulateFields)
-        .lean<TenderDeepAnalysisRecord[]>()
-        .exec(),
-      TenderDeepAnalysisModel.countDocuments(query).exec(),
-      CompanyTenderFilterModel.findOne({ user: params.companyId }).exec(),
-    ]);
+    const [deepAnalyses, totalDeepAnalysis, companyAnalysis] =
+      await Promise.all([
+        TenderDeepAnalysisModel.find(query)
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .populate(deepAnalysisPopulateFields)
+          .lean<TenderDeepAnalysisRecord[]>()
+          .exec(),
+        TenderDeepAnalysisModel.countDocuments(query).exec(),
+        CompanyTenderFilterModel.findOne({ user: params.companyId }).exec(),
+      ]);
 
-    const analysesWithOutDate = analyses.map((analysis) => {
-      const generalAnalysis = analysis.generalAnalysis as
+    const analysesWithOutDate = deepAnalyses.map((deepAnalysis) => {
+      const generalAnalysis = deepAnalysis.generalAnalysis as
         | TenderGeneralAnalysisDocument
         | TenderGeneralAnalysisRecord
         | undefined;
+      const tender = deepAnalysis.tender as TenderDocument | undefined;
 
-      const isHashValid =
-        !!generalAnalysis?.sourceHash && !!companyAnalysis?.sourceHash;
-
-      if (!isHashValid) {
+      if (
+        !generalAnalysis?.sourceHash ||
+        !companyAnalysis?.sourceHash ||
+        !tender?.sourceHash
+      ) {
         return {
-          ...analysis,
-          isOutDate: false,
+          ...deepAnalysis,
+          isOutOfDate: false,
         };
       }
 
       const currentSourceHash = this.buildSourceHash({
         generalAnalysisSourceHash: generalAnalysis.sourceHash,
         companyAnalysisSourceHash: companyAnalysis.sourceHash,
-        outputLanguage: getDeepAnalysisOutputLanguage(analysis),
+        outputLanguage: getDeepAnalysisOutputLanguage(deepAnalysis),
+        tenderSourceHash: tender.sourceHash,
       });
 
       return {
-        ...analysis,
-        isOutDate: analysis.sourceHash !== currentSourceHash,
+        ...deepAnalysis,
+        isOutOfDate: deepAnalysis.sourceHash !== currentSourceHash,
       };
     });
 
-    return { analyses: analysesWithOutDate, total };
+    return { analyses: analysesWithOutDate, total: totalDeepAnalysis };
   }
 
   private async upsertProcessingAnalysisIfNeeded({
@@ -440,6 +445,7 @@ export class TenderDeepAnalysisService {
   }
 
   buildSourceHash(input: {
+    tenderSourceHash: string;
     generalAnalysisSourceHash: string;
     companyAnalysisSourceHash: string;
     outputLanguage?: string;
@@ -452,6 +458,7 @@ export class TenderDeepAnalysisService {
           outputLanguage: input.outputLanguage ?? 'en',
           generalAnalysisSourceHash: input.generalAnalysisSourceHash,
           companyAnalysisSourceHash: input.companyAnalysisSourceHash,
+          tenderSourceHash: input.tenderSourceHash,
         }),
       )
       .digest('hex');

@@ -13,14 +13,29 @@ import { TenderMatchingService } from '@/resources/tender-matching/tender-matchi
 import { TedOpenTendersCollectorService } from '@/resources/ted-open-tenders-collector/ted-open-tenders-collector.service';
 
 const RECENT_TENDERS_CRON = '0 1 * * *';
+const ALL_COMPETITION_TENDERS_CRON = '0 3 * * *';
 const RECENT_TENDERS_LOOKBACK_DAYS = 2;
 const RECENT_TENDERS_PAGE_LIMIT = 100;
 const RECENT_TENDERS_MAX_PAGES = 100;
 
+interface GatherRecentCompetitionTendersOptions {
+  onChangedTenders?: (tenders: TenderDocument[]) => Promise<void> | void;
+}
+
+interface GatherRecentCompetitionTendersResult {
+  pagesFetched: number;
+  noticesFetched: number;
+  saved: number;
+  updated: number;
+  skipped: number;
+}
+
 @Injectable()
 export class TendersCronService {
   private readonly logger = new Logger(TendersCronService.name);
+
   private isGatheringRecentTenders = false;
+  private isGatheringAllCompetitionTenders = false;
 
   constructor(
     private readonly tedSearchService: TedSearchService,
@@ -32,13 +47,51 @@ export class TendersCronService {
         this.collectAllTendersFromTED();
       }, 2000);
     }
+
+    // setTimeout(() => {
+    //   this.gatherRecentCompetitionTendersOnce();
+    // }, 2000);
   }
 
-  async collectAllTendersFromTED() {
-    await new TedOpenTendersCollectorService(
-      this.tedSearchService,
-      this.tendersService,
-    ).collectOpenTendersFromTed();
+  async collectAllTendersFromTED() {}
+
+  @Cron(ALL_COMPETITION_TENDERS_CRON, {
+    timeZone: 'Europe/Warsaw',
+  })
+  async gatherAllCompetitionTenders(): Promise<void> {
+    if (this.isGatheringAllCompetitionTenders) {
+      this.logger.warn('Recent TED tender gather is already running, skipping');
+      return;
+    }
+
+    this.isGatheringAllCompetitionTenders = true;
+
+    try {
+      let matchesSaved = 0;
+
+      const result = await new TedOpenTendersCollectorService(
+        this.tedSearchService,
+        this.tendersService,
+      ).collectOpenTendersFromTed({
+        onChangedTenders: async (tenders) => {
+          const matches = await this.matchChangedTenders(tenders);
+
+          matchesSaved += matches.length;
+        },
+      });
+
+      await logger.info('TED_ALL_COMPETITION_COLLECTED', {
+        ...result,
+        matchesSaved,
+      });
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e.message : 'unknown error';
+
+      this.logger.error(`Recent TED tender gather failed: ${error}`);
+      await logger.error('TED_ALL_COMPETITION_COLLECTED_FAILED', error);
+    } finally {
+      this.isGatheringAllCompetitionTenders = false;
+    }
   }
 
   @Cron(RECENT_TENDERS_CRON, {
@@ -53,43 +106,46 @@ export class TendersCronService {
     this.isGatheringRecentTenders = true;
 
     try {
-      const result = await this.gatherRecentCompetitionTendersOnce();
+      let matchesSaved = 0;
+
+      const result = await this.gatherRecentCompetitionTendersOnce({
+        onChangedTenders: async (tenders) => {
+          const matches = await this.matchChangedTenders(tenders);
+
+          matchesSaved += matches.length;
+        },
+      });
+      const logResult = {
+        ...result,
+        matchesSaved,
+      };
 
       if (isDev) {
         this.logger.log(
-          `Recent TED tender gather completed: pages=${result.pagesFetched} fetched=${result.noticesFetched} saved=${result.saved} updated=${result.updated} skipped=${result.skipped} matches=${result.matchesSaved}`,
+          `Recent TED tender gather completed: pages=${logResult.pagesFetched} fetched=${logResult.noticesFetched} saved=${logResult.saved} updated=${logResult.updated} skipped=${logResult.skipped} matches=${logResult.matchesSaved}`,
         );
       }
 
-      await logger.info('TED_COLLECTED', result);
-    } catch (error: unknown) {
-      this.logger.error(
-        `Recent TED tender gather failed: ${
-          error instanceof Error ? error.message : 'unknown error'
-        }`,
-      );
+      await logger.info('TED_RECENT_COMPETITION_COLLECTED', logResult);
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e.message : 'unknown error';
+
+      this.logger.error(`Recent TED tender gather failed: ${error}`);
+      await logger.error('TED_ALL_COMPETITION_COLLECTED_FAILED', error);
     } finally {
       this.isGatheringRecentTenders = false;
     }
   }
 
-  private async gatherRecentCompetitionTendersOnce(): Promise<{
-    pagesFetched: number;
-    noticesFetched: number;
-    saved: number;
-    updated: number;
-    skipped: number;
-    matchesSaved: number;
-    savedMatches: TenderCompanyMatchDocument[];
-  }> {
+  private async gatherRecentCompetitionTendersOnce(
+    options: GatherRecentCompetitionTendersOptions = {},
+  ): Promise<GatherRecentCompetitionTendersResult> {
     let page = 1;
     let pagesFetched = 0;
     let noticesFetched = 0;
     let saved = 0;
     let updated = 0;
     let skipped = 0;
-    let matchesSaved = 0;
-    const savedMatches: TenderCompanyMatchDocument[] = [];
     let totalNoticeCount: number | undefined;
 
     while (page <= RECENT_TENDERS_MAX_PAGES) {
@@ -112,12 +168,7 @@ export class TendersCronService {
       updated += saveResult.updated;
       skipped += saveResult.skipped;
 
-      const pageMatches = await this.matchChangedTenders(
-        saveResult.changedTenders,
-      );
-
-      savedMatches.push(...pageMatches);
-      matchesSaved += pageMatches.length;
+      await options.onChangedTenders?.(saveResult.changedTenders);
 
       if (
         totalNoticeCount !== undefined &&
@@ -135,8 +186,6 @@ export class TendersCronService {
       saved,
       updated,
       skipped,
-      matchesSaved,
-      savedMatches,
     };
   }
 

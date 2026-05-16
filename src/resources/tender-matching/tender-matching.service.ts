@@ -102,59 +102,6 @@ export class TenderMatchingService {
     return savedMatch;
   }
 
-  async processTenderForCompany(
-    tenderId: string,
-    companyId: string,
-  ): Promise<TenderCompanyMatch | undefined> {
-    const tender = await this.findTender(tenderId);
-    const companyObjectId = toObjectId(companyId);
-
-    if (!companyObjectId) {
-      throw new NotFoundException(`Company ${companyId} not found`);
-    }
-
-    const filter = await CompanyTenderFilterModel.findOne({
-      confirmedByUser: true,
-      user: companyObjectId,
-    }).exec();
-
-    if (!filter) {
-      throw new NotFoundException(
-        `Confirmed company tender filter for company ${companyId} not found`,
-      );
-    }
-
-    const result = this.matchTenderWithFilter(tender, filter);
-    const tenderObjectId = toObjectId(tender._id);
-    const filterId = toObjectId(filter._id);
-
-    if (result.status !== HardMatchStatus.MATCHED) {
-      await this.deleteMatch(tenderObjectId, companyObjectId);
-      return undefined;
-    }
-
-    return this.saveMatch(tenderObjectId, companyObjectId, filterId, result);
-  }
-
-  private async findTender(tenderId: string): Promise<TenderDocument> {
-    const objectId = toObjectId(tenderId);
-    const query = {
-      $or: [
-        ...(objectId ? [{ _id: objectId }] : []),
-        { id: tenderId },
-        { publicationNumber: tenderId },
-      ],
-    } as unknown as QueryFilter<TenderDocument>;
-
-    const tender = await TenderModel.findOne(query).exec();
-
-    if (!tender) {
-      throw new NotFoundException(`Tender ${tenderId} not found`);
-    }
-
-    return tender;
-  }
-
   private async findActiveRecentTenders(): Promise<TenderDocument[]> {
     const publicationDateFrom = new Date();
     publicationDateFrom.setDate(
@@ -174,12 +121,12 @@ export class TenderMatchingService {
   private async deleteMatch(
     tenderId: Types.ObjectId | null,
     companyId: Types.ObjectId,
-  ): Promise<void> {
+  ): Promise<TenderCompanyMatchDocument | null> {
     if (!tenderId) {
-      return;
+      return null;
     }
 
-    await TenderCompanyMatchModel.deleteOne({
+    return TenderCompanyMatchModel.findOneAndDelete({
       tender: tenderId,
       company: companyId,
     }).exec();

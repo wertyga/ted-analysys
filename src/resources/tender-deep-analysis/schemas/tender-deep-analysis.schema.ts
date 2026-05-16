@@ -55,6 +55,7 @@ export interface TenderDeepAnalysis {
   documentsAnalyzedCount?: number;
   documentsTotalCount?: number;
   missingDocumentsWarning?: boolean;
+  isOutOfDate?: boolean;
   sourceHash?: string;
   promptVersion?: string;
   model?: string;
@@ -73,7 +74,6 @@ export type TenderDeepAnalysisRecord = TenderDeepAnalysis & {
     | mongoose.Types.ObjectId
     | TenderGeneralAnalysisRecord
     | TenderGeneralAnalysisDocument;
-  isOutDate?: boolean;
 };
 export type TenderDeepAnalysisSerializable =
   | TenderDeepAnalysisDocument
@@ -166,6 +166,7 @@ const TenderDeepAnalysisSchema = new Schema<TenderDeepAnalysisDocument>(
     documentsAnalyzedCount: { type: Number, min: 0, default: 0 },
     documentsTotalCount: { type: Number, min: 0, default: 0 },
     missingDocumentsWarning: { type: Boolean, default: false },
+    isOutOfDate: { type: Boolean, default: false },
     sourceHash: { type: String },
     promptVersion: String,
     errorMessage: String,
