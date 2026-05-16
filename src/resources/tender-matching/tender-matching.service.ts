@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { QueryFilter, Types, UpdateQuery } from 'mongoose';
 import { CompanyTenderFilterModel } from '@/resources/company-filter/company-filter.schema';
 import { TenderDocument, TenderModel } from '@/resources/tenders/schemas';
-import { toObjectId } from '@/utils';
+import { QueueAsyncConcurrency, toObjectId } from '@/utils';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { mapTenderForMatching } from './tender-for-matching.mapper';
 import { matchTenderWithCompanyFilter } from './tender-match-rules';
@@ -18,12 +18,31 @@ import {
   TenderCompanyMatchDocument,
   TenderCompanyMatchModel,
 } from './schemas/tender-company-match.schema';
+import { gfTime } from '@/goldfish';
 
 const RECENT_ACTIVE_TENDERS_LOOKBACK_DAYS = 2;
 const ACTIVE_COMPETITION_TENDERS_MATCH_BATCH_SIZE = 100;
+const COMPANY_PROFILE_REMATCH_DEBOUNCE_MS = gfTime.minute;
+const COMPANY_PROFILE_REMATCH_CONCURRENCY = 1;
+
+interface DebouncedCompanyProfileRematch {
+  filter: CompanyTenderFilterForMatching;
+  timer?: ReturnType<typeof setTimeout>;
+  promise: Promise<TenderCompanyMatchDocument[]>;
+  resolve: (matches: TenderCompanyMatchDocument[]) => void;
+  reject: (error: unknown) => void;
+}
 
 @Injectable()
 export class TenderMatchingService {
+  private readonly companyProfileRematchQueue = new QueueAsyncConcurrency(
+    COMPANY_PROFILE_REMATCH_CONCURRENCY,
+  );
+  private readonly debouncedCompanyProfileRematches = new Map<
+    string,
+    DebouncedCompanyProfileRematch
+  >();
+
   matchTenderWithFilter(
     tender: TenderDocument,
     filter: CompanyTenderFilterForMatching,
@@ -46,6 +65,76 @@ export class TenderMatchingService {
   }
 
   async rematchActiveCompetitionTendersAfterCompanyProfileUpdated(
+    filter: CompanyTenderFilterForMatching,
+  ): Promise<TenderCompanyMatchDocument[]> {
+    const companyId = toObjectId(filter.user);
+
+    if (!companyId) {
+      return [];
+    }
+
+    const companyKey = String(companyId);
+    const existing = this.debouncedCompanyProfileRematches.get(companyKey);
+
+    if (existing) {
+      existing.filter = filter;
+
+      if (existing.timer) {
+        clearTimeout(existing.timer);
+      }
+
+      existing.timer = setTimeout(
+        () => this.enqueueCompanyProfileRematch(companyKey, existing),
+        COMPANY_PROFILE_REMATCH_DEBOUNCE_MS,
+      );
+
+      return existing.promise;
+    }
+
+    let resolvePromise!: (matches: TenderCompanyMatchDocument[]) => void;
+    let rejectPromise!: (error: unknown) => void;
+    const promise = new Promise<TenderCompanyMatchDocument[]>(
+      (resolve, reject) => {
+        resolvePromise = resolve;
+        rejectPromise = reject;
+      },
+    );
+    const entry: DebouncedCompanyProfileRematch = {
+      filter,
+      promise,
+      resolve: resolvePromise,
+      reject: rejectPromise,
+    };
+
+    entry.timer = setTimeout(
+      () => this.enqueueCompanyProfileRematch(companyKey, entry),
+      COMPANY_PROFILE_REMATCH_DEBOUNCE_MS,
+    );
+    this.debouncedCompanyProfileRematches.set(companyKey, entry);
+
+    return promise;
+  }
+
+  private enqueueCompanyProfileRematch(
+    companyKey: string,
+    entry: DebouncedCompanyProfileRematch,
+  ): void {
+    entry.timer = undefined;
+
+    this.companyProfileRematchQueue
+      .push(async () => {
+        if (this.debouncedCompanyProfileRematches.get(companyKey) === entry) {
+          this.debouncedCompanyProfileRematches.delete(companyKey);
+        }
+
+        return this.rematchActiveCompetitionTendersWithCompanyFilter(
+          entry.filter,
+        );
+      })
+      .then(entry.resolve, entry.reject);
+  }
+
+  private async rematchActiveCompetitionTendersWithCompanyFilter(
     filter: CompanyTenderFilterForMatching,
   ): Promise<TenderCompanyMatchDocument[]> {
     const savedMatches: TenderCompanyMatchDocument[] = [];
