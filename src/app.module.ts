@@ -18,6 +18,7 @@ import { CodelistModule } from './resources/codelist/codelist.module';
 import { CompanyFilterModule } from './resources/company-filter/company-filter.module';
 import { TenderMatchingModule } from './resources/tender-matching/tender-matching.module';
 import { CompanyProfileDocumentsModule } from './resources/company-profile-documents/company-profile-documents.module';
+import { CurrencyExchangeRatesModule } from './resources/currency-exchange-rates/currency-exchange-rates.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { CompanyProfileDocumentsModule } from './resources/company-profile-docum
     CompanyFilterModule,
     TenderMatchingModule,
     CompanyProfileDocumentsModule,
+    CurrencyExchangeRatesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
