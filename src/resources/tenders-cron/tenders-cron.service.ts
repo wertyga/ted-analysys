@@ -6,7 +6,7 @@ import { TedScope } from '@/resources/ted-search/types/ted-search.types';
 import { getTedDate, resolveDeadlineRange } from '@/resources/ted-search/utils';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { TendersService } from '@/resources/tenders/tenders.service';
-import { TenderDocument, TenderModel } from '@/resources/tenders/schemas';
+import { TenderDocument } from '@/resources/tenders/schemas';
 import { isDev, logger } from '@/utils';
 import { TenderCompanyMatchDocument } from '@/resources/tender-matching/schemas/tender-company-match.schema';
 import { TenderMatchingService } from '@/resources/tender-matching/tender-matching.service';
@@ -45,23 +45,19 @@ export class TendersCronService {
   ) {
     if (process.env.NEED_TOGATHER_TED_BASE) {
       setTimeout(() => {
-        this.collectAllTendersFromTED();
+        this.gatherAllCompetitionTenders();
       }, 2000);
     }
-
-    // setTimeout(() => {
-    //   this.gatherRecentCompetitionTendersOnce();
-    // }, 2000);
   }
-
-  async collectAllTendersFromTED() {}
 
   @Cron(ALL_COMPETITION_TENDERS_CRON, {
     timeZone: 'Europe/Warsaw',
   })
   async gatherAllCompetitionTenders(): Promise<void> {
     if (this.isGatheringAllCompetitionTenders) {
-      this.logger.warn('Recent TED tender gather is already running, skipping');
+      this.logger.warn(
+        'All competition TED tender gather is already running, skipping',
+      );
       return;
     }
 
@@ -88,7 +84,7 @@ export class TendersCronService {
     } catch (e: unknown) {
       const error = e instanceof Error ? e.message : 'unknown error';
 
-      this.logger.error(`Recent TED tender gather failed: ${error}`);
+      this.logger.error(`All competition TED tender gather failed: ${error}`);
       await logger.error('TED_ALL_COMPETITION_COLLECTED_FAILED', error);
     } finally {
       this.isGatheringAllCompetitionTenders = false;
@@ -132,7 +128,7 @@ export class TendersCronService {
       const error = e instanceof Error ? e.message : 'unknown error';
 
       this.logger.error(`Recent TED tender gather failed: ${error}`);
-      await logger.error('TED_ALL_COMPETITION_COLLECTED_FAILED', error);
+      await logger.error('TED_RECENT_COMPETITION_COLLECTED_FAILED', error);
     } finally {
       this.isGatheringRecentTenders = false;
     }
@@ -169,7 +165,9 @@ export class TendersCronService {
       updated += saveResult.updated;
       skipped += saveResult.skipped;
 
-      await options.onChangedTenders?.(saveResult.changedTenders);
+      if (saveResult.changedTenders.length > 0) {
+        await options.onChangedTenders?.(saveResult.changedTenders);
+      }
 
       if (
         totalNoticeCount !== undefined &&
