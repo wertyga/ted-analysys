@@ -34,6 +34,7 @@ export interface TenderDeepAnalysis {
   tender: mongoose.Types.ObjectId;
   company: mongoose.Types.ObjectId;
   generalAnalysis?: mongoose.Types.ObjectId;
+  language: string;
   status: TenderDeepAnalysisStatus;
   resultJson?: TenderDeepAnalysisResult;
   executiveSummary?: string;
@@ -126,6 +127,7 @@ const TenderDeepAnalysisSchema = new Schema<TenderDeepAnalysisDocument>(
       ref: 'TenderGeneralAnalysis',
       default: undefined,
     },
+    language: { type: String, required: true, default: 'en', trim: true },
     status: {
       type: String,
       enum: Object.values(TenderDeepAnalysisStatus),
@@ -183,9 +185,11 @@ TenderDeepAnalysisSchema.add({ model: String } as Record<string, unknown>);
 TenderDeepAnalysisSchema.index({ tenderId: 1 });
 TenderDeepAnalysisSchema.index({ tender: 1 });
 TenderDeepAnalysisSchema.index({ company: 1 });
+TenderDeepAnalysisSchema.index({ language: 1 });
 TenderDeepAnalysisSchema.index({ sourceHash: 1 });
 TenderDeepAnalysisSchema.index({ status: 1 });
 TenderDeepAnalysisSchema.index({ tenderId: 1, company: 1 });
+TenderDeepAnalysisSchema.index({ tenderId: 1, company: 1, language: 1 });
 TenderDeepAnalysisSchema.index(
   { tenderId: 1, company: 1, sourceHash: 1 },
   { unique: true },

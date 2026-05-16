@@ -361,10 +361,11 @@ export class CompanyFilterService {
   private async analyzeCompanyProfile(
     payload: CompanyTenderFilterAiPayload,
   ): Promise<CompanyTenderFilterAiResult> {
-    const response = await this.deepSeekAnalysisService.createDeepJsonResponse(
-      COMPANY_TENDER_FILTER_SYSTEM_PROMPT,
-      this.buildUserPrompt(payload),
-    );
+    const response =
+      await this.deepSeekAnalysisService.createGeneralJsonResponse(
+        COMPANY_TENDER_FILTER_SYSTEM_PROMPT,
+        this.buildUserPrompt(payload),
+      );
 
     return this.validateAiResult(response, payload);
   }

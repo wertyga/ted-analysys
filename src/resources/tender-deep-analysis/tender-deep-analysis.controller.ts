@@ -31,7 +31,9 @@ export class TenderDeepAnalysisController {
   @Post()
   @ApiOperation({ summary: 'Run deep company-fit tender analysis' })
   @ApiQuery({ name: 'language', required: false, example: 'en' })
-  @ApiOkResponse({ description: 'Saved deep company-fit analysis' })
+  @ApiOkResponse({
+    description: 'Saved deep company-fit analyses grouped by language',
+  })
   async analyze(
     @Param('tenderId') tenderId: string,
     @Req() req,
@@ -43,29 +45,6 @@ export class TenderDeepAnalysisController {
         companyId: String(req.user._id),
         language,
       });
-
-    return TenderDeepAnalysisModel.serializeDetail(analysis);
-  }
-
-  @Get()
-  @ApiOperation({ summary: 'Get latest completed deep company-fit analysis' })
-  @ApiOkResponse({ description: 'Latest completed deep company-fit analysis' })
-  @ApiNotFoundResponse({ description: 'Deep analysis not found' })
-  async getLatest(@Param('tenderId') tenderId: string, @Req() req) {
-    const companyId = String(req.user._id);
-
-    const analysis = await this.tenderDeepAnalysisService.getDeppAnalysisTender(
-      {
-        tenderId,
-        companyId,
-      },
-    );
-
-    if (!analysis) {
-      throw new NotFoundException(
-        `Deep analysis for tender ${tenderId} and company ${companyId} not found`,
-      );
-    }
 
     return TenderDeepAnalysisModel.serializeDetail(analysis);
   }

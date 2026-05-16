@@ -103,6 +103,7 @@ export class TenderGeneralAnalysisService {
     }).exec();
 
     const isHashEqual = existingBaseAnalysis?.sourceHash === sourceHash;
+
     const hasDoneAnalysis =
       existingBaseAnalysis?.resultJson &&
       existingBaseAnalysis.status === TenderGeneralAnalysisStatus.DONE &&
