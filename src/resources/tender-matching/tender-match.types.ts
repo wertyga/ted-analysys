@@ -70,6 +70,7 @@ export interface CompanyTenderFilterForMatching {
   _id?: Types.ObjectId | string;
   company?: Types.ObjectId | string | null;
   user?: Types.ObjectId | string | null;
+  summary?: string;
   cpvCodes: {
     category?: Types.ObjectId | string | null;
     code: string;
@@ -90,6 +91,9 @@ export interface CompanyTenderFilterForMatching {
   requiredKeywords: string[];
   optionalKeywords: string[];
   excludedKeywords: string[];
+  certifications?: string[];
+  capabilities?: string[];
+  publicProcurementExperience?: boolean | null;
   notificationThreshold: number;
   confirmedByUser?: boolean;
 }
@@ -102,6 +106,74 @@ export interface TenderCompanyMatchResult {
   reasons: string[];
   risks: string[];
   keywordHits: string[];
+}
+
+export type CompanyTenderFitAiPayload = {
+  company: {
+    name?: string;
+    summary?: string;
+    targetCountries: string[];
+    languages: string[];
+    capabilities: string[];
+    certifications: string[];
+    publicProcurementExperience: boolean | null;
+    minBudget: number | null;
+    maxBudget: number | null;
+    currency: string | null;
+    cpvCodes: {
+      code: string;
+      label?: string;
+      source?: string;
+      matchLevel?: string;
+    }[];
+    optionalKeywords: string[];
+    requiredKeywords: string[];
+  };
+  tender: {
+    id: string;
+    title: string;
+    description?: string;
+    cpvCodes: string[];
+    buyerName?: string;
+    buyerCountry?: string;
+    placeOfPerformanceCountries: string[];
+    estimatedValue: {
+      amount: number | null;
+      currency: string | null;
+      amountEur?: number | null;
+    };
+    deadlineAt?: string | null;
+    publicationDate?: string | null;
+    contractNature?: string | null;
+    procedureType?: string | null;
+    noticeLanguage?: string | null;
+    submissionLanguages: string[];
+    selectionCriteria: {
+      name?: string | null;
+      description?: string | null;
+    }[];
+    awardCriteria: {
+      name?: string | null;
+      description?: string | null;
+      type?: string | null;
+      weight?: number | null;
+    }[];
+  };
+  hardMatch: {
+    score: number;
+    decision: string;
+    reasons: string[];
+    risks: string[];
+    keywordHits: string[];
+  };
+};
+
+export interface CompanyTenderFitAiResult {
+  score: number;
+  decision: AiFitDecision;
+  summary: string;
+  reasons: string[];
+  risks: string[];
 }
 
 export interface CpvMatchResult {

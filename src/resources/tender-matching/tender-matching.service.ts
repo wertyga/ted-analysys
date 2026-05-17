@@ -2,12 +2,27 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { QueryFilter, Types, UpdateQuery } from 'mongoose';
 import { CompanyTenderFilterModel } from '@/resources/company-filter/company-filter.schema';
 import { TenderDocument, TenderModel } from '@/resources/tenders/schemas';
-import { QueueAsyncConcurrency, toObjectId } from '@/utils';
+import {
+  getSafeErrorMessage,
+  getString,
+  getStringArray,
+  isRecord,
+  logger,
+  QueueAsyncConcurrency,
+  readNumber,
+  readString,
+  readStringArray,
+  toObjectId,
+  toIsoString,
+} from '@/utils';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { mapTenderForMatching } from './tender-for-matching.mapper';
 import { matchTenderWithCompanyFilter } from './tender-match-rules';
 import {
+  AiFitDecision,
   AiFitStatus,
+  CompanyTenderFitAiPayload,
+  CompanyTenderFitAiResult,
   CompanyTenderFilterForMatching,
   HardMatchStatus,
   NotificationStatus,
@@ -19,11 +34,15 @@ import {
   TenderCompanyMatchModel,
 } from './schemas/tender-company-match.schema';
 import { gfTime } from '@/goldfish';
+import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
+import { COMPANY_TENDER_FIT_SYSTEM_PROMPT } from './company-tender-fit.prompt';
+import { UserModel } from '@/resources/user/user.schema';
 
 const RECENT_ACTIVE_TENDERS_LOOKBACK_DAYS = 2;
 const ACTIVE_COMPETITION_TENDERS_MATCH_BATCH_SIZE = 100;
 const COMPANY_PROFILE_REMATCH_DEBOUNCE_MS = gfTime.minute;
-const COMPANY_PROFILE_REMATCH_CONCURRENCY = 1;
+const COMPANY_PROFILE_REMATCH_CONCURRENCY = 5;
+const COMPANY_TENDER_AI_FIT_CONCURRENCY = 5;
 
 interface DebouncedCompanyProfileRematch {
   filter: CompanyTenderFilterForMatching;
@@ -35,8 +54,15 @@ interface DebouncedCompanyProfileRematch {
 
 @Injectable()
 export class TenderMatchingService {
+  constructor(
+    private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
+  ) {}
+
   private readonly companyProfileRematchQueue = new QueueAsyncConcurrency(
     COMPANY_PROFILE_REMATCH_CONCURRENCY,
+  );
+  private readonly companyTenderAiFitQueue = new QueueAsyncConcurrency(
+    COMPANY_TENDER_AI_FIT_CONCURRENCY,
   );
   private readonly debouncedCompanyProfileRematches = new Map<
     string,
@@ -221,7 +247,91 @@ export class TenderMatchingService {
       result,
     );
 
+    if (result.score < filter.notificationThreshold) {
+      return savedMatch;
+    }
+
+    this.companyTenderAiFitQueue
+      .push(() =>
+        this.evaluateTenderCompanyFitForNotification(
+          savedMatch,
+          tender,
+          filter,
+        ),
+      )
+      .catch((error: unknown) =>
+        logger.info('TENDER_COMPANY_AI_FIT_FAILED', {
+          tenderId: tenderId ? String(tenderId) : null,
+          companyId: String(companyId),
+          error: getSafeErrorMessage(error),
+        }),
+      );
+
     return savedMatch;
+  }
+
+  async evaluateTenderCompanyFitForNotification(
+    match: TenderCompanyMatchDocument,
+    tender: TenderDocument,
+    filter: CompanyTenderFilterForMatching,
+  ): Promise<TenderCompanyMatchDocument | null> {
+    await this.setTenderMatchPendingStatus(match._id);
+
+    logger.info('TENDER_COMPANY_AI_FIT_STARTED', {
+      matchId: String(match._id),
+      tenderId: String(match.tender),
+      companyId: String(match.company),
+      hardMatchScore: match.hardMatchScore,
+      hardMatchDecision: match.decision,
+    });
+
+    try {
+      const payload = await this.buildCompanyTenderFitPayload(
+        tender,
+        filter,
+        match,
+      );
+      const result = await this.analyzeCompanyTenderFit(payload);
+
+      return TenderCompanyMatchModel.findByIdAndUpdate(
+        match._id,
+        {
+          $set: {
+            aiFitStatus: AiFitStatus.COMPLETED,
+            aiFitScore: result.score,
+            aiFitDecision: result.decision,
+            aiFitSummary: result.summary,
+            aiFitReasons: result.reasons,
+            aiFitRisks: result.risks,
+            aiFitError: null,
+          },
+        },
+        { returnDocument: 'after' },
+      ).exec();
+    } catch (error: unknown) {
+      return TenderCompanyMatchModel.findByIdAndUpdate(
+        match._id,
+        {
+          $set: {
+            aiFitStatus: AiFitStatus.FAILED,
+            aiFitError: getSafeErrorMessage(error),
+          },
+        },
+        { returnDocument: 'after' },
+      ).exec();
+    }
+  }
+
+  private async setTenderMatchPendingStatus(_id: Types.ObjectId | string) {
+    await TenderCompanyMatchModel.updateOne(
+      { _id: String(_id) },
+      {
+        $set: {
+          aiFitStatus: AiFitStatus.PENDING,
+          aiFitError: null,
+        },
+      },
+    ).exec();
   }
 
   private async findActiveRecentTenders(): Promise<TenderDocument[]> {
@@ -283,6 +393,181 @@ export class TenderMatchingService {
     ).exec();
   }
 
+  private async analyzeCompanyTenderFit(
+    payload: CompanyTenderFitAiPayload,
+  ): Promise<CompanyTenderFitAiResult> {
+    const response =
+      await this.deepSeekAnalysisService.createGeneralJsonResponse(
+        COMPANY_TENDER_FIT_SYSTEM_PROMPT,
+        this.buildCompanyTenderFitUserPrompt(payload),
+      );
+
+    return this.validateCompanyTenderFitAiResult(response);
+  }
+
+  private buildCompanyTenderFitUserPrompt(
+    payload: CompanyTenderFitAiPayload,
+  ): string {
+    return [
+      'Evaluate whether this hard-matched tender should be sent to the user by email.',
+      '',
+      'Input:',
+      JSON.stringify(payload, null, 2),
+      '',
+      'Return JSON with this exact structure:',
+      JSON.stringify(
+        {
+          score: 75,
+          decision: 'good_fit',
+          summary: 'string',
+          reasons: ['string'],
+          risks: ['string'],
+          recommendedAction: 'review',
+        },
+        null,
+        2,
+      ),
+    ].join('\n');
+  }
+
+  private validateCompanyTenderFitAiResult(
+    value: unknown,
+  ): CompanyTenderFitAiResult {
+    if (!isRecord(value)) {
+      throw new Error('Company tender fit analysis result must be an object');
+    }
+
+    const score = value.score;
+
+    if (
+      typeof score !== 'number' ||
+      !Number.isInteger(score) ||
+      score < 0 ||
+      score > 100
+    ) {
+      throw new Error(
+        'Company tender fit score must be an integer from 0 to 100',
+      );
+    }
+
+    return {
+      score,
+      decision: getAiFitDecision(score),
+      summary: getString(value, 'summary'),
+      reasons: getStringArray(value, 'reasons'),
+      risks: getStringArray(value, 'risks'),
+    };
+  }
+
+  private async buildCompanyTenderFitPayload(
+    tender: TenderDocument,
+    filter: CompanyTenderFilterForMatching,
+    match: TenderCompanyMatchDocument,
+  ): Promise<CompanyTenderFitAiPayload> {
+    const companyName = await this.getCompanyName(filter.user);
+    const populatedTender = await tender.populate({
+      path: 'classificationCpv',
+      select: 'code name',
+    });
+
+    return {
+      company: {
+        name: companyName,
+        summary: filter.summary,
+        targetCountries: filter.targetCountries ?? [],
+        languages: filter.languages ?? [],
+        capabilities: filter.capabilities ?? [],
+        certifications: filter.certifications ?? [],
+        publicProcurementExperience: filter.publicProcurementExperience ?? null,
+        minBudget: filter.minBudget ?? null,
+        maxBudget: filter.maxBudget ?? null,
+        currency: filter.currency ?? null,
+        cpvCodes: (filter.cpvCodes ?? []).map((cpvCode) => ({
+          code: cpvCode.code,
+          label: cpvCode.label,
+          source: cpvCode.source,
+          matchLevel: cpvCode.matchLevel,
+        })),
+        optionalKeywords: filter.optionalKeywords ?? [],
+        requiredKeywords: filter.requiredKeywords ?? [],
+      },
+      tender: {
+        id: tender.id,
+        title: tender.title ?? '',
+        description: tender.description,
+        cpvCodes: readStringArray(populatedTender.classificationCpv),
+        buyerName: tender.buyerName,
+        buyerCountry: tender.buyerCountry,
+        placeOfPerformanceCountries: tender.placeOfPerformanceCountries ?? [],
+        estimatedValue: {
+          amount: tender.estimatedValue?.amount ?? null,
+          currency: tender.estimatedValue?.currency ?? null,
+          amountEur: tender.estimatedValueEur,
+        },
+        deadlineAt: toIsoString(
+          tender.submissionDeadline ?? tender.deadlineReceiptTender,
+        ),
+        publicationDate: toIsoString(tender.publicationDate),
+        contractNature: tender.contractNature ?? null,
+        procedureType: tender.procedureType ?? null,
+        noticeLanguage: tender.noticeLanguage ?? null,
+        submissionLanguages: tender.submissionLanguages ?? [],
+        selectionCriteria: this.mapSelectionCriteria(tender.selectionCriteria),
+        awardCriteria: this.mapAwardCriteria(tender.awardCriteria),
+      },
+      hardMatch: {
+        score: match.hardMatchScore,
+        decision: match.decision,
+        reasons: match.reasons,
+        risks: match.risks,
+        keywordHits: match.keywordHits,
+      },
+    };
+  }
+
+  private async getCompanyName(
+    companyId: Types.ObjectId | string | null | undefined,
+  ): Promise<string | undefined> {
+    const company = await UserModel.findById(companyId)
+      .select('companyName')
+      .lean()
+      .exec();
+
+    return readString(company?.companyName);
+  }
+
+  private mapSelectionCriteria(
+    value: unknown,
+  ): CompanyTenderFitAiPayload['tender']['selectionCriteria'] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value.map((item) => ({
+      name: isRecord(item) ? (readString(item.name) ?? null) : null,
+      description: isRecord(item)
+        ? (readString(item.description) ?? null)
+        : (readString(item) ?? null),
+    }));
+  }
+
+  private mapAwardCriteria(
+    value: unknown,
+  ): CompanyTenderFitAiPayload['tender']['awardCriteria'] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value.map((item) => ({
+      name: isRecord(item) ? (readString(item.name) ?? null) : null,
+      description: isRecord(item)
+        ? (readString(item.description) ?? null)
+        : (readString(item) ?? null),
+      type: isRecord(item) ? (readString(item.type) ?? null) : null,
+      weight: isRecord(item) ? (readNumber(item.weight) ?? null) : null,
+    }));
+  }
+
   private async saveMatch(
     tenderId: Types.ObjectId | null,
     companyId: Types.ObjectId,
@@ -313,6 +598,10 @@ export class TenderMatchingService {
         aiFitStatus: AiFitStatus.NOT_STARTED,
         aiFitScore: null,
         aiFitDecision: null,
+        aiFitSummary: '',
+        aiFitReasons: [],
+        aiFitRisks: [],
+        aiFitError: null,
         notificationStatus: NotificationStatus.NOT_CREATED,
       },
       $unset: {
@@ -332,4 +621,11 @@ export class TenderMatchingService {
 
     return savedMatch;
   }
+}
+
+function getAiFitDecision(score: number): AiFitDecision {
+  if (score >= 85) return AiFitDecision.STRONG_FIT;
+  if (score >= 70) return AiFitDecision.GOOD_FIT;
+  if (score >= 50) return AiFitDecision.MAYBE;
+  return AiFitDecision.REJECT;
 }

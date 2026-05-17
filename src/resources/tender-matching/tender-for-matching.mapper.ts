@@ -1,4 +1,10 @@
-import { getNullableNumber, isRecord, valueToString } from '@/utils';
+import {
+  isRecord,
+  readDate,
+  readNumber,
+  readString,
+  readStringArray,
+} from '@/utils';
 import { TenderDocument } from '@/resources/tenders/schemas';
 import { TenderForMatching } from './tender-match.types';
 
@@ -57,89 +63,4 @@ function readEstimatedAmount(value: unknown): number | null | undefined {
   const amount = readNumber(value);
 
   return !!amount ? amount : null;
-}
-
-function readString(value: unknown): string | undefined {
-  const textValue = valueToString(value);
-
-  if (textValue !== undefined) {
-    const trimmed = textValue.trim();
-
-    if (trimmed.length > 0) {
-      return trimmed;
-    }
-  }
-
-  if (value instanceof Date) {
-    return String(value);
-  }
-
-  if (isRecord(value) && typeof value.code === 'string') {
-    return value.code;
-  }
-
-  return undefined;
-}
-
-// TODO: move to utils/checking.ts if another mapper needs object-aware array coercion.
-function readStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value
-    .flatMap((item) => {
-      const directValue = readString(item);
-
-      if (directValue) {
-        return [directValue];
-      }
-
-      if (isRecord(item)) {
-        return [
-          readString(item.code),
-          readString(item.id),
-          readString(item.value),
-          readString(item.name),
-        ].filter((nestedValue): nestedValue is string => Boolean(nestedValue));
-      }
-
-      return [];
-    })
-    .filter((item, index, array) => array.indexOf(item) === index);
-}
-
-function readNumber(value: unknown): number | null | undefined {
-  const nullableNumber = getNullableNumber(value);
-
-  if (typeof nullableNumber === 'number' && Number.isFinite(nullableNumber)) {
-    return nullableNumber;
-  }
-
-  if (value === null) {
-    return null;
-  }
-
-  if (typeof value === 'string') {
-    const parsed = Number(value);
-
-    return Number.isFinite(parsed) ? parsed : undefined;
-  }
-
-  return undefined;
-}
-
-// TODO: move to utils/checking.ts if date coercion is needed outside tender matching.
-function readDate(value: unknown): Date | null | undefined {
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? undefined : value;
-  }
-
-  if (typeof value === 'string' || typeof value === 'number') {
-    const parsed = new Date(value);
-
-    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
-  }
-
-  return value === null ? null : undefined;
 }

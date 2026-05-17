@@ -21,6 +21,10 @@ export interface TenderCompanyMatch {
   aiFitStatus: AiFitStatus;
   aiFitScore: number | null;
   aiFitDecision: AiFitDecision | null;
+  aiFitSummary: string;
+  aiFitReasons: string[];
+  aiFitRisks: string[];
+  aiFitError: string | null;
   notificationStatus: NotificationStatus;
   staleReason?: MatchStaleReason | null;
   createdAt?: Date;
@@ -88,6 +92,22 @@ export const TenderCompanyMatchSchema = new Schema<TenderCompanyMatchDocument>(
     aiFitDecision: {
       type: String,
       enum: [...Object.values(AiFitDecision), null],
+      default: null,
+    },
+    aiFitSummary: {
+      type: String,
+      default: '',
+    },
+    aiFitReasons: {
+      type: [String],
+      default: [],
+    },
+    aiFitRisks: {
+      type: [String],
+      default: [],
+    },
+    aiFitError: {
+      type: String,
       default: null,
     },
     notificationStatus: {

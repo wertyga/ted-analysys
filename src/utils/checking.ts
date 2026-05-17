@@ -121,6 +121,95 @@ export function getOptionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
+export function readString(value: unknown): string | undefined {
+  const textValue = valueToString(value);
+
+  if (textValue !== undefined) {
+    const trimmed = textValue.trim();
+
+    if (trimmed.length > 0) {
+      return trimmed;
+    }
+  }
+
+  if (value instanceof Date) {
+    return String(value);
+  }
+
+  if (isRecord(value) && typeof value.code === 'string') {
+    return value.code;
+  }
+
+  return undefined;
+}
+
+export function readStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .flatMap((item) => {
+      const directValue = readString(item);
+
+      if (directValue) {
+        return [directValue];
+      }
+
+      if (isRecord(item)) {
+        return [
+          readString(item.code),
+          readString(item.id),
+          readString(item.value),
+          readString(item.name),
+        ].filter((nestedValue): nestedValue is string => Boolean(nestedValue));
+      }
+
+      return [];
+    })
+    .filter((item, index, array) => array.indexOf(item) === index);
+}
+
+export function readNumber(value: unknown): number | null | undefined {
+  const nullableNumber = getNullableNumber(value);
+
+  if (typeof nullableNumber === 'number' && Number.isFinite(nullableNumber)) {
+    return nullableNumber;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  return undefined;
+}
+
+export function readDate(value: unknown): Date | null | undefined {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? undefined : value;
+  }
+
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value);
+
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  }
+
+  return value === null ? null : undefined;
+}
+
+export function toIsoString(value: unknown): string | null {
+  const date = readDate(value);
+
+  return date instanceof Date ? date.toISOString() : null;
+}
+
 export function getNormalizedStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
@@ -137,9 +226,7 @@ export function getNormalizedStringArray(value: unknown): string[] {
 }
 
 export function getCpvCodeArray(value: unknown): string[] {
-  return getNormalizedStringArray(value).filter((code) =>
-    /^\d{8}$/.test(code),
-  );
+  return getNormalizedStringArray(value).filter((code) => /^\d{8}$/.test(code));
 }
 
 export function getOptionalPositiveNumber(value: unknown): number | undefined {

@@ -18,3 +18,7 @@ export const deepAnalysisPopulateFields: PopulateOptions[] = [
   { path: 'tender', populate: tenderCpvPopulateFields },
   { path: 'company', populate: companyCpvPopulateFields },
 ];
+
+export const companyFilterPopulateFields: PopulateOptions[] = [
+  { path: 'user' },
+];
