@@ -12,6 +12,7 @@ const LogsSchema = new Schema(
       enum: LOG_TYPES,
     },
     message: String,
+    ip: String,
     data: Object,
   },
   { timestamps: true },
@@ -24,27 +25,22 @@ class Logger {
     customMessage: string,
     loglevel: LOG_TYPES,
     logData: any = {},
+    ip?: string | null,
   ) {
     return LogModel.create({
       type: loglevel,
+      ip: ip ?? '',
       message: customMessage,
       data: JSON.stringify(logData),
     });
   }
 
-  async error(message: string, data?: any) {
-    await this.saveLog(message, LOG_TYPES.ERROR, data);
+  async error(message: string, data?: any, ip?: string | null) {
+    await this.saveLog(message, LOG_TYPES.ERROR, data, ip);
   }
 
-  async info(message: string, data?: any) {
-    await this.saveLog(message, LOG_TYPES.INFO, data);
-  }
-
-  async emailSent(email: string, isRegister?: boolean) {
-    await this.info('SENT_EMAIL', {
-      email,
-      type: isRegister ? 'registration' : 'restoration',
-    });
+  async info(message: string, data?: any, ip?: string | null) {
+    await this.saveLog(message, LOG_TYPES.INFO, data, ip);
   }
 }
 

@@ -28,11 +28,15 @@ export class HttpErrorLoggingFilter implements ExceptionFilter {
         : response;
     const stack = exception instanceof Error ? exception.stack : undefined;
 
-    logger.error(`${req.method} ${req.url} -> ${status}`, {
-      body,
-      stack,
-      user: req.user ?? null,
-    });
+    logger.error(
+      `${req.method} ${req.url} -> ${status}`,
+      {
+        body,
+        stack,
+        user: req.user ?? null,
+      },
+      this.getClientIp(req),
+    );
 
     res.status(status).json(body);
   }
@@ -79,5 +83,28 @@ export class HttpErrorLoggingFilter implements ExceptionFilter {
       message.includes('not accepted') ||
       message.includes('not found')
     );
+  }
+
+  private getClientIp(req: Request): string | null {
+    const forwardedFor = this.firstHeaderValue(req.headers['x-forwarded-for']);
+
+    return (
+      forwardedFor?.split(',')[0]?.trim() ||
+      this.firstHeaderValue(req.headers['x-real-ip']) ||
+      this.firstHeaderValue(req.headers['cf-connecting-ip']) ||
+      req.ip ||
+      req.socket.remoteAddress ||
+      null
+    );
+  }
+
+  private firstHeaderValue(
+    header: string | string[] | undefined,
+  ): string | null {
+    if (Array.isArray(header)) {
+      return header[0] ?? null;
+    }
+
+    return header ?? null;
   }
 }
