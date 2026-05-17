@@ -1,11 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import {
-  TenderDocument,
-  TenderWithWishlist,
-} from '@/resources/tenders/schemas';
-import { isDuplicateKeyError } from '@/utils';
+import { TenderDocument } from '@/resources/tenders/schemas';
+import { getPaginationMeta, isDuplicateKeyError } from '@/utils';
 import { TendersService } from '@/resources/tenders/tenders.service';
-import { TenderListDto } from '@/resources/tenders/dto/tender.dto';
 import { TenderWishlistItemModel } from './schemas';
 import { UserDocument } from '@/resources/user/user.types';
 
@@ -80,15 +76,13 @@ export class TenderWishlistService {
 
   async listUserTenders(user: UserDocument, page = 1, limit = 20) {
     const userId = user._id;
-    const normalizedPage = Math.max(1, page);
-    const normalizedLimit = Math.min(Math.max(1, limit), 100);
-    const skip = (normalizedPage - 1) * normalizedLimit;
+    const pagination = getPaginationMeta({ page, limit });
 
     const [items, total] = await Promise.all([
       TenderWishlistItemModel.find({ user: userId })
         .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(normalizedLimit)
+        .skip(pagination.skip)
+        .limit(pagination.limit)
         .select('tender')
         .lean()
         .exec(),

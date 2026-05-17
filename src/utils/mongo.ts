@@ -23,6 +23,32 @@ export const getLimitsCursor = (
   return cursor.skip(Number(offset)).limit(Number(limit));
 };
 
+export const getPaginationMeta = ({
+  page,
+  limit,
+  defaultPage = 1,
+  defaultLimit = 20,
+  maxLimit = 100,
+}: {
+  page?: number | null;
+  limit?: number | null;
+  defaultPage?: number;
+  defaultLimit?: number;
+  maxLimit?: number;
+}) => {
+  const normalizedPage = Math.max(1, page ?? defaultPage);
+  const normalizedLimit = Math.min(
+    maxLimit,
+    Math.max(1, limit ?? defaultLimit),
+  );
+
+  return {
+    page: normalizedPage,
+    limit: normalizedLimit,
+    skip: (normalizedPage - 1) * normalizedLimit,
+  };
+};
+
 export const getSortMeta = (sortData = {} as SortDto, cursor?) => {
   const { sortBy = SORT_TYPE.CreatedAt, sortDirection = SORT_DIRECTION.DESC } =
     sortData;

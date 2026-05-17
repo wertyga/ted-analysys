@@ -13,7 +13,7 @@ import {
 import { mapTedError } from './utils';
 import { TenderModel } from '@/resources/tenders/schemas';
 import { TendersService } from '@/resources/tenders/tenders.service';
-import { isDev } from '@/utils';
+import { getPaginationMeta, isDev } from '@/utils';
 import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rates/currency-exchange-rates.service';
 
 @Injectable()
@@ -141,11 +141,12 @@ export class TedSearchService {
   async searchLocalTenders(
     filters: TedTenderSearchRequestDto,
   ): Promise<TedSearchResponse> {
-    const limit = filters.limit ?? 20;
-    const page = filters.page ?? 1;
+    const { limit, skip } = getPaginationMeta({
+      page: filters.page,
+      limit: filters.limit,
+    });
     const query = await this.filters.buildLocalTenderQuery(filters);
     const sort = this.sorting.buildLocalTenderSort(filters);
-    const skip = (page - 1) * limit;
 
     if (isDev) {
       this.logger.debug(`Local Search request: ${JSON.stringify(query)}`);

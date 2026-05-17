@@ -1,4 +1,6 @@
 import mongoose, { Document, Model, Schema, Types } from 'mongoose';
+import { TenderModel, TenderSerializable } from '@/resources/tenders/schemas';
+import { filterModel, isPopulatedRecord } from '@/utils';
 import {
   AiFitDecision,
   AiFitStatus,
@@ -32,6 +34,16 @@ export interface TenderCompanyMatch {
 }
 
 export type TenderCompanyMatchDocument = TenderCompanyMatch & Document;
+export type TenderCompanyMatchSerializable =
+  | TenderCompanyMatchDocument
+  | (TenderCompanyMatch & { _id: unknown });
+
+export interface TenderCompanyMatchModelType extends Model<TenderCompanyMatchDocument> {
+  serializeList(match?: TenderCompanyMatchSerializable | null): unknown | null;
+  serializeDetail(
+    match?: TenderCompanyMatchSerializable | null,
+  ): unknown | null;
+}
 
 export const TenderCompanyMatchSchema = new Schema<TenderCompanyMatchDocument>(
   {
@@ -130,11 +142,52 @@ export const TenderCompanyMatchSchema = new Schema<TenderCompanyMatchDocument>(
 TenderCompanyMatchSchema.index({ tender: 1, company: 1 }, { unique: true });
 TenderCompanyMatchSchema.index({ hardMatchStatus: 1 });
 
-export const TenderCompanyMatchModel: Model<TenderCompanyMatchDocument> =
+function serializeMatchList(
+  match?: TenderCompanyMatchSerializable | null,
+): unknown | null {
+  if (!match) {
+    return null;
+  }
+
+  const { tender, company, companyTenderFilter, ...rest } = filterModel(
+    match as TenderCompanyMatchDocument,
+  );
+
+  return {
+    ...rest,
+    tender: isPopulatedRecord(tender)
+      ? TenderModel.serializeList(tender as unknown as TenderSerializable)
+      : tender,
+  };
+}
+
+function serializeMatchDetail(
+  match?: TenderCompanyMatchSerializable | null,
+): unknown | null {
+  if (!match) {
+    return null;
+  }
+
+  const { tender, company, companyTenderFilter, ...rest } = filterModel(
+    match as TenderCompanyMatchDocument,
+  ) as Record<string, unknown>;
+
+  return {
+    ...rest,
+    tender: isPopulatedRecord(tender)
+      ? TenderModel.serializeDetail(tender as unknown as TenderSerializable)
+      : tender,
+  };
+}
+
+TenderCompanyMatchSchema.statics.serializeList = serializeMatchList;
+TenderCompanyMatchSchema.statics.serializeDetail = serializeMatchDetail;
+
+export const TenderCompanyMatchModel: TenderCompanyMatchModelType =
   (mongoose.models.TenderCompanyMatch as
-    | Model<TenderCompanyMatchDocument>
+    | TenderCompanyMatchModelType
     | undefined) ??
-  mongoose.model<TenderCompanyMatchDocument>(
+  mongoose.model<TenderCompanyMatchDocument, TenderCompanyMatchModelType>(
     'TenderCompanyMatch',
     TenderCompanyMatchSchema,
   );

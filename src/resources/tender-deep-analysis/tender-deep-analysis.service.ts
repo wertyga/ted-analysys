@@ -4,6 +4,7 @@ import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 import {
   companyCpvPopulateFields,
   deepAnalysisPopulateFields,
+  getPaginationMeta,
   getSafeErrorMessage,
   isDuplicateKeyError,
   logger,
@@ -261,9 +262,10 @@ export class TenderDeepAnalysisService {
     const query: QueryFilter<TenderDeepAnalysisDocument> = {
       company: params.companyId,
     };
-    const page = Math.max(1, params.page ?? 1);
-    const limit = Math.min(Math.max(1, params.limit ?? 20), 100);
-    const skip = (page - 1) * limit;
+    const { skip, limit } = getPaginationMeta({
+      page: params.page,
+      limit: params.limit,
+    });
 
     if (params.tenderIds?.length) {
       query.tenderId = { $in: params.tenderIds };

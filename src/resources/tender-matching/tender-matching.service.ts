@@ -4,6 +4,7 @@ import { CompanyTenderFilterModel } from '@/resources/company-filter/company-fil
 import { TenderDocument, TenderModel } from '@/resources/tenders/schemas';
 import {
   getSafeErrorMessage,
+  getPaginationMeta,
   getString,
   getStringArray,
   isRecord,
@@ -14,6 +15,7 @@ import {
   readStringArray,
   toObjectId,
   toIsoString,
+  tenderCpvPopulateFields,
 } from '@/utils';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { mapTenderForMatching } from './tender-for-matching.mapper';
@@ -74,6 +76,51 @@ export class TenderMatchingService {
     filter: CompanyTenderFilterForMatching,
   ): TenderCompanyMatchResult {
     return matchTenderWithCompanyFilter(mapTenderForMatching(tender), filter);
+  }
+
+  async findCompletedAiFitMatchesForUser(
+    companyId: Types.ObjectId | string,
+    minAiFitScore = 65,
+    pagination: { page?: number; limit?: number } = {},
+  ): Promise<{
+    items: TenderCompanyMatchDocument[];
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  }> {
+    const { page, limit, skip } = getPaginationMeta(pagination);
+
+    if (!companyId) {
+      return { items: [], page, limit, total: 0, totalPages: 0 };
+    }
+
+    const query: QueryFilter<TenderCompanyMatchDocument> = {
+      company: companyId,
+      hardMatchStatus: HardMatchStatus.MATCHED,
+      aiFitStatus: AiFitStatus.COMPLETED,
+      aiFitScore: { $gte: minAiFitScore },
+    };
+    const [items, total] = await Promise.all([
+      TenderCompanyMatchModel.find(query)
+        .sort({ aiFitScore: -1, updatedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate({
+          path: 'tender',
+          populate: tenderCpvPopulateFields,
+        })
+        .exec(),
+      TenderCompanyMatchModel.countDocuments(query).exec(),
+    ]);
+
+    return {
+      items,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async matchActiveRecentTendersWithCompanyFilter(
