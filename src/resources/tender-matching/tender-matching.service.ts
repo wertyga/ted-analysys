@@ -324,14 +324,6 @@ export class TenderMatchingService {
   ): Promise<TenderCompanyMatchDocument | null> {
     await this.setTenderMatchPendingStatus(match._id);
 
-    logger.info('TENDER_COMPANY_AI_FIT_STARTED', {
-      matchId: String(match._id),
-      tenderId: String(match.tender),
-      companyId: String(match.company),
-      hardMatchScore: match.hardMatchScore,
-      hardMatchDecision: match.decision,
-    });
-
     try {
       const payload = await this.buildCompanyTenderFitPayload(
         tender,
