@@ -13,7 +13,7 @@ import {
 import { mapTedError } from './utils';
 import { TenderModel } from '@/resources/tenders/schemas';
 import { TendersService } from '@/resources/tenders/tenders.service';
-import { getPaginationMeta, isDev } from '@/utils';
+import { devLog, getPaginationMeta } from '@/utils';
 import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rates/currency-exchange-rates.service';
 
 @Injectable()
@@ -148,9 +148,10 @@ export class TedSearchService {
     const query = await this.filters.buildLocalTenderQuery(filters);
     const sort = this.sorting.buildLocalTenderSort(filters);
 
-    if (isDev) {
-      this.logger.debug(`Local Search request: ${JSON.stringify(query)}`);
-    }
+    devLog(
+      () => `Local Search request: ${JSON.stringify(query)}`,
+      TedSearchService.name,
+    );
 
     const [notices, totalCount] = await Promise.all([
       this.tendersService.findMultipleLocalTendersWithBaseAnalysis(query, {
@@ -177,11 +178,10 @@ export class TedSearchService {
 
     for (let attempt = 0; attempt <= this.retryDelaysMs.length; attempt += 1) {
       try {
-        if (isDev) {
-          this.logger.debug(
-            `TED Search request: ${JSON.stringify(normalizedPayload)}`,
-          );
-        }
+        devLog(
+          () => `TED Search request: ${JSON.stringify(normalizedPayload)}`,
+          TedSearchService.name,
+        );
 
         const response = await this.http.post<TedSearchResponse>(
           '/v3/notices/search',

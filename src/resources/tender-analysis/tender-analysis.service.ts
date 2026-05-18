@@ -1,4 +1,4 @@
-import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import {
   GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
   GeneralTenderAnalysisInput,
@@ -6,7 +6,7 @@ import {
 } from '@/openai/dto/openai-analysis.dto';
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 import { TenderGeneralAnalysisService } from '@/resources/tender-analysis/tender-general-analysis.service';
-import { isDev } from '@/utils';
+import { devLog } from '@/utils';
 import { TenderDocument } from '../tenders/schemas';
 
 export interface TenderAnalysisExecutionResult {
@@ -17,8 +17,6 @@ export interface TenderAnalysisExecutionResult {
 
 @Injectable()
 export class TenderAnalysisService {
-  private readonly logger = new Logger(TenderAnalysisService.name);
-
   constructor(
     private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
     @Inject(forwardRef(() => TenderGeneralAnalysisService))
@@ -39,11 +37,10 @@ export class TenderAnalysisService {
     const result =
       await this.deepSeekAnalysisService.analyzeTenderGeneral(input);
 
-    if (isDev) {
-      this.logger.debug(
-        `General tender analysis completed: tender=${input.tender.id}`,
-      );
-    }
+    devLog(
+      `General tender analysis completed: tender=${input.tender.id}`,
+      TenderAnalysisService.name,
+    );
 
     return {
       result,

@@ -7,7 +7,7 @@ import { getTedDate, resolveDeadlineRange } from '@/resources/ted-search/utils';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { TenderDocument } from '@/resources/tenders/schemas';
-import { isDev, logger } from '@/utils';
+import { devLog, logger } from '@/utils';
 import { TenderCompanyMatchDocument } from '@/resources/tender-matching/schemas/tender-company-match.schema';
 import { TenderMatchingService } from '@/resources/tender-matching/tender-matching.service';
 import { TedOpenTendersCollectorService } from '@/resources/ted-open-tenders-collector/ted-open-tenders-collector.service';
@@ -111,11 +111,10 @@ export class TendersCronService {
         matchesSaved,
       };
 
-      if (isDev) {
-        this.logger.log(
-          `Recent TED tender gather completed: pages=${logResult.pagesFetched} fetched=${logResult.noticesFetched} saved=${logResult.saved} updated=${logResult.updated} skipped=${logResult.skipped} matches=${logResult.matchesSaved}`,
-        );
-      }
+      devLog(
+        `Recent TED tender gather completed: pages=${logResult.pagesFetched} fetched=${logResult.noticesFetched} saved=${logResult.saved} updated=${logResult.updated} skipped=${logResult.skipped} matches=${logResult.matchesSaved}`,
+        TendersCronService.name,
+      );
 
       await logger.info('TED_RECENT_COMPETITION_COLLECTED', logResult);
     } catch (e: unknown) {

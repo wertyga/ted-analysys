@@ -198,9 +198,7 @@ export class TedSearchFilters {
   private async buildContractAwardFilter(
     filters: TedTenderSearchRequestDto,
   ): Promise<MongoFilter | undefined> {
-    const hasRange =
-      filters.contractAwardFrom !== undefined ||
-      filters.contractAwardTo !== undefined;
+    const hasRange = !!filters.contractAwardFrom || !!filters.contractAwardTo;
 
     if (!hasRange) {
       if (filters.currency?.length) {
@@ -230,12 +228,13 @@ export class TedSearchFilters {
         ),
       ),
     );
+
     const validRanges = eurRanges.filter(
       (range): range is MongoFilter => !!range,
     );
 
     if (validRanges.length === 0) {
-      return { _id: { $exists: false } };
+      return undefined;
     }
 
     return {

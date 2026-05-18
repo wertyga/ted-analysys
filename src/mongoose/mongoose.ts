@@ -1,5 +1,4 @@
 import mongoose, { ConnectOptions } from 'mongoose';
-import { isDev } from '@/utils';
 
 const mongooseProps: ConnectOptions = {};
 mongoose.set('strictQuery', false);
