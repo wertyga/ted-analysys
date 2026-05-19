@@ -54,16 +54,16 @@ export class CompanyProfileDocumentsService {
     const profile = this.normalizeProfile(aiResult);
 
     const [industries, mainServices] = await Promise.all([
-      this.cpvService.resolveCodeIds(profile.industries ?? []),
-      this.cpvService.resolveCodeIds(profile.mainServices ?? []),
+      this.cpvService.resolveCpvCodeIds(profile.industries ?? []),
+      this.cpvService.resolveCpvCodeIds(profile.mainServices ?? []),
     ]);
 
     return {
       profile,
       resolvedProfile: {
         ...profile,
-        industries,
-        mainServices,
+        industries: industries.map((id) => id.toString()),
+        mainServices: mainServices.map((id) => id.toString()),
       },
       documents: extractedDocuments.map(({ file, extraction }) => ({
         filename: file.originalname,

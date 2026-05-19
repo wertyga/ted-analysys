@@ -55,7 +55,7 @@ export class UsersController {
   async updateUser(@Req() req, @Body() userData: UpdateUserDto) {
     const user = await this.usersService.updateUser(userData, req.user);
 
-    return { user: UserModel.serializeUser(filterModel(user), undefined) };
+    return { user: UserModel.serializeUser(user) };
   }
 
   @ApiBearerAuth()

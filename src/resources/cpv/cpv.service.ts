@@ -1,5 +1,6 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import axios from 'axios';
+import { Types } from 'mongoose';
 import { CpvCategoryModel, CpvCategory } from './schemas';
 import {
   CpvCategoriesResponse,
@@ -112,18 +113,16 @@ export class CpvService {
       .filter((item): item is CpvCategoryResponseItem => !!item);
   }
 
-  async resolveCodeIds(codes: string[]): Promise<string[]> {
-    const normalizedCodes = this.normalizeCodes(codes);
-
-    if (normalizedCodes.length === 0) {
+  async resolveCpvCodeIds(codes: string[]): Promise<Types.ObjectId[]> {
+    if (codes.length === 0) {
       return [];
     }
 
     const items = await CpvCategoryModel.find({
-      code: { $in: normalizedCodes },
+      code: { $in: codes },
     }).select('_id code');
 
-    return items.map((code) => code._id.toString());
+    return items.map((code) => code._id);
   }
 
   async findDescendantCodes(codes: string[]): Promise<string[]> {

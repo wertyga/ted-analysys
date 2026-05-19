@@ -1,12 +1,14 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { GetUsersRequestDto, UpdateUserDto } from './user.dto';
 import { TUser, USER_TYPE, UserDocument } from './user.types';
 import { companyCpvPopulateFields, getLimitAndSortCursor } from '@/utils';
 import { UserModel } from './user.schema';
-import { CpvCategoryModel } from '@/resources/cpv/schemas';
+import { CpvService } from '@/resources/cpv/cpv.service';
 
 @Injectable()
 export class UsersService {
+  constructor(private readonly cpvService: CpvService) {}
+
   async getUsersList({
     sortDirection,
     sortBy,
@@ -27,15 +29,12 @@ export class UsersService {
   async updateUser(data: UpdateUserDto, user: UserDocument) {
     const userData: Partial<TUser> = {
       ...data,
-      industries: await this.resolveCpvCodeIds(data.industries, 'industries'),
-      mainServices: await this.resolveCpvCodeIds(
-        data.mainServices,
-        'mainServices',
-      ),
+      industries: await this.cpvService.resolveCpvCodeIds(data.industries),
+      mainServices: await this.cpvService.resolveCpvCodeIds(data.mainServices),
     };
 
-    for (let key in data) {
-      if (userData[key] !== undefined && userData[key] !== null) {
+    for (const key in data) {
+      if (userData[key]) {
         user[key] = userData[key];
       }
     }
@@ -51,29 +50,5 @@ export class UsersService {
       _id: userId,
       status: { $ne: USER_TYPE.TEMPORARY },
     }).populate(companyCpvPopulateFields);
-  }
-
-  private async resolveCpvCodeIds(codes: string[], fieldName: string) {
-    const uniqueCodes = Array.from(new Set(codes));
-
-    const categories = await CpvCategoryModel.find({
-      code: { $in: uniqueCodes },
-    }).select('_id code');
-
-    const categoryByCode = new Map(
-      categories.map((category) => [category.code, category]),
-    );
-    const missingCodes = uniqueCodes.filter(
-      (code) => !categoryByCode.has(code),
-    );
-
-    if (missingCodes.length > 0) {
-      throw new BadRequestException({
-        message: `${fieldName} contains unknown CPV codes`,
-        codes: missingCodes,
-      });
-    }
-
-    return codes.map((code) => categoryByCode.get(code)!._id);
   }
 }

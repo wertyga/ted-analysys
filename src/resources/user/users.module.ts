@@ -5,9 +5,10 @@ import { UsersService } from './users.service';
 import { UsersServiceUtils } from './users.service.utils';
 import { CompanyFilterModule } from '@/resources/company-filter/company-filter.module';
 import { TenderWishlistModule } from '@/resources/tender-wishlist/tender-wishlist.module';
+import { CpvModule } from '@/resources/cpv/cpv.module';
 
 @Module({
-  imports: [CompanyFilterModule, TenderWishlistModule],
+  imports: [CompanyFilterModule, TenderWishlistModule, CpvModule],
   controllers: [UsersController, UsersAdmController],
   providers: [UsersService, UsersServiceUtils],
   exports: [UsersService, UsersServiceUtils],
