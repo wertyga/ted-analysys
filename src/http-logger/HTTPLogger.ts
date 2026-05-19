@@ -28,15 +28,17 @@ export class HttpErrorLoggingFilter implements ExceptionFilter {
         : response;
     const stack = exception instanceof Error ? exception.stack : undefined;
 
-    logger.error(
-      `${req.method} ${req.url} -> ${status}`,
-      {
-        body,
-        stack,
-        user: req.user ?? null,
-      },
-      this.getClientIp(req),
-    );
+    if (!this.isUnknownRouteNotFound(status, body, req)) {
+      logger.error(
+        `${req.method} ${req.url} -> ${status}`,
+        {
+          body,
+          stack,
+          user: req.user ?? null,
+        },
+        this.getClientIp(req),
+      );
+    }
 
     res.status(status).json(body);
   }
@@ -82,6 +84,23 @@ export class HttpErrorLoggingFilter implements ExceptionFilter {
       message.includes('invalid') ||
       message.includes('not accepted') ||
       message.includes('not found')
+    );
+  }
+
+  private isUnknownRouteNotFound(
+    status: number,
+    body: string | object,
+    req: Request,
+  ): boolean {
+    if (status !== HttpStatus.NOT_FOUND || typeof body !== 'object') {
+      return false;
+    }
+
+    const message = (body as { message?: unknown }).message;
+
+    return (
+      typeof message === 'string' &&
+      message === `Cannot ${req.method} ${req.url}`
     );
   }
 
