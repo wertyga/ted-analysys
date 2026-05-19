@@ -58,7 +58,6 @@ export class CompanyProfileDocumentsController {
     }),
   )
   async uploadCompanyProfileDocuments(
-    @Req() req,
     @UploadedFiles() files: CompanyProfileDocumentFile[],
   ) {
     if (!files?.length) {

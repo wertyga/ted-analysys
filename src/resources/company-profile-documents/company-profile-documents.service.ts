@@ -94,7 +94,7 @@ export class CompanyProfileDocumentsService {
       .join('\n\n---\n\n')
       .slice(0, MAX_CONTEXT_CHARS);
 
-    return this.deepSeekAnalysisService.createGeneralJsonResponse(
+    return this.deepSeekAnalysisService.createDeepJsonResponse(
       COMPANY_PROFILE_DOCUMENT_SYSTEM_PROMPT,
       context,
     );
