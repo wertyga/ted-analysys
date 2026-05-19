@@ -13,6 +13,9 @@ const emailVariables = {
   date: '{{date}}',
   paymentId: '{{paymentId}}',
   receiptUrl: '{{receiptUrl}}',
+
+  reportTitle: '{{reportTitle}}',
+  matchesHtml: '{{matchesHtml}}',
 };
 
 type TEmailTemplatesCompare = {
@@ -28,6 +31,10 @@ type TEmailTemplatesCompare = {
     | 'date'
     | 'paymentId'
     | 'receiptUrl';
+  [EMAIL_TEMPLATES.TenderMatchReport]:
+    | 'companyName'
+    | 'reportTitle'
+    | 'matchesHtml';
 };
 
 export type EmailReplaceData<T extends EMAIL_TEMPLATES> = {
@@ -54,6 +61,9 @@ export const getEmailTemplate = (type: EMAIL_TEMPLATES) => {
       break;
     case EMAIL_TEMPLATES.OauthRegistered:
       filename = 'oauthRegistered.html';
+      break;
+    case EMAIL_TEMPLATES.TenderMatchReport:
+      filename = 'tenderMatchReport.html';
       break;
 
     default:

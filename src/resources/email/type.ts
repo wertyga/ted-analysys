@@ -5,4 +5,5 @@ export enum EMAIL_TEMPLATES {
   ErrorEmail = 'ErrorEmail',
   PaymentSuccess = 'PaymentSuccess',
   OauthRegistered = 'OauthRegistered',
+  TenderMatchReport = 'TenderMatchReport',
 }

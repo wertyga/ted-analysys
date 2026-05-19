@@ -1,0 +1,99 @@
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      max-width: 680px;
+      width: 100%;
+      margin: 0 auto;
+      font-family: Roboto, RobotoDraft, Helvetica, Arial, "sans-serif";
+      color: #111111;
+      background-color: #ffffff;
+    }
+
+    .container {
+      padding: 30px;
+    }
+
+    .logo {
+      margin: 0 auto 32px auto;
+      text-align: center;
+    }
+
+    .logo img {
+      width: 96px;
+      border-radius: 50%;
+    }
+
+    h2 {
+      margin: 12px 0 0;
+      font-size: 24px;
+    }
+
+    h3 {
+      margin: 0 0 20px;
+      font-size: 22px;
+      font-weight: 600;
+    }
+
+    p {
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    ol {
+      padding-left: 0;
+      margin: 24px 0 0;
+      list-style-position: inside;
+    }
+
+    li {
+      padding: 18px;
+      margin-bottom: 16px;
+      border: 1px solid #d9d9d9;
+      border-radius: 6px;
+      list-style-position: outside;
+    }
+
+    li h4 {
+      margin: 0 0 10px;
+      font-size: 16px;
+    }
+
+    .footer {
+      background-color: #c2c2c2;
+      padding: 24px 12px;
+      margin: 36px 0 0;
+      font-size: 12px;
+      text-align: center;
+    }
+
+    @media screen and (max-width: 500px) {
+      .container {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="logo">
+    <img src="https://travelwithme.b-cdn.net/icon_black_bg.png" />
+    <h2>AI Tenders</h2>
+  </div>
+
+  <h3>{{reportTitle}}</h3>
+
+  <p>Hello <strong>{{companyName}}</strong>,</p>
+  <p>These tenders matched your company profile:</p>
+
+  <ol>
+    {{matchesHtml}}
+  </ol>
+
+  <p class="footer">
+    You received this email because tender match notifications are enabled in your AI Tenders account.
+  </p>
+</div>
+</body>
+</html>
