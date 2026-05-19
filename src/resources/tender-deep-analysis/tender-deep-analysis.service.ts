@@ -258,8 +258,6 @@ export class TenderDeepAnalysisService {
     analyses: TenderDeepAnalysisRecord[];
     total: number;
   }> {
-    const language = normalizeDeepAnalysisLanguage(params.language);
-
     const query: QueryFilter<TenderDeepAnalysisDocument> = {
       company: params.companyId,
     };
@@ -273,9 +271,9 @@ export class TenderDeepAnalysisService {
       query.tenderId = { $in: params.tenderIds };
     }
 
-    if (language) {
+    if (params.language) {
       Object.assign(query, {
-        language,
+        language: params.language,
       });
     }
 
