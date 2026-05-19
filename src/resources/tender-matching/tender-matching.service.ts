@@ -8,6 +8,7 @@ import {
   getString,
   getStringArray,
   isRecord,
+  DebouncedAsyncLatestQueueByKey,
   logger,
   QueueAsyncConcurrency,
   readNumber,
@@ -46,30 +47,27 @@ const COMPANY_PROFILE_REMATCH_DEBOUNCE_MS = gfTime.minute;
 const COMPANY_PROFILE_REMATCH_CONCURRENCY = 5;
 const COMPANY_TENDER_AI_FIT_CONCURRENCY = 5;
 
-interface DebouncedCompanyProfileRematch {
-  filter: CompanyTenderFilterForMatching;
-  timer?: ReturnType<typeof setTimeout>;
-  promise: Promise<TenderCompanyMatchDocument[]>;
-  resolve: (matches: TenderCompanyMatchDocument[]) => void;
-  reject: (error: unknown) => void;
-}
-
 @Injectable()
 export class TenderMatchingService {
-  constructor(
-    private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
-  ) {}
-
-  private readonly companyProfileRematchQueue = new QueueAsyncConcurrency(
-    COMPANY_PROFILE_REMATCH_CONCURRENCY,
-  );
   private readonly companyTenderAiFitQueue = new QueueAsyncConcurrency(
     COMPANY_TENDER_AI_FIT_CONCURRENCY,
   );
-  private readonly debouncedCompanyProfileRematches = new Map<
+  private readonly companyProfileRematches: DebouncedAsyncLatestQueueByKey<
     string,
-    DebouncedCompanyProfileRematch
-  >();
+    CompanyTenderFilterForMatching,
+    TenderCompanyMatchDocument[]
+  >;
+
+  constructor(
+    private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
+  ) {
+    this.companyProfileRematches = new DebouncedAsyncLatestQueueByKey({
+      delayMs: COMPANY_PROFILE_REMATCH_DEBOUNCE_MS,
+      concurrency: COMPANY_PROFILE_REMATCH_CONCURRENCY,
+      runner: (filter) =>
+        this.rematchActiveCompetitionTendersWithCompanyFilter(filter),
+    });
+  }
 
   matchTenderWithFilter(
     tender: TenderDocument,
@@ -84,15 +82,12 @@ export class TenderMatchingService {
     pagination: { page?: number; limit?: number } = {},
   ): Promise<{
     items: TenderCompanyMatchDocument[];
-    page: number;
-    limit: number;
     total: number;
-    totalPages: number;
   }> {
-    const { page, limit, skip } = getPaginationMeta(pagination);
+    const { limit, skip } = getPaginationMeta(pagination);
 
     if (!companyId) {
-      return { items: [], page, limit, total: 0, totalPages: 0 };
+      return { items: [], total: 0 };
     }
 
     const query: QueryFilter<TenderCompanyMatchDocument> = {
@@ -101,6 +96,7 @@ export class TenderMatchingService {
       aiFitStatus: AiFitStatus.COMPLETED,
       aiFitScore: { $gte: minAiFitScore },
     };
+
     const [items, total] = await Promise.all([
       TenderCompanyMatchModel.find(query)
         .sort({ aiFitScore: -1, updatedAt: -1 })
@@ -116,25 +112,8 @@ export class TenderMatchingService {
 
     return {
       items,
-      page,
-      limit,
       total,
-      totalPages: Math.ceil(total / limit),
     };
-  }
-
-  async matchActiveRecentTendersWithCompanyFilter(
-    filter: CompanyTenderFilterForMatching,
-    source: TenderMatchSource,
-  ): Promise<TenderCompanyMatchDocument[]> {
-    const tenders = await this.findActiveRecentTenders();
-    const matches = await Promise.all(
-      tenders.map((tender) =>
-        this.matchTenderWithCompanyFilter(tender, filter, source),
-      ),
-    );
-
-    return matches.filter(Boolean) as TenderCompanyMatchDocument[];
   }
 
   async rematchActiveCompetitionTendersAfterCompanyProfileUpdated(
@@ -147,64 +126,8 @@ export class TenderMatchingService {
     }
 
     const companyKey = String(companyId);
-    const existing = this.debouncedCompanyProfileRematches.get(companyKey);
 
-    if (existing) {
-      existing.filter = filter;
-
-      if (existing.timer) {
-        clearTimeout(existing.timer);
-      }
-
-      existing.timer = setTimeout(
-        () => this.enqueueCompanyProfileRematch(companyKey, existing),
-        COMPANY_PROFILE_REMATCH_DEBOUNCE_MS,
-      );
-
-      return existing.promise;
-    }
-
-    let resolvePromise!: (matches: TenderCompanyMatchDocument[]) => void;
-    let rejectPromise!: (error: unknown) => void;
-    const promise = new Promise<TenderCompanyMatchDocument[]>(
-      (resolve, reject) => {
-        resolvePromise = resolve;
-        rejectPromise = reject;
-      },
-    );
-    const entry: DebouncedCompanyProfileRematch = {
-      filter,
-      promise,
-      resolve: resolvePromise,
-      reject: rejectPromise,
-    };
-
-    entry.timer = setTimeout(
-      () => this.enqueueCompanyProfileRematch(companyKey, entry),
-      COMPANY_PROFILE_REMATCH_DEBOUNCE_MS,
-    );
-    this.debouncedCompanyProfileRematches.set(companyKey, entry);
-
-    return promise;
-  }
-
-  private enqueueCompanyProfileRematch(
-    companyKey: string,
-    entry: DebouncedCompanyProfileRematch,
-  ): void {
-    entry.timer = undefined;
-
-    this.companyProfileRematchQueue
-      .push(async () => {
-        if (this.debouncedCompanyProfileRematches.get(companyKey) === entry) {
-          this.debouncedCompanyProfileRematches.delete(companyKey);
-        }
-
-        return this.rematchActiveCompetitionTendersWithCompanyFilter(
-          entry.filter,
-        );
-      })
-      .then(entry.resolve, entry.reject);
+    return this.companyProfileRematches.run(companyKey, filter);
   }
 
   private async rematchActiveCompetitionTendersWithCompanyFilter(

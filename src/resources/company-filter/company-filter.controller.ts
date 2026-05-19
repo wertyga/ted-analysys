@@ -30,15 +30,4 @@ export class CompanyFilterController {
 
     return CompanyTenderFilterModel.serializeDetail(data);
   }
-
-  @Post('confirm')
-  @ApiOperation({
-    summary: 'Confirm generated tender notification filters and run matching',
-  })
-  @ApiCreatedResponse({
-    description: 'Confirmed company tender filter and saved tender matches.',
-  })
-  confirmCompanyFilter(@Req() req) {
-    return this.companyFilterService.confirmCompanyTenderFilter(req.user);
-  }
 }

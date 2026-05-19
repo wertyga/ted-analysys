@@ -9,6 +9,7 @@ import {
   getSafeErrorMessage,
   isDuplicateKeyError,
   logger,
+  QueueAsyncConcurrency,
   tenderCpvPopulateFields,
 } from '@/utils';
 import { UserModel } from '../user/user.schema';
@@ -33,8 +34,14 @@ import { CompanyFilterService } from '@/resources/company-filter/company-filter.
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { QueryFilter } from 'mongoose';
 
+const TENDER_DEEP_COMPANY_FIT_ANALYSIS_CONCURRENCY = 2;
+
 @Injectable()
 export class TenderDeepAnalysisService {
+  private readonly deepCompanyFitAnalysisQueue = new QueueAsyncConcurrency(
+    TENDER_DEEP_COMPANY_FIT_ANALYSIS_CONCURRENCY,
+  );
+
   constructor(
     private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
     private readonly deepAnalysisBuilder: TenderDeepAnalysisBuilder,
@@ -100,8 +107,9 @@ export class TenderDeepAnalysisService {
         outputLanguage: language,
       });
 
-      const rawResult =
-        await this.deepSeekAnalysisService.analyzeTenderDeepCompanyFit(input);
+      const rawResult = await this.deepCompanyFitAnalysisQueue.push(() =>
+        this.deepSeekAnalysisService.analyzeTenderDeepCompanyFit(input),
+      );
 
       const normalized = this.deepAnalysisBuilder.normalizeResult(
         rawResult,
