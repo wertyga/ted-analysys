@@ -9,7 +9,12 @@ import {
   Headers,
 } from '@nestjs/common';
 import { AuthGuard } from '@/guards';
-import { UpdateUserDto, UserAuthDto, UserMetaResponse } from './user.dto';
+import {
+  UpdateUserDto,
+  UpdateUserNotificationsDto,
+  UserAuthDto,
+  UserMetaResponse,
+} from './user.dto';
 import { UsersService } from './users.service';
 import { UserModel } from './user.schema';
 import { filterModel } from '@/utils';
@@ -56,6 +61,23 @@ export class UsersController {
     const user = await this.usersService.updateUser(userData, req.user);
 
     return { user: UserModel.serializeUser(user) };
+  }
+
+  @ApiBearerAuth()
+  @ApiBody({ type: UpdateUserNotificationsDto })
+  @ApiDefaultResponse({ type: UserAuthDto })
+  @UseGuards(AuthGuard)
+  @Put('/notifications')
+  async updateUserNotifications(
+    @Req() req,
+    @Body() userData: UpdateUserNotificationsDto,
+  ) {
+    const user = await this.usersService.updateUserNotifications(
+      userData,
+      req.user,
+    );
+
+    return { user: UserModel.serializeUser(user, true) };
   }
 
   @ApiBearerAuth()

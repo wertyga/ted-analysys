@@ -33,6 +33,7 @@ import { CompanyTenderFilterModel } from '@/resources/company-filter/company-fil
 import { CompanyFilterService } from '@/resources/company-filter/company-filter.service';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { QueryFilter } from 'mongoose';
+import { AiFitDecision } from '@/resources/tender-matching/tender-match.types';
 
 const TENDER_DEEP_COMPANY_FIT_ANALYSIS_CONCURRENCY = 2;
 

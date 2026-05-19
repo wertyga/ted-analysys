@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { GetUsersRequestDto, UpdateUserDto } from './user.dto';
+import {
+  GetUsersRequestDto,
+  UpdateUserDto,
+  UpdateUserNotificationsDto,
+} from './user.dto';
 import { TUser, USER_TYPE, UserDocument } from './user.types';
 import { companyCpvPopulateFields, getLimitAndSortCursor } from '@/utils';
 import { UserModel } from './user.schema';
@@ -38,6 +42,20 @@ export class UsersService {
         user[key] = userData[key];
       }
     }
+
+    await user.save();
+
+    return user.populate(companyCpvPopulateFields);
+  }
+
+  async updateUserNotifications(
+    data: UpdateUserNotificationsDto,
+    user: UserDocument,
+  ) {
+    user.notifications = {
+      ...(user.notifications ?? {}),
+      ...data.notifications,
+    };
 
     await user.save();
 

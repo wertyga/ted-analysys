@@ -214,7 +214,7 @@ function serializeDeepAnalysisDetail(
       ? TenderModel.serializeDetail(tender as TenderSerializable)
       : null,
     company: isPopulatedRecord(company)
-      ? UserModel.serializeUser(company as UserDocument, 'true')
+      ? UserModel.serializeUser(company as UserDocument, true)
       : null,
     generalAnalysis: isPopulatedRecord(generalAnalysis)
       ? TenderGeneralAnalysisModel.serializeDetail(
@@ -243,7 +243,7 @@ function serializeDeepAnalysisList(
       ? TenderModel.serializeList(tender as TenderSerializable)
       : null,
     company: isPopulatedRecord(company)
-      ? UserModel.serializeUser(company as UserDocument, 'true')
+      ? UserModel.serializeUser(company as UserDocument, true)
       : null,
     generalAnalysis: isPopulatedRecord(generalAnalysis)
       ? TenderGeneralAnalysisModel.serializeList(

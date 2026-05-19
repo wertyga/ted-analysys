@@ -1,6 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { TUser } from './user.types';
+import {
+  TUser,
+  TUserNotificationSettings,
+  UserNotificationFrequency,
+} from './user.types';
 import { PaginationAndSortDto } from '@/Dto';
 import { CpvCategoryResponseItem } from '@/resources/cpv/types';
 import {
@@ -13,8 +17,10 @@ import {
   IsOptional,
   IsString,
   Min,
+  ValidateNested,
 } from 'class-validator';
 import { CurrencySign } from '@/resources/codelist';
+import { AiFitDecision } from '@/resources/tender-matching/tender-match.types';
 
 export const USER_LIST_FIELDS = 'companyName email avatar';
 export const USER_OWNER_FIELDS = 'companyName email avatar';
@@ -33,7 +39,36 @@ type CompanyProfileType = Pick<
   | 'yearsOfExperience'
   | 'publicProcurementExperience'
   | 'typicalContractSize'
+  | 'notifications'
 >;
+
+export class UserNotificationSettingsDto
+  implements TUserNotificationSettings
+{
+  @ApiPropertyOptional({
+    enum: UserNotificationFrequency,
+    example: UserNotificationFrequency.WEEKLY,
+  })
+  @IsOptional()
+  @IsEnum(UserNotificationFrequency)
+  [AiFitDecision.MAYBE]?: UserNotificationFrequency;
+
+  @ApiPropertyOptional({
+    enum: UserNotificationFrequency,
+    example: UserNotificationFrequency.DAILY,
+  })
+  @IsOptional()
+  @IsEnum(UserNotificationFrequency)
+  [AiFitDecision.GOOD_FIT]?: UserNotificationFrequency;
+
+  @ApiPropertyOptional({
+    enum: UserNotificationFrequency,
+    example: UserNotificationFrequency.INSTANT,
+  })
+  @IsOptional()
+  @IsEnum(UserNotificationFrequency)
+  [AiFitDecision.STRONG_FIT]?: UserNotificationFrequency;
+}
 
 export class TypicalContractSizeDto {
   @ApiPropertyOptional({ example: 10000 })
@@ -121,9 +156,20 @@ export class UserDto extends UserOwnerDto implements CompanyProfileType {
 
   @ApiPropertyOptional({ type: TypicalContractSizeDto })
   typicalContractSize?: TypicalContractSizeDto;
+
+  @ApiPropertyOptional({ type: UserNotificationSettingsDto })
+  notifications?: UserNotificationSettingsDto;
 }
 
 export class GetUsersRequestDto extends PaginationAndSortDto {}
+
+export class UpdateUserNotificationsDto {
+  @ApiProperty({ type: UserNotificationSettingsDto })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => UserNotificationSettingsDto)
+  notifications: UserNotificationSettingsDto;
+}
 
 export class UpdateUserDto {
   @ApiPropertyOptional()

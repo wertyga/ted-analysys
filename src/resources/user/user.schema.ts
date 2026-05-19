@@ -2,6 +2,7 @@ import { model, Schema } from 'mongoose';
 import {
   TUser as UserType,
   USER_TYPE,
+  UserNotificationFrequency,
   UserDocument,
   UserMethods,
 } from './user.types';
@@ -9,6 +10,13 @@ import { filterModel, generateHash } from '@/utils';
 import { TSerializeOptions } from '@/types';
 import { USER_LIST_FIELDS } from './user.dto';
 import { CurrencySign } from '@/resources/codelist';
+import { AiFitDecision } from '@/resources/tender-matching/tender-match.types';
+
+const userNotificationFrequencyField = {
+  type: String,
+  enum: Object.values(UserNotificationFrequency),
+  default: UserNotificationFrequency.DISABLED,
+};
 
 export const UserSchema = new Schema<UserType>(
   {
@@ -93,6 +101,11 @@ export const UserSchema = new Schema<UserType>(
         enum: Object.values(CurrencySign),
         default: undefined,
       },
+    },
+    notifications: {
+      [AiFitDecision.MAYBE]: userNotificationFrequencyField,
+      [AiFitDecision.GOOD_FIT]: userNotificationFrequencyField,
+      [AiFitDecision.STRONG_FIT]: userNotificationFrequencyField,
     },
   },
   { timestamps: true },

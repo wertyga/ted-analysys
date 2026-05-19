@@ -1,6 +1,7 @@
 import { Document, Model, Types } from 'mongoose';
 import { TSerializeOptions } from '@/types';
 import type { CurrencySign } from '@/resources/codelist';
+import { AiFitDecision } from '@/resources/tender-matching/tender-match.types';
 
 export enum USER_TYPE {
   TEMPORARY = 'TEMPORARY',
@@ -14,6 +15,20 @@ export type TTypicalContractSize = {
   max?: number;
   currency?: CurrencySign;
 };
+
+export enum UserNotificationFrequency {
+  INSTANT = 'instant',
+  DAILY = 'daily',
+  WEEKLY = 'weekly',
+  DISABLED = 'disabled',
+}
+
+export type TUserNotificationSettings = Partial<
+  Record<
+    Exclude<AiFitDecision, AiFitDecision.REJECT>,
+    UserNotificationFrequency
+  >
+>;
 
 export type TUser = {
   _id: string;
@@ -39,6 +54,7 @@ export type TUser = {
   yearsOfExperience?: number;
   publicProcurementExperience?: boolean;
   typicalContractSize?: TTypicalContractSize;
+  notifications?: TUserNotificationSettings;
   createdAt: string;
   updatedAt: string;
 };
@@ -46,7 +62,7 @@ export type TUser = {
 export interface UserMethods extends Model<UserDocument> {
   serializeUser: (
     user?: UserDocument,
-    guest?: string,
+    guest?: boolean,
     options?: TSerializeOptions,
     isAdminFetch?: boolean,
   ) => TUser;
