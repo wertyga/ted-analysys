@@ -6,7 +6,7 @@ import mongooseConnect from './mongoose/mongoose';
 import { HttpErrorLoggingFilter } from '@/http-logger/HTTPLogger';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   const port = process.env.PORT ?? 3000;
   const corsOrigin = process.env.CORS_ORIGIN?.split(',')
     .map((origin) => origin.trim())
@@ -45,8 +45,6 @@ async function bootstrap() {
     mongooseConnect(() => {
       console.log(`Connected to ${process.env.DB_NAME} database`);
     });
-
-    (async function () {})();
   });
 }
 

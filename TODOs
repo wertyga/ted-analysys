@@ -2,4 +2,4 @@
 - Tidy up tender-matching.service
 - Deep analysis fetch one by lang ??
 - Failed analysis create new document when retry
-- Tender matching for immidiate email send - send after all passed (now for everyone)
+- FE to implement notification user's settings

@@ -49,12 +49,6 @@ export class BaseAnalysisBuilder {
       return candidate.documentType !== TenderSourceDocumentType.TED_XML_NOTICE;
     });
 
-    // Disabled for now
-    // await this.saveXmlContentToTenderIfNeeded(
-    //   tender,
-    //   xmlDocument?.extractedText,
-    // );
-
     const documents: GeneralTenderAnalysisInput['documents'] = xmlDocument
       ? [xmlDocument]
       : [];
