@@ -107,7 +107,7 @@ export class TenderDeepAnalysisService {
         documentTextSnippets: documentsInput.documentTextSnippets,
         outputLanguage: language,
       });
-
+      // throw new Error('TEST ERROR');
       const rawResult = await this.deepCompanyFitAnalysisQueue.push(() =>
         this.deepSeekAnalysisService.analyzeTenderDeepCompanyFit(input),
       );
@@ -164,12 +164,11 @@ export class TenderDeepAnalysisService {
     } catch (error: unknown) {
       const errorMessage = getSafeErrorMessage(error);
 
-      await localDeepAnalysis.updateOne({
-        $set: {
-          status: TenderDeepAnalysisStatus.FAILED,
-          language,
-          errorMessage,
-        },
+      await this.markProcessingAnalysisFailed({
+        error,
+        companyId,
+        sourceHash: localDeepAnalysis.sourceHash ?? '',
+        tenderId,
       });
 
       await this.logDeepAnalysisEvent('TENDER_DEEP_ANALYSIS_FAILED', {
@@ -189,6 +188,7 @@ export class TenderDeepAnalysisService {
     language?: string;
   }): Promise<TenderDeepAnalysisDocument> {
     const language = normalizeDeepAnalysisLanguage(params.language);
+
     const [tender, company] = await Promise.all([
       this.tendersService.findByTedIdOrCreateIfNeeded(params.tenderId),
       UserModel.findById(params.companyId),
@@ -351,99 +351,45 @@ export class TenderDeepAnalysisService {
     deepAnalysis: TenderDeepAnalysisDocument;
     shouldStart: boolean;
   }> {
-    try {
-      const deepAnalysis = await TenderDeepAnalysisModel.findOne({
-        tenderId: tender.id,
-        company: companyId,
-        sourceHash,
-      }).populate(deepAnalysisPopulateFields);
+    const deepAnalysis = await TenderDeepAnalysisModel.findOne({
+      tenderId: tender.id,
+      company: companyId,
+      sourceHash,
+    }).populate(deepAnalysisPopulateFields);
 
-      const isNeedToUpdateOrCreateProcessing =
-        !deepAnalysis ||
-        deepAnalysis.status === TenderDeepAnalysisStatus.FAILED;
-
-      if (isNeedToUpdateOrCreateProcessing) {
-        const deepAnalysisInProcess =
-          await TenderDeepAnalysisModel.findOneAndUpdate(
-            {
-              tenderId: tender.id,
-              company: companyId,
-              sourceHash,
-            },
-            {
-              $set: {
-                tender: tender._id,
-                company: companyId,
-                sourceHash,
-                generalAnalysis: generalAnalysisId,
-                language,
-                status: TenderDeepAnalysisStatus.PROCESSING,
-                promptVersion: TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION,
-              },
-              $unset: { errorMessage: '' },
-            },
-            { returnDocument: 'after', upsert: true },
-          ).populate(deepAnalysisPopulateFields);
-
-        return {
-          deepAnalysis: deepAnalysisInProcess,
-          shouldStart: true,
-        };
-      }
-
-      return { deepAnalysis, shouldStart: false };
-    } catch (error: unknown) {
-      if (!isDuplicateKeyError(error)) {
-        await this.markProcessingAnalysisFailed({
-          tenderId: tender.id,
-          companyId,
-          sourceHash,
-          error,
-        });
-
-        throw error;
-      }
-
-      const duplicate = await TenderDeepAnalysisModel.findOne({
-        tenderId: tender.id,
-        company: companyId,
-        sourceHash: sourceHash,
-      })
-        .populate(deepAnalysisPopulateFields)
-        .exec();
-
-      if (!duplicate) {
-        throw error;
-      }
-
-      const shouldStart =
-        duplicate.promptVersion !== TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION ||
-        duplicate.status === TenderDeepAnalysisStatus.FAILED ||
-        duplicate.status === TenderDeepAnalysisStatus.PENDING;
-
-      if (shouldStart) {
-        const restarted = await TenderDeepAnalysisModel.findByIdAndUpdate(
-          duplicate._id,
+    const isNeedToUpdateOrCreateProcessing =
+      !deepAnalysis || deepAnalysis.status === TenderDeepAnalysisStatus.FAILED;
+    console.log({ deepAnalysis });
+    if (isNeedToUpdateOrCreateProcessing) {
+      const deepAnalysisInProcess =
+        await TenderDeepAnalysisModel.findOneAndUpdate(
+          {
+            tenderId: tender.id,
+            company: companyId,
+            sourceHash,
+          },
           {
             $set: {
-              status: TenderDeepAnalysisStatus.PROCESSING,
+              tender: tender._id,
+              company: companyId,
+              sourceHash,
+              generalAnalysis: generalAnalysisId,
               language,
+              status: TenderDeepAnalysisStatus.PROCESSING,
               promptVersion: TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION,
             },
             $unset: { errorMessage: '' },
           },
-          { returnDocument: 'after' },
-        )
-          .populate(deepAnalysisPopulateFields)
-          .exec();
+          { returnDocument: 'after', upsert: true },
+        ).populate(deepAnalysisPopulateFields);
 
-        if (restarted) {
-          return { deepAnalysis: restarted, shouldStart };
-        }
-      }
-
-      return { deepAnalysis: duplicate, shouldStart };
+      return {
+        deepAnalysis: deepAnalysisInProcess,
+        shouldStart: true,
+      };
     }
+
+    return { deepAnalysis, shouldStart: false };
   }
 
   private async markProcessingAnalysisFailed({

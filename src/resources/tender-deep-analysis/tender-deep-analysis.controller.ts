@@ -79,20 +79,11 @@ export class UserTenderDeepAnalysisController {
       tenderIds,
     });
 
-    const languages = new Set();
-    result.analyses.forEach((analysis) => {
-      languages.add(analysis.language);
-    });
-
-    const isForDetails = languages.size === 1;
-
     return {
       ...result,
-      analyses: result.analyses.map((analysis) =>
-        isForDetails
-          ? TenderDeepAnalysisModel.serializeDetail(analysis)
-          : TenderDeepAnalysisModel.serializeList(analysis),
-      ),
+      analyses: result.analyses.map((analysis) => {
+        return TenderDeepAnalysisModel.serializeDetail(analysis);
+      }),
     };
   }
 }
