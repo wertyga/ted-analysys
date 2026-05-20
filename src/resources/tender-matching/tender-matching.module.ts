@@ -2,10 +2,9 @@ import { Module } from '@nestjs/common';
 import { DeepSeekModule } from '@/deepseek/deepseek.module';
 import { TenderMatchingService } from './tender-matching.service';
 import { TenderMatchingController } from './tender-matching.controller';
-import { TenderMatchNotificationsModule } from '@/resources/tender-match-notifications/tender-match-notifications.module';
 
 @Module({
-  imports: [DeepSeekModule, TenderMatchNotificationsModule],
+  imports: [DeepSeekModule],
   controllers: [TenderMatchingController],
   providers: [TenderMatchingService],
   exports: [TenderMatchingService],

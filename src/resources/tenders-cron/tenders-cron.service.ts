@@ -12,6 +12,7 @@ import { TenderCompanyMatchDocument } from '@/resources/tender-matching/schemas/
 import { TenderMatchingService } from '@/resources/tender-matching/tender-matching.service';
 import { TedOpenTendersCollectorService } from '@/resources/ted-open-tenders-collector/ted-open-tenders-collector.service';
 import { TenderMatchSource } from '@/resources/tender-matching/tender-match.types';
+import { TenderMatchNotificationsService } from '@/resources/tender-match-notifications/tender-match-notifications.service';
 
 const RECENT_TENDERS_CRON = '0 1 * * *';
 const ALL_COMPETITION_TENDERS_CRON = '0 3 * * *';
@@ -42,6 +43,7 @@ export class TendersCronService {
     private readonly tedSearchService: TedSearchService,
     private readonly tendersService: TendersService,
     private readonly tenderMatchingService: TenderMatchingService,
+    private readonly tenderMatchNotificationsService: TenderMatchNotificationsService,
   ) {}
 
   @Cron(ALL_COMPETITION_TENDERS_CRON, {
@@ -75,6 +77,8 @@ export class TendersCronService {
         ...result,
         matchesSaved,
       });
+
+      await this.sendInstantTenderMatchReports();
     } catch (e: unknown) {
       const error = e instanceof Error ? e.message : 'unknown error';
 
@@ -117,6 +121,8 @@ export class TendersCronService {
       );
 
       await logger.info('TED_RECENT_COMPETITION_COLLECTED', logResult);
+
+      await this.sendInstantTenderMatchReports();
     } catch (e: unknown) {
       const error = e instanceof Error ? e.message : 'unknown error';
 
@@ -194,6 +200,11 @@ export class TendersCronService {
     );
 
     return matches.flat();
+  }
+
+  private async sendInstantTenderMatchReports(): Promise<void> {
+    await this.tenderMatchingService.waitForTenderCompanyAiFitQueueIdle();
+    await this.tenderMatchNotificationsService.sendInstantReports();
   }
 
   private buildRecentCompetitionTenderFilters(page: number) {

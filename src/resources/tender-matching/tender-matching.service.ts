@@ -40,7 +40,6 @@ import { gfTime } from '@/goldfish';
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 import { COMPANY_TENDER_FIT_SYSTEM_PROMPT } from './company-tender-fit.prompt';
 import { UserModel } from '@/resources/user/user.schema';
-import { TenderMatchNotificationsService } from '@/resources/tender-match-notifications/tender-match-notifications.service';
 
 const RECENT_ACTIVE_TENDERS_LOOKBACK_DAYS = 2;
 const ACTIVE_COMPETITION_TENDERS_MATCH_BATCH_SIZE = 100;
@@ -61,7 +60,6 @@ export class TenderMatchingService {
 
   constructor(
     private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
-    private readonly tenderMatchNotificationsService: TenderMatchNotificationsService,
   ) {
     this.companyProfileRematches = new DebouncedAsyncLatestQueueByKey({
       delayMs: COMPANY_PROFILE_REMATCH_DEBOUNCE_MS,
@@ -130,6 +128,10 @@ export class TenderMatchingService {
     const companyKey = String(companyId);
 
     return this.companyProfileRematches.run(companyKey, filter);
+  }
+
+  async waitForTenderCompanyAiFitQueueIdle(): Promise<void> {
+    await this.companyTenderAiFitQueue.onIdle();
   }
 
   private async rematchActiveCompetitionTendersWithCompanyFilter(
@@ -273,15 +275,6 @@ export class TenderMatchingService {
         { returnDocument: 'after' },
       ).exec();
 
-      this.tenderMatchNotificationsService
-        .handleMatchReady(updatedMatch)
-        .catch((notificationError: unknown) =>
-          logger.info('TENDER_MATCH_NOTIFICATION_FAILED', {
-            matchId: String(match._id),
-            error: getSafeErrorMessage(notificationError),
-          }),
-        );
-
       return updatedMatch;
     } catch (error: unknown) {
       return TenderCompanyMatchModel.findByIdAndUpdate(
@@ -307,22 +300,6 @@ export class TenderMatchingService {
         },
       },
     ).exec();
-  }
-
-  private async findActiveRecentTenders(): Promise<TenderDocument[]> {
-    const publicationDateFrom = new Date();
-    publicationDateFrom.setDate(
-      publicationDateFrom.getDate() - RECENT_ACTIVE_TENDERS_LOOKBACK_DAYS,
-    );
-
-    return TenderModel.find({
-      publicationDate: { $gte: publicationDateFrom },
-      $or: [
-        { submissionDeadline: { $exists: false } },
-        { submissionDeadline: null },
-        { submissionDeadline: { $gte: new Date() } },
-      ],
-    }).exec();
   }
 
   private async findActiveCompetitionTendersBatch(

@@ -23,6 +23,7 @@ import { TenderMatchNotificationLogModel } from './schemas';
 
 const DAILY_TENDER_MATCH_NOTIFICATIONS_CRON = '0 8 * * *';
 const WEEKLY_TENDER_MATCH_NOTIFICATIONS_CRON = '0 8 * * 1';
+const MAX_DETAILED_MATCHES_PER_REPORT = 3;
 
 type NotifiableFrequency =
   | UserNotificationFrequency.INSTANT
@@ -36,39 +37,33 @@ type PopulatedTenderMatch = TenderCompanyMatchDocument & {
 @Injectable()
 export class TenderMatchNotificationsService {
   private readonly nestLogger = new Logger(TenderMatchNotificationsService.name);
+  private isSendingInstantReports = false;
   private isSendingDailyReports = false;
   private isSendingWeeklyReports = false;
 
   constructor(private readonly emailService: EmailService) {}
 
-  async handleMatchReady(
-    match: TenderCompanyMatchDocument | null,
-  ): Promise<void> {
-    if (!match?.aiFitDecision) {
+  async sendInstantReports(): Promise<void> {
+    if (this.isSendingInstantReports) {
+      this.nestLogger.warn('Instant tender match reports are already running');
       return;
     }
 
-    const user = await UserModel.findById(match.company)
-      .select('email companyName notifications')
-      .exec();
-    const frequency = this.getNotificationFrequency(
-      user?.notifications,
-      match.aiFitDecision,
-    );
+    this.isSendingInstantReports = true;
 
-    if (!user || frequency !== UserNotificationFrequency.INSTANT) {
-      return;
+    try {
+      await this.sendBatchReports(UserNotificationFrequency.INSTANT);
+    } catch (error: unknown) {
+      this.nestLogger.error(
+        `Instant tender match reports failed: ${getSafeErrorMessage(error)}`,
+      );
+      await logger.error(
+        'TENDER_MATCH_INSTANT_NOTIFICATIONS_FAILED',
+        getSafeErrorMessage(error),
+      );
+    } finally {
+      this.isSendingInstantReports = false;
     }
-
-    const populatedMatch = await TenderCompanyMatchModel.findById(match._id)
-      .populate('tender')
-      .exec();
-
-    if (!this.isPopulatedTenderMatch(populatedMatch)) {
-      return;
-    }
-
-    await this.sendReport(user, [populatedMatch], frequency);
   }
 
   @Cron(DAILY_TENDER_MATCH_NOTIFICATIONS_CRON, {
@@ -227,17 +222,6 @@ export class TenderMatchNotificationsService {
     }
   }
 
-  private getNotificationFrequency(
-    notifications: TUserNotificationSettings | undefined,
-    decision: AiFitDecision,
-  ): UserNotificationFrequency | undefined {
-    if (decision === AiFitDecision.REJECT) {
-      return undefined;
-    }
-
-    return notifications?.[decision];
-  }
-
   private getDecisionsForFrequency(
     notifications: TUserNotificationSettings | undefined,
     frequency: NotifiableFrequency,
@@ -277,7 +261,9 @@ export class TenderMatchNotificationsService {
   }
 
   private buildMatchesHtml(matches: PopulatedTenderMatch[]): string {
-    return matches
+    const detailedMatches = matches.slice(0, MAX_DETAILED_MATCHES_PER_REPORT);
+    const remainingCount = matches.length - detailedMatches.length;
+    const detailedMatchesHtml = detailedMatches
       .map((match) => {
         const tender = match.tender;
         const title = this.escapeHtml(tender.title || tender.id);
@@ -303,6 +289,18 @@ export class TenderMatchNotificationsService {
         ].join('');
       })
       .join('');
+
+    if (remainingCount <= 0) {
+      return detailedMatchesHtml;
+    }
+
+    return [
+      detailedMatchesHtml,
+      '<li>',
+      `<p><strong>${remainingCount} more matching tender${remainingCount === 1 ? '' : 's'} included in this report.</strong></p>`,
+      '<p>They were marked as notified and will not be sent again.</p>',
+      '</li>',
+    ].join('');
   }
 
   private isPopulatedTenderMatch(
