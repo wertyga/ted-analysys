@@ -29,6 +29,9 @@ export interface TenderCompanyMatch {
   aiFitError: string | null;
   notificationStatus: NotificationStatus;
   staleReason?: MatchStaleReason | null;
+  staleExplanation?: string | null;
+  staleReasons?: string[];
+  staleRisks?: string[];
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -131,6 +134,18 @@ export const TenderCompanyMatchSchema = new Schema<TenderCompanyMatchDocument>(
       type: String,
       enum: [...Object.values(MatchStaleReason), null],
       default: null,
+    },
+    staleExplanation: {
+      type: String,
+      default: null,
+    },
+    staleReasons: {
+      type: [String],
+      default: [],
+    },
+    staleRisks: {
+      type: [String],
+      default: [],
     },
   },
   {

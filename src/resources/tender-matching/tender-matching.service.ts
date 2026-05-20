@@ -209,7 +209,7 @@ export class TenderMatchingService {
     const filterId = toObjectId(filter._id);
 
     if (result.status !== HardMatchStatus.MATCHED) {
-      await this.markMatchedMatchStale(tenderId, companyId, source);
+      await this.markMatchedMatchStale(tenderId, companyId, source, result);
 
       return undefined;
     }
@@ -324,6 +324,7 @@ export class TenderMatchingService {
     tenderId: Types.ObjectId | null,
     companyId: Types.ObjectId,
     staleReason: TenderMatchSource,
+    result: TenderCompanyMatchResult,
   ): Promise<TenderCompanyMatchDocument | null> {
     if (!tenderId) {
       return null;
@@ -339,6 +340,9 @@ export class TenderMatchingService {
         $set: {
           hardMatchStatus: HardMatchStatus.STALE,
           staleReason,
+          staleExplanation: buildStaleExplanation(result),
+          staleReasons: result.reasons,
+          staleRisks: result.risks,
         },
       },
       { returnDocument: 'after' },
@@ -558,6 +562,9 @@ export class TenderMatchingService {
       },
       $unset: {
         staleReason: '',
+        staleExplanation: '',
+        staleReasons: '',
+        staleRisks: '',
       },
     };
 
@@ -573,6 +580,16 @@ export class TenderMatchingService {
 
     return savedMatch;
   }
+}
+
+function buildStaleExplanation(result: TenderCompanyMatchResult): string {
+  const reason = result.reasons[0];
+
+  if (reason) {
+    return reason;
+  }
+
+  return `Hard match score below threshold: ${result.score}`;
 }
 
 function getAiFitDecision(score: number): AiFitDecision {

@@ -3,3 +3,29 @@
 - Deep analysis fetch one by lang ??
 - Failed analysis create new document when retry
 - FE to implement notification user's settings
+
+. Company Profile Completeness Score
+Покажи пользователю:
+Company profile completeness: 68%
+Missing:
+- certifications
+- references
+- operating countries
+- typical contract size
+Это мотивирует заполнить профиль и улучшает matching.
+
+TenderRequirementsModule
+Для checklist:
+mandatory requirements
+required documents
+eligibility criteria
+award criteria
+submission instructions
+
+BuyerIntelligenceModule
+Позже, но очень ценно:
+buyer profile
+past tenders
+past winners
+average contract value
+common CPVs
