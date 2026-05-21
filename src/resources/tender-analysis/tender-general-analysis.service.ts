@@ -17,13 +17,23 @@ import { TenderDocument } from '../tenders/schemas';
 import { TenderGeneralAnalysisBuilder } from './tender-general-analysis.builder';
 import { GENERAL_TENDER_ANALYSIS_PROMPT_VERSION } from '@/openai/dto/openai-analysis.dto';
 import { createHash } from 'crypto';
-import { getSafeErrorMessage, isDuplicateKeyError, sleep } from '@/utils';
+import {
+  getSafeErrorMessage,
+  isDuplicateKeyError,
+  QueueAsyncConcurrency,
+  sleep,
+} from '@/utils';
 
 const ANALYSIS_WAIT_TIMEOUT_MS = 10 * 60 * 1000;
 const ANALYSIS_WAIT_INTERVAL_MS = 1000;
+const BASE_ANALYSIS_CONCURRENCY = 20;
 
 @Injectable()
 export class TenderGeneralAnalysisService {
+  private readonly baseAnalysisQueue = new QueueAsyncConcurrency(
+    BASE_ANALYSIS_CONCURRENCY,
+  );
+
   constructor(
     @Inject(forwardRef(() => TenderAnalysisService))
     private readonly tenderAnalysisService: TenderAnalysisService,
@@ -40,6 +50,7 @@ export class TenderGeneralAnalysisService {
 
       const execution =
         await this.tenderAnalysisService.analyzeTenderGeneral(analysisInput);
+
       const sourceHash =
         this.tenderAnalysisService.getBaseAnalysisSourceHash(tender);
 
@@ -133,8 +144,10 @@ export class TenderGeneralAnalysisService {
         { returnDocument: 'after', upsert: true },
       );
 
-      // Async update of analysis
-      this.fetchBaseAnalysis(analysis, tender);
+      // Async update of analysis with bounded concurrency.
+      void this.baseAnalysisQueue.push(() =>
+        this.fetchBaseAnalysis(analysis, tender),
+      );
 
       return analysis;
     } catch (error: unknown) {

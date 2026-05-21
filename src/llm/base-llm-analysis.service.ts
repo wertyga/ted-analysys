@@ -44,7 +44,9 @@ export abstract class BaseLlmAnalysisService {
   ): Promise<GeneralTenderAnalysisResult> {
     const context = this.buildTenderContext(input);
     const outputLanguage = input.outputLanguage ?? 'en';
+
     const prompt = this.buildGeneralTenderAnalysisPrompt(outputLanguage);
+
     const responseText = await this.createJsonResponse(
       prompt,
       context,
@@ -63,6 +65,7 @@ export abstract class BaseLlmAnalysisService {
       'Return JSON only. The JSON must match this schema:',
       JSON.stringify(TENDER_DEEP_COMPANY_FIT_JSON_SCHEMA),
     ].join('\n\n');
+
     const context = buildTenderDeepCompanyFitUserPrompt(input).slice(
       0,
       this.maxContextChars,

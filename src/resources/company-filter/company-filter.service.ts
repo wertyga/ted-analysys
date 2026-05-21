@@ -299,7 +299,9 @@ export class CompanyFilterService {
     sourceHash,
   }: CompanyFilterGenerationInput): Promise<void> {
     const payload = this.buildCompanyProfilePayload(populatedUser);
+
     const result = await this.analyzeCompanyProfile(payload);
+
     const cpvCodes = await this.buildCompanyTenderFilterCpvCodes(
       populatedUser,
       result.additionalCpvSuggestions,

@@ -107,7 +107,7 @@ export class TenderDeepAnalysisService {
         documentTextSnippets: documentsInput.documentTextSnippets,
         outputLanguage: language,
       });
-      // throw new Error('TEST ERROR');
+
       const rawResult = await this.deepCompanyFitAnalysisQueue.push(() =>
         this.deepSeekAnalysisService.analyzeTenderDeepCompanyFit(input),
       );
