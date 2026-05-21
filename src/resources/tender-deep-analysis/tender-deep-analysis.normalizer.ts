@@ -20,6 +20,7 @@ export function normalizeResultJsonScoreBreakdown(
   resultJson: TenderDeepAnalysisResult,
 ): TenderDeepAnalysisResult {
   const normalized = structuredClone(resultJson) as TenderDeepAnalysisResult;
+  normalizeSerializedRiskAnalysisShape(normalized);
   const mutable = normalized as unknown as {
     companyFitAnalysis: Record<string, unknown>;
     scores: Record<string, unknown>;
@@ -85,6 +86,7 @@ export function normalizeResultJsonScoreBreakdown(
   if (riskFit && typeof riskFit.score === 'number') {
     mutable.scores.riskFitScore = clampSerializedScore(riskFit.score);
   }
+  normalizeSerializedRiskCriticalBlockers(normalized);
   normalizeSerializedDecisionFactors(normalized);
   normalizeSerializedDocumentationAndClarity(normalized);
   normalizeSerializedProcedure(normalized);
@@ -94,6 +96,7 @@ export function normalizeResultJsonScoreBreakdown(
   syncSerializedLegacyFitScores(normalized);
   normalizeSerializedSeverityLabels(normalized);
   removeSerializedEmptyScoreEvidence(normalized);
+  normalizeSerializedEvidenceMap(normalized);
 
   delete mutable.companyFitAnalysis.scoreBreakdown;
 
@@ -159,7 +162,7 @@ function applySerializedScoreExplanations(
     }
 
     if (isTechnicalSerializedScoreExplanation(item.explanation)) {
-      item.explanation = '';
+      item.explanation = buildSerializedScoreExplanationFallback(key, item);
     }
 
     if (!Array.isArray(item.evidence)) {
@@ -174,6 +177,44 @@ function applySerializedScoreExplanations(
 
 function isTechnicalSerializedScoreExplanation(value: unknown): boolean {
   return typeof value !== 'string' || value.trim() === '';
+}
+
+function buildSerializedScoreExplanationFallback(
+  key: CompanyFitScoreKey,
+  item: Record<string, unknown>,
+): string {
+  const evidence = normalizeStringList(item.evidence);
+  const missingInformation = normalizeStringList(item.missingInformation);
+
+  if (evidence.length > 0) {
+    return evidence.join('; ');
+  }
+
+  if (missingInformation.length > 0) {
+    return missingInformation.join('; ');
+  }
+
+  return `${key}: ${clampSerializedScore(item.score)}/100`;
+}
+
+function normalizeSerializedRiskAnalysisShape(
+  resultJson: TenderDeepAnalysisResult,
+): void {
+  const riskAnalysis = resultJson.riskAnalysis as unknown;
+
+  if (!Array.isArray(riskAnalysis)) {
+    return;
+  }
+
+  resultJson.riskAnalysis = {
+    overallRiskLevel: 'critical',
+    riskScore: 0,
+    tenderRisks: [],
+    companySpecificRisks: [],
+    criticalBlockers: [],
+    mitigations: [],
+    risks: riskAnalysis,
+  } as unknown as TenderDeepAnalysisResult['riskAnalysis'];
 }
 
 function normalizeSerializedDocumentationAndClarity(
@@ -329,6 +370,109 @@ function normalizeSerializedDecisionFactors(
     compactSerializedBlockers(blockers);
 }
 
+function normalizeSerializedRiskCriticalBlockers(
+  resultJson: TenderDeepAnalysisResult,
+): void {
+  resultJson.riskAnalysis ||= {} as TenderDeepAnalysisResult['riskAnalysis'];
+  const riskAnalysis = resultJson.riskAnalysis as unknown as Record<
+    string,
+    unknown
+  >;
+  const criticalBlockers = Array.isArray(riskAnalysis.criticalBlockers)
+    ? riskAnalysis.criticalBlockers
+    : [];
+  const risks = [
+    ...extractSerializedRiskItems(riskAnalysis.tenderRisks),
+    ...extractSerializedRiskItems(riskAnalysis.companySpecificRisks),
+    ...extractSerializedRiskItems(riskAnalysis.risks),
+    ...extractSerializedRiskItems(riskAnalysis.criticalRisks),
+  ];
+
+  for (const risk of risks) {
+    const severity = normalizeSerializedBlockerSeverity(risk.severity);
+
+    if (severity !== 'CRITICAL' && severity !== 'HIGH') {
+      continue;
+    }
+
+    if (typeof risk.description !== 'string' || !risk.description.trim()) {
+      continue;
+    }
+
+    appendSerializedRiskBlocker(criticalBlockers, {
+      type: mapSerializedRiskBlockerType(
+        String(risk.type ?? risk.category ?? 'other'),
+      ),
+      description: risk.description.trim(),
+      canBeResolved: severity !== 'CRITICAL',
+      resolutionAction:
+        typeof risk.mitigation === 'string' ? risk.mitigation : undefined,
+    });
+  }
+
+  riskAnalysis.criticalBlockers = criticalBlockers;
+}
+
+function extractSerializedRiskItems(
+  value: unknown,
+): Array<Record<string, unknown>> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isRecordLike);
+}
+
+function appendSerializedRiskBlocker(
+  blockers: unknown[],
+  blocker: Record<string, unknown>,
+): void {
+  const description = String(blocker.description).trim().toLowerCase();
+
+  if (
+    blockers.some(
+      (existing) =>
+        isRecordLike(existing) &&
+        String(existing.description ?? '')
+          .trim()
+          .toLowerCase() === description,
+    )
+  ) {
+    return;
+  }
+
+  blockers.push(blocker);
+}
+
+function mapSerializedRiskBlockerType(type: string): string {
+  const normalized = type.trim().toLowerCase();
+  const mapping: Record<string, string> = {
+    deadline: 'expired_deadline',
+    expired_deadline: 'expired_deadline',
+    documentation: 'missing_documents',
+    missing_documents: 'missing_documents',
+    scope: 'unclear_scope',
+    unclear_scope: 'unclear_scope',
+    certification: 'mandatory_requirement',
+    eligibility: 'mandatory_requirement',
+    mandatory_requirement: 'mandatory_requirement',
+    requirement: 'mandatory_requirement',
+    language: 'language',
+    legal: 'legal',
+    contractual: 'legal',
+    financial: 'financial',
+    commercial: 'financial',
+    budget: 'financial',
+    capability: 'company_fit',
+    company_fit: 'company_fit',
+    delivery: 'company_fit',
+    experience: 'company_fit',
+    operational: 'company_fit',
+  };
+
+  return mapping[normalized] ?? 'other';
+}
+
 function getSerializedProcurementDocumentsAccess(
   missingDocuments: Array<{ status?: string }>,
 ): 'MISSING' | 'PORTAL_LINK_AVAILABLE' | 'DIRECT_LINK_AVAILABLE' | 'UNKNOWN' {
@@ -386,7 +530,8 @@ function findScoreItem(
 }
 
 function normalizeSerializedBlockerType(value: unknown): string {
-  const normalized = typeof value === 'string' ? value : 'other';
+  const normalized =
+    typeof value === 'string' ? value.trim().toLowerCase() : '';
 
   return [
     'capability',
@@ -423,6 +568,7 @@ function isDefaultedSerializedScore(item: Record<string, unknown>): boolean {
 
 function compactSerializedBlockers(blockers: unknown[]): unknown[] {
   const byType = new Map<string, Record<string, unknown>>();
+  const otherBlockers: Record<string, unknown>[] = [];
 
   for (const blocker of blockers) {
     if (!isRecordLike(blocker) || typeof blocker.description !== 'string') {
@@ -434,6 +580,12 @@ function compactSerializedBlockers(blockers: unknown[]): unknown[] {
     }
 
     const type = typeof blocker.type === 'string' ? blocker.type : 'other';
+
+    if (type === 'other') {
+      otherBlockers.push(blocker);
+      continue;
+    }
+
     const current = byType.get(type);
 
     if (
@@ -451,9 +603,13 @@ function compactSerializedBlockers(blockers: unknown[]): unknown[] {
     'certification',
     'geography',
     'financial',
+    'legal',
+    'deadline',
+    'language',
   ]
     .map((type) => byType.get(type))
     .filter(Boolean)
+    .concat(otherBlockers)
     .map((blocker) => ({
       ...blocker,
       description: String(blocker?.description),
@@ -702,6 +858,91 @@ function removeSerializedEmptyScoreEvidence(
   }
 }
 
+function normalizeSerializedEvidenceMap(
+  resultJson: TenderDeepAnalysisResult,
+): void {
+  const rawItems = Array.isArray(resultJson.evidenceMap)
+    ? resultJson.evidenceMap
+    : [];
+
+  resultJson.evidenceMap = rawItems
+    .map((item): TenderDeepAnalysisResult['evidenceMap'][number] | null => {
+      if (!isRecordLike(item)) {
+        return null;
+      }
+
+      const claim =
+        getNonEmptyString(item.claim) ??
+        getNonEmptyString(item.description) ??
+        getNonEmptyString(item.reference) ??
+        getNonEmptyString(item.source);
+
+      if (!claim) {
+        return null;
+      }
+
+      return {
+        claim,
+        evidenceSource: normalizeSerializedEvidenceSource(
+          item.evidenceSource ?? item.source,
+        ),
+        fieldName: getNonEmptyString(item.fieldName),
+        documentName:
+          getNonEmptyString(item.documentName) ??
+          getNonEmptyString(item.reference),
+        evidenceText:
+          getNonEmptyString(item.evidenceText) ??
+          getNonEmptyString(item.excerpt) ??
+          getNonEmptyString(item.description),
+        confidence: normalizeSerializedEvidenceConfidence(item.confidence),
+      };
+    })
+    .filter(
+      (item): item is TenderDeepAnalysisResult['evidenceMap'][number] =>
+        item !== null,
+    );
+}
+
+function getNonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : undefined;
+}
+
+function normalizeSerializedEvidenceSource(
+  value: unknown,
+): TenderDeepAnalysisResult['evidenceMap'][number]['evidenceSource'] {
+  const normalized = typeof value === 'string' ? value.trim() : '';
+
+  if (
+    [
+      'structured_ted',
+      'tender_document',
+      'general_analysis',
+      'company_profile',
+      'derived',
+      'missing',
+    ].includes(normalized)
+  ) {
+    return normalized as TenderDeepAnalysisResult['evidenceMap'][number]['evidenceSource'];
+  }
+
+  return 'missing';
+}
+
+function normalizeSerializedEvidenceConfidence(
+  value: unknown,
+): TenderDeepAnalysisResult['evidenceMap'][number]['confidence'] {
+  const normalized =
+    typeof value === 'string' ? value.trim().toLowerCase() : '';
+
+  if (['high', 'medium', 'low'].includes(normalized)) {
+    return normalized as TenderDeepAnalysisResult['evidenceMap'][number]['confidence'];
+  }
+
+  return 'medium';
+}
+
 function severityRank(severity: string): number {
   if (severity === 'CRITICAL') return 4;
   if (severity === 'HIGH') return 3;
@@ -788,6 +1029,20 @@ function getNumber(value: unknown): number {
 
 function isRecordLike(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function normalizeStringList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === 'string' ? item.trim() : ''))
+      .filter(Boolean);
+  }
+
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return [value.trim()];
+  }
+
+  return [];
 }
 
 function roundScore(value: number): number {

@@ -284,6 +284,7 @@ export class TenderDeepAnalysisBuilder {
     syncLegacyFitScores(result);
     normalizeRiskSeverityLabels(result);
     removeEmptyScoreEvidence(result);
+    normalizeEvidenceMap(result);
     removeDuplicateScoreBreakdowns(result);
 
     return result;
@@ -370,7 +371,9 @@ function ensureResultShape(
   result.companyFitAnalysis.missingCompanyInformation ||= [];
   result.companyFitAnalysis.missingTenderInformation ||= [];
   result.companyFitAnalysis.assumptions ||= [];
+  normalizeRiskAnalysisShape(result);
   result.riskAnalysis ||= {} as TenderDeepAnalysisResult['riskAnalysis'];
+  result.riskAnalysis.tenderRisks ||= [];
   result.riskAnalysis.companySpecificRisks ||= [];
   result.riskAnalysis.criticalBlockers ||= [];
   result.documentationAnalysis ||=
@@ -403,6 +406,24 @@ function ensureResultShape(
       missingInformation: [],
     };
   }
+}
+
+function normalizeRiskAnalysisShape(result: TenderDeepAnalysisResult): void {
+  const riskAnalysis = result.riskAnalysis as unknown;
+
+  if (!Array.isArray(riskAnalysis)) {
+    return;
+  }
+
+  result.riskAnalysis = {
+    overallRiskLevel: 'critical',
+    riskScore: 0,
+    tenderRisks: [],
+    companySpecificRisks: [],
+    criticalBlockers: [],
+    mitigations: [],
+    risks: riskAnalysis,
+  } as unknown as TenderDeepAnalysisResult['riskAnalysis'];
 }
 
 function applyTenderIntelligenceSourceFields(
@@ -740,6 +761,8 @@ function applyDecisionFactors(
   result: TenderDeepAnalysisResult,
   input: TenderDeepCompanyFitAnalysisInput,
 ): void {
+  normalizeRiskCriticalBlockers(result);
+
   const blockers = result.decisionFactors?.criticalBlockers ?? [];
 
   for (const blocker of result.companyFitAnalysis.criticalBlockers ?? []) {
@@ -818,6 +841,46 @@ function applyDecisionFactors(
     ...(result.decisionFactors ?? {}),
     criticalBlockers: compactDecisionBlockers(blockers),
   };
+}
+
+function normalizeRiskCriticalBlockers(result: TenderDeepAnalysisResult): void {
+  const riskAnalysis = result.riskAnalysis as unknown as Record<
+    string,
+    unknown
+  >;
+  const risks = [
+    ...extractRiskItems(result.riskAnalysis.tenderRisks),
+    ...extractRiskItems(result.riskAnalysis.companySpecificRisks),
+    ...extractRiskItems(riskAnalysis.risks),
+    ...extractRiskItems(
+      (result.riskAnalysis as unknown as { criticalRisks?: unknown })
+        .criticalRisks,
+    ),
+  ];
+
+  for (const risk of risks) {
+    const severity = normalizeRiskSeverity(risk.severity);
+
+    if (severity !== 'CRITICAL' && severity !== 'HIGH') {
+      continue;
+    }
+
+    const description = getRiskDescription(risk);
+
+    if (!description) {
+      continue;
+    }
+
+    addRiskCriticalBlocker(result.riskAnalysis.criticalBlockers, {
+      type: mapRiskAnalysisBlockerType(
+        String(risk.type ?? risk.category ?? 'other'),
+      ),
+      description,
+      canBeResolved: severity !== 'CRITICAL',
+      resolutionAction:
+        typeof risk.mitigation === 'string' ? risk.mitigation : undefined,
+    });
+  }
 }
 
 function applyDocumentationAndClarity(
@@ -1198,6 +1261,51 @@ function addDecisionBlocker(
   blockers.push(blocker);
 }
 
+function addRiskCriticalBlocker(
+  blockers: TenderDeepAnalysisResult['riskAnalysis']['criticalBlockers'],
+  blocker: TenderDeepAnalysisResult['riskAnalysis']['criticalBlockers'][number],
+): void {
+  if (!blocker.description.trim()) {
+    return;
+  }
+
+  const normalized = blocker.description.trim().toLowerCase();
+
+  if (
+    blockers.some(
+      (existing) => existing.description.trim().toLowerCase() === normalized,
+    )
+  ) {
+    return;
+  }
+
+  blockers.push(blocker);
+}
+
+function extractRiskItems(value: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isRecord);
+}
+
+function normalizeRiskSeverity(value: unknown): string {
+  const normalized = typeof value === 'string' ? value.toUpperCase() : '';
+
+  if (['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(normalized)) {
+    return normalized;
+  }
+
+  return '';
+}
+
+function getRiskDescription(risk: Record<string, unknown>): string | null {
+  return typeof risk.description === 'string' && risk.description.trim()
+    ? risk.description.trim()
+    : null;
+}
+
 function compactDecisionBlockers(
   blockers: NonNullable<
     TenderDeepAnalysisResult['decisionFactors']
@@ -1213,12 +1321,20 @@ function compactDecisionBlockers(
       TenderDeepAnalysisResult['decisionFactors']
     >['criticalBlockers'][number]
   >();
+  const otherBlockers: NonNullable<
+    TenderDeepAnalysisResult['decisionFactors']
+  >['criticalBlockers'] = [];
 
   for (const blocker of blockers) {
     if (
       typeof blocker.description !== 'string' ||
       blocker.description.trim() === ''
     ) {
+      continue;
+    }
+
+    if (blocker.type === 'other') {
+      otherBlockers.push(blocker);
       continue;
     }
 
@@ -1236,17 +1352,29 @@ function compactDecisionBlockers(
     NonNullable<
       TenderDeepAnalysisResult['decisionFactors']
     >['criticalBlockers'][number]['type']
-  > = ['eligibility', 'capability', 'certification', 'geography', 'financial'];
+  > = [
+    'eligibility',
+    'capability',
+    'certification',
+    'geography',
+    'financial',
+    'legal',
+    'deadline',
+    'language',
+  ];
 
-  return order
-    .map((type) => byType.get(type))
-    .filter(
-      (
-        blocker,
-      ): blocker is NonNullable<
-        TenderDeepAnalysisResult['decisionFactors']
-      >['criticalBlockers'][number] => Boolean(blocker),
-    )
+  return [
+    ...order
+      .map((type) => byType.get(type))
+      .filter(
+        (
+          blocker,
+        ): blocker is NonNullable<
+          TenderDeepAnalysisResult['decisionFactors']
+        >['criticalBlockers'][number] => Boolean(blocker),
+      ),
+    ...otherBlockers,
+  ]
     .map((blocker) => ({
       ...blocker,
       severity:
@@ -1262,7 +1390,8 @@ function normalizeDecisionBlockerType(
 ): NonNullable<
   TenderDeepAnalysisResult['decisionFactors']
 >['criticalBlockers'][number]['type'] {
-  const normalized = typeof value === 'string' ? value : 'other';
+  const normalized =
+    typeof value === 'string' ? value.trim().toLowerCase() : '';
 
   if (
     [
@@ -1340,7 +1469,7 @@ function applyUserFacingScoreExplanations(
     }
 
     if (isTechnicalScoreExplanation(item.explanation)) {
-      item.explanation = '';
+      item.explanation = buildScoreExplanationFallback(key, item);
     }
 
     item.evidence = normalizeStringList(item.evidence);
@@ -1352,6 +1481,28 @@ function applyUserFacingScoreExplanations(
 
 function isTechnicalScoreExplanation(value: unknown): boolean {
   return typeof value !== 'string' || value.trim() === '';
+}
+
+function buildScoreExplanationFallback(
+  key: CompanyFitScoreKey,
+  item: {
+    score: number;
+    evidence?: unknown;
+    missingInformation?: unknown;
+  },
+): string {
+  const evidence = normalizeStringList(item.evidence);
+  const missingInformation = normalizeStringList(item.missingInformation);
+
+  if (evidence.length > 0) {
+    return evidence.join('; ');
+  }
+
+  if (missingInformation.length > 0) {
+    return missingInformation.join('; ');
+  }
+
+  return `${key}: ${clampRound(item.score)}/100`;
 }
 
 function applyCompanyFitSummaryFields(result: TenderDeepAnalysisResult): void {
@@ -1497,6 +1648,87 @@ function removeEmptyScoreEvidence(result: TenderDeepAnalysisResult): void {
   }
 }
 
+function normalizeEvidenceMap(result: TenderDeepAnalysisResult): void {
+  const rawItems = Array.isArray(result.evidenceMap) ? result.evidenceMap : [];
+
+  result.evidenceMap = rawItems
+    .map((item): TenderDeepAnalysisResult['evidenceMap'][number] | null => {
+      if (!isRecord(item)) {
+        return null;
+      }
+
+      const claim =
+        getNonEmptyString(item.claim) ??
+        getNonEmptyString(item.description) ??
+        getNonEmptyString(item.reference) ??
+        getNonEmptyString(item.source);
+
+      if (!claim) {
+        return null;
+      }
+
+      return {
+        claim,
+        evidenceSource: normalizeEvidenceSource(
+          item.evidenceSource ?? item.source,
+        ),
+        fieldName: getNonEmptyString(item.fieldName),
+        documentName:
+          getNonEmptyString(item.documentName) ??
+          getNonEmptyString(item.reference),
+        evidenceText:
+          getNonEmptyString(item.evidenceText) ??
+          getNonEmptyString(item.excerpt) ??
+          getNonEmptyString(item.description),
+        confidence: normalizeEvidenceConfidence(item.confidence),
+      };
+    })
+    .filter(
+      (item): item is TenderDeepAnalysisResult['evidenceMap'][number] =>
+        item !== null,
+    );
+}
+
+function getNonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : undefined;
+}
+
+function normalizeEvidenceSource(
+  value: unknown,
+): TenderDeepAnalysisResult['evidenceMap'][number]['evidenceSource'] {
+  const normalized = typeof value === 'string' ? value.trim() : '';
+
+  if (
+    [
+      'structured_ted',
+      'tender_document',
+      'general_analysis',
+      'company_profile',
+      'derived',
+      'missing',
+    ].includes(normalized)
+  ) {
+    return normalized as TenderDeepAnalysisResult['evidenceMap'][number]['evidenceSource'];
+  }
+
+  return 'missing';
+}
+
+function normalizeEvidenceConfidence(
+  value: unknown,
+): TenderDeepAnalysisResult['evidenceMap'][number]['confidence'] {
+  const normalized =
+    typeof value === 'string' ? value.trim().toLowerCase() : '';
+
+  if (['high', 'medium', 'low'].includes(normalized)) {
+    return normalized as TenderDeepAnalysisResult['evidenceMap'][number]['confidence'];
+  }
+
+  return 'medium';
+}
+
 function normalizeRequirementsClarityFields(
   result: TenderDeepAnalysisResult,
 ): void {
@@ -1518,15 +1750,38 @@ function mapCompanyBlockerType(
 ): NonNullable<
   TenderDeepAnalysisResult['decisionFactors']
 >['criticalBlockers'][number]['type'] {
-  if (/capability|scope|reference/.test(type)) return 'capability';
-  if (/certification/.test(type)) return 'certification';
-  if (/geograph/.test(type)) return 'geography';
-  if (/eligibility|mandatory/.test(type)) return 'eligibility';
-  if (/deadline/.test(type)) return 'deadline';
-  if (/language/.test(type)) return 'language';
-  if (/financial/.test(type)) return 'financial';
-  if (/legal/.test(type)) return 'legal';
-  return 'other';
+  const normalized = type.trim().toLowerCase();
+  const mapping: Record<
+    string,
+    NonNullable<
+      TenderDeepAnalysisResult['decisionFactors']
+    >['criticalBlockers'][number]['type']
+  > = {
+    capability: 'capability',
+    capability_gap: 'capability',
+    company_fit: 'capability',
+    experience: 'capability',
+    reference: 'capability',
+    references: 'capability',
+    scope: 'capability',
+    scope_mismatch: 'capability',
+    certification: 'certification',
+    certification_gap: 'certification',
+    geographic: 'geography',
+    geography: 'geography',
+    geographic_gap: 'geography',
+    location: 'geography',
+    eligibility: 'eligibility',
+    mandatory: 'eligibility',
+    mandatory_requirement: 'eligibility',
+    requirement: 'eligibility',
+    deadline: 'deadline',
+    language: 'language',
+    financial: 'financial',
+    legal: 'legal',
+  };
+
+  return mapping[normalized] ?? 'other';
 }
 
 function mapRiskBlockerType(
@@ -1534,13 +1789,65 @@ function mapRiskBlockerType(
 ): NonNullable<
   TenderDeepAnalysisResult['decisionFactors']
 >['criticalBlockers'][number]['type'] {
-  if (/company_fit|scope/.test(type)) return 'capability';
-  if (/mandatory|eligibility/.test(type)) return 'eligibility';
-  if (/language/.test(type)) return 'language';
-  if (/financial/.test(type)) return 'financial';
-  if (/legal/.test(type)) return 'legal';
-  if (/deadline/.test(type)) return 'deadline';
-  return 'other';
+  const normalized = type.trim().toLowerCase();
+  const mapping: Record<
+    string,
+    NonNullable<
+      TenderDeepAnalysisResult['decisionFactors']
+    >['criticalBlockers'][number]['type']
+  > = {
+    capability: 'capability',
+    company_fit: 'capability',
+    experience: 'capability',
+    operational: 'capability',
+    scope: 'capability',
+    unclear_scope: 'capability',
+    certification: 'certification',
+    eligibility: 'eligibility',
+    mandatory_requirement: 'eligibility',
+    language: 'language',
+    financial: 'financial',
+    legal: 'legal',
+    contractual: 'legal',
+    deadline: 'deadline',
+    expired_deadline: 'deadline',
+  };
+
+  return mapping[normalized] ?? 'other';
+}
+
+function mapRiskAnalysisBlockerType(
+  type: string,
+): TenderDeepAnalysisResult['riskAnalysis']['criticalBlockers'][number]['type'] {
+  const normalized = type.trim().toLowerCase();
+  const mapping: Record<
+    string,
+    TenderDeepAnalysisResult['riskAnalysis']['criticalBlockers'][number]['type']
+  > = {
+    deadline: 'expired_deadline',
+    expired_deadline: 'expired_deadline',
+    documentation: 'missing_documents',
+    missing_documents: 'missing_documents',
+    scope: 'unclear_scope',
+    unclear_scope: 'unclear_scope',
+    certification: 'mandatory_requirement',
+    eligibility: 'mandatory_requirement',
+    mandatory_requirement: 'mandatory_requirement',
+    requirement: 'mandatory_requirement',
+    language: 'language',
+    legal: 'legal',
+    contractual: 'legal',
+    financial: 'financial',
+    commercial: 'financial',
+    budget: 'financial',
+    capability: 'company_fit',
+    company_fit: 'company_fit',
+    delivery: 'company_fit',
+    experience: 'company_fit',
+    operational: 'company_fit',
+  };
+
+  return mapping[normalized] ?? 'other';
 }
 
 function hasSelectionCriteriaGap(

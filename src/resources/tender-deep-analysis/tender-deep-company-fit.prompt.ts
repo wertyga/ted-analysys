@@ -1,7 +1,7 @@
 import { TenderDeepCompanyFitAnalysisInput } from '@/types';
 
 export const TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION =
-  'tender-deep-company-fit-v1.0.8';
+  'tender-deep-company-fit-v1.0.9';
 
 const MAX_JSON_CHARS = 60_000;
 const MAX_SNIPPETS_JSON_CHARS = 40_000;
@@ -109,6 +109,7 @@ export function buildTenderDeepCompanyFitUserPrompt(
     '',
     'For each criterion assign score from 0 to 100, set integer weight percentage, calculate weightedScore = score * weight / 100, explain the score, provide evidence, and list missing information.',
     'Every scores.scoreBreakdown item must include a non-empty explanation written in the requested output language. Do not leave explanation empty.',
+    'Never return scores.scoreBreakdown[*].explanation as an empty string. If a score is obvious from structured data, still explain the evidence and reasoning.',
     'fitScore must be the weighted sum of scoreBreakdown weightedScore values. Do not set fitScore to 0 only because finalRecommendation is no_go or because a critical blocker exists.',
     'Use only scores.scoreBreakdown as the canonical score breakdown. Do not put scopeFit, capabilityFit, cpvFit, geographicFit, languageFit, eligibilityFit, certificationFit, experienceFit, financialFit, commercialFit, deadlineFit, riskFit, or scoreBreakdown inside companyFitAnalysis.',
     'If a criterion has enough structured evidence, score it directly. Do not leave languageFit, financialFit, or deadlineFit as a backend fallback when tender/company fields provide evidence.',
@@ -143,7 +144,10 @@ export function buildTenderDeepCompanyFitUserPrompt(
     '- If deadline is expired, finalRecommendation.value must be "not_actionable".',
     '- Critical blockers affect recommendation and bid/no-bid decision, but must not overwrite the weighted fitScore. A no_go recommendation may still have a non-zero fitScore when geography, language, eligibility, deadline, or commercial factors are partially positive.',
     '- Put critical blockers in top-level decisionFactors.criticalBlockers. Keep blocker wording consistent across bidNoBidDecision, riskAnalysis, and companyFitAnalysis if those legacy fields are present.',
+    '- decisionFactors.criticalBlockers is the canonical blocker path for frontend and filtering. If bidNoBidDecision, companyFitAnalysis, or riskAnalysis mention blockers, duplicate the canonical blockers into decisionFactors.criticalBlockers.',
     '- Keep decisionFactors.criticalBlockers deduplicated to the main 4-5 blockers, grouped by eligibility, capability, certification, geography, financial/legal only when relevant.',
+    '- Return riskAnalysis as an object, not an array. Put risk list fields inside riskAnalysis.tenderRisks, riskAnalysis.companySpecificRisks, or riskAnalysis.criticalRisks if you need legacy compatibility.',
+    '- If an explicitly mandatory certification is required and the company certifications do not include an equivalent certification, reflect that in eligibilityFit and certificationFit using the evidence and severity of that requirement.',
     '- If procurement documents, technical specifications, SWZ/specification package, annexes, or selection criteria are not analyzed, missingDocumentsWarning must be true, even when the no_go decision is already clear. Use decisionFactors.missingDocumentsImpact.impactOnBidPreparation and impactOnGoNoGoDecision separately.',
     '- Return documentationAnalysis.missingDocuments as structured objects, not plain strings.',
     '- missingDocuments must describe procurement documents that are needed to complete tender understanding, bid/no-bid decision, technical compliance, commercial pricing, eligibility review, or contract risk review.',
@@ -168,6 +172,7 @@ export function buildTenderDeepCompanyFitUserPrompt(
     '- companyProfileConfidence is confidence in the company evidence. Reduce it when capabilities, certifications, CPV industries/services, operating countries, languages, or typical contract size are missing, weak, or contradictory.',
     '- scoringConfidence is confidence in the numeric scoring. It should reflect tenderDataConfidence, companyProfileConfidence, and evidence quality.',
     '- Evidence must reference one of: structured_ted, tender_document, general_analysis, company_profile, derived, missing.',
+    '- evidenceMap must be claim-based, not a source inventory. Each item must include claim, evidenceSource, evidenceText, and confidence. Do not return evidenceMap as a list of sources without claims.',
     '- Scores must be integers from 0 to 100.',
     '- Return JSON only matching TenderDeepAnalysisResult.',
   ].join('\n');
