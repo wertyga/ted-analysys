@@ -13,6 +13,49 @@ export type BidNoBidDecision =
   | 'no_bid'
   | 'not_actionable';
 
+export enum MissingTenderDocumentType {
+  SWZ = 'SWZ',
+  PRICE_FORM = 'PRICE_FORM',
+  TECHNICAL_SPECIFICATION = 'TECHNICAL_SPECIFICATION',
+  CONTRACT_DRAFT = 'CONTRACT_DRAFT',
+  CONTRACT_ANNEX = 'CONTRACT_ANNEX',
+  FORM = 'FORM',
+  Q_AND_A = 'Q_AND_A',
+  PROCUREMENT_PACKAGE = 'PROCUREMENT_PACKAGE',
+  OTHER = 'OTHER',
+}
+
+export enum MissingTenderDocumentImportance {
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH',
+  CRITICAL = 'CRITICAL',
+}
+
+export enum MissingTenderDocumentStatus {
+  MISSING = 'MISSING',
+  PORTAL_LINK_AVAILABLE = 'PORTAL_LINK_AVAILABLE',
+  DIRECT_LINK_AVAILABLE = 'DIRECT_LINK_AVAILABLE',
+  NOT_REQUIRED = 'NOT_REQUIRED',
+  ALREADY_ANALYZED = 'ALREADY_ANALYZED',
+  UNKNOWN = 'UNKNOWN',
+}
+
+export interface MissingTenderDocument {
+  name: string;
+  type: MissingTenderDocumentType;
+  importance: MissingTenderDocumentImportance;
+  status: MissingTenderDocumentStatus;
+  description: string;
+  whyNeeded: string;
+  impactIfMissing: string;
+  sourceEvidence: string | null;
+  portalUrl: string | null;
+  directDownloadUrl: string | null;
+  possibleUrls: string[];
+  recommendedAction: string;
+}
+
 export interface TenderDeepAnalysisResult {
   schemaVersion: string;
   language: string;
@@ -102,7 +145,7 @@ export interface TenderDeepAnalysisResult {
     documentsTotalCount: number;
     missingDocumentsWarning: boolean;
     documentationCompletenessScore: number;
-    missingDocuments: string[];
+    missingDocuments: MissingTenderDocument[];
   };
   clarificationQuestions: Array<{
     priority: 'high' | 'medium' | 'low';
@@ -552,6 +595,7 @@ export interface TenderAnalysisTenderDto {
   internalLotIdentifiers?: string[];
   documentUrls?: string[];
   submissionUrls?: string[];
+  documentAccess?: unknown;
   euFundLot?: boolean;
   selectionCriteria?: unknown[];
   awardCriteria?: unknown[];

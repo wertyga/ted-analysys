@@ -18,6 +18,11 @@ import { isRecord } from '@/utils';
 import { Tender, TenderDocument } from '../tenders/schemas';
 import { UserDocument } from '../user/user.types';
 import { TenderGeneralAnalysis } from '../tender-analysis/schemas';
+import {
+  collectAnalyzedDocumentNames,
+  collectTenderDocumentAccessUrls,
+  normalizeMissingDocuments,
+} from './missing-tender-documents.utils';
 
 export const COMPANY_FIT_WEIGHTS = {
   scopeFit: 18,
@@ -136,6 +141,8 @@ export class TenderDeepAnalysisBuilder {
       internalLotIdentifiers: tender.internalLotIdentifiers ?? [],
       documentUrls: tender.documentUrls ?? [],
       submissionUrls: tender.submissionUrls ?? [],
+      documentAccess: (tender as unknown as { documentAccess?: unknown })
+        .documentAccess,
       euFundLot: tender.euFundLot,
       selectionCriteria: tender.selectionCriteria ?? [],
       awardCriteria: tender.awardCriteria ?? [],
@@ -831,9 +838,15 @@ function applyDocumentationAndClarity(
   result: TenderDeepAnalysisResult,
   input: TenderDeepCompanyFitAnalysisInput,
 ): void {
-  const missingDocuments = normalizeStringList(
+  const documentAccessUrls = collectTenderDocumentAccessUrls(input.tender);
+  const missingDocuments = normalizeMissingDocuments(
     result.documentationAnalysis.missingDocuments,
+    {
+      ...documentAccessUrls,
+      analyzedDocumentNames: collectAnalyzedDocumentNames(input),
+    },
   );
+  result.documentationAnalysis.missingDocuments = missingDocuments;
   const hasMissingProcurementDocs =
     missingDocuments.length > 0 ||
     input.derived.documentUrlsCount > input.derived.documentsAnalyzedCount;

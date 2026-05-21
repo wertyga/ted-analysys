@@ -20,6 +20,10 @@ import {
   TenderGeneralAnalysisSerializable,
 } from '@/resources/tender-analysis/schemas';
 import { normalizeResultJsonScoreBreakdown } from '../tender-deep-analysis.normalizer';
+import {
+  collectTenderDocumentAccessUrls,
+  normalizeMissingDocuments,
+} from '../missing-tender-documents.utils';
 
 export enum TenderDeepAnalysisStatus {
   PENDING = 'pending',
@@ -208,7 +212,7 @@ function serializeDeepAnalysisDetail(
     filterModel(
       analysis as TenderDeepAnalysisDocument,
     ) as TenderDeepAnalysisRecord;
-  const normalizedRest = normalizeSerializedDeepAnalysis(rest);
+  const normalizedRest = normalizeSerializedDeepAnalysis(rest, tender);
 
   return {
     ...normalizedRest,
@@ -237,7 +241,7 @@ function serializeDeepAnalysisList(
     filterModel(
       analysis as TenderDeepAnalysisDocument,
     ) as TenderDeepAnalysisRecord;
-  const normalizedRest = normalizeSerializedDeepAnalysis(rest);
+  const normalizedRest = normalizeSerializedDeepAnalysis(rest, tender);
 
   return {
     ...normalizedRest,
@@ -257,12 +261,21 @@ function serializeDeepAnalysisList(
 
 function normalizeSerializedDeepAnalysis<
   T extends Partial<TenderDeepAnalysisRecord>,
->(analysis: T): T {
+>(analysis: T, tender?: TenderDeepAnalysisRecord['tender']): T {
   if (!analysis.resultJson) {
     return analysis;
   }
 
   const resultJson = normalizeResultJsonScoreBreakdown(analysis.resultJson);
+  const urlContext = collectTenderDocumentAccessUrls(tender);
+
+  resultJson.documentationAnalysis.missingDocuments = normalizeMissingDocuments(
+    resultJson.documentationAnalysis.missingDocuments,
+    {
+      ...urlContext,
+      analyzedDocumentNames: [],
+    },
+  );
   const scores = resultJson.scores;
 
   return {
