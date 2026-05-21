@@ -20,6 +20,7 @@ import { TenderMatchingModule } from './resources/tender-matching/tender-matchin
 import { CompanyProfileDocumentsModule } from './resources/company-profile-documents/company-profile-documents.module';
 import { CurrencyExchangeRatesModule } from './resources/currency-exchange-rates/currency-exchange-rates.module';
 import { FreemiusModule } from './resources/freemius/freemius.module';
+import { FeedbackModule } from './resources/feedback/feedback.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { FreemiusModule } from './resources/freemius/freemius.module';
     CompanyProfileDocumentsModule,
     CurrencyExchangeRatesModule,
     FreemiusModule,
+    FeedbackModule,
   ],
   controllers: [AppController],
   providers: [AppService],
