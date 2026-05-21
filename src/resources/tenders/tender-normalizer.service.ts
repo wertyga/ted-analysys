@@ -32,9 +32,8 @@ export class TenderNormalizerService {
   async normalizeTedNoticeWithCpvCodes(
     rawNotice: TedNotice,
     rawIds = false,
+    normalizedTender = this.normalizeTedNotice(rawNotice),
   ): Promise<NormalizedTenderDto> {
-    const normalizedTender = this.normalizeTedNotice(rawNotice);
-
     const {
       classificationCpv,
       mainClassificationProc,

@@ -160,12 +160,18 @@ export class TendersService {
       return undefined;
     }
 
-    const normalizedTenderDto =
-      await this.tenderNormalizer.normalizeTedNoticeWithCpvCodes(notice, true);
-    const estimatedValueEur =
-      await this.calculateEstimatedValueEur(normalizedTenderDto);
+    const normalizedTender = this.tenderNormalizer.normalizeTedNotice(notice);
 
-    const sourceHash = this.buildTenderSourceHash(normalizedTenderDto);
+    const normalizedTenderDto =
+      await this.tenderNormalizer.normalizeTedNoticeWithCpvCodes(
+        notice,
+        true,
+        normalizedTender,
+      );
+    const estimatedValueEur =
+      await this.calculateEstimatedValueEur(normalizedTender);
+
+    const sourceHash = this.buildTenderSourceHash(normalizedTender);
 
     const tenderDoc = await TenderModel.findOneAndUpdate(
       { id: publicationNumber },
@@ -273,9 +279,10 @@ export class TendersService {
       const existingTender =
         existingTendersByPublicationNumber.get(publicationNumber);
 
-      const shouldUpdateExistingTender =
-        !!existingTender &&
-        this.shouldUpdateTenderFromTedNotice(existingTender, notice);
+      const shouldUpdateExistingTender = this.shouldUpdateTenderFromTedNotice(
+        existingTender,
+        notice,
+      );
 
       if (existingTender && !shouldUpdateExistingTender) {
         skipped += 1;
@@ -301,9 +308,13 @@ export class TendersService {
   }
 
   private shouldUpdateTenderFromTedNotice(
-    tender: TenderDocument,
+    tender: TenderDocument | undefined | null,
     notice: TedNotice,
   ): boolean {
+    if (!tender) {
+      return true;
+    }
+
     const normalizedTenderDto =
       this.tenderNormalizer.normalizeTedNotice(notice);
 
@@ -479,9 +490,10 @@ export class TendersService {
     let savedTender: TenderDocument | null | undefined =
       await TenderModel.findOne({ id: publicationNumber }).exec();
 
-    const shouldUpsertTender =
-      !savedTender ||
-      areTedNoticeVersionsDifferent(savedTender.noticeVersion, notice);
+    const shouldUpsertTender = this.shouldUpdateTenderFromTedNotice(
+      savedTender,
+      notice,
+    );
 
     if (shouldUpsertTender) {
       savedTender = await this.upsertTender(notice);
@@ -609,8 +621,8 @@ export class TendersService {
   }
 
   private buildTenderSourceHash(normalizedTender: NormalizedTenderDto): string {
-    const { classificationCpv, ...rest } = normalizedTender;
-
-    return createHash('sha256').update(JSON.stringify(rest)).digest('hex');
+    return createHash('sha256')
+      .update(JSON.stringify(normalizedTender))
+      .digest('hex');
   }
 }

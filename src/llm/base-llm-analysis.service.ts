@@ -4,7 +4,7 @@ import {
   GeneralTenderAnalysisInput,
   GeneralTenderAnalysisResult,
 } from '@/openai/dto/openai-analysis.dto';
-import { buildGeneralTenderAnalysisPrompt } from '@/openai/prompts/general-tender-analysis.prompt';
+import { buildGeneralTenderAnalysisPrompt } from '@/resources/tender-analysis/general-tender-analysis.prompt';
 import { GENERAL_TENDER_ANALYSIS_JSON_SCHEMA } from '@/openai/schemas/general-tender-analysis.schema';
 import { getSafeErrorMessage, isRecord } from '@/utils';
 import {
@@ -14,7 +14,7 @@ import {
 import {
   buildTenderDeepCompanyFitSystemPrompt,
   buildTenderDeepCompanyFitUserPrompt,
-} from '@/openai/prompts/tender-deep-company-fit.prompt';
+} from '@/resources/tender-deep-analysis/tender-deep-company-fit.prompt';
 import { TENDER_DEEP_COMPANY_FIT_JSON_SCHEMA } from '@/openai/schemas/tender-deep-company-fit.schema';
 
 type JsonRecord = Record<string, unknown>;
@@ -71,6 +71,7 @@ export abstract class BaseLlmAnalysisService {
       this.maxContextChars,
     );
     const responseText = await this.createJsonResponse(prompt, context, 'deep');
+
     const parsed = this.parseJson(responseText);
 
     if (!isRecord(parsed)) {

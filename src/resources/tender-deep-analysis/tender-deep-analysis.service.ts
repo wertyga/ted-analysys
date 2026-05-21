@@ -22,7 +22,7 @@ import {
 } from './schemas';
 import { TenderGeneralAnalysisService } from '../tender-analysis/tender-general-analysis.service';
 import { TenderDeepAnalysisBuilder } from './tender-deep-analysis.builder';
-import { TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION } from '@/openai/prompts/tender-deep-company-fit.prompt';
+import { TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION } from '@/resources/tender-deep-analysis/tender-deep-company-fit.prompt';
 import { TenderDeepDocumentInputService } from './tender-deep-document-input.service';
 import { CompanyTenderFilterModel } from '@/resources/company-filter/company-filter.schema';
 import { CompanyFilterService } from '@/resources/company-filter/company-filter.service';

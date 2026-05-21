@@ -13,7 +13,7 @@ import {
   TenderDeepRecommendation,
   TenderRequirement,
 } from '@/types';
-import { TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION } from '@/openai/prompts/tender-deep-company-fit.prompt';
+import { TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION } from '@/resources/tender-deep-analysis/tender-deep-company-fit.prompt';
 import { isRecord } from '@/utils';
 import { Tender, TenderDocument } from '../tenders/schemas';
 import { UserDocument } from '../user/user.types';

@@ -10,7 +10,7 @@ import {
   TedScope,
   TedSearchResponse,
 } from './types/ted-search.types';
-import { mapTedError } from './utils';
+import { mapTedError, searchTendersDefaultFields } from './utils';
 import { TenderModel } from '@/resources/tenders/schemas';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { devLog, getPaginationMeta } from '@/utils';
@@ -42,80 +42,13 @@ export class TedSearchService {
 
   private readonly filters: TedSearchFilters;
 
-  private readonly searchTendersDefaultFields = [
-    'notice-identifier',
-    'publication-number',
-    'notice-type',
-    'notice-subtype',
-    'notice-version',
-    'notice-title',
-    'publication-date',
-    'dispatch-date',
-    'deadline',
-    'deadline-receipt-tender-date-lot',
-    'deadline-receipt-tender-time-lot',
-    'deadline-receipt-answers-date-lot',
-    'deadline-receipt-answers-time-lot',
-    'title-proc',
-    'title-lot',
-    'description-proc',
-    'description-lot',
-    'procedure-type',
-    'contract-nature',
-    'legal-basis',
-    'classification-cpv',
-    'main-classification-proc',
-    'main-classification-lot',
-    'additional-classification-lot',
-    'buyer-name',
-    'buyer-identifier',
-    'buyer-country',
-    'buyer-city',
-    'main-activity',
-    'buyer-email',
-    'buyer-internet-address',
-    'buyer-profile',
-    'estimated-value-proc',
-    'estimated-value-cur-proc',
-    'estimated-value-lot',
-    'estimated-value-cur-lot',
-    'place-of-performance-country-proc',
-    'place-of-performance-country-lot',
-    'place-of-performance-city-proc',
-    'place-of-performance-city-lot',
-    'identifier-lot',
-    'internal-identifier-lot',
-    'links',
-    'document-url-lot',
-    'submission-url-lot',
-    'electronic-submission-lot',
-    'submission-language',
-    'official-language',
-    'contract-duration-start-date-lot',
-    'contract-duration-end-date-lot',
-    'duration-period-value-lot',
-    'duration-period-unit-lot',
-    'sme-lot',
-    'framework-agreement-lot',
-    'dps-usage-lot',
-    'eu-fund-lot',
-    'selection-criterion-name-lot',
-    'selection-criterion-description-lot',
-    'award-criterion-name-lot',
-    'award-criterion-description-lot',
-    'award-criterion-type-lot',
-    'award-criterion-number-weight-lot',
-  ];
-
   private withDefaultFields({
     fields = [],
     ...payload
   }: TedSearchRequestDto): TedSearchRequestDto {
     return {
       ...payload,
-      fields: Array.from(
-        new Set([...fields, ...this.searchTendersDefaultFields]),
-      ),
+      fields: Array.from(new Set([...fields, ...searchTendersDefaultFields])),
     };
   }
 
@@ -134,7 +67,7 @@ export class TedSearchService {
       paginationMode: TedPaginationMode.PAGE_NUMBER,
       onlyLatestVersions: true,
       checkQuerySyntax: false,
-      fields: this.searchTendersDefaultFields,
+      fields: searchTendersDefaultFields,
     });
   }
 

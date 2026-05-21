@@ -12,9 +12,9 @@ import { TedSearchService } from './ted-search.service';
 import { TedSearchResponse } from './types/ted-search.types';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { TendersService } from '@/resources/tenders/tenders.service';
-import { TenderWishlistService } from '@/resources/tender-wishlist/tender-wishlist.service';
 import { TenderListDto } from '@/resources/tenders/dto/tender.dto';
 import { AdminAccessGuard } from '@/guards';
+import fs from 'node:fs';
 
 @ApiTags('ted')
 @Controller('ted')
@@ -22,7 +22,6 @@ export class TedSearchController {
   constructor(
     private readonly tedSearchService: TedSearchService,
     private readonly tendersService: TendersService,
-    private readonly tenderWishlistService: TenderWishlistService,
   ) {}
 
   @UseGuards(AdminAccessGuard)
@@ -42,6 +41,8 @@ export class TedSearchController {
       ...body,
       noticeTypes: body.noticeTypes ?? TENDER_COMPETITION_NOTICE_TYPES,
     });
+
+    fs.writeFileSync('notice.json', JSON.stringify(noticeData));
 
     const tendersWithBaseAnalysis =
       await this.tendersService.upsertIfNeededMultipleTendersWithGeneralAnalysis(
