@@ -488,18 +488,16 @@ function applyDocumentCounts(
   result: TenderDeepAnalysisResult,
   input: TenderDeepCompanyFitAnalysisInput,
 ): void {
-  const documentsAnalyzedCount = input.derived.documentsAnalyzedCount;
-  const documentsTotalCount = Math.max(
-    input.derived.documentUrlsCount,
-    input.derived.documentsDownloadedCount,
-    documentsAnalyzedCount,
-  );
+  const noticeDocumentsAnalyzedCount = input.derived.documentsAnalyzedCount;
 
-  result.documentationAnalysis.documentsAnalyzedCount = documentsAnalyzedCount;
-  result.documentationAnalysis.documentsTotalCount = documentsTotalCount;
-  result.documentationAnalysis.documentsAvailable = documentsAnalyzedCount > 0;
-  result.documentationAnalysis.missingDocumentsWarning =
-    documentsTotalCount > documentsAnalyzedCount;
+  result.documentationAnalysis.noticeDocumentsAnalyzedCount =
+    noticeDocumentsAnalyzedCount;
+  result.documentationAnalysis.procurementDocumentsAnalyzedCount = 0;
+  result.documentationAnalysis.documentsAnalyzedCount = 0;
+  result.documentationAnalysis.documentsTotalCount = 0;
+  result.documentationAnalysis.documentsAvailable =
+    noticeDocumentsAnalyzedCount > 0;
+  result.documentationAnalysis.missingDocumentsWarning = false;
 }
 
 function isScoreBreakdownItem(value: unknown): value is {
@@ -762,19 +760,7 @@ function applyDecisionFactors(
     });
   }
 
-  const legacyDecisionBlockers = extractTextList(
-    (result.bidNoBidDecision as unknown as { criticalBlockers?: unknown })
-      .criticalBlockers,
-  );
-
-  for (const description of legacyDecisionBlockers) {
-    addDecisionBlocker(blockers, {
-      type: 'other',
-      severity: 'HIGH',
-      description,
-      source: 'bid_decision',
-    });
-  }
+  addBidDecisionBlockers(blockers, result.bidNoBidDecision);
 
   if (!input.company.capabilities || input.company.capabilities.length === 0) {
     addDecisionBlocker(blockers, {
@@ -850,6 +836,14 @@ function applyDocumentationAndClarity(
   const hasMissingProcurementDocs =
     missingDocuments.length > 0 ||
     input.derived.documentUrlsCount > input.derived.documentsAnalyzedCount;
+  const procurementDocumentsAccess =
+    documentAccessUrls.directFileUrls.length > 0
+      ? 'DIRECT_LINK_AVAILABLE'
+      : documentAccessUrls.portalUrls.length > 0
+        ? 'PORTAL_LINK_AVAILABLE'
+        : hasMissingProcurementDocs
+          ? 'MISSING'
+          : 'UNKNOWN';
   const noticeCoverageScore =
     input.derived.documentsAnalyzedCount > 0
       ? 80
@@ -886,23 +880,16 @@ function applyDocumentationAndClarity(
     overallDocumentationCompletenessScore;
   result.documentationAnalysis.missingDocumentsWarning =
     hasMissingProcurementDocs;
-  (
-    result.documentationAnalysis as unknown as {
-      noticeDocumentsAnalyzedCount?: number;
-      procurementDocumentsAnalyzedCount?: number;
-      procurementDocumentsAvailable?: boolean;
-    }
-  ).noticeDocumentsAnalyzedCount = input.derived.documentsAnalyzedCount;
-  (
-    result.documentationAnalysis as unknown as {
-      procurementDocumentsAnalyzedCount?: number;
-    }
-  ).procurementDocumentsAnalyzedCount = 0;
-  (
-    result.documentationAnalysis as unknown as {
-      procurementDocumentsAvailable?: boolean;
-    }
-  ).procurementDocumentsAvailable = input.derived.documentUrlsCount > 0;
+  result.documentationAnalysis.noticeDocumentsAnalyzedCount =
+    input.derived.documentsAnalyzedCount;
+  result.documentationAnalysis.procurementDocumentsAnalyzedCount = 0;
+  result.documentationAnalysis.procurementDocumentsAvailable =
+    procurementDocumentsAccess !== 'MISSING' &&
+    procurementDocumentsAccess !== 'UNKNOWN';
+  result.documentationAnalysis.procurementDocumentsAccess =
+    procurementDocumentsAccess;
+  result.documentationAnalysis.documentsAnalyzedCount = 0;
+  result.documentationAnalysis.documentsTotalCount = missingDocuments.length;
   delete (
     result.documentationAnalysis as unknown as {
       missingDocumentsImpactOnDecision?: unknown;
@@ -1135,12 +1122,50 @@ function hasLanguageOverlap(input: TenderDeepCompanyFitAnalysisInput): boolean {
   return input.derived.preliminarySignals.languageOverlap === true;
 }
 
-function extractTextList(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
+function addBidDecisionBlockers(
+  blockers: NonNullable<
+    TenderDeepAnalysisResult['decisionFactors']
+  >['criticalBlockers'],
+  bidNoBidDecision: TenderDeepAnalysisResult['bidNoBidDecision'],
+): void {
+  const decision = bidNoBidDecision as unknown as {
+    criticalBlockers?: unknown;
+    decisionFactors?: {
+      criticalBlockers?: unknown;
+    };
+  };
 
-  return value.filter((item): item is string => typeof item === 'string');
+  for (const value of [
+    decision.criticalBlockers,
+    decision.decisionFactors?.criticalBlockers,
+  ]) {
+    if (!Array.isArray(value)) {
+      continue;
+    }
+
+    for (const item of value) {
+      if (typeof item === 'string') {
+        addDecisionBlocker(blockers, {
+          type: 'other',
+          severity: 'HIGH',
+          description: item,
+          source: 'bid_decision',
+        });
+        continue;
+      }
+
+      if (!isRecord(item) || typeof item.description !== 'string') {
+        continue;
+      }
+
+      addDecisionBlocker(blockers, {
+        type: normalizeDecisionBlockerType(item.type),
+        severity: normalizeDecisionBlockerSeverity(item.severity),
+        description: item.description,
+        source: 'bid_decision',
+      });
+    }
+  }
 }
 
 function addDecisionBlocker(
@@ -1207,22 +1232,6 @@ function compactDecisionBlockers(
     }
   }
 
-  const canonicalDescriptions: Partial<
-    Record<
-      NonNullable<
-        TenderDeepAnalysisResult['decisionFactors']
-      >['criticalBlockers'][number]['type'],
-      string
-    >
-  > = {
-    eligibility:
-      'Procedure access/selection criteria are unclear or restricted; company has no evidence of invitation or qualification.',
-    capability:
-      'No declared capability or experience in the required industrial/nuclear maintenance scope.',
-    certification:
-      'No declared certifications or site-access clearances for nuclear or industrial maintenance work.',
-    geography: 'No operating presence in the tender performance country.',
-  };
   const order: Array<
     NonNullable<
       TenderDeepAnalysisResult['decisionFactors']
@@ -1240,13 +1249,56 @@ function compactDecisionBlockers(
     )
     .map((blocker) => ({
       ...blocker,
-      description: canonicalDescriptions[blocker.type] ?? blocker.description,
       severity:
         blocker.type === 'capability' || blocker.type === 'certification'
           ? 'CRITICAL'
           : blocker.severity,
     }))
     .slice(0, 5);
+}
+
+function normalizeDecisionBlockerType(
+  value: unknown,
+): NonNullable<
+  TenderDeepAnalysisResult['decisionFactors']
+>['criticalBlockers'][number]['type'] {
+  const normalized = typeof value === 'string' ? value : 'other';
+
+  if (
+    [
+      'capability',
+      'certification',
+      'geography',
+      'eligibility',
+      'deadline',
+      'language',
+      'financial',
+      'legal',
+      'other',
+    ].includes(normalized)
+  ) {
+    return normalized as NonNullable<
+      TenderDeepAnalysisResult['decisionFactors']
+    >['criticalBlockers'][number]['type'];
+  }
+
+  return 'other';
+}
+
+function normalizeDecisionBlockerSeverity(
+  value: unknown,
+): NonNullable<
+  TenderDeepAnalysisResult['decisionFactors']
+>['criticalBlockers'][number]['severity'] {
+  const normalized = typeof value === 'string' ? value.toUpperCase() : 'HIGH';
+
+  if (['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(normalized)) {
+    return normalized as NonNullable<
+      TenderDeepAnalysisResult['decisionFactors']
+    >['criticalBlockers'][number]['severity'];
+  }
+
+  return 'HIGH';
 }
 
 function severityRank(severity: string): number {
@@ -1288,7 +1340,7 @@ function applyUserFacingScoreExplanations(
     }
 
     if (isTechnicalScoreExplanation(item.explanation)) {
-      item.explanation = getUserFacingScoreExplanation(key, result.language);
+      item.explanation = '';
     }
 
     item.evidence = normalizeStringList(item.evidence);
@@ -1302,186 +1354,30 @@ function isTechnicalScoreExplanation(value: unknown): boolean {
   return typeof value !== 'string' || value.trim() === '';
 }
 
-function getUserFacingScoreExplanation(
-  key: CompanyFitScoreKey,
-  language?: string,
-): string {
-  const explanations = getLocalizedMessages(language).scoreExplanations;
-
-  return explanations[key];
-}
-
 function applyCompanyFitSummaryFields(result: TenderDeepAnalysisResult): void {
   const mutable = result.companyFitAnalysis as unknown as Record<
     string,
     unknown
   >;
-  const messages = getLocalizedMessages(result.language);
 
   if (!Array.isArray(mutable.strengths) || mutable.strengths.length === 0) {
-    mutable.strengths = messages.strengths;
+    mutable.strengths = [];
   }
 
   if (!Array.isArray(mutable.weaknesses) || mutable.weaknesses.length === 0) {
-    mutable.weaknesses = messages.weaknesses;
+    mutable.weaknesses = [];
   }
 
   if (
     !Array.isArray(mutable.capabilityGaps) ||
     mutable.capabilityGaps.length === 0
   ) {
-    mutable.capabilityGaps = messages.capabilityGaps;
+    mutable.capabilityGaps = [];
   }
 
   mutable.missingCompanyInformation = normalizeMissingCompanyInformation(
     mutable.missingCompanyInformation,
-    result.language,
   );
-}
-
-function getLocalizedMessages(language?: string): {
-  strengths: string[];
-  weaknesses: string[];
-  capabilityGaps: Array<Record<string, string>>;
-  missingCompanyInformation: Record<string, string>;
-  scoreExplanations: Record<CompanyFitScoreKey, string>;
-} {
-  if (language === 'DEU' || language?.toLowerCase().startsWith('de')) {
-    return {
-      strengths: [
-        'Englisch ist als Einreichungssprache zugelassen.',
-        'Die Einreichungsfrist ist fuer einen vorbereiteten Bieter nicht unmittelbar kritisch.',
-      ],
-      weaknesses: [
-        'Keine deklarierte Reparatur- oder Wartungsfaehigkeit.',
-        'Keine deklarierten Zertifizierungen fuer kerntechnische oder industrielle Wartung.',
-        'Keine operative Praesenz in Slowenien.',
-        'Keine CPV-/Profilueberschneidung mit dem Reparatur- und Wartungsumfang.',
-      ],
-      capabilityGaps: [
-        {
-          requirement: 'Faehigkeit fuer kerntechnische/industrielle Wartung',
-          currentState:
-            'Das Unternehmensprofil weist nur Softwareentwicklung aus.',
-          severity: 'CRITICAL',
-          severityLabel: 'Kritisch',
-        },
-        {
-          requirement:
-            'Kerntechnische Sicherheitszertifizierungen und Standortfreigaben',
-          currentState: 'Es sind keine relevanten Zertifizierungen deklariert.',
-          severity: 'CRITICAL',
-          severityLabel: 'Kritisch',
-        },
-        {
-          requirement: 'Vor-Ort-Leistungsfaehigkeit in Slowenien',
-          currentState:
-            'Die Einsatzlaender des Unternehmens enthalten Slowenien nicht.',
-          severity: 'HIGH',
-          severityLabel: 'Hoch',
-        },
-      ],
-      missingCompanyInformation: {
-        'No company capabilities are declared.':
-          'Es sind keine Unternehmensfaehigkeiten deklariert.',
-        'Company description is missing.':
-          'Die Unternehmensbeschreibung fehlt.',
-        'Company industries and main services are missing or not populated.':
-          'Branchen und Hauptleistungen des Unternehmens fehlen oder sind nicht gepflegt.',
-        'Company operating regions are missing.':
-          'Die Einsatzregionen des Unternehmens fehlen.',
-        'Company languages are missing.': 'Die Unternehmenssprachen fehlen.',
-        'Typical contract size is missing.':
-          'Die typische Auftragsgroesse fehlt.',
-      },
-      scoreExplanations: {
-        scopeFit:
-          'Der Ausschreibungsumfang betrifft industrielle/kerntechnische Reparatur und Wartung; das Unternehmensprofil weist nur Softwareentwicklung aus.',
-        capabilityFit:
-          'Es sind keine Unternehmensfaehigkeiten fuer industrielle, mechanische oder kerntechnische Wartung deklariert.',
-        cpvFit:
-          'Der CPV-Code der Ausschreibung betrifft Reparatur- und Wartungsdienstleistungen; das Unternehmensprofil ueberschneidet sich damit nicht.',
-        geographicFit:
-          'Die Leistung ist in Slowenien zu erbringen; die Einsatzlaender des Unternehmens enthalten Slowenien nicht.',
-        languageFit:
-          'Englisch ist fuer die Einreichung zugelassen und das Unternehmen unterstuetzt Englisch.',
-        eligibilityFit:
-          'Verfahrenszugang und Auswahlkriterien sind eingeschraenkt oder unklar; Einladung oder Qualifikation sind nicht belegt.',
-        certificationFit:
-          'Es sind keine Zertifizierungen oder Standortfreigaben fuer kerntechnische oder industrielle Wartung deklariert.',
-        experienceFit:
-          'Es sind keine relevanten Referenzen in industrieller oder kerntechnischer Wartung deklariert.',
-        financialFit:
-          'Der Auftragswert fehlt; eine typische Auftragsgroesse ist deklariert, aber kein verlaesslicher Vergleich moeglich.',
-        commercialFit:
-          'Die kommerzielle Passung ist schwach, weil das Unternehmen den Leistungsumfang nicht glaubhaft erbringen kann.',
-        deadlineFit:
-          'Die Einreichungsfrist ist nicht abgelaufen und fuer vorbereitete Bieter nutzbar; andere Blocker dominieren.',
-        riskFit:
-          'Die Risikopassung ist schwach, weil Faehigkeits-, Zertifizierungs-, Geografie- und Eignungsblocker wesentlich sind.',
-      },
-    };
-  }
-
-  return {
-    strengths: [
-      'English is accepted as a submission language.',
-      'Submission deadline is not immediately urgent for a prepared bidder.',
-    ],
-    weaknesses: [
-      'No declared repair or maintenance capability.',
-      'No declared nuclear or industrial maintenance certifications.',
-      'No operating presence in Slovenia.',
-      'No CPV/profile overlap with the repair and maintenance scope.',
-    ],
-    capabilityGaps: [
-      {
-        requirement: 'Nuclear/industrial maintenance capability',
-        currentState: 'Company profile indicates software development only.',
-        severity: 'CRITICAL',
-        severityLabel: 'Critical',
-      },
-      {
-        requirement: 'Nuclear safety certifications and site-access clearances',
-        currentState: 'No relevant certifications are declared.',
-        severity: 'CRITICAL',
-        severityLabel: 'Critical',
-      },
-      {
-        requirement: 'On-site delivery capability in Slovenia',
-        currentState: 'Company operating countries do not include Slovenia.',
-        severity: 'HIGH',
-        severityLabel: 'High',
-      },
-    ],
-    missingCompanyInformation: {},
-    scoreExplanations: {
-      scopeFit:
-        'Tender scope is industrial/nuclear repair and maintenance; company profile indicates software development only.',
-      capabilityFit:
-        'No declared company capability in industrial, mechanical, or nuclear maintenance.',
-      cpvFit:
-        'Tender CPV is repair and maintenance services; company CPV/profile does not overlap with that scope.',
-      geographicFit:
-        'Tender performance is in Slovenia; company operating countries do not include Slovenia.',
-      languageFit:
-        'English is accepted for submission and the company supports English.',
-      eligibilityFit:
-        'Procedure access and selection criteria appear restricted or unclear; invitation/qualification status is not evidenced.',
-      certificationFit:
-        'No declared certifications or site-access clearances for nuclear or industrial maintenance work.',
-      experienceFit:
-        'No relevant industrial or nuclear maintenance references are declared.',
-      financialFit:
-        'Estimated value is missing; company typical contract range is declared, but reliable comparison is not possible.',
-      commercialFit:
-        'Commercial fit is poor because the company cannot credibly deliver the tender scope.',
-      deadlineFit:
-        'Submission deadline is not expired and timing is usable for a prepared bidder, but other blockers dominate.',
-      riskFit:
-        'Risk fit is poor because capability, certification, geography, and eligibility blockers are material.',
-    },
-  };
 }
 
 function syncDocumentationScores(result: TenderDeepAnalysisResult): void {
@@ -1503,13 +1399,8 @@ function syncLegacyFitScores(result: TenderDeepAnalysisResult): void {
     fitScore;
 }
 
-function normalizeMissingCompanyInformation(
-  value: unknown,
-  language?: string,
-): string[] {
-  const messages = getLocalizedMessages(language).missingCompanyInformation;
-
-  return normalizeStringList(value).map((item) => messages[item] ?? item);
+function normalizeMissingCompanyInformation(value: unknown): string[] {
+  return normalizeStringList(value);
 }
 
 function normalizeRiskSeverityLabels(result: TenderDeepAnalysisResult): void {

@@ -105,7 +105,59 @@ export const TENDER_DEEP_COMPANY_FIT_JSON_SCHEMA = {
     },
     clarificationQuestions: { type: 'array' },
     bidPreparationPlan: { type: 'object' },
-    scores: { type: 'object' },
+    scores: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        scoreBreakdown: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: true,
+            required: [
+              'criterion',
+              'score',
+              'weight',
+              'weightedScore',
+              'explanation',
+              'evidence',
+              'missingInformation',
+            ],
+            properties: {
+              criterion: {
+                type: 'string',
+                enum: [
+                  'scopeFit',
+                  'capabilityFit',
+                  'cpvFit',
+                  'geographicFit',
+                  'languageFit',
+                  'eligibilityFit',
+                  'certificationFit',
+                  'experienceFit',
+                  'financialFit',
+                  'commercialFit',
+                  'deadlineFit',
+                  'riskFit',
+                ],
+              },
+              score: { type: 'number' },
+              weight: { type: 'number' },
+              weightedScore: { type: 'number' },
+              explanation: { type: 'string', minLength: 1 },
+              evidence: {
+                type: 'array',
+                items: { type: 'string' },
+              },
+              missingInformation: {
+                type: 'array',
+                items: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+    },
     confidence: {
       type: 'object',
       required: [

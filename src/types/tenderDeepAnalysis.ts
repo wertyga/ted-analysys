@@ -143,6 +143,14 @@ export interface TenderDeepAnalysisResult {
     documentsAvailable: boolean;
     documentsAnalyzedCount: number;
     documentsTotalCount: number;
+    noticeDocumentsAnalyzedCount?: number;
+    procurementDocumentsAnalyzedCount?: number;
+    procurementDocumentsAvailable?: boolean;
+    procurementDocumentsAccess?:
+      | 'MISSING'
+      | 'PORTAL_LINK_AVAILABLE'
+      | 'DIRECT_LINK_AVAILABLE'
+      | 'UNKNOWN';
     missingDocumentsWarning: boolean;
     documentationCompletenessScore: number;
     missingDocuments: MissingTenderDocument[];

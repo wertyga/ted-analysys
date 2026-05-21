@@ -85,8 +85,8 @@ export function normalizeResultJsonScoreBreakdown(
   if (riskFit && typeof riskFit.score === 'number') {
     mutable.scores.riskFitScore = clampSerializedScore(riskFit.score);
   }
-  normalizeSerializedDocumentationAndClarity(normalized);
   normalizeSerializedDecisionFactors(normalized);
+  normalizeSerializedDocumentationAndClarity(normalized);
   normalizeSerializedProcedure(normalized);
   cleanupSerializedCompanyFitAnalysis(normalized);
   mutable.scores.riskLevelScore = calculateSerializedRiskLevelScore(normalized);
@@ -207,8 +207,6 @@ function normalizeSerializedDocumentationAndClarity(
     .missingDocuments as ReturnType<typeof normalizeMissingDocuments>;
   const hasMissingDocs =
     normalizedMissingDocuments.length > 0 ||
-    getNumber(mutable.documentationAnalysis.documentsTotalCount) >
-      getNumber(mutable.documentationAnalysis.documentsAnalyzedCount) ||
     (getNumber(
       mutable.documentationAnalysis.procurementDocumentsAnalyzedCount,
     ) === 0 &&
@@ -251,6 +249,11 @@ function normalizeSerializedDocumentationAndClarity(
     mutable.documentationAnalysis.documentsAnalyzedCount ?? 0;
   mutable.documentationAnalysis.procurementDocumentsAnalyzedCount = 0;
   mutable.documentationAnalysis.procurementDocumentsAvailable = hasMissingDocs;
+  mutable.documentationAnalysis.procurementDocumentsAccess =
+    getSerializedProcurementDocumentsAccess(normalizedMissingDocuments);
+  mutable.documentationAnalysis.documentsAnalyzedCount = 0;
+  mutable.documentationAnalysis.documentsTotalCount =
+    normalizedMissingDocuments.length;
   mutable.scores.documentationCompletenessScore =
     overallDocumentationCompletenessScore;
   mutable.decisionFactors.missingDocumentsImpact = {
@@ -296,7 +299,10 @@ function normalizeSerializedDecisionFactors(
 ): void {
   const mutable = resultJson as unknown as {
     decisionFactors?: { criticalBlockers?: unknown[] };
-    bidNoBidDecision?: { criticalBlockers?: unknown };
+    bidNoBidDecision?: {
+      criticalBlockers?: unknown;
+      decisionFactors?: { criticalBlockers?: unknown };
+    };
   };
   mutable.decisionFactors ||= {};
   const blockers = Array.isArray(mutable.decisionFactors.criticalBlockers)
@@ -304,22 +310,69 @@ function normalizeSerializedDecisionFactors(
     : [];
 
   if (Array.isArray(mutable.bidNoBidDecision?.criticalBlockers)) {
-    for (const description of mutable.bidNoBidDecision.criticalBlockers) {
-      if (typeof description !== 'string') {
-        continue;
-      }
+    appendSerializedDecisionBlockers(
+      blockers,
+      mutable.bidNoBidDecision.criticalBlockers,
+    );
+  }
 
-      blockers.push({
-        type: 'other',
-        severity: 'HIGH',
-        description,
-        source: 'bid_decision',
-      });
-    }
+  if (
+    Array.isArray(mutable.bidNoBidDecision?.decisionFactors?.criticalBlockers)
+  ) {
+    appendSerializedDecisionBlockers(
+      blockers,
+      mutable.bidNoBidDecision.decisionFactors.criticalBlockers,
+    );
   }
 
   mutable.decisionFactors.criticalBlockers =
     compactSerializedBlockers(blockers);
+}
+
+function getSerializedProcurementDocumentsAccess(
+  missingDocuments: Array<{ status?: string }>,
+): 'MISSING' | 'PORTAL_LINK_AVAILABLE' | 'DIRECT_LINK_AVAILABLE' | 'UNKNOWN' {
+  const statuses = new Set(missingDocuments.map((document) => document.status));
+
+  if (statuses.has('DIRECT_LINK_AVAILABLE')) {
+    return 'DIRECT_LINK_AVAILABLE';
+  }
+  if (statuses.has('PORTAL_LINK_AVAILABLE')) {
+    return 'PORTAL_LINK_AVAILABLE';
+  }
+  if (missingDocuments.length > 0 || statuses.has('MISSING')) {
+    return 'MISSING';
+  }
+
+  return 'UNKNOWN';
+}
+
+function appendSerializedDecisionBlockers(
+  blockers: unknown[],
+  values: unknown[],
+): void {
+  for (const item of values) {
+    if (typeof item === 'string') {
+      blockers.push({
+        type: 'other',
+        severity: 'HIGH',
+        description: item,
+        source: 'bid_decision',
+      });
+      continue;
+    }
+
+    if (!isRecordLike(item) || typeof item.description !== 'string') {
+      continue;
+    }
+
+    blockers.push({
+      type: normalizeSerializedBlockerType(item.type),
+      severity: normalizeSerializedBlockerSeverity(item.severity),
+      description: item.description,
+      source: 'bid_decision',
+    });
+  }
 }
 
 function findScoreItem(
@@ -330,6 +383,32 @@ function findScoreItem(
     (item): item is Record<string, unknown> =>
       isRecordLike(item) && item.criterion === criterion,
   );
+}
+
+function normalizeSerializedBlockerType(value: unknown): string {
+  const normalized = typeof value === 'string' ? value : 'other';
+
+  return [
+    'capability',
+    'certification',
+    'geography',
+    'eligibility',
+    'deadline',
+    'language',
+    'financial',
+    'legal',
+    'other',
+  ].includes(normalized)
+    ? normalized
+    : 'other';
+}
+
+function normalizeSerializedBlockerSeverity(value: unknown): string {
+  const normalized = typeof value === 'string' ? value.toUpperCase() : 'HIGH';
+
+  return ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(normalized)
+    ? normalized
+    : 'HIGH';
 }
 
 function isDefaultedSerializedScore(item: Record<string, unknown>): boolean {
