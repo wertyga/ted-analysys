@@ -172,3 +172,9 @@ export const serializeMongoObjectId = (
 
   return goFunc(value);
 };
+
+export function toRecord<T>(documentOrRecord: T) {
+  return 'toObject' in (documentOrRecord as any)
+    ? (documentOrRecord as any).toObject()
+    : documentOrRecord;
+}

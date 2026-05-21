@@ -168,7 +168,6 @@ const TenderDeepAnalysisSchema = new Schema<TenderDeepAnalysisDocument>(
     documentsAnalyzedCount: { type: Number, min: 0, default: 0 },
     documentsTotalCount: { type: Number, min: 0, default: 0 },
     missingDocumentsWarning: { type: Boolean, default: false },
-    isOutOfDate: { type: Boolean, default: false },
     sourceHash: { type: String },
     promptVersion: String,
     errorMessage: String,
@@ -189,7 +188,10 @@ TenderDeepAnalysisSchema.index({ language: 1 });
 TenderDeepAnalysisSchema.index({ sourceHash: 1 });
 TenderDeepAnalysisSchema.index({ status: 1 });
 TenderDeepAnalysisSchema.index({ tenderId: 1, company: 1 });
-TenderDeepAnalysisSchema.index({ tenderId: 1, company: 1, language: 1 });
+TenderDeepAnalysisSchema.index(
+  { tenderId: 1, company: 1, language: 1 },
+  { unique: true },
+);
 TenderDeepAnalysisSchema.index(
   { tenderId: 1, company: 1, sourceHash: 1 },
   { unique: true },

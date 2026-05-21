@@ -7,18 +7,13 @@ import {
   devLog,
   getPaginationMeta,
   getSafeErrorMessage,
-  isDuplicateKeyError,
   logger,
   QueueAsyncConcurrency,
   tenderCpvPopulateFields,
+  toRecord,
 } from '@/utils';
 import { UserModel } from '../user/user.schema';
 import { TenderDocument, TenderModel } from '../tenders/schemas';
-import {
-  TenderGeneralAnalysis,
-  TenderGeneralAnalysisDocument,
-  TenderGeneralAnalysisRecord,
-} from '../tender-analysis/schemas';
 import {
   TenderDeepAnalysisDocument,
   TenderDeepAnalysisModel,
@@ -33,7 +28,12 @@ import { CompanyTenderFilterModel } from '@/resources/company-filter/company-fil
 import { CompanyFilterService } from '@/resources/company-filter/company-filter.service';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { QueryFilter } from 'mongoose';
-import { AiFitDecision } from '@/resources/tender-matching/tender-match.types';
+import {
+  getCompanyAnalysisSourceHash,
+  getGeneralAnalysisSourceHash,
+  getTenderSourceHash,
+  normalizeDeepAnalysisLanguage,
+} from '@/resources/tender-deep-analysis/tender-deep-analysis.utils';
 
 const TENDER_DEEP_COMPANY_FIT_ANALYSIS_CONCURRENCY = 2;
 
@@ -117,40 +117,47 @@ export class TenderDeepAnalysisService {
         input,
       );
 
-      await localDeepAnalysis.updateOne({
-        $set: {
-          status: TenderDeepAnalysisStatus.COMPLETED,
-          language,
-          resultJson: normalized,
-          executiveSummary: normalized.executiveSummary,
-          fitScore: normalized.scores.fitScore,
-          fitConfidenceScore: normalized.scores.fitConfidenceScore,
-          participationReadinessScore:
-            normalized.scores.participationReadinessScore,
-          documentationCompletenessScore:
-            normalized.scores.documentationCompletenessScore,
-          requirementsClarityScore: normalized.scores.requirementsClarityScore,
-          riskScore:
-            normalized.scores.riskLevelScore ?? normalized.scores.riskScore,
-          riskLevelScore: normalized.scores.riskLevelScore,
-          riskFitScore: normalized.scores.riskFitScore,
-          opportunityScore: normalized.scores.opportunityScore,
-          companyCapabilityScore: normalized.scores.companyCapabilityScore,
-          eligibilityFitScore: normalized.scores.eligibilityFitScore,
-          commercialFitScore: normalized.scores.commercialFitScore,
-          deadlineFitScore: normalized.scores.deadlineFitScore,
-          recommendation: normalized.finalRecommendation.value,
-          documentsAnalyzedCount:
-            normalized.documentationAnalysis.documentsAnalyzedCount,
-          documentsTotalCount:
-            normalized.documentationAnalysis.documentsTotalCount,
-          missingDocumentsWarning:
-            normalized.documentationAnalysis.missingDocumentsWarning,
-          model: this.deepSeekAnalysisService.getDeepAnalysisModel(),
-          analyzedAt: new Date(),
+      await TenderDeepAnalysisModel.updateOne(
+        {
+          _id: localDeepAnalysis._id,
+          sourceHash: localDeepAnalysis.sourceHash,
         },
-        $unset: { errorMessage: '' },
-      });
+        {
+          $set: {
+            status: TenderDeepAnalysisStatus.COMPLETED,
+            language,
+            resultJson: normalized,
+            executiveSummary: normalized.executiveSummary,
+            fitScore: normalized.scores.fitScore,
+            fitConfidenceScore: normalized.scores.fitConfidenceScore,
+            participationReadinessScore:
+              normalized.scores.participationReadinessScore,
+            documentationCompletenessScore:
+              normalized.scores.documentationCompletenessScore,
+            requirementsClarityScore:
+              normalized.scores.requirementsClarityScore,
+            riskScore:
+              normalized.scores.riskLevelScore ?? normalized.scores.riskScore,
+            riskLevelScore: normalized.scores.riskLevelScore,
+            riskFitScore: normalized.scores.riskFitScore,
+            opportunityScore: normalized.scores.opportunityScore,
+            companyCapabilityScore: normalized.scores.companyCapabilityScore,
+            eligibilityFitScore: normalized.scores.eligibilityFitScore,
+            commercialFitScore: normalized.scores.commercialFitScore,
+            deadlineFitScore: normalized.scores.deadlineFitScore,
+            recommendation: normalized.finalRecommendation.value,
+            documentsAnalyzedCount:
+              normalized.documentationAnalysis.documentsAnalyzedCount,
+            documentsTotalCount:
+              normalized.documentationAnalysis.documentsTotalCount,
+            missingDocumentsWarning:
+              normalized.documentationAnalysis.missingDocumentsWarning,
+            model: this.deepSeekAnalysisService.getDeepAnalysisModel(),
+            analyzedAt: new Date(),
+          },
+          $unset: { errorMessage: '' },
+        },
+      ).exec();
 
       await this.logDeepAnalysisEvent('TENDER_DEEP_ANALYSIS_COMPLETED', {
         companyId,
@@ -186,7 +193,7 @@ export class TenderDeepAnalysisService {
     tenderId: string;
     companyId: string;
     language?: string;
-  }): Promise<TenderDeepAnalysisDocument> {
+  }): Promise<TenderDeepAnalysisDocument | TenderDeepAnalysisRecord> {
     const language = normalizeDeepAnalysisLanguage(params.language);
 
     const [tender, company] = await Promise.all([
@@ -234,29 +241,6 @@ export class TenderDeepAnalysisService {
     return localDeepAnalysis;
   }
 
-  async getDeppAnalysisTender(params: {
-    tenderId: string;
-    companyId: string;
-    language?: string;
-  }): Promise<TenderDeepAnalysisRecord | null> {
-    const language = normalizeDeepAnalysisLanguage(params.language);
-
-    const query = {
-      tenderId: params.tenderId,
-      company: params.companyId,
-    };
-
-    if (language) {
-      Object.assign(query, { language });
-    }
-
-    return TenderDeepAnalysisModel.findOne(query)
-      .sort({ createdAt: -1 })
-      .populate(deepAnalysisPopulateFields)
-      .lean<TenderDeepAnalysisRecord>()
-      .exec();
-  }
-
   async listByCompany(params: {
     companyId: string;
     page?: number;
@@ -301,36 +285,11 @@ export class TenderDeepAnalysisService {
         CompanyTenderFilterModel.findOne({ user: params.companyId }).exec(),
       ]);
 
-    const analysesWithOutDate = deepAnalyses.map((deepAnalysis) => {
-      const generalAnalysis = deepAnalysis.generalAnalysis as
-        | TenderGeneralAnalysisDocument
-        | TenderGeneralAnalysisRecord
-        | undefined;
-      const tender = deepAnalysis.tender as TenderDocument | undefined;
-
-      if (
-        !generalAnalysis?.sourceHash ||
-        !companyAnalysis?.sourceHash ||
-        !tender?.sourceHash
-      ) {
-        return {
-          ...deepAnalysis,
-          isOutOfDate: false,
-        };
-      }
-
-      const currentSourceHash = this.buildSourceHash({
-        generalAnalysisSourceHash: generalAnalysis.sourceHash,
-        companyAnalysisSourceHash: companyAnalysis.sourceHash,
-        outputLanguage: getDeepAnalysisOutputLanguage(deepAnalysis),
-        tenderSourceHash: tender.sourceHash,
-      });
-
-      return {
-        ...deepAnalysis,
-        isOutOfDate: deepAnalysis.sourceHash !== currentSourceHash,
-      };
-    });
+    const analysesWithOutDate = await Promise.all(
+      deepAnalyses.map((deepAnalysis) =>
+        this.withOutOfDateFlag(deepAnalysis, companyAnalysis),
+      ),
+    );
 
     return { analyses: analysesWithOutDate, total: totalDeepAnalysis };
   }
@@ -357,39 +316,61 @@ export class TenderDeepAnalysisService {
       sourceHash,
     }).populate(deepAnalysisPopulateFields);
 
-    const isNeedToUpdateOrCreateProcessing =
-      !deepAnalysis || deepAnalysis.status === TenderDeepAnalysisStatus.FAILED;
-    console.log({ deepAnalysis });
-    if (isNeedToUpdateOrCreateProcessing) {
-      const deepAnalysisInProcess =
-        await TenderDeepAnalysisModel.findOneAndUpdate(
-          {
-            tenderId: tender.id,
-            company: companyId,
-            sourceHash,
-          },
-          {
-            $set: {
-              tender: tender._id,
-              company: companyId,
-              sourceHash,
-              generalAnalysis: generalAnalysisId,
-              language,
-              status: TenderDeepAnalysisStatus.PROCESSING,
-              promptVersion: TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION,
-            },
-            $unset: { errorMessage: '' },
-          },
-          { returnDocument: 'after', upsert: true },
-        ).populate(deepAnalysisPopulateFields);
-
-      return {
-        deepAnalysis: deepAnalysisInProcess,
-        shouldStart: true,
-      };
+    if (
+      deepAnalysis &&
+      deepAnalysis.status !== TenderDeepAnalysisStatus.FAILED
+    ) {
+      return { deepAnalysis, shouldStart: false };
     }
 
-    return { deepAnalysis, shouldStart: false };
+    const deepAnalysisInProcess =
+      await TenderDeepAnalysisModel.findOneAndUpdate(
+        {
+          tenderId: tender.id,
+          company: companyId,
+          language,
+        },
+        {
+          $set: {
+            tender: tender._id,
+            company: companyId,
+            sourceHash,
+            generalAnalysis: generalAnalysisId,
+            language,
+            status: TenderDeepAnalysisStatus.PROCESSING,
+            promptVersion: TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION,
+          },
+          $unset: {
+            errorMessage: '',
+            resultJson: '',
+            executiveSummary: '',
+            fitScore: '',
+            fitConfidenceScore: '',
+            participationReadinessScore: '',
+            documentationCompletenessScore: '',
+            requirementsClarityScore: '',
+            riskScore: '',
+            riskLevelScore: '',
+            riskFitScore: '',
+            opportunityScore: '',
+            companyCapabilityScore: '',
+            eligibilityFitScore: '',
+            commercialFitScore: '',
+            deadlineFitScore: '',
+            recommendation: '',
+            documentsAnalyzedCount: '',
+            documentsTotalCount: '',
+            missingDocumentsWarning: '',
+            analyzedAt: '',
+          },
+        },
+        { returnDocument: 'after', upsert: true },
+      ).populate(deepAnalysisPopulateFields);
+
+    return {
+      deepAnalysis: deepAnalysisInProcess,
+      shouldStart: true,
+    };
   }
 
   private async markProcessingAnalysisFailed({
@@ -454,24 +435,54 @@ export class TenderDeepAnalysisService {
       )
       .digest('hex');
   }
-}
 
-function getDeepAnalysisOutputLanguage(
-  analysis: TenderDeepAnalysisRecord,
-): string | undefined {
-  if (analysis.language) {
-    return analysis.language;
+  private async isSourceHashIsOutOfDate(
+    deepAnalysis: TenderDeepAnalysisDocument | TenderDeepAnalysisRecord,
+    companyAnalysis?: { sourceHash?: string } | null,
+  ): Promise<boolean> {
+    const [
+      tenderSourceHash,
+      generalAnalysisSourceHash,
+      companyAnalysisSourceHash,
+    ] = await Promise.all([
+      getTenderSourceHash(deepAnalysis),
+      getGeneralAnalysisSourceHash(deepAnalysis),
+      companyAnalysis?.sourceHash
+        ? companyAnalysis.sourceHash
+        : getCompanyAnalysisSourceHash(deepAnalysis),
+    ]);
+
+    if (
+      !deepAnalysis.sourceHash ||
+      !tenderSourceHash ||
+      !generalAnalysisSourceHash ||
+      !companyAnalysisSourceHash
+    ) {
+      return false;
+    }
+
+    const currentSourceHash = this.buildSourceHash({
+      tenderSourceHash,
+      generalAnalysisSourceHash,
+      companyAnalysisSourceHash,
+      outputLanguage: normalizeDeepAnalysisLanguage(deepAnalysis.language),
+    });
+
+    return deepAnalysis.sourceHash !== currentSourceHash;
   }
 
-  const resultJson = analysis.resultJson as { language?: unknown } | undefined;
+  private async withOutOfDateFlag(
+    deepAnalysis: TenderDeepAnalysisDocument | TenderDeepAnalysisRecord,
+    companyAnalysis?: { sourceHash?: string } | null,
+  ): Promise<TenderDeepAnalysisRecord> {
+    const isOutOfDate = await this.isSourceHashIsOutOfDate(
+      deepAnalysis,
+      companyAnalysis,
+    );
 
-  return typeof resultJson?.language === 'string'
-    ? resultJson.language
-    : undefined;
-}
-
-function normalizeDeepAnalysisLanguage(language?: string): string {
-  const normalized = language?.trim();
-
-  return normalized && normalized.length > 0 ? normalized : 'en';
+    return {
+      ...toRecord(deepAnalysis),
+      isOutOfDate,
+    };
+  }
 }
