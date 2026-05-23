@@ -15,6 +15,7 @@ import { TendersService } from '@/resources/tenders/tenders.service';
 import { TenderListDto } from '@/resources/tenders/dto/tender.dto';
 import { AdminAccessGuard } from '@/guards';
 import fs from 'node:fs';
+import { TariffService } from '@/resources/tariff';
 
 @ApiTags('ted')
 @Controller('ted')
@@ -22,6 +23,7 @@ export class TedSearchController {
   constructor(
     private readonly tedSearchService: TedSearchService,
     private readonly tendersService: TendersService,
+    private readonly tariffService: TariffService,
   ) {}
 
   @UseGuards(AdminAccessGuard)
@@ -37,9 +39,10 @@ export class TedSearchController {
     @Req() req,
     @Body() body: TedTenderSearchRequestDto,
   ): Promise<TedSearchResponse> {
+    const searchBody = await this.applySearchTariffRules(req.user, body);
     const noticeData = await this.tedSearchService.searchTenders({
-      ...body,
-      noticeTypes: body.noticeTypes ?? TENDER_COMPETITION_NOTICE_TYPES,
+      ...searchBody,
+      noticeTypes: searchBody.noticeTypes ?? TENDER_COMPETITION_NOTICE_TYPES,
     });
 
     fs.writeFileSync('notice.json', JSON.stringify(noticeData));
@@ -74,9 +77,10 @@ export class TedSearchController {
     @Req() req,
     @Body() body: TedTenderSearchRequestDto,
   ): Promise<TedSearchResponse> {
+    const searchBody = await this.applySearchTariffRules(req.user, body);
     const noticeData = await this.tedSearchService.searchLocalTenders({
-      ...body,
-      noticeTypes: body.noticeTypes ?? TENDER_COMPETITION_NOTICE_TYPES,
+      ...searchBody,
+      noticeTypes: searchBody.noticeTypes ?? TENDER_COMPETITION_NOTICE_TYPES,
     });
     const localTenders = (noticeData.notices ?? []) as TenderListDto[];
 
@@ -90,6 +94,23 @@ export class TedSearchController {
     return {
       ...noticeData,
       notices: localTenders,
+    };
+  }
+
+  private async applySearchTariffRules(
+    user,
+    body: TedTenderSearchRequestDto,
+  ): Promise<TedTenderSearchRequestDto> {
+    const tariff = await this.tariffService.getUserTariff(user);
+    const maxResultsPerSearch = tariff.rules.search.maxResultsPerSearch;
+
+    if (!maxResultsPerSearch) {
+      return body;
+    }
+
+    return {
+      ...body,
+      limit: Math.min(body.limit ?? maxResultsPerSearch, maxResultsPerSearch),
     };
   }
 }

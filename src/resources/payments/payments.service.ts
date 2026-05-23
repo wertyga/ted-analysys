@@ -87,20 +87,18 @@ export class PaymentsService {
   }
 
   async getActiveEntitlement(user: UserDocument) {
-    const entitlements = await PaymentEntitlementModel.find({
+    const activeEntitlements = await PaymentEntitlementModel.find({
       user: user._id,
       type: 'subscription',
-    }).lean();
+      isCanceled: false,
+      $or: [{ expiration: null }, { expiration: { $gt: new Date() } }],
+    }).sort({ createdAt: -1 });
 
-    try {
-      return getFreemius().entitlement.getActive(entitlements);
-    } catch (error) {
-      if (error.message.includes('Multiple active entitlements found')) {
-        return this.resolveMultipleActiveEntitlements(user);
-      }
-
-      throw error;
+    if (activeEntitlements.length > 1) {
+      return this.resolveMultipleActiveEntitlements(user);
     }
+
+    return activeEntitlements[0] ? filterModel(activeEntitlements[0]) : null;
   }
 
   async getPricing() {
@@ -113,7 +111,7 @@ export class PaymentsService {
     return getFreemius().customerPortal.retrieveDataByEmail({
       email: user.email,
       endpoint,
-      primaryLicenseId: activeEntitlement?.fsLicenseId,
+      primaryLicenseId: activeEntitlement?.licenseId,
       sandbox: isDev,
     });
   }
@@ -158,7 +156,7 @@ export class PaymentsService {
       planId: data.planId,
       quota: data.quota,
       withRecommendation: data.withRecommendation,
-      licenseId: activeEntitlement.fsLicenseId,
+      licenseId: activeEntitlement.licenseId,
     });
   }
 
@@ -169,7 +167,7 @@ export class PaymentsService {
     const freemius = getFreemius();
     const activeEntitlement = await this.getRequiredActiveEntitlement(user);
     const purchase = await freemius.purchase.retrievePurchase(
-      activeEntitlement.fsLicenseId,
+      activeEntitlement.licenseId,
     );
 
     if (!purchase?.subscriptionId) {
@@ -188,7 +186,7 @@ export class PaymentsService {
       throw new BadRequestException('Failed to cancel Freemius subscription');
     }
 
-    await this.syncEntitlementFromLicense(activeEntitlement.fsLicenseId);
+    await this.syncEntitlementFromLicense(activeEntitlement.licenseId);
 
     return result;
   }
@@ -286,9 +284,17 @@ export class PaymentsService {
     const tariffType = await this.getPurchaseTariffType(purchase);
 
     const entitlement = await PaymentEntitlementModel.findOneAndUpdate(
-      { fsLicenseId: purchase.licenseId },
+      { licenseId: purchase.licenseId },
       {
-        ...entitlementRecord,
+        user: entitlementRecord.user,
+        licenseId: entitlementRecord.fsLicenseId,
+        planId: entitlementRecord.fsPlanId,
+        priceId: entitlementRecord.fsPricingId,
+        externalUserId: entitlementRecord.fsUserId,
+        type: entitlementRecord.type,
+        expiration: entitlementRecord.expiration,
+        isCanceled: entitlementRecord.isCanceled,
+        createdAt: entitlementRecord.createdAt,
         ...(tariffType ? { tariffType } : {}),
       },
       { returnDocument: 'after', upsert: true },
@@ -299,7 +305,7 @@ export class PaymentsService {
         {
           user: user._id,
           type: 'subscription',
-          fsLicenseId: { $ne: purchase.licenseId },
+          licenseId: { $ne: purchase.licenseId },
           isCanceled: false,
         },
         { isCanceled: true },
@@ -309,8 +315,8 @@ export class PaymentsService {
     return filterModel(entitlement as PaymentEntitlementDocument);
   }
 
-  private async deleteEntitlement(fsLicenseId: string) {
-    await PaymentEntitlementModel.deleteOne({ fsLicenseId });
+  private async deleteEntitlement(licenseId: string) {
+    await PaymentEntitlementModel.deleteOne({ licenseId });
   }
 
   private async getPurchaseTariffType(

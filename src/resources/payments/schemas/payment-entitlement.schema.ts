@@ -4,10 +4,10 @@ import { TariffType } from '@/resources/tariff/tariff.types';
 
 export interface PaymentEntitlement {
   user: mongoose.Types.ObjectId;
-  fsLicenseId: string;
-  fsPlanId: string;
-  fsPricingId: string;
-  fsUserId: string;
+  licenseId: string;
+  planId: string;
+  priceId: string;
+  externalUserId: string;
   tariffType?: TariffType;
   type: PurchaseEntitlementType;
   expiration: Date | null;
@@ -26,23 +26,23 @@ const PaymentEntitlementSchema = new Schema<PaymentEntitlementDocument>(
       required: true,
       index: true,
     },
-    fsLicenseId: {
+    licenseId: {
       type: String,
       required: true,
       unique: true,
       index: true,
     },
-    fsPlanId: {
+    planId: {
       type: String,
       required: true,
       index: true,
     },
-    fsPricingId: {
+    priceId: {
       type: String,
       required: true,
       index: true,
     },
-    fsUserId: {
+    externalUserId: {
       type: String,
       required: true,
       index: true,
@@ -72,7 +72,7 @@ const PaymentEntitlementSchema = new Schema<PaymentEntitlementDocument>(
     },
   },
   {
-    collection: 'freemius_entitlements',
+    collection: 'payments_entitlements',
     timestamps: true,
   },
 );

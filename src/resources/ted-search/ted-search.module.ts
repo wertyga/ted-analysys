@@ -5,6 +5,7 @@ import { TedSearchController } from './ted-search.controller';
 import { TedSearchService } from './ted-search.service';
 import { TenderWishlistModule } from '@/resources/tender-wishlist/tender-wishlist.module';
 import { CurrencyExchangeRatesModule } from '@/resources/currency-exchange-rates/currency-exchange-rates.module';
+import { TariffModule } from '@/resources/tariff';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { CurrencyExchangeRatesModule } from '@/resources/currency-exchange-rates
     forwardRef(() => TendersModule),
     TenderWishlistModule,
     CurrencyExchangeRatesModule,
+    TariffModule,
   ],
   controllers: [TedSearchController],
   providers: [TedSearchService],
