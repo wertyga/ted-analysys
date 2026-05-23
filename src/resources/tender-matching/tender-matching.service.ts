@@ -41,7 +41,6 @@ import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 import { COMPANY_TENDER_FIT_SYSTEM_PROMPT } from './company-tender-fit.prompt';
 import { UserModel } from '@/resources/user/user.schema';
 
-const RECENT_ACTIVE_TENDERS_LOOKBACK_DAYS = 2;
 const ACTIVE_COMPETITION_TENDERS_MATCH_BATCH_SIZE = 100;
 const COMPANY_PROFILE_REMATCH_DEBOUNCE_MS = gfTime.minute;
 const COMPANY_PROFILE_REMATCH_CONCURRENCY = 5;

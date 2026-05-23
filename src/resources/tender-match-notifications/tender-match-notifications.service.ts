@@ -6,6 +6,7 @@ import { EMAIL_TEMPLATES } from '@/resources/email/type';
 import {
   AiFitDecision,
   AiFitStatus,
+  NotificationStatus,
 } from '@/resources/tender-matching/tender-match.types';
 import {
   TenderCompanyMatchDocument,
@@ -36,7 +37,9 @@ type PopulatedTenderMatch = TenderCompanyMatchDocument & {
 
 @Injectable()
 export class TenderMatchNotificationsService {
-  private readonly nestLogger = new Logger(TenderMatchNotificationsService.name);
+  private readonly nestLogger = new Logger(
+    TenderMatchNotificationsService.name,
+  );
   private isSendingInstantReports = false;
   private isSendingDailyReports = false;
   private isSendingWeeklyReports = false;
@@ -118,10 +121,15 @@ export class TenderMatchNotificationsService {
     }
   }
 
-  private async sendBatchReports(frequency: NotifiableFrequency): Promise<void> {
+  private async sendBatchReports(
+    frequency: NotifiableFrequency,
+  ): Promise<void> {
+    await this.skipMatchesForDisabledNotifications();
+
     const users = await UserModel.find({
-      $or: this.getNotificationDecisionFields()
-        .map((decision) => ({ [`notifications.${decision}`]: frequency })),
+      $or: this.getNotificationDecisionFields().map((decision) => ({
+        [`notifications.${decision}`]: frequency,
+      })),
     })
       .select('email companyName notifications')
       .exec();
@@ -161,6 +169,7 @@ export class TenderMatchNotificationsService {
       company: userId,
       aiFitStatus: AiFitStatus.COMPLETED,
       aiFitDecision: { $in: decisions },
+      notificationStatus: NotificationStatus.NOT_CREATED,
       ...(sentMatchIds.length > 0 ? { _id: { $nin: sentMatchIds } } : {}),
     })
       .sort({ aiFitScore: -1, updatedAt: -1 })
@@ -189,6 +198,7 @@ export class TenderMatchNotificationsService {
     );
 
     await this.createLogs(user, matches, frequency);
+    await this.markMatchesNotificationStatus(matches, NotificationStatus.SENT);
     await logger.info('TENDER_MATCH_NOTIFICATION_SENT', {
       userId: String(user._id),
       frequency,
@@ -220,6 +230,57 @@ export class TenderMatchNotificationsService {
         throw error;
       }
     }
+  }
+
+  private async skipMatchesForDisabledNotifications(): Promise<void> {
+    const users = await UserModel.find({})
+      .select('_id notifications')
+      .lean()
+      .exec();
+
+    for (const user of users) {
+      const disabledDecisions = this.getNotificationDecisionFields().filter(
+        (decision) =>
+          this.isNotificationDisabled(user.notifications?.[decision]),
+      );
+
+      if (disabledDecisions.length === 0) {
+        continue;
+      }
+
+      await TenderCompanyMatchModel.updateMany(
+        {
+          company: user._id,
+          aiFitStatus: AiFitStatus.COMPLETED,
+          aiFitDecision: { $in: disabledDecisions },
+          notificationStatus: NotificationStatus.NOT_CREATED,
+        },
+        { $set: { notificationStatus: NotificationStatus.SKIPPED } },
+      ).exec();
+    }
+  }
+
+  private async markMatchesNotificationStatus(
+    matches: PopulatedTenderMatch[],
+    notificationStatus: NotificationStatus,
+  ): Promise<void> {
+    if (matches.length === 0) {
+      return;
+    }
+
+    await TenderCompanyMatchModel.updateMany(
+      { _id: { $in: matches.map((match) => match._id) } },
+      { $set: { notificationStatus } },
+    ).exec();
+  }
+
+  private isNotificationDisabled(
+    frequency: UserNotificationFrequency | undefined,
+  ): boolean {
+    return (
+      frequency === undefined ||
+      frequency === UserNotificationFrequency.DISABLED
+    );
   }
 
   private getDecisionsForFrequency(
@@ -270,7 +331,8 @@ export class TenderMatchNotificationsService {
         const buyer = tender.buyerName
           ? `<p><strong>Buyer:</strong> ${this.escapeHtml(tender.buyerName)}</p>`
           : '';
-        const deadline = tender.submissionDeadline ?? tender.deadlineReceiptTender;
+        const deadline =
+          tender.submissionDeadline ?? tender.deadlineReceiptTender;
         const deadlineText = deadline
           ? `<p><strong>Deadline:</strong> ${deadline.toISOString().slice(0, 10)}</p>`
           : '';
