@@ -1,12 +1,14 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
 import type { PurchaseEntitlementType } from '@freemius/sdk';
+import { TariffType } from '@/resources/tariff/tariff.types';
 
-export interface FreemiusEntitlement {
+export interface PaymentEntitlement {
   user: mongoose.Types.ObjectId;
   fsLicenseId: string;
   fsPlanId: string;
   fsPricingId: string;
   fsUserId: string;
+  tariffType?: TariffType;
   type: PurchaseEntitlementType;
   expiration: Date | null;
   isCanceled: boolean;
@@ -14,9 +16,9 @@ export interface FreemiusEntitlement {
   updatedAt?: Date;
 }
 
-export type FreemiusEntitlementDocument = FreemiusEntitlement & Document;
+export type PaymentEntitlementDocument = PaymentEntitlement & Document;
 
-const FreemiusEntitlementSchema = new Schema<FreemiusEntitlementDocument>(
+const PaymentEntitlementSchema = new Schema<PaymentEntitlementDocument>(
   {
     user: {
       type: Schema.Types.ObjectId,
@@ -45,6 +47,11 @@ const FreemiusEntitlementSchema = new Schema<FreemiusEntitlementDocument>(
       required: true,
       index: true,
     },
+    tariffType: {
+      type: String,
+      enum: Object.values(TariffType),
+      index: true,
+    },
     type: {
       type: String,
       enum: ['subscription', 'oneoff'],
@@ -70,13 +77,13 @@ const FreemiusEntitlementSchema = new Schema<FreemiusEntitlementDocument>(
   },
 );
 
-FreemiusEntitlementSchema.index({ user: 1, type: 1 });
+PaymentEntitlementSchema.index({ user: 1, type: 1 });
 
-export const FreemiusEntitlementModel: Model<FreemiusEntitlementDocument> =
-  (mongoose.models.FreemiusEntitlement as
-    | Model<FreemiusEntitlementDocument>
+export const PaymentEntitlementModel: Model<PaymentEntitlementDocument> =
+  (mongoose.models.PaymentEntitlement as
+    | Model<PaymentEntitlementDocument>
     | undefined) ??
-  mongoose.model<FreemiusEntitlementDocument>(
-    'FreemiusEntitlement',
-    FreemiusEntitlementSchema,
+  mongoose.model<PaymentEntitlementDocument>(
+    'PaymentEntitlement',
+    PaymentEntitlementSchema,
   );

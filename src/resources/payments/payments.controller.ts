@@ -23,31 +23,31 @@ import type { RawBodyRequest } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthGuard } from '@/guards';
 import { HttpErrorLoggingFilter } from '@/http-logger/HTTPLogger';
-import { FreemiusService } from './freemius.service';
+import { PaymentsService } from './payments.service';
 import {
-  CancelFreemiusSubscriptionDto,
-  ChangeFreemiusSubscriptionDto,
-  CreateFreemiusCheckoutDto,
-  FreemiusCheckoutPurchaseDto,
-  FreemiusCheckoutResponseDto,
-  FreemiusEntitlementResponseDto,
-  FreemiusWebhookResponseDto,
-} from './dto/freemius.dto';
+  CancelPaymentSubscriptionDto,
+  ChangePaymentSubscriptionDto,
+  CreatePaymentCheckoutDto,
+  PaymentCheckoutPurchaseDto,
+  PaymentCheckoutResponseDto,
+  PaymentEntitlementResponseDto,
+  PaymentWebhookResponseDto,
+} from './dto/payments.dto';
 
-@ApiTags('Freemius')
+@ApiTags('Payments')
 @UseFilters(HttpErrorLoggingFilter)
-@Controller('/freemius')
-export class FreemiusController {
-  constructor(private readonly freemiusService: FreemiusService) {}
+@Controller('/payments')
+export class PaymentsController {
+  constructor(private readonly paymentsService: PaymentsService) {}
 
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Create Freemius checkout',
     description:
-      'Creates a checkout for a new purchase. If the user already has an active subscription, use /freemius/subscription/change-checkout instead.',
+      'Creates a checkout for a new purchase. If the user already has an active subscription, use /payments/subscription/change-checkout instead.',
   })
-  @ApiBody({ type: CreateFreemiusCheckoutDto })
-  @ApiOkResponse({ type: FreemiusCheckoutResponseDto })
+  @ApiBody({ type: CreatePaymentCheckoutDto })
+  @ApiOkResponse({ type: PaymentCheckoutResponseDto })
   @ApiBadRequestResponse({
     description:
       'Missing Freemius config, invalid request, or user already has an active subscription.',
@@ -57,8 +57,8 @@ export class FreemiusController {
   })
   @UseGuards(AuthGuard)
   @Post('/checkout')
-  async createCheckout(@Req() req, @Body() body: CreateFreemiusCheckoutDto) {
-    return this.freemiusService.createCheckout(req.user, body ?? {});
+  async createCheckout(@Req() req, @Body() body: CreatePaymentCheckoutDto) {
+    return this.paymentsService.createCheckout(req.user, body ?? {});
   }
 
   @ApiBearerAuth()
@@ -67,7 +67,7 @@ export class FreemiusController {
     description:
       'Returns the active local Freemius subscription entitlement for the authenticated user.',
   })
-  @ApiOkResponse({ type: FreemiusEntitlementResponseDto })
+  @ApiOkResponse({ type: PaymentEntitlementResponseDto })
   @ApiUnauthorizedResponse({
     description: 'Bearer token is missing or invalid.',
   })
@@ -75,7 +75,7 @@ export class FreemiusController {
   @Get('/entitlement')
   async getEntitlement(@Req() req) {
     return {
-      entitlement: await this.freemiusService.getActiveEntitlement(req.user),
+      entitlement: await this.paymentsService.getActiveEntitlement(req.user),
     };
   }
 
@@ -89,7 +89,7 @@ export class FreemiusController {
   })
   @Get('/pricing')
   async getPricing() {
-    return this.freemiusService.getPricing();
+    return this.paymentsService.getPricing();
   }
 
   @ApiBearerAuth()
@@ -108,9 +108,9 @@ export class FreemiusController {
   @UseGuards(AuthGuard)
   @Get('/customer-portal')
   async getCustomerPortal(@Req() req: Request) {
-    return this.freemiusService.getCustomerPortal(
+    return this.paymentsService.getCustomerPortal(
       req.user,
-      this.getRequestUrl(req, '/freemius/customer-portal/action'),
+      this.getRequestUrl(req, '/payments/customer-portal/action'),
     );
   }
 
@@ -128,7 +128,7 @@ export class FreemiusController {
     @Req() req: RawBodyRequest<Request>,
     @Res() res: Response,
   ) {
-    const response = await this.freemiusService.processCustomerPortalAction(
+    const response = await this.paymentsService.processCustomerPortalAction(
       this.createFetchRequest(req),
     );
 
@@ -141,8 +141,8 @@ export class FreemiusController {
     description:
       'Creates an upgrade/downgrade/change checkout for the authenticated user active subscription. Uses the existing Freemius license ID and authorization so Freemius applies upgrade flow/proration.',
   })
-  @ApiBody({ type: ChangeFreemiusSubscriptionDto })
-  @ApiOkResponse({ type: FreemiusCheckoutResponseDto })
+  @ApiBody({ type: ChangePaymentSubscriptionDto })
+  @ApiOkResponse({ type: PaymentCheckoutResponseDto })
   @ApiBadRequestResponse({
     description: 'No active subscription, invalid plan, or Freemius API error.',
   })
@@ -153,9 +153,9 @@ export class FreemiusController {
   @Post('/subscription/change-checkout')
   async createSubscriptionChangeCheckout(
     @Req() req,
-    @Body() body: ChangeFreemiusSubscriptionDto,
+    @Body() body: ChangePaymentSubscriptionDto,
   ) {
-    return this.freemiusService.createSubscriptionChangeCheckout(
+    return this.paymentsService.createSubscriptionChangeCheckout(
       req.user,
       body,
     );
@@ -167,7 +167,7 @@ export class FreemiusController {
     description:
       'Cancels the authenticated user active Freemius subscription through Freemius API and refreshes local entitlement state.',
   })
-  @ApiBody({ type: CancelFreemiusSubscriptionDto })
+  @ApiBody({ type: CancelPaymentSubscriptionDto })
   @ApiOkResponse({
     description: 'Freemius subscription cancellation response.',
   })
@@ -181,9 +181,9 @@ export class FreemiusController {
   @Post('/subscription/cancel')
   async cancelSubscription(
     @Req() req,
-    @Body() body: CancelFreemiusSubscriptionDto,
+    @Body() body: CancelPaymentSubscriptionDto,
   ) {
-    return this.freemiusService.cancelSubscription(req.user, body ?? {});
+    return this.paymentsService.cancelSubscription(req.user, body ?? {});
   }
 
   @ApiOperation({
@@ -191,15 +191,15 @@ export class FreemiusController {
     description:
       'Processes overlay checkout success payload. Backend verifies purchase by license ID via Freemius API before saving entitlement.',
   })
-  @ApiBody({ type: FreemiusCheckoutPurchaseDto })
-  @ApiOkResponse({ type: FreemiusEntitlementResponseDto })
+  @ApiBody({ type: PaymentCheckoutPurchaseDto })
+  @ApiOkResponse({ type: PaymentEntitlementResponseDto })
   @ApiBadRequestResponse({
     description: 'Missing or invalid Freemius license ID.',
   })
   @Post('/purchase')
   async processCheckoutPurchase(@Body() body: unknown) {
     return {
-      entitlement: await this.freemiusService.processCheckoutPurchase(
+      entitlement: await this.paymentsService.processCheckoutPurchase(
         body as never,
       ),
     };
@@ -210,14 +210,14 @@ export class FreemiusController {
     description:
       'Handles Freemius hosted checkout redirect, verifies redirect signature and syncs entitlement.',
   })
-  @ApiOkResponse({ type: FreemiusEntitlementResponseDto })
+  @ApiOkResponse({ type: PaymentEntitlementResponseDto })
   @ApiBadRequestResponse({
     description: 'Invalid redirect signature or missing Freemius license ID.',
   })
   @Get('/process-purchase')
   async processHostedCheckoutRedirect(@Req() req: Request) {
     return {
-      entitlement: await this.freemiusService.processRedirect(
+      entitlement: await this.paymentsService.processRedirect(
         this.getRequestUrl(req),
         process.env.FREEMIUS_PROXY_URL,
       ),
@@ -229,14 +229,14 @@ export class FreemiusController {
     description:
       'Public webhook endpoint for Freemius. Signature is verified with x-signature over raw body. Handles license/subscription events and ignores non-entitlement events.',
   })
-  @ApiOkResponse({ type: FreemiusWebhookResponseDto })
+  @ApiOkResponse({ type: PaymentWebhookResponseDto })
   @ApiBadRequestResponse({ description: 'Malformed webhook payload.' })
   @Post('/webhook')
   async processWebhook(
     @Req() req: RawBodyRequest<Request>,
     @Res() res: Response,
   ) {
-    const result = await this.freemiusService.processWebhook(
+    const result = await this.paymentsService.processWebhook(
       req.headers,
       req.rawBody ?? JSON.stringify(req.body ?? {}),
     );

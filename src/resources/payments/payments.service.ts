@@ -17,14 +17,16 @@ import { UserModel } from '@/resources/user/user.schema';
 import { UserDocument } from '@/resources/user/user.types';
 import { filterModel, isDev } from '@/utils';
 import {
-  FreemiusEntitlementDocument,
-  FreemiusEntitlementModel,
-} from './schemas/freemius-entitlement.schema';
+  PaymentEntitlementDocument,
+  PaymentEntitlementModel,
+} from './schemas/payment-entitlement.schema';
+import { resolveTariffTypeByFreemiusPlanName } from '@/resources/tariff/freemius-tariff';
+import type { TariffType } from '@/resources/tariff/tariff.types';
 import {
-  CancelFreemiusSubscriptionDto,
-  ChangeFreemiusSubscriptionDto,
-  CreateFreemiusCheckoutDto,
-} from './dto/freemius.dto';
+  CancelPaymentSubscriptionDto,
+  ChangePaymentSubscriptionDto,
+  CreatePaymentCheckoutDto,
+} from './dto/payments.dto';
 
 type CheckoutPurchasePayload = {
   purchase?: { license_id?: string };
@@ -32,8 +34,8 @@ type CheckoutPurchasePayload = {
 };
 
 @Injectable()
-export class FreemiusService {
-  async createCheckout(user: UserDocument, data: CreateFreemiusCheckoutDto) {
+export class PaymentsService {
+  async createCheckout(user: UserDocument, data: CreatePaymentCheckoutDto) {
     if (!data.licenseId) {
       const activeEntitlement = await this.getActiveEntitlement(user);
 
@@ -85,7 +87,7 @@ export class FreemiusService {
   }
 
   async getActiveEntitlement(user: UserDocument) {
-    const entitlements = await FreemiusEntitlementModel.find({
+    const entitlements = await PaymentEntitlementModel.find({
       user: user._id,
       type: 'subscription',
     }).lean();
@@ -93,10 +95,7 @@ export class FreemiusService {
     try {
       return getFreemius().entitlement.getActive(entitlements);
     } catch (error) {
-      if (
-        error instanceof Error &&
-        error.message.includes('Multiple active entitlements found')
-      ) {
+      if (error.message.includes('Multiple active entitlements found')) {
         return this.resolveMultipleActiveEntitlements(user);
       }
 
@@ -151,7 +150,7 @@ export class FreemiusService {
 
   async createSubscriptionChangeCheckout(
     user: UserDocument,
-    data: ChangeFreemiusSubscriptionDto,
+    data: ChangePaymentSubscriptionDto,
   ) {
     const activeEntitlement = await this.getRequiredActiveEntitlement(user);
 
@@ -165,7 +164,7 @@ export class FreemiusService {
 
   async cancelSubscription(
     user: UserDocument,
-    data: CancelFreemiusSubscriptionDto,
+    data: CancelPaymentSubscriptionDto,
   ) {
     const freemius = getFreemius();
     const activeEntitlement = await this.getRequiredActiveEntitlement(user);
@@ -234,7 +233,7 @@ export class FreemiusService {
     listener.on(subscriptionEvents, async (event: WebhookEvent) => {
       const data = (event as unknown as { data?: { license_id?: string } })
         .data;
-      console.log({ event: JSON.stringify(event, null, 2) });
+
       const license = event.objects?.license;
       const licenseId = data?.license_id ?? (license && license.id);
 
@@ -284,15 +283,19 @@ export class FreemiusService {
     const entitlementRecord = purchase.toEntitlementRecord({
       user: user._id,
     });
+    const tariffType = await this.getPurchaseTariffType(purchase);
 
-    const entitlement = await FreemiusEntitlementModel.findOneAndUpdate(
+    const entitlement = await PaymentEntitlementModel.findOneAndUpdate(
       { fsLicenseId: purchase.licenseId },
-      entitlementRecord,
+      {
+        ...entitlementRecord,
+        ...(tariffType ? { tariffType } : {}),
+      },
       { returnDocument: 'after', upsert: true },
     );
 
     if (purchase.isActive && purchase.isSubscription()) {
-      await FreemiusEntitlementModel.updateMany(
+      await PaymentEntitlementModel.updateMany(
         {
           user: user._id,
           type: 'subscription',
@@ -303,11 +306,23 @@ export class FreemiusService {
       );
     }
 
-    return filterModel(entitlement as FreemiusEntitlementDocument);
+    return filterModel(entitlement as PaymentEntitlementDocument);
   }
 
   private async deleteEntitlement(fsLicenseId: string) {
-    await FreemiusEntitlementModel.deleteOne({ fsLicenseId });
+    await PaymentEntitlementModel.deleteOne({ fsLicenseId });
+  }
+
+  private async getPurchaseTariffType(
+    purchase: PurchaseInfo,
+  ): Promise<TariffType | undefined> {
+    const pricing = await getFreemius().pricing.retrieve();
+
+    const plan = pricing.plans?.find(
+      (item) => String(item.id) === String(purchase.planId),
+    );
+
+    return resolveTariffTypeByFreemiusPlanName(plan?.name);
   }
 
   private async getRequiredActiveEntitlement(user: UserDocument) {
@@ -328,7 +343,7 @@ export class FreemiusService {
   }
 
   private async resolveMultipleActiveEntitlements(user: UserDocument) {
-    const activeEntitlements = await FreemiusEntitlementModel.find({
+    const activeEntitlements = await PaymentEntitlementModel.find({
       user: user._id,
       type: 'subscription',
       isCanceled: false,
@@ -342,7 +357,7 @@ export class FreemiusService {
     }
 
     if (staleEntitlements.length) {
-      await FreemiusEntitlementModel.updateMany(
+      await PaymentEntitlementModel.updateMany(
         {
           _id: { $in: staleEntitlements.map((entitlement) => entitlement._id) },
         },
