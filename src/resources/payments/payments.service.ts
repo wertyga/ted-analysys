@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -21,7 +22,8 @@ import {
   PaymentEntitlementModel,
 } from './schemas/payment-entitlement.schema';
 import { resolveTariffTypeByFreemiusPlanName } from '@/resources/tariff/freemius-tariff';
-import type { TariffType } from '@/resources/tariff/tariff.types';
+import { TariffType } from '@/resources/tariff/tariff.types';
+import { TARIFF_RANK } from '@/resources/tariff/tariff-rules';
 import {
   CancelPaymentSubscriptionDto,
   ChangePaymentSubscriptionDto,
@@ -33,19 +35,62 @@ type CheckoutPurchasePayload = {
   trial?: { license_id?: string };
 };
 
+type ActivePaymentEntitlement = Record<string, any> & {
+  _id: unknown;
+  licenseId: string;
+  planId: string;
+  tariffType?: TariffType | null;
+  isCanceled?: boolean;
+  expiration?: Date | null;
+};
+
+type FreemiusCheckoutData = CreatePaymentCheckoutDto & {
+  licenseId?: string;
+};
+
 @Injectable()
 export class PaymentsService {
   async createCheckout(user: UserDocument, data: CreatePaymentCheckoutDto) {
-    if (!data.licenseId) {
-      const activeEntitlement = await this.getActiveEntitlement(user);
+    const activeEntitlement = await this.getActiveEntitlement(user);
 
-      if (activeEntitlement) {
-        throw new BadRequestException(
-          'User already has an active Freemius subscription. Use subscription/change-checkout to change it.',
-        );
-      }
+    if (!activeEntitlement) {
+      return this.createNewSubscriptionCheckout(user, data);
     }
 
+    if (!data.planId) {
+      return this.rejectActiveSubscriptionPurchase();
+    }
+
+    return this.createSubscriptionChangeCheckout(user, {
+      planId: data.planId,
+      quota: data.quota,
+      withRecommendation: data.withRecommendation,
+    });
+  }
+
+  async createNewSubscriptionCheckout(
+    user: UserDocument,
+    data: CreatePaymentCheckoutDto,
+  ) {
+    const activeEntitlement = await this.getActiveEntitlement(user);
+
+    if (activeEntitlement) {
+      return this.rejectActiveSubscriptionPurchase();
+    }
+
+    return this.createFreemiusCheckout(user, data);
+  }
+
+  rejectActiveSubscriptionPurchase(): never {
+    throw new ConflictException(
+      'User already has an active subscription for the current paid period.',
+    );
+  }
+
+  private async createFreemiusCheckout(
+    user: UserDocument,
+    data: FreemiusCheckoutData,
+  ) {
     const freemius = getFreemius();
     const checkout = await freemius.checkout.create({
       user: {
@@ -86,11 +131,12 @@ export class PaymentsService {
     return this.syncEntitlementFromRedirect(redirectInfo);
   }
 
-  async getActiveEntitlement(user: UserDocument) {
+  async getActiveEntitlement(
+    user: UserDocument,
+  ): Promise<ActivePaymentEntitlement | undefined> {
     const activeEntitlements = await PaymentEntitlementModel.find({
       user: user._id,
       type: 'subscription',
-      isCanceled: false,
       $or: [{ expiration: null }, { expiration: { $gt: new Date() } }],
     }).sort({ createdAt: -1 });
 
@@ -98,7 +144,7 @@ export class PaymentsService {
       return this.resolveMultipleActiveEntitlements(user);
     }
 
-    return activeEntitlements[0] ? filterModel(activeEntitlements[0]) : null;
+    return activeEntitlements[0];
   }
 
   async getPricing() {
@@ -151,8 +197,92 @@ export class PaymentsService {
     data: ChangePaymentSubscriptionDto,
   ) {
     const activeEntitlement = await this.getRequiredActiveEntitlement(user);
+    const targetTariffType = await this.getTariffTypeByPlanId(data.planId);
+    const currentTariffType =
+      await this.getEntitlementTariffType(activeEntitlement);
 
-    return this.createCheckout(user, {
+    if (targetTariffType === currentTariffType) {
+      if (activeEntitlement.isCanceled) {
+        return this.reactivateCanceledSubscription(user, data);
+      }
+
+      return this.rejectActiveSubscriptionPurchase();
+    }
+
+    if (this.isTariffUpgrade(currentTariffType, targetTariffType)) {
+      return this.createSubscriptionUpgradeCheckout(user, data);
+    }
+
+    return this.createSubscriptionDowngradeCheckout(user, data);
+  }
+
+  async reactivateCanceledSubscription(
+    user: UserDocument,
+    data: ChangePaymentSubscriptionDto,
+  ) {
+    const activeEntitlement = await this.getRequiredActiveEntitlement(user);
+
+    if (!activeEntitlement.isCanceled) {
+      return this.rejectActiveSubscriptionPurchase();
+    }
+
+    const targetTariffType = await this.getTariffTypeByPlanId(data.planId);
+    const currentTariffType =
+      await this.getEntitlementTariffType(activeEntitlement);
+
+    if (targetTariffType !== currentTariffType) {
+      throw new BadRequestException(
+        'Reactivation is only available for the same subscription plan.',
+      );
+    }
+
+    return this.createFreemiusCheckout(user, {
+      planId: data.planId,
+      quota: data.quota,
+      withRecommendation: data.withRecommendation,
+      licenseId: activeEntitlement.licenseId,
+    });
+  }
+
+  async createSubscriptionUpgradeCheckout(
+    user: UserDocument,
+    data: ChangePaymentSubscriptionDto,
+  ) {
+    const activeEntitlement = await this.getRequiredActiveEntitlement(user);
+    const targetTariffType = await this.getTariffTypeByPlanId(data.planId);
+    const currentTariffType =
+      await this.getEntitlementTariffType(activeEntitlement);
+
+    if (!this.isTariffUpgrade(currentTariffType, targetTariffType)) {
+      throw new BadRequestException(
+        'Target subscription plan is not higher than the current plan.',
+      );
+    }
+
+    return this.createFreemiusCheckout(user, {
+      planId: data.planId,
+      quota: data.quota,
+      withRecommendation: data.withRecommendation,
+      licenseId: activeEntitlement.licenseId,
+    });
+  }
+
+  async createSubscriptionDowngradeCheckout(
+    user: UserDocument,
+    data: ChangePaymentSubscriptionDto,
+  ) {
+    const activeEntitlement = await this.getRequiredActiveEntitlement(user);
+    const targetTariffType = await this.getTariffTypeByPlanId(data.planId);
+    const currentTariffType =
+      await this.getEntitlementTariffType(activeEntitlement);
+
+    if (!this.isTariffDowngrade(currentTariffType, targetTariffType)) {
+      throw new BadRequestException(
+        'Target subscription plan is not lower than the current plan.',
+      );
+    }
+
+    return this.createFreemiusCheckout(user, {
       planId: data.planId,
       quota: data.quota,
       withRecommendation: data.withRecommendation,
@@ -331,6 +461,40 @@ export class PaymentsService {
     return resolveTariffTypeByFreemiusPlanName(plan?.name);
   }
 
+  private async getTariffTypeByPlanId(planId: string): Promise<TariffType> {
+    const pricing = await getFreemius().pricing.retrieve();
+    const plan = pricing.plans?.find((item) => String(item.id) === planId);
+    const tariffType = resolveTariffTypeByFreemiusPlanName(plan?.name);
+
+    if (tariffType === TariffType.FREE) {
+      throw new BadRequestException('Unknown or unsupported paid plan.');
+    }
+
+    return tariffType;
+  }
+
+  private async getEntitlementTariffType(
+    entitlement: ActivePaymentEntitlement,
+  ): Promise<TariffType> {
+    return entitlement.tariffType && entitlement.tariffType !== TariffType.FREE
+      ? entitlement.tariffType
+      : this.getTariffTypeByPlanId(entitlement.planId);
+  }
+
+  private isTariffUpgrade(
+    currentTariffType: TariffType,
+    targetTariffType: TariffType,
+  ): boolean {
+    return TARIFF_RANK[targetTariffType] > TARIFF_RANK[currentTariffType];
+  }
+
+  private isTariffDowngrade(
+    currentTariffType: TariffType,
+    targetTariffType: TariffType,
+  ): boolean {
+    return TARIFF_RANK[targetTariffType] < TARIFF_RANK[currentTariffType];
+  }
+
   private async getRequiredActiveEntitlement(user: UserDocument) {
     const activeEntitlement = await this.getActiveEntitlement(user);
 
@@ -352,7 +516,6 @@ export class PaymentsService {
     const activeEntitlements = await PaymentEntitlementModel.find({
       user: user._id,
       type: 'subscription',
-      isCanceled: false,
       $or: [{ expiration: null }, { expiration: { $gt: new Date() } }],
     }).sort({ createdAt: -1 });
 

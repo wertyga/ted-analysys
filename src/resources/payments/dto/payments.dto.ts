@@ -19,15 +19,6 @@ export class CreatePaymentCheckoutDto {
 
   @ApiPropertyOptional({
     description:
-      'Existing Freemius license ID. Used only for upgrade/downgrade/change checkout flows.',
-    example: '67890',
-  })
-  @IsOptional()
-  @IsString()
-  licenseId?: string;
-
-  @ApiPropertyOptional({
-    description:
       'Optional checkout quota/units for products using unit pricing.',
     example: 1,
   })

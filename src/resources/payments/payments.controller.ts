@@ -26,7 +26,6 @@ import { HttpErrorLoggingFilter } from '@/http-logger/HTTPLogger';
 import { PaymentsService } from './payments.service';
 import {
   CancelPaymentSubscriptionDto,
-  ChangePaymentSubscriptionDto,
   CreatePaymentCheckoutDto,
   PaymentCheckoutPurchaseDto,
   PaymentCheckoutResponseDto,
@@ -44,7 +43,7 @@ export class PaymentsController {
   @ApiOperation({
     summary: 'Create Freemius checkout',
     description:
-      'Creates a checkout for a new purchase. If the user already has an active subscription, use /payments/subscription/change-checkout instead.',
+      'Creates the correct Freemius overlay checkout for a new subscription, reactivation, upgrade, or downgrade.',
   })
   @ApiBody({ type: CreatePaymentCheckoutDto })
   @ApiOkResponse({ type: PaymentCheckoutResponseDto })
@@ -133,32 +132,6 @@ export class PaymentsController {
     );
 
     return this.sendFetchResponse(res, response);
-  }
-
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'Create checkout for subscription change',
-    description:
-      'Creates an upgrade/downgrade/change checkout for the authenticated user active subscription. Uses the existing Freemius license ID and authorization so Freemius applies upgrade flow/proration.',
-  })
-  @ApiBody({ type: ChangePaymentSubscriptionDto })
-  @ApiOkResponse({ type: PaymentCheckoutResponseDto })
-  @ApiBadRequestResponse({
-    description: 'No active subscription, invalid plan, or Freemius API error.',
-  })
-  @ApiUnauthorizedResponse({
-    description: 'Bearer token is missing or invalid.',
-  })
-  @UseGuards(AuthGuard)
-  @Post('/subscription/change-checkout')
-  async createSubscriptionChangeCheckout(
-    @Req() req,
-    @Body() body: ChangePaymentSubscriptionDto,
-  ) {
-    return this.paymentsService.createSubscriptionChangeCheckout(
-      req.user,
-      body,
-    );
   }
 
   @ApiBearerAuth()
