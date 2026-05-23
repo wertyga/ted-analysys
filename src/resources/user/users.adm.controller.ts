@@ -25,7 +25,9 @@ export class UsersAdmController {
     const { users, total } = await this.userService.getUsersList(query);
 
     return {
-      users: users.map((user) => UserModel.serializeUser(user)),
+      users: users.map((user) =>
+        UserModel.serializeUser(user, true, undefined, true),
+      ),
       total,
     };
   }
@@ -33,6 +35,6 @@ export class UsersAdmController {
   @ApiDefaultResponse({ description: 'Current admin user.' })
   @Get('/self')
   async getSelfUser(@Req() req) {
-    return UserModel.serializeUser(req.user);
+    return UserModel.serializeUser(req.use);
   }
 }

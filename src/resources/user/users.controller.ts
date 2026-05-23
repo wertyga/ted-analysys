@@ -6,7 +6,7 @@ import {
   Req,
   UseFilters,
   UseGuards,
-  Headers,
+  Query,
 } from '@nestjs/common';
 import { AuthGuard } from '@/guards';
 import {
@@ -17,14 +17,13 @@ import {
 } from './user.dto';
 import { UsersService } from './users.service';
 import { UserModel } from './user.schema';
-import { filterModel } from '@/utils';
 
 import { HttpErrorLoggingFilter } from '@/http-logger/HTTPLogger';
-import { UserDocument } from '@/resources/user/user.types';
 import {
   ApiBearerAuth,
   ApiBody,
   ApiDefaultResponse,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { TenderWishlistService } from '@/resources/tender-wishlist/tender-wishlist.service';
@@ -82,8 +81,16 @@ export class UsersController {
 
   @ApiBearerAuth()
   @ApiDefaultResponse({ type: UserAuthDto })
+  @ApiQuery({
+    name: 'withDescription',
+    required: false,
+    type: Boolean,
+  })
   @Get('/self')
-  async getSelfUser(@Req() req, @Headers() headers: Record<string, string>) {
+  async getSelfUser(
+    @Req() req,
+    @Query('withDescription') withDescription?: string,
+  ) {
     if (!req.user) {
       return null;
     }
@@ -91,7 +98,15 @@ export class UsersController {
     const user = await this.usersService.getUser(req.user._id.toString());
 
     return {
-      user: UserModel.serializeUser(user as UserDocument),
+      user: UserModel.serializeUser(
+        user,
+        false,
+        Boolean(withDescription)
+          ? undefined
+          : {
+              excludeFields: ['companyDescription'],
+            },
+      ),
     };
   }
 }

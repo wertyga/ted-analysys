@@ -247,26 +247,6 @@ export function getOptionalNonNegativeNumber(
   return Math.round(value);
 }
 
-export function setIfPresent(
-  target: Record<string, unknown>,
-  key: string,
-  value: unknown,
-): void {
-  if (value !== undefined && value !== null && value !== '') {
-    target[key] = value;
-  }
-}
-
-export function setArrayIfPresent(
-  target: Record<string, unknown>,
-  key: string,
-  value: unknown[] | undefined,
-): void {
-  if (value && value.length > 0) {
-    target[key] = value;
-  }
-}
-
 export function getBoolean(
   record: Record<string, unknown>,
   key: string,

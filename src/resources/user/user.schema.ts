@@ -112,7 +112,7 @@ export const UserSchema = new Schema<UserType>(
 );
 
 function serializeUser(
-  user?: UserDocument,
+  user?: UserDocument | null,
   guest?: boolean,
   options?: TSerializeOptions<UserDocument>,
   isAdminFetch?: boolean,
@@ -121,18 +121,21 @@ function serializeUser(
     return null;
   }
 
-  const {
-    hashPassword,
-    updatedAt,
-    recoveryToken,
-    tempEmail,
-    status,
-    oauthId,
-    ...rest
-  } = filterModel(user, options);
+  const userFields = filterModel(user, {
+    excludeFields: [
+      'hashPassword',
+      'updatedAt',
+      'recoveryToken',
+      'tempEmail',
+      'status',
+      'oauthId',
+      ...(options?.excludeFields ?? []),
+    ],
+    includeFields: options?.includeFields,
+  });
 
   const result = {
-    ...rest,
+    ...userFields,
   };
 
   if (guest) {
@@ -140,7 +143,7 @@ function serializeUser(
   }
 
   if (isAdminFetch) {
-    result.status = status;
+    result.status = user.status;
   }
 
   return result;
@@ -153,6 +156,7 @@ UserSchema.virtual('password').set(function (password) {
   this.hashPassword = generateHash(password);
 });
 
+UserSchema.statics.serializeUser = serializeUser;
 UserSchema.statics.serializeUser = serializeUser;
 
 UserSchema.statics.serializeListUser = function (user: UserDocument) {

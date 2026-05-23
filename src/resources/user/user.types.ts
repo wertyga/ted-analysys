@@ -61,7 +61,7 @@ export type TUser = {
 
 export interface UserMethods extends Model<UserDocument> {
   serializeUser: (
-    user?: UserDocument,
+    user?: UserDocument | null,
     guest?: boolean,
     options?: TSerializeOptions,
     isAdminFetch?: boolean,
