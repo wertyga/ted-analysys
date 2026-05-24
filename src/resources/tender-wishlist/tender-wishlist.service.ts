@@ -1,15 +1,26 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { TenderDocument } from '@/resources/tenders/schemas';
 import { getPaginationMeta, isDuplicateKeyError } from '@/utils';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { TenderWishlistItemModel } from './schemas';
 import { UserDocument } from '@/resources/user/user.types';
+import { TariffService } from '@/resources/tariff';
 
 @Injectable()
 export class TenderWishlistService {
-  constructor(private readonly tendersService: TendersService) {}
+  constructor(
+    private readonly tendersService: TendersService,
+    private readonly tariffService: TariffService,
+  ) {}
 
   async addTender(user: UserDocument, tenderId: string) {
+    await this.canAddTenderGuard(user, tenderId);
+
     const tender = await this.findOrFetchTender(tenderId);
 
     try {
@@ -109,5 +120,41 @@ export class TenderWishlistService {
 
   async countUserTenders(user: UserDocument) {
     return TenderWishlistItemModel.countDocuments({ user: user._id }).exec();
+  }
+
+  private async canAddTenderGuard(
+    user: UserDocument,
+    tenderId: string,
+  ): Promise<void> {
+    const tariff = await this.tariffService.getUserTariff(user);
+    const rule = tariff.rules.wishlist;
+
+    if (!rule.enabled) {
+      throw new ForbiddenException('Wishlist is not available for this tariff');
+    }
+
+    if (!rule.maxItems) {
+      return;
+    }
+
+    const existingItem = await TenderWishlistItemModel.findOne({
+      user: user._id,
+      tenderId,
+    })
+      .select('_id')
+      .lean()
+      .exec();
+
+    if (existingItem) {
+      return;
+    }
+
+    const currentCount = await this.countUserTenders(user);
+
+    if (currentCount >= rule.maxItems) {
+      throw new ConflictException(
+        `Wishlist limit reached for this tariff: ${rule.maxItems}`,
+      );
+    }
   }
 }

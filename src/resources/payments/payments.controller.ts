@@ -1,9 +1,9 @@
 import {
-  All,
   Body,
   Controller,
   Get,
   Post,
+  Query,
   Req,
   Res,
   UseFilters,
@@ -15,7 +15,6 @@ import {
   ApiBody,
   ApiOkResponse,
   ApiOperation,
-  ApiDefaultResponse,
   ApiUnauthorizedResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -27,17 +26,23 @@ import { PaymentsService } from './payments.service';
 import {
   CancelPaymentSubscriptionDto,
   CreatePaymentCheckoutDto,
+  GetPaymentListDto,
   PaymentCheckoutPurchaseDto,
   PaymentCheckoutResponseDto,
   PaymentEntitlementResponseDto,
+  PaymentListResponseDto,
   PaymentWebhookResponseDto,
 } from './dto/payments.dto';
+import { PaymentsWebhookService } from '@/resources/payments/payments.webhook.service';
 
 @ApiTags('Payments')
 @UseFilters(HttpErrorLoggingFilter)
 @Controller('/payments')
 export class PaymentsController {
-  constructor(private readonly paymentsService: PaymentsService) {}
+  constructor(
+    private readonly paymentsService: PaymentsService,
+    private paymentsWebhookService: PaymentsWebhookService,
+  ) {}
 
   @ApiBearerAuth()
   @ApiOperation({
@@ -57,7 +62,26 @@ export class PaymentsController {
   @UseGuards(AuthGuard)
   @Post('/checkout')
   async createCheckout(@Req() req, @Body() body: CreatePaymentCheckoutDto) {
-    return this.paymentsService.createCheckout(req.user, body ?? {});
+    const checkout = await this.paymentsService.createCheckout(req.user, body);
+
+    return checkout;
+  }
+
+  @ApiOperation({
+    summary: 'Process Freemius checkout purchase callback',
+    description:
+      'Processes overlay checkout success payload. Backend verifies purchase by license ID via Freemius API before saving entitlement.',
+  })
+  @ApiBody({ type: PaymentCheckoutPurchaseDto })
+  @ApiOkResponse({ type: PaymentEntitlementResponseDto })
+  @ApiBadRequestResponse({
+    description: 'Missing or invalid Freemius license ID.',
+  })
+  @Get('/purchase')
+  async processCheckoutPurchase(@Query('licenseId') licenseId: string) {
+    return {
+      entitlement: await this.paymentsService.getCheckout(licenseId),
+    };
   }
 
   @ApiBearerAuth()
@@ -74,7 +98,7 @@ export class PaymentsController {
   @Get('/entitlement')
   async getEntitlement(@Req() req) {
     return {
-      entitlement: await this.paymentsService.getActiveEntitlement(req.user),
+      entitlement: await this.paymentsService.getUserEntitlement(req.user),
     };
   }
 
@@ -88,50 +112,25 @@ export class PaymentsController {
   })
   @Get('/pricing')
   async getPricing() {
-    return this.paymentsService.getPricing();
+    return this.paymentsService.getPricingList();
   }
 
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Get Freemius customer portal data',
+    summary: 'List Freemius payments',
     description:
-      'Returns Customer Portal data for the authenticated user: subscriptions, plans, payments, billing and signed action URLs.',
+      'Returns the authenticated user payment history directly from Freemius.',
   })
-  @ApiOkResponse({
-    description:
-      'Freemius Customer Portal data. Shape is owned by Freemius SDK.',
-  })
+  @ApiOkResponse({ type: PaymentListResponseDto })
   @ApiUnauthorizedResponse({
     description: 'Bearer token is missing or invalid.',
   })
   @UseGuards(AuthGuard)
-  @Get('/customer-portal')
-  async getCustomerPortal(@Req() req: Request) {
-    return this.paymentsService.getCustomerPortal(
-      req.user,
-      this.getRequestUrl(req, '/payments/customer-portal/action'),
-    );
-  }
-
-  @ApiOperation({
-    summary: 'Process Freemius customer portal signed action',
-    description:
-      'Public signed-action endpoint used by Freemius Customer Portal URLs for billing, invoices, cancellation coupon, cancellation and restore purchase actions.',
-  })
-  @ApiDefaultResponse({
-    description:
-      'Proxies the Response returned by Freemius SDK action processor.',
-  })
-  @All('/customer-portal/action')
-  async processCustomerPortalAction(
-    @Req() req: RawBodyRequest<Request>,
-    @Res() res: Response,
-  ) {
-    const response = await this.paymentsService.processCustomerPortalAction(
-      this.createFetchRequest(req),
-    );
-
-    return this.sendFetchResponse(res, response);
+  @Get('/list')
+  async getPayments(@Req() req, @Query() query: GetPaymentListDto) {
+    return {
+      payments: await this.paymentsService.getPayments(req.user, query),
+    };
   }
 
   @ApiBearerAuth()
@@ -152,49 +151,8 @@ export class PaymentsController {
   })
   @UseGuards(AuthGuard)
   @Post('/subscription/cancel')
-  async cancelSubscription(
-    @Req() req,
-    @Body() body: CancelPaymentSubscriptionDto,
-  ) {
-    return this.paymentsService.cancelSubscription(req.user, body ?? {});
-  }
-
-  @ApiOperation({
-    summary: 'Process Freemius checkout purchase callback',
-    description:
-      'Processes overlay checkout success payload. Backend verifies purchase by license ID via Freemius API before saving entitlement.',
-  })
-  @ApiBody({ type: PaymentCheckoutPurchaseDto })
-  @ApiOkResponse({ type: PaymentEntitlementResponseDto })
-  @ApiBadRequestResponse({
-    description: 'Missing or invalid Freemius license ID.',
-  })
-  @Post('/purchase')
-  async processCheckoutPurchase(@Body() body: unknown) {
-    return {
-      entitlement: await this.paymentsService.processCheckoutPurchase(
-        body as never,
-      ),
-    };
-  }
-
-  @ApiOperation({
-    summary: 'Process hosted checkout redirect',
-    description:
-      'Handles Freemius hosted checkout redirect, verifies redirect signature and syncs entitlement.',
-  })
-  @ApiOkResponse({ type: PaymentEntitlementResponseDto })
-  @ApiBadRequestResponse({
-    description: 'Invalid redirect signature or missing Freemius license ID.',
-  })
-  @Get('/process-purchase')
-  async processHostedCheckoutRedirect(@Req() req: Request) {
-    return {
-      entitlement: await this.paymentsService.processRedirect(
-        this.getRequestUrl(req),
-        process.env.FREEMIUS_PROXY_URL,
-      ),
-    };
+  async cancelSubscription(@Req() req) {
+    return this.paymentsService.cancelSubscription(req.user);
   }
 
   @ApiOperation({
@@ -209,75 +167,11 @@ export class PaymentsController {
     @Req() req: RawBodyRequest<Request>,
     @Res() res: Response,
   ) {
-    const result = await this.paymentsService.processWebhook(
+    const result = await this.paymentsWebhookService.processWebhook(
       req.headers,
       req.rawBody ?? JSON.stringify(req.body ?? {}),
     );
 
-    console.log({ result });
-
     return res.status(result.status).json(result);
-  }
-
-  private getRequestUrl(req: Request, pathname?: string) {
-    const protocol =
-      this.getForwardedHeader(req, 'x-forwarded-proto') ?? req.protocol;
-    const host =
-      this.getForwardedHeader(req, 'x-forwarded-host') ?? req.get('host');
-
-    return `${protocol}://${host}${pathname ?? req.originalUrl}`;
-  }
-
-  private getForwardedHeader(req: Request, header: string) {
-    const value = req.headers[header];
-
-    if (Array.isArray(value)) {
-      return value[0];
-    }
-
-    return value?.split(',')[0]?.trim();
-  }
-
-  private createFetchRequest(req: RawBodyRequest<Request>) {
-    const body =
-      req.method === 'GET' || req.method === 'HEAD'
-        ? undefined
-        : (req.rawBody ?? JSON.stringify(req.body ?? {}));
-
-    return new Request(this.getRequestUrl(req), {
-      method: req.method,
-      headers: this.createFetchHeaders(req),
-      body: Buffer.isBuffer(body) ? body.toString('utf8') : body,
-    });
-  }
-
-  private createFetchHeaders(req: Request) {
-    const headers = new Headers();
-
-    Object.entries(req.headers).forEach(([key, value]) => {
-      if (Array.isArray(value)) {
-        value.forEach((item) => headers.append(key, item));
-        return;
-      }
-
-      if (value) {
-        headers.set(key, value);
-      }
-    });
-
-    return headers;
-  }
-
-  private async sendFetchResponse(
-    res: Response,
-    response: globalThis.Response,
-  ) {
-    response.headers.forEach((value, key) => {
-      res.setHeader(key, value);
-    });
-
-    const body = Buffer.from(await response.arrayBuffer());
-
-    return res.status(response.status).send(body);
   }
 }

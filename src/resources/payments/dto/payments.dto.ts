@@ -1,10 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
+  IsInt,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
+  Max,
+  Min,
 } from 'class-validator';
 
 export class CreatePaymentCheckoutDto {
@@ -13,26 +18,9 @@ export class CreatePaymentCheckoutDto {
       'Freemius plan ID to preselect in checkout. Omit it to use the default paid plan.',
     example: '12345',
   })
-  @IsOptional()
   @IsString()
-  planId?: string;
-
-  @ApiPropertyOptional({
-    description:
-      'Optional checkout quota/units for products using unit pricing.',
-    example: 1,
-  })
-  @IsOptional()
-  @IsNumber()
-  quota?: number;
-
-  @ApiPropertyOptional({
-    description: 'Whether Freemius should include its recommended option.',
-    default: true,
-  })
-  @IsOptional()
-  @IsBoolean()
-  withRecommendation?: boolean;
+  @IsNotEmpty()
+  planId: string;
 }
 
 export class ChangePaymentSubscriptionDto {
@@ -103,6 +91,40 @@ export class PaymentEntitlementResponseDto {
     nullable: true,
   })
   entitlement: Record<string, unknown> | null;
+}
+
+export class GetPaymentListDto {
+  @ApiPropertyOptional({
+    description: 'Number of Freemius payments to return.',
+    example: 20,
+    default: 20,
+    maximum: 50,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  @Transform(({ value }) => Number(value))
+  count: number = 20;
+
+  @ApiPropertyOptional({
+    description: 'Freemius payments offset.',
+    example: 0,
+    default: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Transform(({ value }) => Number(value))
+  offset: number = 0;
+}
+
+export class PaymentListResponseDto {
+  @ApiProperty({
+    description: 'Freemius payments for the authenticated user.',
+    type: [Object],
+  })
+  payments: Record<string, unknown>[];
 }
 
 export class PaymentWebhookResponseDto {

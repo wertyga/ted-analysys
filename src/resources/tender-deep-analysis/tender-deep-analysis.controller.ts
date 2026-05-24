@@ -16,12 +16,12 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import { AuthGuard } from '@/guards';
+import { AuthGuard, TariffProGuard } from '@/guards';
 import { TenderDeepAnalysisService } from './tender-deep-analysis.service';
 import { TenderDeepAnalysisModel } from './schemas';
 
 @ApiTags('deep-analysis')
-@UseGuards(AuthGuard)
+@UseGuards(TariffProGuard)
 @Controller('tenders/:tenderId/deep-analysis')
 export class TenderDeepAnalysisController {
   constructor(
@@ -51,7 +51,7 @@ export class TenderDeepAnalysisController {
 }
 
 @ApiTags('deep-analysis')
-@UseGuards(AuthGuard)
+@UseGuards(TariffProGuard)
 @Controller('deep-analysis')
 export class UserTenderDeepAnalysisController {
   constructor(

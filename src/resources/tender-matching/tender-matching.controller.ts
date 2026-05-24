@@ -1,4 +1,11 @@
-import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  ForbiddenException,
+  Get,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOkResponse,
@@ -8,13 +15,17 @@ import {
 import { AuthGuard } from '@/guards';
 import { TenderMatchingService } from './tender-matching.service';
 import { TenderCompanyMatchModel } from '@/resources/tender-matching/schemas/tender-company-match.schema';
+import { TariffService } from '@/resources/tariff';
 
 @ApiTags('tender-matching')
 @ApiBearerAuth()
 @UseGuards(AuthGuard)
 @Controller('tender-matching')
 export class TenderMatchingController {
-  constructor(private readonly tenderMatchingService: TenderMatchingService) {}
+  constructor(
+    private readonly tenderMatchingService: TenderMatchingService,
+    private readonly tariffService: TariffService,
+  ) {}
 
   @Get('ai-fit')
   @ApiOperation({
@@ -29,6 +40,14 @@ export class TenderMatchingController {
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',
   ) {
+    const tariff = await this.tariffService.getUserTariff(req.user);
+
+    if (!tariff.rules.tenderMatching.enabled) {
+      throw new ForbiddenException(
+        'Tender matching is not available for this tariff',
+      );
+    }
+
     const { items, ...rest } =
       await this.tenderMatchingService.findCompletedAiFitMatchesForUser(
         req.user._id,

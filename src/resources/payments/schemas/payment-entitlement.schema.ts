@@ -7,6 +7,7 @@ export interface PaymentEntitlement {
   licenseId: string;
   planId: string;
   priceId: string;
+  subscriptionId: string;
   externalUserId: string;
   tariffType?: TariffType;
   type: PurchaseEntitlementType;
@@ -42,6 +43,11 @@ const PaymentEntitlementSchema = new Schema<PaymentEntitlementDocument>(
       required: true,
       index: true,
     },
+    subscriptionId: {
+      type: String,
+      required: true,
+      index: true,
+    },
     externalUserId: {
       type: String,
       required: true,
@@ -49,7 +55,7 @@ const PaymentEntitlementSchema = new Schema<PaymentEntitlementDocument>(
     },
     tariffType: {
       type: String,
-      enum: Object.values(TariffType),
+      enum: TariffType,
       index: true,
     },
     type: {

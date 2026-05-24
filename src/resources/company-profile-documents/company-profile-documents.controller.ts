@@ -2,7 +2,6 @@ import {
   BadRequestException,
   Controller,
   Post,
-  Req,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
@@ -16,13 +15,13 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { AuthGuard } from '@/guards';
+import { TariffProGuard } from '@/guards';
 import { CompanyProfileDocumentsService } from './company-profile-documents.service';
 import { CompanyProfileDocumentFile } from './company-profile-documents.types';
 
 @ApiTags('company-profile-documents')
 @ApiBearerAuth()
-@UseGuards(AuthGuard)
+@UseGuards(TariffProGuard)
 @Controller('company-profile-documents')
 export class CompanyProfileDocumentsController {
   constructor(

@@ -1,0 +1,1 @@
+export { freemiusClient } from './freemius';

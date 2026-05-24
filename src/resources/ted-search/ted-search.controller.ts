@@ -16,6 +16,7 @@ import { TenderListDto } from '@/resources/tenders/dto/tender.dto';
 import { AdminAccessGuard } from '@/guards';
 import fs from 'node:fs';
 import { TariffService } from '@/resources/tariff';
+import { UserDocument } from '@/resources/user/user.types';
 
 @ApiTags('ted')
 @Controller('ted')
@@ -39,13 +40,10 @@ export class TedSearchController {
     @Req() req,
     @Body() body: TedTenderSearchRequestDto,
   ): Promise<TedSearchResponse> {
-    const searchBody = await this.applySearchTariffRules(req.user, body);
     const noticeData = await this.tedSearchService.searchTenders({
-      ...searchBody,
-      noticeTypes: searchBody.noticeTypes ?? TENDER_COMPETITION_NOTICE_TYPES,
+      ...body,
+      noticeTypes: body.noticeTypes ?? TENDER_COMPETITION_NOTICE_TYPES,
     });
-
-    fs.writeFileSync('notice.json', JSON.stringify(noticeData));
 
     const tendersWithBaseAnalysis =
       await this.tendersService.upsertIfNeededMultipleTendersWithGeneralAnalysis(
@@ -78,10 +76,12 @@ export class TedSearchController {
     @Body() body: TedTenderSearchRequestDto,
   ): Promise<TedSearchResponse> {
     const searchBody = await this.applySearchTariffRules(req.user, body);
+
     const noticeData = await this.tedSearchService.searchLocalTenders({
       ...searchBody,
       noticeTypes: searchBody.noticeTypes ?? TENDER_COMPETITION_NOTICE_TYPES,
     });
+
     const localTenders = (noticeData.notices ?? []) as TenderListDto[];
 
     if (req.user) {
@@ -98,7 +98,7 @@ export class TedSearchController {
   }
 
   private async applySearchTariffRules(
-    user,
+    user: UserDocument,
     body: TedTenderSearchRequestDto,
   ): Promise<TedTenderSearchRequestDto> {
     const tariff = await this.tariffService.getUserTariff(user);
@@ -108,9 +108,22 @@ export class TedSearchController {
       return body;
     }
 
+    const requestedLimit = body.limit ?? 20;
+
+    const page = Math.min(
+      body.page ?? 1,
+      Math.ceil(maxResultsPerSearch / requestedLimit),
+    );
+
+    const limit = Math.min(
+      requestedLimit,
+      maxResultsPerSearch - (page - 1) * requestedLimit,
+    );
+
     return {
       ...body,
-      limit: Math.min(body.limit ?? maxResultsPerSearch, maxResultsPerSearch),
+      limit,
+      page,
     };
   }
 }

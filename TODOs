@@ -1,6 +1,7 @@
 - Queue for general analysis
 - Tidy up tender-matching.service
 - FE to implement notification user's settings
+- FE - deep analysis isOutOfDate
 
 buyerProfile: https://ch-giorgi.sudest-marchespublics.com
 пробовать доставать portalUrl для deep analysis

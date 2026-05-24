@@ -21,6 +21,7 @@ import {
 import { UserModel } from '@/resources/user/user.schema';
 import { getSafeErrorMessage, isDuplicateKeyError, logger } from '@/utils';
 import { TenderMatchNotificationLogModel } from './schemas';
+import { TariffService } from '@/resources/tariff';
 
 const DAILY_TENDER_MATCH_NOTIFICATIONS_CRON = '0 8 * * *';
 const WEEKLY_TENDER_MATCH_NOTIFICATIONS_CRON = '0 8 * * 1';
@@ -44,7 +45,10 @@ export class TenderMatchNotificationsService {
   private isSendingDailyReports = false;
   private isSendingWeeklyReports = false;
 
-  constructor(private readonly emailService: EmailService) {}
+  constructor(
+    private readonly emailService: EmailService,
+    private readonly tariffService: TariffService,
+  ) {}
 
   async sendInstantReports(): Promise<void> {
     if (this.isSendingInstantReports) {
@@ -135,6 +139,12 @@ export class TenderMatchNotificationsService {
       .exec();
 
     for (const user of users) {
+      const tariff = await this.tariffService.getUserTariff(user);
+
+      if (!tariff.rules.notifications.enabled) {
+        continue;
+      }
+
       const decisions = this.getDecisionsForFrequency(
         user.notifications,
         frequency,

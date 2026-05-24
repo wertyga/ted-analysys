@@ -40,6 +40,7 @@ import { gfTime } from '@/goldfish';
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 import { COMPANY_TENDER_FIT_SYSTEM_PROMPT } from './company-tender-fit.prompt';
 import { UserModel } from '@/resources/user/user.schema';
+import { TariffService } from '@/resources/tariff';
 
 const ACTIVE_COMPETITION_TENDERS_MATCH_BATCH_SIZE = 100;
 const COMPANY_PROFILE_REMATCH_DEBOUNCE_MS = gfTime.minute;
@@ -59,6 +60,7 @@ export class TenderMatchingService {
 
   constructor(
     private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
+    private readonly tariffService: TariffService,
   ) {
     this.companyProfileRematches = new DebouncedAsyncLatestQueueByKey({
       delayMs: COMPANY_PROFILE_REMATCH_DEBOUNCE_MS,
@@ -200,6 +202,10 @@ export class TenderMatchingService {
     const companyId = toObjectId(filter.user);
 
     if (!companyId) {
+      return undefined;
+    }
+
+    if (!(await this.isTenderMatchingEnabled(companyId))) {
       return undefined;
     }
 
@@ -489,6 +495,20 @@ export class TenderMatchingService {
       .exec();
 
     return readString(company?.companyName);
+  }
+
+  private async isTenderMatchingEnabled(
+    companyId: Types.ObjectId,
+  ): Promise<boolean> {
+    const company = await UserModel.findById(companyId).select('_id').exec();
+
+    if (!company) {
+      return false;
+    }
+
+    const tariff = await this.tariffService.getUserTariff(company);
+
+    return tariff.rules.tenderMatching.enabled;
   }
 
   private mapSelectionCriteria(

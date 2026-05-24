@@ -1,5 +1,5 @@
 free: {
-    search: {
+    search: { // +
         enabled: true,
         maxResultsPerSearch: 20,
     },
@@ -9,23 +9,23 @@ free: {
         maxAnalyzedTendersPerSearch: 3,
     },
     
-    deepAnalysis: {
+    deepAnalysis: { // +
         enabled: false,
     },
     
-    companyDocuments: {
+    companyDocuments: { // +
         uploadEnabled: false,
     },
     
-    tenderMatching: {
+    tenderMatching: { // +
         enabled: false,
     },
     
-    notifications: {
+    notifications: { // +
         enabled: false,
     },
     
-    wishlist: {
+    wishlist: { // +
         enabled: true,
         maxItems: 5,
     },

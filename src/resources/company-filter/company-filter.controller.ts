@@ -5,13 +5,13 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { AuthGuard } from '@/guards';
+import { TariffProGuard } from '@/guards';
 import { CompanyFilterService } from './company-filter.service';
 import { CompanyTenderFilterModel } from '@/resources/company-filter/company-filter.schema';
 
 @ApiTags('company-filter')
 @ApiBearerAuth()
-@UseGuards(AuthGuard)
+@UseGuards(TariffProGuard)
 @Controller('company-filter')
 export class CompanyFilterController {
   constructor(private readonly companyFilterService: CompanyFilterService) {}

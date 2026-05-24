@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Freemius Checkout Test</title>
+    <title>Payments Checkout Test</title>
     <style>
       :root {
         color-scheme: light;
@@ -214,7 +214,7 @@
   </head>
   <body>
     <main>
-      <h1>Freemius checkout test</h1>
+      <h1>Payments checkout test</h1>
       <p>Use this page with the local Nest API and a real user bearer token.</p>
 
       <div class="layout">
@@ -243,34 +243,25 @@
             </div>
           </div>
 
-          <label for="licenseId">License ID for upgrade</label>
-          <input id="licenseId" placeholder="Optional" />
-
           <div class="actions">
             <button id="loadPricing" class="secondary">Load plans</button>
             <button id="createCheckout" class="primary">Create checkout</button>
             <button id="openOverlay" class="secondary" disabled>
               Open overlay
             </button>
-            <button id="openHosted" class="secondary" disabled>
-              Hosted checkout
-            </button>
             <button id="checkEntitlement" class="secondary">
               Check entitlement
-            </button>
-            <button id="changeSubscription" class="secondary">
-              Change subscription
             </button>
             <button id="cancelSubscription" class="secondary">
               Cancel subscription
             </button>
-            <button id="loadPortal" class="secondary">Customer portal</button>
           </div>
 
           <div id="status" class="status"></div>
           <p class="hint">
-            Overlay imports @freemius/checkout from esm.sh. Hosted checkout uses
-            only the backend-generated link.
+            Overlay imports @freemius/checkout from esm.sh. The backend decides
+            whether checkout is a new purchase, reactivation, upgrade, or
+            downgrade.
           </p>
         </section>
 
@@ -292,18 +283,14 @@
         planId: document.getElementById('planId'),
         planSelect: document.getElementById('planSelect'),
         quota: document.getElementById('quota'),
-        licenseId: document.getElementById('licenseId'),
       };
 
       const buttons = {
         loadPricing: document.getElementById('loadPricing'),
         createCheckout: document.getElementById('createCheckout'),
         openOverlay: document.getElementById('openOverlay'),
-        openHosted: document.getElementById('openHosted'),
         checkEntitlement: document.getElementById('checkEntitlement'),
-        changeSubscription: document.getElementById('changeSubscription'),
         cancelSubscription: document.getElementById('cancelSubscription'),
-        loadPortal: document.getElementById('loadPortal'),
       };
 
       const statusEl = document.getElementById('status');
@@ -318,11 +305,8 @@
       buttons.loadPricing.addEventListener('click', loadPricing);
       buttons.createCheckout.addEventListener('click', createCheckout);
       buttons.openOverlay.addEventListener('click', openOverlay);
-      buttons.openHosted.addEventListener('click', openHosted);
       buttons.checkEntitlement.addEventListener('click', checkEntitlement);
-      buttons.changeSubscription.addEventListener('click', changeSubscription);
       buttons.cancelSubscription.addEventListener('click', cancelSubscription);
-      buttons.loadPortal.addEventListener('click', loadPortal);
       fields.planSelect.addEventListener('change', () => {
         fields.planId.value = fields.planSelect.value;
         persistForm();
@@ -332,7 +316,7 @@
         setStatus('Loading pricing...');
 
         try {
-          const pricing = await apiFetch('/freemius/pricing');
+          const pricing = await apiFetch('/payments/pricing');
           const plans = pricing.plans ?? [];
 
           fields.planSelect.innerHTML = [
@@ -357,16 +341,15 @@
         state.checkout = null;
         updateCheckoutButtons();
 
-        const body = cleanPayload({
-          planId: fields.planId.value.trim(),
-          licenseId: fields.licenseId.value.trim(),
-          quota: fields.quota.value.trim()
-            ? Number(fields.quota.value.trim())
-            : undefined,
+          const body = cleanPayload({
+            planId: fields.planId.value.trim(),
+            quota: fields.quota.value.trim()
+              ? Number(fields.quota.value.trim())
+              : undefined,
         });
 
         try {
-          const checkout = await apiFetch('/freemius/checkout', {
+          const checkout = await apiFetch('/payments/checkout', {
             method: 'POST',
             body: JSON.stringify(body),
           });
@@ -398,11 +381,10 @@
             success: async (data) => {
               log('Overlay purchase callback', data);
               setStatus('Processing purchase...');
-
+console.log({data});
               try {
-                const result = await apiFetch('/freemius/purchase', {
-                  method: 'POST',
-                  body: JSON.stringify(data),
+                const result = await apiFetch(`/payments/purchase?licenseId=${data.purchase.license_id}`, {
+                  method: 'GET',
                 });
                 log('Purchase processed', result);
                 setStatus('Purchase processed.', 'ok');
@@ -420,20 +402,11 @@
         }
       }
 
-      function openHosted() {
-        if (!state.checkout?.link) {
-          setStatus('Create checkout first.', 'error');
-          return;
-        }
-
-        window.location.href = state.checkout.link;
-      }
-
       async function checkEntitlement() {
         setStatus('Checking entitlement...');
 
         try {
-          const result = await apiFetch('/freemius/entitlement');
+          const result = await apiFetch('/payments/entitlement');
           log('Entitlement', result);
           setStatus(
             result.entitlement
@@ -447,51 +420,15 @@
         }
       }
 
-      async function changeSubscription() {
-        const planId = fields.planId.value.trim();
-
-        if (!planId) {
-          setStatus('Plan ID is required.', 'error');
-          return;
-        }
-
-        setStatus('Creating change checkout...');
-
-        try {
-          const checkout = await apiFetch(
-            '/freemius/subscription/change-checkout',
-            {
-              method: 'POST',
-              body: JSON.stringify(
-                cleanPayload({
-                  planId,
-                  quota: fields.quota.value.trim()
-                    ? Number(fields.quota.value.trim())
-                    : undefined,
-                }),
-              ),
-            },
-          );
-
-          state.checkout = checkout;
-          log('Subscription change checkout created', checkout);
-          setStatus('Change checkout created.', 'ok');
-          updateCheckoutButtons();
-        } catch (error) {
-          setStatus(error.message, 'error');
-          log('Change checkout failed', serializeError(error));
-        }
-      }
-
       async function cancelSubscription() {
-        if (!confirm('Cancel the active Freemius subscription?')) {
+        if (!confirm('Cancel the active payment subscription?')) {
           return;
         }
 
         setStatus('Cancelling subscription...');
 
         try {
-          const result = await apiFetch('/freemius/subscription/cancel', {
+          const result = await apiFetch('/payments/subscription/cancel', {
             method: 'POST',
             body: JSON.stringify({ feedback: 'Cancelled from test page' }),
           });
@@ -501,19 +438,6 @@
         } catch (error) {
           setStatus(error.message, 'error');
           log('Cancel subscription failed', serializeError(error));
-        }
-      }
-
-      async function loadPortal() {
-        setStatus('Loading customer portal data...');
-
-        try {
-          const result = await apiFetch('/freemius/customer-portal');
-          log('Customer portal', result);
-          setStatus('Customer portal data loaded.', 'ok');
-        } catch (error) {
-          setStatus(error.message, 'error');
-          log('Customer portal failed', serializeError(error));
         }
       }
 
@@ -564,7 +488,6 @@
 
       function updateCheckoutButtons() {
         buttons.openOverlay.disabled = !state.checkout?.options;
-        buttons.openHosted.disabled = !state.checkout?.link;
       }
 
       function setStatus(message, type = '') {
@@ -590,13 +513,12 @@
 
       function persistForm() {
         localStorage.setItem(
-          'freemius-test-form',
+          'payments-test-form',
           JSON.stringify({
             apiUrl: fields.apiUrl.value,
             token: fields.token.value,
             planId: fields.planId.value,
             quota: fields.quota.value,
-            licenseId: fields.licenseId.value,
           }),
         );
       }
@@ -604,7 +526,7 @@
       function restoreForm() {
         try {
           const saved = JSON.parse(
-            localStorage.getItem('freemius-test-form') ?? '{}',
+            localStorage.getItem('payments-test-form') ?? '{}',
           );
 
           for (const [key, value] of Object.entries(saved)) {
@@ -613,7 +535,7 @@
             }
           }
         } catch {
-          localStorage.removeItem('freemius-test-form');
+          localStorage.removeItem('payments-test-form');
         }
       }
 
