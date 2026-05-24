@@ -6,9 +6,10 @@ import { TenderGeneralAnalysisBuilder } from './tender-general-analysis.builder'
 import { TenderGeneralAnalysisController } from './tender-general-analysis.controller';
 import { TenderAnalysisService } from './tender-analysis.service';
 import { TenderGeneralAnalysisService } from './tender-general-analysis.service';
+import { TariffModule } from '@/resources/tariff';
 
 @Module({
-  imports: [DeepSeekModule, forwardRef(() => TendersModule)],
+  imports: [DeepSeekModule, forwardRef(() => TendersModule), TariffModule],
   controllers: [TenderGeneralAnalysisController],
   providers: [
     TenderAnalysisService,

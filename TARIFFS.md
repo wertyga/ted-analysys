@@ -6,7 +6,6 @@ free: {
     
     basicAnalysis: {
         enabled: true,
-        maxAnalyzedTendersPerSearch: 3,
     },
     
     deepAnalysis: { // +

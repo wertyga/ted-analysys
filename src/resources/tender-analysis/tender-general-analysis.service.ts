@@ -27,6 +27,27 @@ import {
 const ANALYSIS_WAIT_TIMEOUT_MS = 10 * 60 * 1000;
 const ANALYSIS_WAIT_INTERVAL_MS = 1000;
 const BASE_ANALYSIS_CONCURRENCY = 20;
+const FREE_BASIC_ANALYSIS_FIELDS = [
+  'summary',
+  {
+    name: 'scopeOfWork',
+    len: 2,
+  },
+  {
+    name: 'keyRequirements',
+    len: 3,
+  },
+  { name: 'risks', len: 2 },
+  'deadlines',
+  'estimatedValue',
+  'complexityScore',
+  'opportunityScore',
+  'confidenceScore',
+  'generalRecommendation',
+  'analysisDepth',
+  'documentsAnalyzedCount',
+  'missingDocumentsWarning',
+] as const;
 
 @Injectable()
 export class TenderGeneralAnalysisService {
@@ -224,6 +245,32 @@ export class TenderGeneralAnalysisService {
     }
 
     return TenderGeneralAnalysisModel.serializeDetail(analysis);
+  }
+
+  filterFreeBasicAnalysisFields<T extends { resultJson?: any }>(
+    analysis: T | null,
+  ): Partial<T> | null {
+    if (!analysis?.resultJson) {
+      return null;
+    }
+
+    const resultJson: Partial<T> = {};
+
+    FREE_BASIC_ANALYSIS_FIELDS.forEach((field) => {
+      if (typeof field === 'string') {
+        resultJson[field] = analysis.resultJson[field];
+      }
+      if (typeof field === 'object') {
+        resultJson[field.name] = Array.isArray(analysis.resultJson[field.name])
+          ? analysis.resultJson[field.name].slice(0, field.len ?? 100)
+          : analysis.resultJson[field.name];
+      }
+    });
+
+    return {
+      ...analysis,
+      resultJson,
+    };
   }
 
   buildGeneralTenderAnalysisSourceHash(

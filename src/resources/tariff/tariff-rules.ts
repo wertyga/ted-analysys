@@ -8,7 +8,6 @@ export const TARIFF_RULES: Record<TariffType, TariffRules> = {
     },
     basicAnalysis: {
       enabled: true,
-      maxAnalyzedTendersPerSearch: 3,
     },
     companyFilter: {
       enabled: false,

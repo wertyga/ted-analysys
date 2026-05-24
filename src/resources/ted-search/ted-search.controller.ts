@@ -14,7 +14,6 @@ import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/ni
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { TenderListDto } from '@/resources/tenders/dto/tender.dto';
 import { AdminAccessGuard } from '@/guards';
-import fs from 'node:fs';
 import { TariffService } from '@/resources/tariff';
 import { UserDocument } from '@/resources/user/user.types';
 

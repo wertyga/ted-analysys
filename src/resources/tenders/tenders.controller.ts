@@ -10,16 +10,21 @@ import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { TenderDetailDto, TenderDto } from './dto/tender.dto';
 import { TendersService } from './tenders.service';
 import { TenderModel } from './schemas';
-import { TenderWishlistService } from '@/resources/tender-wishlist/tender-wishlist.service';
 import { TenderGeneralAnalysisModel } from '@/resources/tender-analysis/schemas';
+import { TariffService } from '@/resources/tariff/tariff.service';
+import { TariffType } from '@/resources/tariff/tariff.types';
+import { TenderGeneralAnalysisService } from '@/resources/tender-analysis/tender-general-analysis.service';
+import { TenderGeneralAnalysisDetailDto } from '@/resources/tender-analysis/dto/tender-general-analysis.dto';
 
 @ApiTags('tenders')
 @Controller('tenders')
 export class TendersController {
   constructor(
     private readonly tendersService: TendersService,
-    @Inject(forwardRef(() => TenderWishlistService))
-    private readonly tenderWishlistService: TenderWishlistService,
+    @Inject(TariffService)
+    private readonly tariffService: TariffService,
+    @Inject(forwardRef(() => TenderGeneralAnalysisService))
+    private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
   ) {}
 
   @Get(':id')
@@ -41,11 +46,21 @@ export class TendersController {
       );
     }
 
+    let generalAnalysis = TenderGeneralAnalysisModel.serializeDetail(
+      tender.generalAnalysis,
+    );
+    const tariff = await this.tariffService.getUserTariff(req.user);
+
+    if (tariff.type === TariffType.free) {
+      generalAnalysis =
+        this.tenderGeneralAnalysisService.filterFreeBasicAnalysisFields(
+          generalAnalysis,
+        ) as TenderGeneralAnalysisDetailDto;
+    }
+
     return {
       ...tenderSerialized,
-      generalAnalysis: TenderGeneralAnalysisModel.serializeDetail(
-        tender.generalAnalysis,
-      ),
+      generalAnalysis,
     };
   }
 }

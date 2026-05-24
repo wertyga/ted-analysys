@@ -21,7 +21,6 @@ export interface TariffRules {
   search: TariffSearchRule;
   basicAnalysis: {
     enabled: boolean;
-    maxAnalyzedTendersPerSearch?: number;
   };
   companyFilter: {
     enabled: boolean;

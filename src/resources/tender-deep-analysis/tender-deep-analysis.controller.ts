@@ -51,7 +51,7 @@ export class TenderDeepAnalysisController {
 }
 
 @ApiTags('deep-analysis')
-@UseGuards(TariffProGuard)
+@UseGuards(AuthGuard)
 @Controller('deep-analysis')
 export class UserTenderDeepAnalysisController {
   constructor(
