@@ -21,7 +21,7 @@ type JsonRecord = Record<string, unknown>;
 type LlmAnalysisPurpose = 'general' | 'deep';
 
 export abstract class BaseLlmAnalysisService {
-  protected readonly retryDelaysMs = [500, 1500];
+  protected readonly retryDelaysMs = [500, ...new Array(10).fill(1500)];
   protected readonly maxDocumentChars = 40_000;
   protected readonly maxContextChars = 180_000;
 
@@ -126,7 +126,7 @@ export abstract class BaseLlmAnalysisService {
       } catch (error: unknown) {
         lastError = error;
         this.logger.warn(
-          `${this.providerName} tender analysis failed on attempt ${attempt + 1}: ${getSafeErrorMessage(
+          `${this.providerName} createJsonResponse failed on attempt ${attempt + 1}: ${getSafeErrorMessage(
             error,
           )}`,
         );

@@ -225,6 +225,19 @@ export function getNormalizedStringArray(value: unknown): string[] {
   );
 }
 
+export function uniqueFlatMap<T extends Record<string, unknown>>(
+  items: T[],
+  key: keyof T,
+): string[] {
+  return Array.from(
+    new Set(
+      items
+        .flatMap((item) => (Array.isArray(item[key]) ? item[key] : []))
+        .filter((value): value is string => typeof value === 'string'),
+    ),
+  );
+}
+
 export function getCpvCodeArray(value: unknown): string[] {
   return getNormalizedStringArray(value).filter((code) => /^\d{8}$/.test(code));
 }

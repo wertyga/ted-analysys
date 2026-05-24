@@ -546,6 +546,36 @@ export interface CompanyAnalysisDto {
     max?: number;
     currency?: string;
   };
+  companyDocumentEvidence?: CompanyAnalysisDocumentEvidence;
+}
+
+export interface CompanyAnalysisDocumentEvidence {
+  summary: string;
+  capabilities: string[];
+  certifications: string[];
+  industries: string[];
+  technologies: string[];
+  countries: string[];
+  languages: string[];
+  referenceProjects: string[];
+  experienceSignals: string[];
+  limitations: string[];
+  documents: Array<{
+    filename: string;
+    textHash: string;
+    documentType?: string | null;
+    summary: string;
+    capabilities: string[];
+    certifications: string[];
+    industries: string[];
+    technologies: string[];
+    countries: string[];
+    languages: string[];
+    referenceProjects: string[];
+    experienceSignals: string[];
+    limitations: string[];
+    confidenceScore?: number | null;
+  }>;
 }
 
 export interface CpvAnalysisRef {
@@ -649,6 +679,6 @@ export interface TenderDeepCompanyFitAnalysisInput {
   company: CompanyAnalysisDto;
   companyAnalysis?: unknown;
   derived: TenderCompanyFitDerivedMetadata;
-  documentAnalyses?: unknown[];
+  documentMetadata?: unknown[];
   documentTextSnippets?: unknown[];
 }

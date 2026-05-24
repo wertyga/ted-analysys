@@ -34,6 +34,8 @@ import { UserModel } from '@/resources/user/user.schema';
 import { COMPANY_TENDER_FILTER_SYSTEM_PROMPT } from './company-filter.prompt';
 import { TenderMatchingService } from '@/resources/tender-matching/tender-matching.service';
 import { CpvCategoryModel } from '@/resources/cpv/schemas';
+import { CompanyProfileDocumentsService } from '@/resources/company-profile-documents/company-profile-documents.service';
+import { CompanyDocumentEvidence } from '@/resources/company-profile-documents/company-profile-documents.types';
 
 const COMPANY_FILTER_WAIT_TIMEOUT_MS = 10 * 60 * 1000;
 const COMPANY_FILTER_WAIT_INTERVAL_MS = 1000;
@@ -64,6 +66,7 @@ interface CompanyTenderFilterAiPayload {
     currency?: CurrencySign;
   };
   minDaysBeforeDeadline: number;
+  companyDocumentEvidence?: CompanyDocumentEvidence;
 }
 
 interface CompanyTenderFilterAiResult {
@@ -109,6 +112,7 @@ export class CompanyFilterService {
   constructor(
     private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
     private readonly tenderMatchingService: TenderMatchingService,
+    private readonly companyProfileDocumentsService: CompanyProfileDocumentsService,
   ) {
     this.companyFilterGenerations = new DebouncedAsyncLatestQueueByKey({
       delayMs: COMPANY_FILTER_GENERATION_DEBOUNCE_MS,
@@ -193,7 +197,7 @@ export class CompanyFilterService {
     shouldBeUpdated: boolean;
   }> {
     const existing = await CompanyTenderFilterModel.findOne({ user: user._id });
-    const currentHash = this.calculateHash(user);
+    const currentHash = await this.calculateHash(user);
 
     const areHashEquals = existing && existing.sourceHash === currentHash;
     const saveStatus =
@@ -229,7 +233,12 @@ export class CompanyFilterService {
     return { companyAnalysis: analysis, shouldBeUpdated: true };
   }
 
-  calculateHash(user: UserDocument): string {
+  async calculateHash(user: UserDocument): Promise<string> {
+    const companyDocumentEvidenceSourceHash =
+      await this.companyProfileDocumentsService.getCompanyDocumentEvidenceSourceHash(
+        String(user._id),
+      );
+
     return createHash('sha256')
       .update(
         JSON.stringify({
@@ -253,6 +262,7 @@ export class CompanyFilterService {
               }
             : undefined,
           minDaysBeforeDeadline: user.minDaysBeforeDeadline,
+          companyDocumentEvidenceSourceHash,
         }),
       )
       .digest('hex');
@@ -298,7 +308,7 @@ export class CompanyFilterService {
     companyAnalysisId,
     sourceHash,
   }: CompanyFilterGenerationInput): Promise<void> {
-    const payload = this.buildCompanyProfilePayload(populatedUser);
+    const payload = await this.buildCompanyProfilePayload(populatedUser);
 
     const result = await this.analyzeCompanyProfile(payload);
 
@@ -400,9 +410,14 @@ export class CompanyFilterService {
     ].join('\n');
   }
 
-  private buildCompanyProfilePayload(
+  private async buildCompanyProfilePayload(
     user: UserDocument,
-  ): CompanyTenderFilterAiPayload {
+  ): Promise<CompanyTenderFilterAiPayload> {
+    const companyDocumentEvidence =
+      await this.companyProfileDocumentsService.buildCompanyDocumentEvidence(
+        String(user._id),
+      );
+
     return {
       companyName: user.companyName,
       country: user.country,
@@ -418,6 +433,7 @@ export class CompanyFilterService {
       publicProcurementExperience: user.publicProcurementExperience,
       typicalContractSize: user.typicalContractSize,
       minDaysBeforeDeadline: user.minDaysBeforeDeadline,
+      companyDocumentEvidence,
     };
   }
 

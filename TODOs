@@ -2,6 +2,7 @@
 - Tidy up tender-matching.service
 - FE to implement notification user's settings
 - FE - deep analysis isOutOfDate
+- BE - optimize documents text
 
 buyerProfile: https://ch-giorgi.sudest-marchespublics.com
 пробовать доставать portalUrl для deep analysis

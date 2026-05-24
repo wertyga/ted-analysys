@@ -5,7 +5,7 @@ import { BaseAnalysisBuilder } from '@/analysis-builder/base-analysis.builder';
 import { DocumentInputAnalysis } from '@/openai/dto/openai-analysis.dto';
 
 export interface DeepDocumentInput {
-  documentAnalyses: unknown[];
+  documentMetadata: unknown[];
   documentTextSnippets: unknown[];
 }
 
@@ -21,7 +21,7 @@ export class TenderDeepDocumentInputService extends BaseAnalysisBuilder {
     ]);
 
     return {
-      documentAnalyses: documents.map((document) =>
+      documentMetadata: documents.map((document) =>
         this.toDocumentAnalysis(document),
       ),
       documentTextSnippets: documents.map((document) =>

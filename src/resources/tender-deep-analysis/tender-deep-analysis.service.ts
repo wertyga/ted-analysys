@@ -34,8 +34,9 @@ import {
   getTenderSourceHash,
   normalizeDeepAnalysisLanguage,
 } from '@/resources/tender-deep-analysis/tender-deep-analysis.utils';
+import { CompanyProfileDocumentsService } from '@/resources/company-profile-documents/company-profile-documents.service';
 
-const TENDER_DEEP_COMPANY_FIT_ANALYSIS_CONCURRENCY = 2;
+const TENDER_DEEP_COMPANY_FIT_ANALYSIS_CONCURRENCY = 5;
 
 @Injectable()
 export class TenderDeepAnalysisService {
@@ -49,6 +50,7 @@ export class TenderDeepAnalysisService {
     private readonly deepDocumentInputService: TenderDeepDocumentInputService,
     private readonly tendersService: TendersService,
     private readonly companyFilterService: CompanyFilterService,
+    private readonly companyProfileDocumentsService: CompanyProfileDocumentsService,
     @Inject(forwardRef(() => TenderGeneralAnalysisService))
     private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
   ) {}
@@ -90,12 +92,21 @@ export class TenderDeepAnalysisService {
       const [generalAnalysis, companyAnalysis] = await Promise.all([
         this.tenderGeneralAnalysisService.getFinishedGeneralAnalysis(tender),
         this.companyFilterService.getFinishedCompanyAnalysis(company),
+        this.companyProfileDocumentsService.getFinishedCompanyDocumentsAnalysis(
+          company,
+        ),
       ]);
 
-      const companyDto =
-        this.deepAnalysisBuilder.buildCompanyAnalysisDto(company);
+      const companyDocumentEvidence =
+        await this.companyProfileDocumentsService.buildCompanyDocumentEvidence(
+          String(company._id),
+        );
+      const companyDto = this.deepAnalysisBuilder.buildCompanyAnalysisDto(
+        company,
+        companyDocumentEvidence,
+      );
 
-      const documentsInput =
+      const tenderDocumentsInput =
         await this.deepDocumentInputService.buildDeepDocumentInput(tender);
 
       const input = this.deepAnalysisBuilder.buildInput({
@@ -103,8 +114,8 @@ export class TenderDeepAnalysisService {
         generalAnalysis,
         company: companyDto,
         companyAnalysis,
-        documentAnalyses: documentsInput.documentAnalyses,
-        documentTextSnippets: documentsInput.documentTextSnippets,
+        documentMetadata: tenderDocumentsInput.documentMetadata,
+        documentTextSnippets: tenderDocumentsInput.documentTextSnippets,
         outputLanguage: language,
       });
 

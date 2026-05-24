@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Controller,
   Post,
+  Req,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
@@ -58,11 +59,15 @@ export class CompanyProfileDocumentsController {
   )
   async uploadCompanyProfileDocuments(
     @UploadedFiles() files: CompanyProfileDocumentFile[],
+    @Req() req,
   ) {
     if (!files?.length) {
       throw new BadRequestException('At least one document is required');
     }
 
-    return this.companyProfileDocumentsService.uploadAndExtractProfile(files);
+    return this.companyProfileDocumentsService.uploadAndExtractProfile(
+      files,
+      req.user,
+    );
   }
 }

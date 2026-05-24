@@ -1,3 +1,5 @@
+import { CompanyProfileDocumentType } from './schemas';
+
 export const COMPANY_PROFILE_DOCUMENT_SYSTEM_PROMPT = [
   'You extract a company procurement profile from uploaded company documents.',
   'Return only valid JSON. Do not include markdown.',
@@ -62,4 +64,43 @@ export const COMPANY_PROFILE_DOCUMENT_SYSTEM_PROMPT = [
     },
     extractionWarnings: ['string'],
   }),
+].join('\n');
+
+export const COMPANY_PROFILE_DOCUMENT_ANALYSIS_PROMPT_VERSION = '2026-05-24';
+
+export const COMPANY_PROFILE_SINGLE_DOCUMENT_ANALYSIS_PROMPT = [
+  'You analyze one uploaded company document for procurement and tender-fit evidence.',
+  'Return only valid JSON. Do not include markdown.',
+  '',
+  'Use only facts supported by this document. Do not invent company facts.',
+  'Keep arrays concise, deduplicated, and procurement-relevant.',
+  'If evidence is weak or missing, return [] or null rather than guessing.',
+  '',
+  'Extract evidence that can help decide whether this company is suitable for public tenders:',
+  '- concrete capabilities, products, services, delivery abilities, technical abilities, logistics abilities, production abilities, compliance abilities, or operational abilities',
+  '- certifications, standards, licenses, permits, or formal qualifications',
+  '- industries/sectors explicitly supported by the document',
+  '- technologies, platforms, methods, equipment, or tools',
+  '- countries, regions, languages, and delivery geography',
+  '- reference projects, named clients, case studies, public-sector or tender experience',
+  '- experience signals such as founding date, years in operation, project counts, team size, turnover, contract values',
+  '- limitations, gaps, caveats, missing evidence, or unsupported claims',
+  '',
+  'Return this JSON shape:',
+  JSON.stringify({
+    documentType: Object.values(CompanyProfileDocumentType).join('|'),
+    summary: 'string',
+    capabilities: ['string'],
+    certifications: ['string'],
+    industries: ['string'],
+    technologies: ['string'],
+    countries: ['string'],
+    languages: ['string'],
+    referenceProjects: ['string'],
+    experienceSignals: ['string'],
+    limitations: ['string'],
+    confidenceScore: 'number|null',
+  }),
+  '',
+  `documentType must be one of: ${Object.values(CompanyProfileDocumentType).join(', ')}.`,
 ].join('\n');

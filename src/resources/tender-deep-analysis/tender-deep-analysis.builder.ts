@@ -11,9 +11,9 @@ import {
   TenderDeepAnalysisResult,
   TenderDeepCompanyFitAnalysisInput,
   TenderDeepRecommendation,
+  CompanyAnalysisDocumentEvidence,
   TenderRequirement,
 } from '@/types';
-import { TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION } from '@/resources/tender-deep-analysis/tender-deep-company-fit.prompt';
 import { isRecord } from '@/utils';
 import { Tender, TenderDocument } from '../tenders/schemas';
 import { UserDocument } from '../user/user.types';
@@ -57,7 +57,10 @@ type MutableDeepResult = TenderDeepAnalysisResult & {
 
 @Injectable()
 export class TenderDeepAnalysisBuilder {
-  buildCompanyAnalysisDto(user: UserDocument): CompanyAnalysisDto {
+  buildCompanyAnalysisDto(
+    user: UserDocument,
+    companyDocumentEvidence?: CompanyAnalysisDocumentEvidence,
+  ): CompanyAnalysisDto {
     const source = user as any;
 
     return {
@@ -92,6 +95,7 @@ export class TenderDeepAnalysisBuilder {
             currency: source.typicalContractSize.currency,
           }
         : undefined,
+      companyDocumentEvidence,
     };
   }
 
@@ -203,11 +207,11 @@ export class TenderDeepAnalysisBuilder {
     generalAnalysis?: TenderGeneralAnalysis | null;
     company: CompanyAnalysisDto;
     companyAnalysis?: unknown;
-    documentAnalyses?: unknown[];
+    documentMetadata?: unknown[];
     documentTextSnippets?: unknown[];
     outputLanguage?: string;
   }): TenderDeepCompanyFitAnalysisInput {
-    const documentAnalyses = params.documentAnalyses ?? [];
+    const documentMetadata = params.documentMetadata ?? [];
 
     return {
       outputLanguage: params.outputLanguage ?? 'en',
@@ -218,10 +222,10 @@ export class TenderDeepAnalysisBuilder {
       derived: this.buildDerivedMetadata({
         tender: params.tender,
         company: params.company,
-        documentsDownloadedCount: documentAnalyses.length,
-        documentsAnalyzedCount: documentAnalyses.length,
+        documentsDownloadedCount: documentMetadata.length,
+        documentsAnalyzedCount: documentMetadata.length,
       }),
-      documentAnalyses,
+      documentMetadata,
       documentTextSnippets: params.documentTextSnippets ?? [],
     };
   }

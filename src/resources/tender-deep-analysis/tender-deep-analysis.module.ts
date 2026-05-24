@@ -3,6 +3,7 @@ import { DeepSeekModule } from '@/deepseek/deepseek.module';
 import { TendersModule } from '../tenders/tenders.module';
 import { TenderAnalysisModule } from '../tender-analysis/tender-analysis.module';
 import { CompanyFilterModule } from '@/resources/company-filter/company-filter.module';
+import { CompanyProfileDocumentsModule } from '@/resources/company-profile-documents/company-profile-documents.module';
 import { TenderDeepAnalysisBuilder } from './tender-deep-analysis.builder';
 import {
   TenderDeepAnalysisController,
@@ -15,6 +16,7 @@ import { TenderDeepAnalysisService } from './tender-deep-analysis.service';
   imports: [
     DeepSeekModule,
     CompanyFilterModule,
+    CompanyProfileDocumentsModule,
     forwardRef(() => TendersModule),
     forwardRef(() => TenderAnalysisModule),
   ],

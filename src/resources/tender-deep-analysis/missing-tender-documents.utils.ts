@@ -49,11 +49,11 @@ export function collectTenderDocumentAccessUrls(tender: unknown): {
 }
 
 export function collectAnalyzedDocumentNames(input: {
-  documentAnalyses?: unknown[];
+  documentMetadata?: unknown[];
   documentTextSnippets?: unknown[];
 }): string[] {
   return uniqueStrings([
-    ...collectNames(input.documentAnalyses),
+    ...collectNames(input.documentMetadata),
     ...collectNames(input.documentTextSnippets),
   ]);
 }

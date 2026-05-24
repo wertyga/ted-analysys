@@ -1,4 +1,5 @@
 import { CurrencySign } from '@/resources/codelist';
+import { CompanyProfileDocumentType } from './schemas';
 
 export interface CompanyProfileDocumentFile {
   originalname: string;
@@ -44,5 +45,44 @@ export interface CompanyProfileDocumentUploadResult {
     textHash: string;
     contentLength: number;
     warnings: string[];
+    analysis?: CompanyProfileDocumentAnalysisResult;
   }>;
+}
+
+export interface CompanyProfileDocumentAnalysisResult {
+  status?: string;
+  documentType?: CompanyProfileDocumentType | null;
+  summary: string;
+  capabilities: string[];
+  certifications: string[];
+  industries: string[];
+  technologies: string[];
+  countries: string[];
+  languages: string[];
+  referenceProjects: string[];
+  experienceSignals: string[];
+  limitations: string[];
+  confidenceScore?: number | null;
+  errorMessage?: string | null;
+  analyzedAt?: Date | null;
+}
+
+export interface CompanyDocumentEvidenceItem
+  extends CompanyProfileDocumentAnalysisResult {
+  filename: string;
+  textHash: string;
+}
+
+export interface CompanyDocumentEvidence {
+  summary: string;
+  capabilities: string[];
+  certifications: string[];
+  industries: string[];
+  technologies: string[];
+  countries: string[];
+  languages: string[];
+  referenceProjects: string[];
+  experienceSignals: string[];
+  limitations: string[];
+  documents: CompanyDocumentEvidenceItem[];
 }
