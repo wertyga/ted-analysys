@@ -1,8 +1,11 @@
-- Queue for general analysis
-- Tidy up tender-matching.service
 - FE to implement notification user's settings
 - FE - deep analysis isOutOfDate
+- FE - deep analysis forceUpdate
+- FE - self - withDescription
+
+- BE - Tidy up tender-matching.service
 - BE - optimize documents text
+- BE - deep analysis restriction - pro/business
 
 buyerProfile: https://ch-giorgi.sudest-marchespublics.com
 пробовать доставать portalUrl для deep analysis

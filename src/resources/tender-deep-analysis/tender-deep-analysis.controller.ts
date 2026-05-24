@@ -31,6 +31,7 @@ export class TenderDeepAnalysisController {
   @Post()
   @ApiOperation({ summary: 'Run deep company-fit tender analysis' })
   @ApiQuery({ name: 'language', required: false, example: 'en' })
+  @ApiQuery({ name: 'forceUpdate', required: false, example: 'true' })
   @ApiOkResponse({
     description: 'Saved deep company-fit analyses grouped by language',
   })
@@ -38,12 +39,14 @@ export class TenderDeepAnalysisController {
     @Param('tenderId') tenderId: string,
     @Req() req,
     @Query('language') language = 'en',
+    @Query('forceUpdate') forceUpdate: string,
   ) {
     const analysis =
       await this.tenderDeepAnalysisService.analyzeTenderDeepCompanyFit({
         tenderId,
         companyId: String(req.user._id),
         language,
+        forceUpdate: !!forceUpdate,
       });
 
     return TenderDeepAnalysisModel.serializeDetail(analysis);

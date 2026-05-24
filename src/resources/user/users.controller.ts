@@ -97,16 +97,12 @@ export class UsersController {
 
     const user = await this.usersService.getUser(req.user._id.toString());
 
+    const exclude = !withDescription
+      ? {}
+      : { excludeFields: ['companyDescription'] };
+
     return {
-      user: UserModel.serializeUser(
-        user,
-        false,
-        Boolean(withDescription)
-          ? undefined
-          : {
-              excludeFields: ['companyDescription'],
-            },
-      ),
+      user: UserModel.serializeUser(user, false, exclude),
     };
   }
 }

@@ -48,7 +48,7 @@ const MAX_DOCUMENTS = 10;
 const MAX_CONTEXT_CHARS = 80_000;
 const MAX_SINGLE_DOCUMENT_CONTEXT_CHARS = 40_000;
 const MAX_DOCUMENT_EVIDENCE_ITEMS = 10;
-const DOCUMENT_ANALYSIS_CONCURRENCY = 10;
+const DOCUMENT_ANALYSIS_CONCURRENCY = 20;
 const DOCUMENT_ANALYSIS_WAIT_TIMEOUT_MS = 10 * 60 * 1000;
 const DOCUMENT_ANALYSIS_WAIT_INTERVAL_MS = 1000;
 
@@ -114,13 +114,14 @@ export class CompanyProfileDocumentsService {
       files.map((file) => this.extractDocument(file)),
     );
 
-    const documentAnalyses = await Promise.all(
-      extractedDocuments.map((document) =>
-        this.createProcessingAnalyzeAndSaveDocument(user, document),
-      ),
+    // Async run documents analysis
+    extractedDocuments.map((document) =>
+      this.createProcessingAnalyzeAndSaveDocument(user, document),
     );
 
-    const aiResult = await this.extractProfileWithAi(extractedDocuments);
+    const aiResult = await this.documentAnalysisQueue.push(() =>
+      this.extractProfileWithAi(extractedDocuments),
+    );
 
     const profile = this.normalizeProfile(aiResult);
 
@@ -143,7 +144,6 @@ export class CompanyProfileDocumentsService {
         textHash: extraction.textHash,
         contentLength: extraction.contentLength,
         warnings: extraction.warnings,
-        analysis: documentAnalyses[index],
       })),
     };
   }

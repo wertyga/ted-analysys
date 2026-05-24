@@ -133,7 +133,11 @@ export class CompanyFilterService {
         isForceUpdate,
       );
 
-    if (shouldBeUpdated || isForceUpdate) {
+    if (shouldBeUpdated) {
+      await this.companyProfileDocumentsService.getFinishedCompanyDocumentsAnalysis(
+        user,
+      );
+
       this.companyFilterGenerations
         .run(String(populatedUser._id), {
           populatedUser,

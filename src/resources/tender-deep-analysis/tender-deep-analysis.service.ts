@@ -204,6 +204,7 @@ export class TenderDeepAnalysisService {
     tenderId: string;
     companyId: string;
     language?: string;
+    forceUpdate?: boolean;
   }): Promise<TenderDeepAnalysisDocument | TenderDeepAnalysisRecord> {
     const language = normalizeDeepAnalysisLanguage(params.language);
 
@@ -238,6 +239,7 @@ export class TenderDeepAnalysisService {
         generalAnalysisId: generalAnalysis._id.toString(),
         language,
         sourceHash,
+        forceUpdate: params.forceUpdate,
       });
 
     if (shouldStart) {
@@ -311,12 +313,14 @@ export class TenderDeepAnalysisService {
     language,
     sourceHash,
     companyId,
+    forceUpdate,
   }: {
     tender: TenderDocument;
     companyId: string;
     generalAnalysisId: string;
     language: string;
     sourceHash: string;
+    forceUpdate?: boolean;
   }): Promise<{
     deepAnalysis: TenderDeepAnalysisDocument;
     shouldStart: boolean;
@@ -327,10 +331,10 @@ export class TenderDeepAnalysisService {
       sourceHash,
     }).populate(deepAnalysisPopulateFields);
 
-    if (
-      deepAnalysis &&
-      deepAnalysis.status !== TenderDeepAnalysisStatus.FAILED
-    ) {
+    const shouldStart =
+      !deepAnalysis || deepAnalysis.status === TenderDeepAnalysisStatus.FAILED;
+
+    if (!shouldStart && !forceUpdate) {
       return { deepAnalysis, shouldStart: false };
     }
 

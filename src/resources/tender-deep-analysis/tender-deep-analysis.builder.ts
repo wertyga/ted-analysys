@@ -779,6 +779,16 @@ function applyDecisionFactors(
   }
 
   for (const blocker of result.riskAnalysis.criticalBlockers ?? []) {
+    if (typeof blocker === 'string') {
+      addDecisionBlocker(blockers, {
+        type: 'other',
+        severity: 'CRITICAL',
+        description: blocker,
+        source: 'risk',
+      });
+      continue;
+    }
+
     addDecisionBlocker(blockers, {
       type: mapRiskBlockerType(blocker.type),
       severity: blocker.canBeResolved ? 'HIGH' : 'CRITICAL',
@@ -788,58 +798,6 @@ function applyDecisionFactors(
   }
 
   addBidDecisionBlockers(blockers, result.bidNoBidDecision);
-
-  if (!input.company.capabilities || input.company.capabilities.length === 0) {
-    addDecisionBlocker(blockers, {
-      type: 'capability',
-      severity: 'CRITICAL',
-      description:
-        'No declared capability or experience in the required industrial/nuclear maintenance scope.',
-      source: 'backend_guardrail',
-    });
-  }
-
-  if (
-    !input.company.certifications ||
-    input.company.certifications.length === 0
-  ) {
-    addDecisionBlocker(blockers, {
-      type: 'certification',
-      severity: 'CRITICAL',
-      description:
-        'No declared certifications or site-access clearances for nuclear or industrial maintenance work.',
-      source: 'backend_guardrail',
-    });
-  }
-
-  if (input.derived.preliminarySignals.countryOverlap === false) {
-    addDecisionBlocker(blockers, {
-      type: 'geography',
-      severity: 'HIGH',
-      description: 'No operating presence in the tender performance country.',
-      source: 'backend_guardrail',
-    });
-  }
-
-  if (input.derived.preliminarySignals.cpvOverlap === false) {
-    addDecisionBlocker(blockers, {
-      type: 'capability',
-      severity: 'CRITICAL',
-      description:
-        'Company CPV/profile does not overlap with the tender scope.',
-      source: 'backend_guardrail',
-    });
-  }
-
-  if (hasSelectionCriteriaGap(result, input)) {
-    addDecisionBlocker(blockers, {
-      type: 'eligibility',
-      severity: 'HIGH',
-      description:
-        'Selection criteria are missing or unclear and likely require relevant maintenance references.',
-      source: 'backend_guardrail',
-    });
-  }
 
   result.decisionFactors = {
     ...(result.decisionFactors ?? {}),
