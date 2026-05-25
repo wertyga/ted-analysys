@@ -50,10 +50,6 @@ export class PaymentsService {
       return this.upgradeSubscription(user, data.planId);
     }
 
-    if (activeEntitlement.isCanceled && areTariffTypesTheSame) {
-      return this.renewCanceledSubscription(user);
-    }
-
     if (activeEntitlement.isCanceled && !areTariffTypesTheSame) {
       // ...
     }

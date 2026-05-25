@@ -155,6 +155,18 @@ export class PaymentsController {
     return this.paymentsService.cancelSubscription(req.user);
   }
 
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Cancel active Freemius subscription',
+    description:
+      'Cancels the authenticated user active Freemius subscription through Freemius API and refreshes local entitlement state.',
+  })
+  @UseGuards(AuthGuard)
+  @Post('/subscription/renew')
+  async renewSubscription(@Req() req) {
+    return this.paymentsService.renewCanceledSubscription(req.user);
+  }
+
   @ApiOperation({
     summary: 'Process Freemius webhook',
     description:

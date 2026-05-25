@@ -62,7 +62,6 @@ export class PaymentsWebhookService {
     listener.on(subscriptionSyncEvents, async (event: WebhookEvent) => {
       const data = (event as unknown as { data?: { license_id?: string } })
         .data;
-      console.log('subscriptionSyncEvents', { data });
       const licenseId = data?.license_id;
 
       if (licenseId) {
@@ -87,16 +86,6 @@ export class PaymentsWebhookService {
         );
       }
     });
-
-    // listener.on('license.deleted', async (event: WebhookEvent) => {
-    //   console.log('license.deleted', { event });
-    //   const data = (event as unknown as { data?: { license_id?: string } })
-    //     .data;
-    //
-    //   if (data?.license_id) {
-    //     await this.deleteEntitlement(data.license_id);
-    //   }
-    // });
 
     this.webhookListener = listener;
 
