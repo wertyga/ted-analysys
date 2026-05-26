@@ -1,5 +1,6 @@
 import { TedSearchService } from '@/resources/ted-search/ted-search.service';
 import { buildTedTenderSearchQuery } from '@/resources/ted-search/ted-builders';
+import { TedDeadlineRange } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
 import {
   TedPaginationMode,
   TedScope,
@@ -13,6 +14,7 @@ import { isRecord } from '@/utils';
 
 const DEFAULT_PAGE_LIMIT = 100;
 const DEFAULT_MAX_PAGES = 10000;
+const RECENT_TENDERS_LOOKBACK_DAYS = 2;
 
 export interface TedOpenTendersCollectorOptions {
   pageLimit?: number;
@@ -40,14 +42,39 @@ export class TedOpenTendersCollectorService {
   async collectOpenTendersFromTed(
     options: TedOpenTendersCollectorOptions = {},
   ): Promise<TedOpenTendersCollectorResult> {
-    const pageLimit = options.pageLimit ?? DEFAULT_PAGE_LIMIT;
-    const maxPages = options.maxPages ?? DEFAULT_MAX_PAGES;
-
     const query = buildTedTenderSearchQuery({
       noticeTypes: TENDER_COMPETITION_NOTICE_TYPES,
       submissionDeadlineFrom: getTedDate(),
     });
 
+    return this.collectCompetitionTendersFromTed(query, options);
+  }
+
+  async collectRecentCompetitionTendersFromTed(
+    options: TedOpenTendersCollectorOptions = {},
+  ): Promise<TedOpenTendersCollectorResult> {
+    const publicationDateFrom = new Date();
+
+    publicationDateFrom.setDate(
+      publicationDateFrom.getDate() - RECENT_TENDERS_LOOKBACK_DAYS,
+    );
+
+    const query = buildTedTenderSearchQuery({
+      noticeTypes: TENDER_COMPETITION_NOTICE_TYPES,
+      publicationDateFrom: getTedDate(publicationDateFrom),
+      publicationDateTo: getTedDate(),
+      submissionDeadlineRange: TedDeadlineRange.ANY_OPEN,
+    });
+
+    return this.collectCompetitionTendersFromTed(query, options);
+  }
+
+  private async collectCompetitionTendersFromTed(
+    query: string,
+    options: TedOpenTendersCollectorOptions,
+  ): Promise<TedOpenTendersCollectorResult> {
+    const pageLimit = options.pageLimit ?? DEFAULT_PAGE_LIMIT;
+    const maxPages = options.maxPages ?? DEFAULT_MAX_PAGES;
     let iterationNextToken = options.iterationNextToken?.trim() || undefined;
     let pagesFetched = 0;
     let noticesFetched = 0;

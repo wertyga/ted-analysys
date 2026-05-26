@@ -12,6 +12,7 @@ import { IsNumber, IsOptional, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
   TedContractNature,
+  TedDeadlineRange,
   TedProcedureType,
 } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
 import { resolveDeadlineRange } from '@/resources/ted-search/utils';
@@ -33,6 +34,7 @@ export interface TedTenderSearchFilters {
   currency?: CurrencySign[];
   publicationDateFrom?: string;
   publicationDateTo?: string;
+  submissionDeadlineRange?: TedDeadlineRange;
   submissionDeadlineFrom?: string;
   submissionDeadlineTo?: string;
   sortColumn?: TedTenderSortColumn;

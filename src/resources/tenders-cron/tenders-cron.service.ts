@@ -1,10 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { TedDeadlineRange } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
 import { TedSearchService } from '@/resources/ted-search/ted-search.service';
-import { TedScope } from '@/resources/ted-search/types/ted-search.types';
-import { getTedDate, resolveDeadlineRange } from '@/resources/ted-search/utils';
-import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { TenderDocument } from '@/resources/tenders/schemas';
 import { devLog, logger } from '@/utils';
@@ -16,21 +12,8 @@ import { TenderMatchNotificationsService } from '@/resources/tender-match-notifi
 
 const RECENT_TENDERS_CRON = '0 1 * * *';
 const ALL_COMPETITION_TENDERS_CRON = '0 3 * * *';
-const RECENT_TENDERS_LOOKBACK_DAYS = 2;
 const RECENT_TENDERS_PAGE_LIMIT = 100;
 const RECENT_TENDERS_MAX_PAGES = 100;
-
-interface GatherRecentCompetitionTendersOptions {
-  onChangedTenders?: (tenders: TenderDocument[]) => Promise<void> | void;
-}
-
-interface GatherRecentCompetitionTendersResult {
-  pagesFetched: number;
-  noticesFetched: number;
-  saved: number;
-  updated: number;
-  skipped: number;
-}
 
 @Injectable()
 export class TendersCronService {
@@ -103,7 +86,10 @@ export class TendersCronService {
     try {
       let matchesSaved = 0;
 
-      const result = await this.gatherRecentCompetitionTendersOnce({
+      const result = await new TedOpenTendersCollectorService(
+        this.tedSearchService,
+        this.tendersService,
+      ).collectRecentCompetitionTendersFromTed({
         onChangedTenders: async (tenders) => {
           const matches = await this.matchChangedTenders(tenders);
 
@@ -133,60 +119,6 @@ export class TendersCronService {
     }
   }
 
-  private async gatherRecentCompetitionTendersOnce(
-    options: GatherRecentCompetitionTendersOptions = {},
-  ): Promise<GatherRecentCompetitionTendersResult> {
-    let page = 1;
-    let pagesFetched = 0;
-    let noticesFetched = 0;
-    let saved = 0;
-    let updated = 0;
-    let skipped = 0;
-    let totalNoticeCount: number | undefined;
-
-    while (page <= RECENT_TENDERS_MAX_PAGES) {
-      const response = await this.tedSearchService.searchTenders(
-        this.buildRecentCompetitionTenderFilters(page),
-      );
-
-      const notices = this.tendersService.extractNotices(response);
-
-      pagesFetched += 1;
-      noticesFetched += notices.length;
-      totalNoticeCount = response.totalNoticeCount ?? totalNoticeCount;
-
-      if (notices.length === 0) {
-        break;
-      }
-
-      const saveResult = await this.tendersService.saveNewTedTenders(notices);
-      saved += saveResult.saved;
-      updated += saveResult.updated;
-      skipped += saveResult.skipped;
-
-      if (saveResult.changedTenders.length > 0) {
-        await options.onChangedTenders?.(saveResult.changedTenders);
-      }
-
-      if (
-        totalNoticeCount !== undefined &&
-        page * RECENT_TENDERS_PAGE_LIMIT >= totalNoticeCount
-      ) {
-        break;
-      }
-
-      page += 1;
-    }
-
-    return {
-      pagesFetched,
-      noticesFetched,
-      saved,
-      updated,
-      skipped,
-    };
-  }
-
   private async matchChangedTenders(
     tenders: TenderDocument[],
   ): Promise<TenderCompanyMatchDocument[]> {
@@ -205,24 +137,5 @@ export class TendersCronService {
   private async sendInstantTenderMatchReports(): Promise<void> {
     await this.tenderMatchingService.waitForTenderCompanyAiFitQueueIdle();
     await this.tenderMatchNotificationsService.sendInstantReports();
-  }
-
-  private buildRecentCompetitionTenderFilters(page: number) {
-    const today = new Date();
-    const publicationDateFrom = new Date();
-
-    publicationDateFrom.setDate(
-      publicationDateFrom.getDate() - RECENT_TENDERS_LOOKBACK_DAYS,
-    );
-
-    return resolveDeadlineRange({
-      noticeTypes: TENDER_COMPETITION_NOTICE_TYPES,
-      publicationDateFrom: getTedDate(publicationDateFrom),
-      publicationDateTo: getTedDate(today),
-      submissionDeadlineRange: TedDeadlineRange.ANY_OPEN,
-      scope: TedScope.ACTIVE,
-      limit: RECENT_TENDERS_PAGE_LIMIT,
-      page,
-    });
   }
 }
