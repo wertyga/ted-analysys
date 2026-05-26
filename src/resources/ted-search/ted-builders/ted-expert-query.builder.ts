@@ -41,10 +41,6 @@ export interface TedTenderSearchFilters {
   contractAwardTo?: number;
 }
 
-export function quoteTedValue(value: string): string {
-  return `"${value.trim().replace(/"/g, '\\"')}"`;
-}
-
 export function buildTedTenderSearchQuery(
   filters: TedTenderSearchFilters,
 ): string {

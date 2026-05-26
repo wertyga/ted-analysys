@@ -16,6 +16,10 @@ import { TendersService } from '@/resources/tenders/tenders.service';
 import { devLog, getPaginationMeta } from '@/utils';
 import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rates/currency-exchange-rates.service';
 
+type TedTenderSearchInput = TedTenderSearchRequestDto & {
+  additionalFields?: string[];
+};
+
 @Injectable()
 export class TedSearchService {
   private readonly logger = new Logger(TedSearchService.name);
@@ -56,9 +60,10 @@ export class TedSearchService {
     return this.postWithRetry(dto);
   }
 
-  async searchTenders(
-    filters: TedTenderSearchRequestDto,
-  ): Promise<TedSearchResponse> {
+  async searchTenders({
+    additionalFields,
+    ...filters
+  }: TedTenderSearchInput): Promise<TedSearchResponse> {
     return this.searchNotices({
       query: buildTedTenderSearchQuery(filters),
       scope: filters.scope ?? TedScope.ACTIVE,
@@ -67,7 +72,7 @@ export class TedSearchService {
       paginationMode: TedPaginationMode.PAGE_NUMBER,
       onlyLatestVersions: true,
       checkQuerySyntax: false,
-      fields: searchTendersDefaultFields,
+      fields: [...searchTendersDefaultFields, ...(additionalFields ?? [])],
     });
   }
 

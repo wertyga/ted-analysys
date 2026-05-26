@@ -1,99 +1,380 @@
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>AI Tenders - New matching tenders</title>
   <style>
     body {
-      max-width: 680px;
+      margin: 0;
+      padding: 0;
+      background: #f3f6fb;
+      color: #0f172a;
+      font-family: Arial, Helvetica, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    table {
+      border-collapse: collapse;
+    }
+
+    img {
+      border: 0;
+      display: block;
+      outline: none;
+      text-decoration: none;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .page {
       width: 100%;
+      background: #f3f6fb;
+      padding: 32px 12px;
+    }
+
+    .email {
+      width: 100%;
+      max-width: 680px;
       margin: 0 auto;
-      font-family: Roboto, RobotoDraft, Helvetica, Arial, "sans-serif";
-      color: #111111;
-      background-color: #ffffff;
+      background: #ffffff;
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
     }
 
-    .container {
-      padding: 30px;
+    .hero {
+      background: #0f172a;
+      padding: 34px 34px 30px;
+      color: #ffffff;
     }
 
-    .logo {
-      margin: 0 auto 32px auto;
+    .brand-row {
+      width: 100%;
+    }
+
+    .brand-logo {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      background: #111827;
+    }
+
+    .brand-name {
+      padding-left: 14px;
+      font-size: 20px;
+      line-height: 24px;
+      font-weight: 700;
+    }
+
+    .eyebrow {
+      margin: 34px 0 10px;
+      color: #38bdf8;
+      font-size: 13px;
+      line-height: 18px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .hero-title {
+      margin: 0;
+      font-size: 34px;
+      line-height: 40px;
+      font-weight: 800;
+    }
+
+    .hero-text {
+      margin: 14px 0 0;
+      max-width: 520px;
+      color: #cbd5e1;
+      font-size: 15px;
+      line-height: 23px;
+    }
+
+    .hero-stats {
+      margin-top: 24px;
+      width: 100%;
+    }
+
+    .stat-card {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 16px;
+      padding: 16px;
+    }
+
+    .stat-number {
+      color: #ffffff;
+      font-size: 28px;
+      line-height: 32px;
+      font-weight: 800;
+    }
+
+    .stat-label {
+      padding-top: 4px;
+      color: #94a3b8;
+      font-size: 12px;
+      line-height: 16px;
+    }
+
+    .content {
+      padding: 32px 34px 36px;
+    }
+
+    .greeting {
+      margin: 0 0 18px;
+      font-size: 16px;
+      line-height: 24px;
+      color: #334155;
+    }
+
+    .section-title {
+      margin: 0 0 16px;
+      font-size: 18px;
+      line-height: 24px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    .tender-card {
+      margin: 0 0 16px;
+      border: 1px solid #e2e8f0;
+      border-radius: 18px;
+      overflow: hidden;
+      background: #ffffff;
+    }
+
+    .tender-inner {
+      padding: 20px;
+    }
+
+    .tender-title {
+      margin: 0;
+      color: #0f172a;
+      font-size: 17px;
+      line-height: 24px;
+      font-weight: 800;
+    }
+
+    .summary {
+      margin: 14px 0 0;
+      color: #334155;
+      font-size: 14px;
+      line-height: 22px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #dcfce7;
+      color: #166534;
+      font-size: 12px;
+      line-height: 14px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .badge-good {
+      background: #e0f2fe;
+      color: #075985;
+    }
+
+    .badge-maybe {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .details-table {
+      width: 100%;
+      margin-top: 16px;
+      background: #f8fafc;
+      border-radius: 14px;
+    }
+
+    .detail-cell {
+      padding: 12px 14px;
+      font-size: 13px;
+      line-height: 18px;
+      color: #475569;
+      vertical-align: top;
+    }
+
+    .detail-label {
+      display: block;
+      margin-bottom: 3px;
+      color: #94a3b8;
+      font-size: 11px;
+      line-height: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .detail-value {
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    .more-card {
+      margin-top: 18px;
+      padding: 22px;
+      border-radius: 18px;
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
       text-align: center;
     }
 
-    .logo img {
-      width: 96px;
-      border-radius: 50%;
+    .more-title {
+      margin: 0;
+      color: #0f172a;
+      font-size: 18px;
+      line-height: 24px;
+      font-weight: 800;
     }
 
-    h2 {
-      margin: 12px 0 0;
-      font-size: 24px;
-    }
-
-    h3 {
-      margin: 0 0 20px;
-      font-size: 22px;
-      font-weight: 600;
-    }
-
-    p {
+    .more-text {
+      margin: 8px 0 0;
+      color: #64748b;
       font-size: 14px;
-      line-height: 1.5;
+      line-height: 22px;
     }
 
-    ol {
-      padding-left: 0;
-      margin: 24px 0 0;
-      list-style-position: inside;
+    .cta-wrap {
+      padding-top: 24px;
+      text-align: center;
     }
 
-    li {
-      padding: 18px;
-      margin-bottom: 16px;
-      border: 1px solid #d9d9d9;
-      border-radius: 6px;
-      list-style-position: outside;
+    .cta {
+      display: inline-block;
+      padding: 14px 22px;
+      border-radius: 12px;
+      background: #22c55e;
+      color: #052e16 !important;
+      font-size: 14px;
+      line-height: 18px;
+      font-weight: 800;
+      text-decoration: none;
     }
 
-    li h4 {
-      margin: 0 0 10px;
-      font-size: 16px;
+    .secondary-note {
+      margin: 14px 0 0;
+      color: #64748b;
+      font-size: 12px;
+      line-height: 18px;
+      text-align: center;
     }
 
     .footer {
-      background-color: #c2c2c2;
-      padding: 24px 12px;
-      margin: 36px 0 0;
-      font-size: 12px;
+      padding: 24px 34px 30px;
+      background: #f8fafc;
+      border-top: 1px solid #e2e8f0;
+      color: #64748b;
       text-align: center;
+      font-size: 12px;
+      line-height: 18px;
     }
 
-    @media screen and (max-width: 500px) {
-      .container {
-        padding: 16px;
+    .footer strong {
+      color: #334155;
+    }
+
+    @media screen and (max-width: 520px) {
+      .page {
+        padding: 0;
+      }
+
+      .email {
+        border-radius: 0;
+      }
+
+      .hero,
+      .content,
+      .footer {
+        padding-left: 20px;
+        padding-right: 20px;
+      }
+
+      .hero-title {
+        font-size: 28px;
+        line-height: 34px;
+      }
+
+      .stat-card {
+        padding: 14px;
+      }
+
+      .detail-cell {
+        display: block;
+        width: auto !important;
       }
     }
   </style>
 </head>
 <body>
-<div class="container">
-  <div class="logo">
-    <img src="https://travelwithme.b-cdn.net/icon_black_bg.png" />
-    <h2>AI Tenders</h2>
+  <div class="page">
+    <table role="presentation" class="email" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td class="hero">
+          <table role="presentation" class="brand-row" cellpadding="0" cellspacing="0">
+            <tr>
+              <td width="52">
+                <img class="brand-logo" src="https://travelwithme.b-cdn.net/icon_black_bg.png" width="52" height="52" alt="AI Tenders" />
+              </td>
+              <td class="brand-name">AI Tenders</td>
+            </tr>
+          </table>
+
+          <p class="eyebrow">Tender match report</p>
+          <h1 class="hero-title">{{reportTitle}}</h1>
+          <p class="hero-text">We scanned new opportunities against your company profile and selected the tenders with the strongest commercial and capability fit.</p>
+
+          <table role="presentation" class="hero-stats" cellpadding="0" cellspacing="0">
+            <tr>
+              <td width="50%" style="padding-right:8px;">
+                <div class="stat-card">
+                  <div class="stat-number">{{highestScore}}</div>
+                  <div class="stat-label">Highest AI fit score</div>
+                </div>
+              </td>
+              <td width="50%" style="padding-left:8px;">
+                <div class="stat-card">
+                  <div class="stat-number">{{highlightedCount}}</div>
+                  <div class="stat-label">Top tenders highlighted</div>
+                </div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="content">
+          <p class="greeting">Hello <strong>{{companyName}}</strong>,<br />these tenders matched your company profile and are worth reviewing first.</p>
+
+          <h2 class="section-title">Top matches</h2>
+
+          {{matchesHtml}}
+
+          <div class="cta-wrap">
+            <a class="cta" href="{{dashboardUrl}}">View tender matches</a>
+            <p class="secondary-note">Open your dashboard to review requirements, deadlines, and AI fit details.</p>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td class="footer">
+          <strong>AI Tenders</strong><br />
+          You received this email because tender match notifications are enabled in your AI Tenders account.<br />
+          You can change notification settings in your account dashboard.
+        </td>
+      </tr>
+    </table>
   </div>
-
-  <h3>{{reportTitle}}</h3>
-
-  <p>Hello <strong>{{companyName}}</strong>,</p>
-  <p>These tenders matched your company profile:</p>
-
-  <ol>
-    {{matchesHtml}}
-  </ol>
-
-  <p class="footer">
-    You received this email because tender match notifications are enabled in your AI Tenders account.
-  </p>
-</div>
 </body>
 </html>

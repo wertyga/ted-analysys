@@ -15,7 +15,10 @@ const emailVariables = {
   receiptUrl: '{{receiptUrl}}',
 
   reportTitle: '{{reportTitle}}',
+  highestScore: '{{highestScore}}',
+  highlightedCount: '{{highlightedCount}}',
   matchesHtml: '{{matchesHtml}}',
+  dashboardUrl: '{{dashboardUrl}}',
 };
 
 type TEmailTemplatesCompare = {
@@ -34,11 +37,17 @@ type TEmailTemplatesCompare = {
   [EMAIL_TEMPLATES.TenderMatchReport]:
     | 'companyName'
     | 'reportTitle'
+    | 'highestScore'
+    | 'highlightedCount'
+    | 'dashboardUrl'
     | 'matchesHtml';
 };
 
 export type EmailReplaceData<T extends EMAIL_TEMPLATES> = {
-  [K in Extract<TEmailTemplatesCompare[T], keyof typeof emailVariables>]: string;
+  [K in Extract<
+    TEmailTemplatesCompare[T],
+    keyof typeof emailVariables
+  >]: string;
 };
 
 export const getEmailTemplate = (type: EMAIL_TEMPLATES) => {

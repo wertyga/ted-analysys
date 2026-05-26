@@ -203,6 +203,11 @@ export class TenderMatchNotificationsService {
       {
         companyName: user.companyName || 'there',
         reportTitle: this.buildReportTitle(matches, frequency),
+        highestScore: this.buildHighestScore(matches),
+        highlightedCount: String(
+          Math.min(matches.length, MAX_DETAILED_MATCHES_PER_REPORT),
+        ),
+        dashboardUrl: this.buildDashboardUrl(),
         matchesHtml: this.buildMatchesHtml(matches),
       },
     );
@@ -323,12 +328,31 @@ export class TenderMatchNotificationsService {
     matches: PopulatedTenderMatch[],
     frequency: NotifiableFrequency,
   ): string {
-    const prefix =
-      frequency === UserNotificationFrequency.INSTANT
-        ? 'New matching tender'
-        : 'Matching tender report';
+    const tenderLabel = `tender${matches.length === 1 ? '' : 's'}`;
 
-    return `${prefix}: ${matches.length} tender${matches.length === 1 ? '' : 's'}`;
+    if (frequency === UserNotificationFrequency.INSTANT) {
+      return `${matches.length} new matching ${tenderLabel} found`;
+    }
+
+    return `${matches.length} matching ${tenderLabel} in your report`;
+  }
+
+  private buildHighestScore(matches: PopulatedTenderMatch[]): string {
+    const score = matches.reduce<number | null>((maxScore, match) => {
+      if (typeof match.aiFitScore !== 'number') {
+        return maxScore;
+      }
+
+      return maxScore === null
+        ? match.aiFitScore
+        : Math.max(maxScore, match.aiFitScore);
+    }, null);
+
+    return score === null ? 'n/a' : String(score);
+  }
+
+  private buildDashboardUrl(): string {
+    return process.env.USER_DASHBOARD_URL || '#';
   }
 
   private buildMatchesHtml(matches: PopulatedTenderMatch[]): string {
@@ -339,25 +363,52 @@ export class TenderMatchNotificationsService {
         const tender = match.tender;
         const title = this.escapeHtml(tender.title || tender.id);
         const buyer = tender.buyerName
-          ? `<p><strong>Buyer:</strong> ${this.escapeHtml(tender.buyerName)}</p>`
-          : '';
+          ? this.escapeHtml(tender.buyerName)
+          : 'Not specified';
         const deadline =
           tender.submissionDeadline ?? tender.deadlineReceiptTender;
         const deadlineText = deadline
-          ? `<p><strong>Deadline:</strong> ${deadline.toISOString().slice(0, 10)}</p>`
-          : '';
+          ? deadline.toISOString().slice(0, 10)
+          : 'Not specified';
+        const score = match.aiFitScore ?? 'n/a';
+        const badgeClass = this.getMatchBadgeClass(match.aiFitDecision);
+        const badgeLabel = this.getMatchBadgeLabel(match.aiFitDecision);
+        const badgeClasses = ['badge', badgeClass].filter(Boolean).join(' ');
 
         return [
-          '<li>',
-          `<h4>${title}</h4>`,
-          `<p><strong>TED id:</strong> ${this.escapeHtml(tender.id)}</p>`,
-          `<p><strong>AI fit:</strong> ${match.aiFitScore ?? 'n/a'} (${this.escapeHtml(match.aiFitDecision ?? 'n/a')})</p>`,
+          '<div class="tender-card">',
+          '<div class="tender-inner">',
+          '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">',
+          '<tr>',
+          '<td style="padding-right:12px;">',
+          `<h3 class="tender-title">${title}</h3>`,
+          '</td>',
+          '<td width="112" align="right" valign="top">',
+          `<span class="${badgeClasses}">${score} &middot; ${badgeLabel}</span>`,
+          '</td>',
+          '</tr>',
+          '</table>',
           match.aiFitSummary
-            ? `<p>${this.escapeHtml(match.aiFitSummary)}</p>`
+            ? `<p class="summary">${this.escapeHtml(match.aiFitSummary)}</p>`
             : '',
-          buyer,
-          deadlineText,
-          '</li>',
+          '<table role="presentation" class="details-table" cellpadding="0" cellspacing="0">',
+          '<tr>',
+          '<td class="detail-cell" width="34%">',
+          '<span class="detail-label">TED ID</span>',
+          `<span class="detail-value">${this.escapeHtml(tender.id)}</span>`,
+          '</td>',
+          '<td class="detail-cell" width="33%">',
+          '<span class="detail-label">Buyer</span>',
+          `<span class="detail-value">${buyer}</span>`,
+          '</td>',
+          '<td class="detail-cell" width="33%">',
+          '<span class="detail-label">Deadline</span>',
+          `<span class="detail-value">${deadlineText}</span>`,
+          '</td>',
+          '</tr>',
+          '</table>',
+          '</div>',
+          '</div>',
         ].join('');
       })
       .join('');
@@ -368,11 +419,39 @@ export class TenderMatchNotificationsService {
 
     return [
       detailedMatchesHtml,
-      '<li>',
-      `<p><strong>${remainingCount} more matching tender${remainingCount === 1 ? '' : 's'} included in this report.</strong></p>`,
-      '<p>They were marked as notified and will not be sent again.</p>',
-      '</li>',
+      '<div class="more-card">',
+      `<p class="more-title">+${remainingCount} more matching tender${remainingCount === 1 ? '' : 's'}</p>`,
+      '<p class="more-text">The full report includes all matched tenders. They were marked as notified and will not be sent again.</p>',
+      '</div>',
     ].join('');
+  }
+
+  private getMatchBadgeClass(decision?: AiFitDecision | null): string {
+    if (decision === AiFitDecision.GOOD_FIT) {
+      return 'badge-good';
+    }
+
+    if (decision === AiFitDecision.MAYBE) {
+      return 'badge-maybe';
+    }
+
+    return '';
+  }
+
+  private getMatchBadgeLabel(decision?: AiFitDecision | null): string {
+    if (decision === AiFitDecision.STRONG_FIT) {
+      return 'Strong fit';
+    }
+
+    if (decision === AiFitDecision.GOOD_FIT) {
+      return 'Good fit';
+    }
+
+    if (decision === AiFitDecision.MAYBE) {
+      return 'Maybe';
+    }
+
+    return decision ? this.escapeHtml(decision) : 'n/a';
   }
 
   private isPopulatedTenderMatch(

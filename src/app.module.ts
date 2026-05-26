@@ -22,6 +22,7 @@ import { CurrencyExchangeRatesModule } from './resources/currency-exchange-rates
 import { PaymentsModule } from './resources/payments/payments.module';
 import { FeedbackModule } from './resources/feedback/feedback.module';
 import { TariffModule } from './resources/tariff';
+import { SimilarContractsModule } from './resources/similar-contracts/similar-contracts.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { TariffModule } from './resources/tariff';
     PaymentsModule,
     FeedbackModule,
     TariffModule,
+    SimilarContractsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
