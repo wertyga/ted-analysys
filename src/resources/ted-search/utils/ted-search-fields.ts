@@ -141,3 +141,47 @@ export const searchTendersDefaultFields = [
   // 'tender-validity-deadline-value-lot',
   // 'tender-validity-deadline-unit-lot',
 ];
+
+export const TED_COMPETITION_LOT_FIELDS = [
+  'identifier-lot',
+  'internal-identifier-lot',
+
+  'title-lot',
+  'description-lot',
+
+  'main-classification-lot',
+  'additional-classification-lot',
+  'contract-nature-main-lot',
+
+  'estimated-value-lot',
+  'estimated-value-cur-lot',
+  'framework-maximum-value-lot',
+  'framework-maximum-value-cur-lot',
+
+  'framework-agreement-lot',
+  'dps-usage-lot',
+
+  'duration-period-value-lot',
+  'duration-period-unit-lot',
+
+  'deadline-receipt-tender-date-lot',
+  'deadline-receipt-tender-time-lot',
+
+  'document-url-lot',
+  'submission-url-lot',
+  'electronic-submission-lot',
+  'submission-language',
+
+  'place-of-performance-country-lot',
+  'place-of-performance-subdiv-lot',
+  'place-of-performance-city-lot',
+
+  'award-criterion-type-lot',
+  'award-criterion-name-lot',
+  'award-criterion-description-lot',
+  'award-criterion-number-weight-lot',
+
+  'selection-criterion-name-lot',
+  'selection-criterion-description-lot',
+  'selection-criteria-source',
+] as const;

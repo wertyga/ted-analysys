@@ -4,12 +4,16 @@ import { SimilarContractAwardsRequestDto } from './dto/similar-contract-awards-r
 import { TedSearchService } from '@/resources/ted-search/ted-search.service';
 import {
   TedNotice,
+  TedPaginationMode,
   TedScope,
   TedSearchResponse,
   TedSortOrder,
   TedTenderSortColumn,
 } from '@/resources/ted-search/types/ted-search.types';
-import { getTedDate } from '@/resources/ted-search/utils';
+import {
+  getTedDate,
+  searchTendersDefaultFields,
+} from '@/resources/ted-search/utils';
 import { TENDER_RESULT_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { winnerFields } from './similar-contracts.utils';
 import { TenderDocument, TenderModel } from '@/resources/tenders/schemas';
@@ -35,6 +39,7 @@ import {
   readString,
   tenderCpvPopulateFields,
 } from '@/utils';
+import { buildTedTenderSearchQuery } from '@/resources/ted-search/ted-builders';
 
 const HISTORY_YEARS_BACK = 3;
 const COUNT_OF_AWARD_TENDERS_SEARCH = 1;
@@ -63,13 +68,13 @@ export class SimilarContractsService {
   async normalizeResultTender(
     notice: TedNotice,
   ): Promise<normalizedAwardTenderDto> {
-    console.log({ notice });
     const normalizedTenderDto =
       await this.tenderNormalizer.normalizeTedNoticeWithCpvCodes(notice, false);
 
     const awardXml = await fetchXmlContentFromNotice(notice.links);
 
     const xmlAwardValue = extractXmlAwardValue(awardXml);
+    console.log({ xmlAwardValue });
     const xmlWinners = extractXmlAwardWinners(awardXml);
 
     const normalizedAward = {
@@ -110,19 +115,25 @@ export class SimilarContractsService {
   async searchHistoryAwards(
     dto: SimilarContractAwardsRequestDto,
   ): Promise<TedSearchResponse> {
-    return this.tedSearchService.searchTenders({
-      cpvCodes: dto.cpvCodes,
-      buyerCountries: dto.buyerCountries,
-      contractNature: dto.contractNature,
-      noticeTypes: TENDER_RESULT_NOTICE_TYPES,
-      publicationDateFrom: this.publicationDateFromHistoryTedDate,
-      publicationDateTo: getTedDate(),
+    return this.tedSearchService.searchNotices({
+      query: buildTedTenderSearchQuery({
+        cpvCodes: dto.cpvCodes,
+        buyerCountries: dto.buyerCountries,
+        contractNature: dto.contractNature,
+        noticeTypes: TENDER_RESULT_NOTICE_TYPES,
+        publicationDateFrom: this.publicationDateFromHistoryTedDate,
+        publicationDateTo: getTedDate(),
+        winnerSelectionStatus: 'selec-w',
+        sortColumn: TedTenderSortColumn.PUBLICATION_DATE,
+        sortOrder: TedSortOrder.DESC,
+      }),
       scope: TedScope.ALL,
+      checkQuerySyntax: false,
+      onlyLatestVersions: true,
+      paginationMode: TedPaginationMode.PAGE_NUMBER,
       limit: COUNT_OF_AWARD_TENDERS_SEARCH,
       page: 1,
-      sortColumn: TedTenderSortColumn.PUBLICATION_DATE,
-      sortOrder: TedSortOrder.DESC,
-      additionalFields: winnerFields,
+      fields: [...searchTendersDefaultFields, ...winnerFields],
     });
   }
 
@@ -162,7 +173,6 @@ export class SimilarContractsService {
       };
     }
 
-    console.log('TED_SEARCH');
     const { totalNoticeCount, normalizedTenders } =
       await this.searchAwardsFromTed(filters);
 
@@ -180,7 +190,7 @@ export class SimilarContractsService {
 
   async upsertAwardTender(
     normalizedTender: normalizedAwardTenderDto,
-    searchHash: string,
+    searchHash?: string,
   ) {
     const estimatedValueEur =
       await this.tendersService.calculateEstimatedValueEur(normalizedTender);
@@ -191,15 +201,20 @@ export class SimilarContractsService {
       estimatedValueEur,
     );
 
+    const filter = searchHash
+      ? { id: normalizedTender.id, searchHash }
+      : { id: normalizedTender.id, searchHash: { $exists: false } };
+
     const savedTender = await AwardTenderModel.findOneAndUpdate(
-      { id: normalizedTender.id, searchHash },
+      filter,
       { $set: awardTender },
       { returnDocument: 'after', upsert: true, strict: false },
     )
+      .populate(tenderCpvPopulateFields)
       .lean()
       .exec();
 
-    return savedTender.populate(tenderCpvPopulateFields);
+    return savedTender;
   }
 
   async searchAwardsFromTed(filters: SimilarContractAwardsRequestDto) {
@@ -259,7 +274,7 @@ export class SimilarContractsService {
 
   private toAwardTenderDocument(
     normalizedTender: normalizedAwardTenderDto,
-    searchHash: string,
+    searchHash: string | undefined,
     estimatedValueEur: number | null,
   ): Record<string, unknown> {
     const {
@@ -276,7 +291,7 @@ export class SimilarContractsService {
       ...tender
     } = normalizedTender;
 
-    return {
+    const awardTender: Record<string, unknown> = {
       ...tender,
       estimatedValueEur,
       winners: this.buildAwardTenderWinners({
@@ -291,9 +306,16 @@ export class SimilarContractsService {
         winnerSelectionStatus,
         winnerDecisionDate,
       }),
-      searchHash,
-      searchCacheExpiresAt: new Date(Date.now() + AWARD_SEARCH_CACHE_TTL_MS),
     };
+
+    if (searchHash) {
+      awardTender.searchHash = searchHash;
+      awardTender.searchCacheExpiresAt = new Date(
+        Date.now() + AWARD_SEARCH_CACHE_TTL_MS,
+      );
+    }
+
+    return awardTender;
   }
 
   private buildAwardTenderWinners({

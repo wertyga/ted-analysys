@@ -16,10 +16,6 @@ import { TendersService } from '@/resources/tenders/tenders.service';
 import { devLog, getPaginationMeta } from '@/utils';
 import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rates/currency-exchange-rates.service';
 
-type TedTenderSearchInput = TedTenderSearchRequestDto & {
-  additionalFields?: string[];
-};
-
 @Injectable()
 export class TedSearchService {
   private readonly logger = new Logger(TedSearchService.name);
@@ -46,25 +42,14 @@ export class TedSearchService {
 
   private readonly filters: TedSearchFilters;
 
-  private withDefaultFields({
-    fields = [],
-    ...payload
-  }: TedSearchRequestDto): TedSearchRequestDto {
-    return {
-      ...payload,
-      fields: Array.from(new Set([...fields, ...searchTendersDefaultFields])),
-    };
-  }
-
   async searchNotices(dto: TedSearchRequestDto): Promise<TedSearchResponse> {
     return this.postWithRetry(dto);
   }
 
-  async searchTenders({
-    additionalFields,
-    ...filters
-  }: TedTenderSearchInput): Promise<TedSearchResponse> {
-    return this.searchNotices({
+  async searchTenders(
+    filters: TedTenderSearchRequestDto,
+  ): Promise<TedSearchResponse> {
+    return this.postWithRetry({
       query: buildTedTenderSearchQuery(filters),
       scope: filters.scope ?? TedScope.ACTIVE,
       limit: filters.limit ?? 20,
@@ -72,7 +57,7 @@ export class TedSearchService {
       paginationMode: TedPaginationMode.PAGE_NUMBER,
       onlyLatestVersions: true,
       checkQuerySyntax: false,
-      fields: [...searchTendersDefaultFields, ...(additionalFields ?? [])],
+      fields: searchTendersDefaultFields,
     });
   }
 
@@ -111,19 +96,18 @@ export class TedSearchService {
   private async postWithRetry(
     payload: TedSearchRequestDto,
   ): Promise<TedSearchResponse> {
-    const normalizedPayload = this.withDefaultFields({ ...payload });
     let lastError: unknown;
 
     for (let attempt = 0; attempt <= this.retryDelaysMs.length; attempt += 1) {
       try {
         devLog(
-          () => `TED Search request: ${JSON.stringify(normalizedPayload)}`,
+          () => `TED Search request: ${JSON.stringify(payload)}`,
           TedSearchService.name,
         );
 
         const response = await this.http.post<TedSearchResponse>(
           '/v3/notices/search',
-          normalizedPayload,
+          payload,
         );
 
         return response.data;

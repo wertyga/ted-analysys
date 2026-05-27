@@ -52,8 +52,8 @@ export interface AwardTender {
   links?: TenderDocumentsLinks;
   rawNotice?: Record<string, unknown>;
   sourceHash: string;
-  searchHash: string;
-  searchCacheExpiresAt: Date;
+  searchHash?: string;
+  searchCacheExpiresAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -139,11 +139,9 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
       default: [],
     },
     links: Schema.Types.Mixed,
-    searchHash: { type: String, required: true, index: true },
+    searchHash: { type: String, index: true },
     searchCacheExpiresAt: {
       type: Date,
-      required: true,
-      default: () => new Date(Date.now() + AWARD_SEARCH_CACHE_TTL_MS),
     },
   },
   {
@@ -158,7 +156,13 @@ AwardTenderSchema.index({
   contractNature: 1,
   publicationDate: -1,
 });
-AwardTenderSchema.index({ id: 1, searchHash: 1 }, { unique: true });
+AwardTenderSchema.index(
+  { id: 1, searchHash: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { searchHash: { $exists: true } },
+  },
+);
 AwardTenderSchema.index({ 'winners.identifier': 1 });
 AwardTenderSchema.index({ 'winners.name': 1 });
 AwardTenderSchema.index({ searchCacheExpiresAt: 1 }, { expireAfterSeconds: 0 });

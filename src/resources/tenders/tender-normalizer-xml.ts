@@ -1,8 +1,8 @@
 import * as cheerio from 'cheerio';
 import axios from 'axios';
 import { isTag, type AnyNode, type Element } from 'domhandler';
-import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
-import { Tender, TenderDocumentsLinks } from '@/resources/tenders/schemas';
+import { TenderDocumentsLinks } from '@/resources/tenders/schemas';
+import { sleep } from '@/utils';
 
 export interface TextCandidate {
   text: string;
@@ -50,6 +50,7 @@ export async function fetchXmlContentFromNotice<T extends TenderDocumentsLinks>(
 
 export async function fetchXmlContentFromUrl(
   sourceUrl?: string,
+  attempts = 1,
 ): Promise<string | undefined> {
   try {
     if (sourceUrl === undefined || !/^https?:\/\//i.test(sourceUrl)) {
@@ -73,7 +74,13 @@ export async function fetchXmlContentFromUrl(
 
     return content.includes('<') ? content : undefined;
   } catch (e) {
-    return undefined;
+    if (attempts > 10) {
+      return undefined;
+    }
+
+    await sleep(500);
+
+    return fetchXmlContentFromUrl(sourceUrl, attempts + 1);
   }
 }
 
