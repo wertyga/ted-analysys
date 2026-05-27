@@ -1,8 +1,8 @@
 import * as cheerio from 'cheerio';
 import axios from 'axios';
 import { isTag, type AnyNode, type Element } from 'domhandler';
-import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
-import { Tender, TenderDocumentsLinks } from '@/resources/tenders/schemas';
+import { TenderDocumentsLinks } from '@/resources/tenders/schemas';
+import { sleep } from '@/utils';
 
 export interface TextCandidate {
   text: string;
@@ -50,27 +50,38 @@ export async function fetchXmlContentFromNotice<T extends TenderDocumentsLinks>(
 
 export async function fetchXmlContentFromUrl(
   sourceUrl?: string,
+  attempts = 1,
 ): Promise<string | undefined> {
-  if (sourceUrl === undefined || !/^https?:\/\//i.test(sourceUrl)) {
-    return undefined;
+  try {
+    if (sourceUrl === undefined || !/^https?:\/\//i.test(sourceUrl)) {
+      return undefined;
+    }
+
+    const response = await axios.get<string | ArrayBuffer>(sourceUrl, {
+      responseType: 'text',
+      timeout: 30_000,
+      headers: {
+        Accept: 'application/xml, text/xml, text/plain, */*',
+      },
+      maxContentLength: 25 * 1024 * 1024,
+      maxBodyLength: 25 * 1024 * 1024,
+    });
+
+    const content =
+      typeof response.data === 'string'
+        ? response.data
+        : Buffer.from(response.data).toString('utf8');
+
+    return content.includes('<') ? content : undefined;
+  } catch (e) {
+    if (attempts > 10) {
+      return undefined;
+    }
+
+    await sleep(500);
+
+    return fetchXmlContentFromUrl(sourceUrl, attempts + 1);
   }
-
-  const response = await axios.get<string | ArrayBuffer>(sourceUrl, {
-    responseType: 'text',
-    timeout: 30_000,
-    headers: {
-      Accept: 'application/xml, text/xml, text/plain, */*',
-    },
-    maxContentLength: 25 * 1024 * 1024,
-    maxBodyLength: 25 * 1024 * 1024,
-  });
-
-  const content =
-    typeof response.data === 'string'
-      ? response.data
-      : Buffer.from(response.data).toString('utf8');
-
-  return content.includes('<') ? content : undefined;
 }
 
 export function extractXmlDescriptionCandidates(xml: string): TextCandidate[] {

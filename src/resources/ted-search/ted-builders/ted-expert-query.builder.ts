@@ -41,6 +41,7 @@ export interface TedTenderSearchFilters {
   sortOrder?: TedSortOrder;
   contractAwardFrom?: number;
   contractAwardTo?: number;
+  winnerSelectionStatus?: string;
 }
 
 export function buildTedTenderSearchQuery(
@@ -82,6 +83,9 @@ export function buildTedTenderSearchQuery(
     buildInPart('procedure-type', procedureType),
     buildInPart('contract-nature', contractNature),
     buildInPart('total-value-cur', currency),
+    buildInPart('winner-selection-status', [
+      ...(filters.winnerSelectionStatus ? [filters.winnerSelectionStatus] : []),
+    ]),
     buildRangePart('total-value', contractAwardFrom, contractAwardTo),
     buildDateRangePart(
       'publication-date',
@@ -95,10 +99,7 @@ export function buildTedTenderSearchQuery(
     ),
   ].filter((part): part is string => !!part);
 
-  const query =
-    parts.length === 0
-      ? 'publication-number = *'
-      : parts.map((part) => `(${part})`).join(' AND ');
+  const query = parts.map((part) => `(${part})`).join(' AND ');
 
   return appendSortPart(query, filters.sortColumn, filters.sortOrder);
 }

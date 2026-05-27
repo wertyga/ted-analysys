@@ -9,11 +9,10 @@ import { TenderMatchingService } from '@/resources/tender-matching/tender-matchi
 import { TedOpenTendersCollectorService } from '@/resources/ted-open-tenders-collector/ted-open-tenders-collector.service';
 import { TenderMatchSource } from '@/resources/tender-matching/tender-match.types';
 import { TenderMatchNotificationsService } from '@/resources/tender-match-notifications/tender-match-notifications.service';
+import { SimilarContractsService } from '@/resources/similar-contracts/similar-contracts.service';
 
 const RECENT_TENDERS_CRON = '0 1 * * *';
 const ALL_COMPETITION_TENDERS_CRON = '0 3 * * *';
-const RECENT_TENDERS_PAGE_LIMIT = 100;
-const RECENT_TENDERS_MAX_PAGES = 100;
 
 @Injectable()
 export class TendersCronService {
@@ -27,7 +26,18 @@ export class TendersCronService {
     private readonly tendersService: TendersService,
     private readonly tenderMatchingService: TenderMatchingService,
     private readonly tenderMatchNotificationsService: TenderMatchNotificationsService,
-  ) {}
+    private readonly similarContractsService: SimilarContractsService,
+  ) {
+    // setTimeout(async () => {
+    //   const result = await new TedOpenTendersCollectorService(
+    //     this.tedSearchService,
+    //     this.tendersService,
+    //     this.similarContractsService,
+    //   ).collectResultTendersHistoryFromTed();
+    //
+    //   await logger.info('TED_ALL_RESULT_COLLECTED', result);
+    // }, 3000);
+  }
 
   @Cron(ALL_COMPETITION_TENDERS_CRON, {
     timeZone: 'Europe/Warsaw',
@@ -48,6 +58,7 @@ export class TendersCronService {
       const result = await new TedOpenTendersCollectorService(
         this.tedSearchService,
         this.tendersService,
+        this.similarContractsService,
       ).collectOpenTendersFromTed({
         onChangedTenders: async (tenders) => {
           const matches = await this.matchChangedTenders(tenders);
@@ -89,6 +100,7 @@ export class TendersCronService {
       const result = await new TedOpenTendersCollectorService(
         this.tedSearchService,
         this.tendersService,
+        this.similarContractsService,
       ).collectRecentCompetitionTendersFromTed({
         onChangedTenders: async (tenders) => {
           const matches = await this.matchChangedTenders(tenders);

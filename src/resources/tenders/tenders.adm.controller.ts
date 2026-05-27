@@ -22,6 +22,7 @@ import {
   isRecord,
 } from '@/utils';
 import { MigrateTenderDateFieldsResult } from './tenders.service';
+import { searchTendersDefaultFields } from '@/resources/ted-search/utils';
 
 class GatherActiveTendersRequestDto {
   @IsOptional()
@@ -86,7 +87,7 @@ export class TendersAdmController {
           onlyLatestVersions: true,
           checkQuerySyntax: false,
           iterationNextToken,
-          fields: this.tendersService.tenderDefaultFields,
+          fields: searchTendersDefaultFields,
         });
         const notices = this.tendersService.extractNotices(response);
 

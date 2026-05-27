@@ -35,7 +35,7 @@ import {
   valueToString,
 } from '@/utils';
 import { tenderCpvPopulateFields } from '@/resources/tenders/utils/tender.utils';
-import { SortOrder } from 'mongoose';
+import { Mongoose, SortOrder, Types } from 'mongoose';
 import {
   TenderDeepAnalysisDocument,
   TenderDeepAnalysisModel,
@@ -46,6 +46,7 @@ import {
 } from '@/resources/tender-wishlist/schemas';
 import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rates/currency-exchange-rates.service';
 import { CurrencySign } from '@/resources/codelist';
+import { searchTendersDefaultFields } from '@/resources/ted-search/utils';
 
 export interface GatherActiveTendersResult {
   completed?: boolean;
@@ -79,71 +80,6 @@ export type TenderDocumentWithGeneralAnalysis = TenderDocument & {
 export class TendersService {
   private readonly logger = new Logger(TendersService.name);
 
-  tenderDefaultFields = [
-    'notice-identifier',
-    'publication-number',
-    'notice-type',
-    'notice-subtype',
-    'notice-version',
-    'notice-title',
-    'publication-date',
-    'dispatch-date',
-    'deadline',
-    'deadline-receipt-tender-date-lot',
-    'deadline-receipt-tender-time-lot',
-    'deadline-receipt-answers-date-lot',
-    'deadline-receipt-answers-time-lot',
-    'title-proc',
-    'title-lot',
-    'description-proc',
-    'description-lot',
-    'procedure-type',
-    'contract-nature',
-    'legal-basis',
-    'classification-cpv',
-    'main-classification-proc',
-    'main-classification-lot',
-    'additional-classification-lot',
-    'buyer-name',
-    'buyer-identifier',
-    'buyer-country',
-    'buyer-city',
-    'main-activity',
-    'buyer-email',
-    'buyer-internet-address',
-    'buyer-profile',
-    'estimated-value-proc',
-    'estimated-value-cur-proc',
-    'estimated-value-lot',
-    'estimated-value-cur-lot',
-    'place-of-performance-country-proc',
-    'place-of-performance-country-lot',
-    'place-of-performance-city-proc',
-    'place-of-performance-city-lot',
-    'identifier-lot',
-    'internal-identifier-lot',
-    'links',
-    'document-url-lot',
-    'submission-url-lot',
-    'electronic-submission-lot',
-    'submission-language',
-    'official-language',
-    'contract-duration-start-date-lot',
-    'contract-duration-end-date-lot',
-    'duration-period-value-lot',
-    'duration-period-unit-lot',
-    'sme-lot',
-    'framework-agreement-lot',
-    'dps-usage-lot',
-    'eu-fund-lot',
-    'selection-criterion-name-lot',
-    'selection-criterion-description-lot',
-    'award-criterion-name-lot',
-    'award-criterion-description-lot',
-    'award-criterion-type-lot',
-    'award-criterion-number-weight-lot',
-  ];
-
   constructor(
     @Inject(forwardRef(() => TedSearchService))
     private readonly tedSearchService: TedSearchService,
@@ -168,6 +104,7 @@ export class TendersService {
         true,
         normalizedTender,
       );
+
     const estimatedValueEur =
       await this.calculateEstimatedValueEur(normalizedTender);
 
@@ -342,6 +279,19 @@ export class TendersService {
     return localTender.populate(tenderCpvPopulateFields);
   }
 
+  async getNormalizedTenderWithBaseAnalysis(tedTender: any) {
+    tedTender._id = new Types.ObjectId().toHexString();
+    const generalAnalysis =
+      await this.tenderGeneralAnalysisService.ensureAnalysisForTender(
+        tedTender as any,
+      );
+
+    tedTender.generalAnalysis =
+      TenderGeneralAnalysisModel.serializeDetail(generalAnalysis);
+
+    return tedTender;
+  }
+
   async findMultipleLocalTendersWithBaseAnalysis(
     tenderQuery: Record<string, unknown>,
     options: {
@@ -428,32 +378,10 @@ export class TendersService {
       paginationMode: TedPaginationMode.PAGE_NUMBER,
       onlyLatestVersions: true,
       checkQuerySyntax: false,
-      fields: this.tenderDefaultFields,
+      fields: searchTendersDefaultFields,
     });
 
     return this.extractNotices(response)[0];
-  }
-
-  async searchTendersByPublicationNumbers(
-    dto: TedPublicationNumbersSearchRequestDto,
-  ): Promise<TedNotice[]> {
-    const publicationNumbers = Array.from(new Set(dto.publicationNumbers));
-    const quotedPublicationNumbers = publicationNumbers
-      .map((publicationNumber) => `"${publicationNumber}"`)
-      .join(', ');
-
-    return this.tedSearchService
-      .searchNotices({
-        query: `publication-number IN (${quotedPublicationNumbers})`,
-        scope: dto.scope ?? TedScope.ACTIVE,
-        limit: dto.limit ?? 20,
-        page: dto.page ?? 1,
-        paginationMode: TedPaginationMode.PAGE_NUMBER,
-        onlyLatestVersions: true,
-        checkQuerySyntax: false,
-        fields: this.tenderDefaultFields,
-      })
-      .then((response) => this.extractNotices(response).filter(Boolean));
   }
 
   extractNotices(response: TedSearchResponse): TedNotice[] {
