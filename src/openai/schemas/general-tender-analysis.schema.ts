@@ -3,6 +3,7 @@ export const GENERAL_TENDER_ANALYSIS_JSON_SCHEMA = {
   additionalProperties: false,
   required: [
     'summary',
+    'lots',
     'scopeOfWork',
     'keyRequirements',
     'eligibilityCriteria',
@@ -25,6 +26,47 @@ export const GENERAL_TENDER_ANALYSIS_JSON_SCHEMA = {
   ],
   properties: {
     summary: { type: 'string' },
+
+    lots: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: [
+          'identifier',
+          'title',
+          'summary',
+          'cpvCodes',
+          'estimatedValue',
+          'deadline',
+          'source',
+        ],
+        properties: {
+          identifier: { type: ['string', 'null'] },
+          title: { type: ['string', 'null'] },
+          summary: { type: 'string' },
+          cpvCodes: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+          estimatedValue: {
+            type: ['object', 'null'],
+            additionalProperties: false,
+            required: ['amount', 'currency', 'description'],
+            properties: {
+              amount: { type: ['number', 'null'] },
+              currency: { type: ['string', 'null'] },
+              description: { type: ['string', 'null'] },
+            },
+          },
+          deadline: { type: ['string', 'null'] },
+          source: {
+            type: 'string',
+            enum: ['STRUCTURED_DATA', 'XML_NOTICE', 'DOCUMENT_TEXT'],
+          },
+        },
+      },
+    },
 
     scopeOfWork: {
       type: 'array',

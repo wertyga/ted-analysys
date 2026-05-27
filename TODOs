@@ -6,6 +6,7 @@
 - BE - Tidy up tender-matching.service
 - BE - optimize documents text
 - BE - deep analysis restriction - pro/business
+- GEN_ANALYSIS - extract lots !!!
 
 buyerProfile: https://ch-giorgi.sudest-marchespublics.com
 пробовать доставать portalUrl для deep analysis

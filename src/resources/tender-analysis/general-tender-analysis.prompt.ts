@@ -21,7 +21,11 @@ export function buildGeneralTenderAnalysisPrompt(
     'If TENDER STRUCTURED DATA has null value fields but XML_NOTICE contains explicit value fields, use XML_NOTICE for estimatedValue and set estimatedValue.source to XML_NOTICE.',
 
     'LOTS',
+    'Always return lots as a structured array. Return [] only when no lot structure is present in TENDER STRUCTURED DATA, XML_NOTICE, or DOCUMENTS.',
     'Use tender.lots together with the general description to understand lot-specific scope, CPVs, values, deadlines, submission channels, selection criteria, and award criteria.',
+    'If tender.lots is missing, empty, or incomplete, inspect DOCUMENTS for explicit lot sections, lot numbers, lot titles, lot descriptions, lot values, lot CPVs, lot deadlines, and lot-specific criteria, and include those document-derived lots in the analysis.',
+    'For each returned lot, preserve explicit lot identifier and title when available, summarize the lot-specific scope, include CPV codes, value, and deadline only when explicitly present, and set source to STRUCTURED_DATA, XML_NOTICE, or DOCUMENT_TEXT.',
+    'When lots are extracted only from DOCUMENTS, clearly indicate in the relevant summary, scope, value, criteria, or risk text that the lot information comes from document text.',
     'If lots differ, mention lot-specific scope instead of flattening everything into one generic summary.',
     'If multiple lots are present, analyze all provided lots at a useful summary level.',
     'If only some lot titles or descriptions are provided, do not assume missing lot details. Mention that lot data is incomplete.',

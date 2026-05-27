@@ -30,6 +30,10 @@ const BASE_ANALYSIS_CONCURRENCY = 20;
 const FREE_BASIC_ANALYSIS_FIELDS = [
   'summary',
   {
+    name: 'lots',
+    len: 3,
+  },
+  {
     name: 'scopeOfWork',
     len: 2,
   },

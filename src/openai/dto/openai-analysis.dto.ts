@@ -22,6 +22,11 @@ export type EstimatedValueSource =
   | 'DOCUMENT_TEXT'
   | 'NOT_FOUND';
 
+export type TenderAnalysisLotSource =
+  | 'STRUCTURED_DATA'
+  | 'XML_NOTICE'
+  | 'DOCUMENT_TEXT';
+
 export type DocumentInputAnalysis = {
   id?: string;
   filename?: string | null;
@@ -95,6 +100,20 @@ export interface GeneralTenderAnalysisInput {
 
 export interface GeneralTenderAnalysisResult {
   summary: string;
+
+  lots: Array<{
+    identifier: string | null;
+    title: string | null;
+    summary: string;
+    cpvCodes: string[];
+    estimatedValue: {
+      amount: number | null;
+      currency: string | null;
+      description: string | null;
+    } | null;
+    deadline: string | null;
+    source: TenderAnalysisLotSource;
+  }>;
 
   scopeOfWork: string[];
   keyRequirements: string[];
