@@ -343,6 +343,9 @@
     "codes" : [ "GBP" ],
     "label" : "Pound sterling"
   }, {
+    "codes" : [ "GPB" ],
+    "label" : "Pound sterling"
+  }, {
     "codes" : [ "BWP" ],
     "label" : "Pula"
   }, {

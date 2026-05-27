@@ -135,7 +135,17 @@ export class CurrencyExchangeRatesService {
           currency,
         };
 
-    return CurrencyExchangeRateModel.findOne(query).sort({ date: -1 }).exec();
+    let rate = await CurrencyExchangeRateModel.findOne(query).sort({
+      date: -1,
+    });
+
+    if (!rate) {
+      rate = await CurrencyExchangeRateModel.findOne({ currency }).sort({
+        date: -1,
+      });
+    }
+
+    return rate;
   }
 
   private parseEcbDailyRates(xml: string): {

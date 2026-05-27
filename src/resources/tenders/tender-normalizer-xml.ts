@@ -51,26 +51,30 @@ export async function fetchXmlContentFromNotice<T extends TenderDocumentsLinks>(
 export async function fetchXmlContentFromUrl(
   sourceUrl?: string,
 ): Promise<string | undefined> {
-  if (sourceUrl === undefined || !/^https?:\/\//i.test(sourceUrl)) {
+  try {
+    if (sourceUrl === undefined || !/^https?:\/\//i.test(sourceUrl)) {
+      return undefined;
+    }
+
+    const response = await axios.get<string | ArrayBuffer>(sourceUrl, {
+      responseType: 'text',
+      timeout: 30_000,
+      headers: {
+        Accept: 'application/xml, text/xml, text/plain, */*',
+      },
+      maxContentLength: 25 * 1024 * 1024,
+      maxBodyLength: 25 * 1024 * 1024,
+    });
+
+    const content =
+      typeof response.data === 'string'
+        ? response.data
+        : Buffer.from(response.data).toString('utf8');
+
+    return content.includes('<') ? content : undefined;
+  } catch (e) {
     return undefined;
   }
-
-  const response = await axios.get<string | ArrayBuffer>(sourceUrl, {
-    responseType: 'text',
-    timeout: 30_000,
-    headers: {
-      Accept: 'application/xml, text/xml, text/plain, */*',
-    },
-    maxContentLength: 25 * 1024 * 1024,
-    maxBodyLength: 25 * 1024 * 1024,
-  });
-
-  const content =
-    typeof response.data === 'string'
-      ? response.data
-      : Buffer.from(response.data).toString('utf8');
-
-  return content.includes('<') ? content : undefined;
 }
 
 export function extractXmlDescriptionCandidates(xml: string): TextCandidate[] {

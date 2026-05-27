@@ -11,6 +11,7 @@ import { SimilarContractAwardsRequestDto } from './dto/similar-contract-awards-r
 import { SimilarContractsService } from './similar-contracts.service';
 import { TedSearchResponse } from '@/resources/ted-search/types/ted-search.types';
 import { TendersService } from '@/resources/tenders/tenders.service';
+import { AwardTenderModel } from '@/resources/similar-contracts/schemas';
 
 @ApiTags('similar-contracts')
 @Controller('similar-contracts')
@@ -30,25 +31,17 @@ export class SimilarContractsController {
   @ApiServiceUnavailableResponse({ description: 'TED API is unavailable' })
   async searchHistoryAwards(
     @Query('tenderId') tenderId: string,
-  ): Promise<TedSearchResponse | any> {
-    try {
-      const tenderResponse =
-        await this.similarContractsService.searchAwardsFromTed(tenderId);
-
-      const tenderWithBaseAnalysis = await Promise.all(
-        tenderResponse.notices.map((tender) => {
-          return this.tendersService.getNormalizedTenderWithBaseAnalysis(
-            tender,
-          );
-        }),
+  ): Promise<TedSearchResponse> {
+    const tenderResponse =
+      await this.similarContractsService.searchAwardsAndUpsertIfNeeded(
+        tenderId,
       );
 
-      return {
-        ...tenderResponse,
-        notices: tenderWithBaseAnalysis,
-      };
-    } catch (e) {
-      console.log({ e });
-    }
+    return {
+      totalNoticeCount: tenderResponse.totalNoticeCount,
+      notices: tenderResponse.notices.map((tender) => {
+        return AwardTenderModel.toDetailDto(tender);
+      }),
+    };
   }
 }

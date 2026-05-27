@@ -53,6 +53,7 @@ export enum CurrencySign {
   GEL = 'GEL',
   GHS = 'GHS',
   GIP = 'GIP',
+  GPB = 'GPB',
   GMD = 'GMD',
   GNF = 'GNF',
   GTQ = 'GTQ',

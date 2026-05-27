@@ -52,6 +52,8 @@ export interface AwardTender {
   links?: TenderDocumentsLinks;
   rawNotice?: Record<string, unknown>;
   sourceHash: string;
+  searchHash: string;
+  searchCacheExpiresAt: Date;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -61,8 +63,10 @@ export type AwardTenderRecord = AwardTender & { _id: unknown };
 export type AwardTenderSerializable = AwardTenderDocument | AwardTenderRecord;
 
 export interface AwardTenderModelType extends Model<AwardTenderDocument> {
-  serialize(tender: AwardTenderSerializable): Partial<AwardTender>;
+  toDetailDto(tender: AwardTenderSerializable): Partial<AwardTender>;
 }
+
+export const AWARD_SEARCH_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const AwardTenderWinnerSchema = new Schema<AwardTenderWinner>(
   {
@@ -82,7 +86,7 @@ const AwardTenderWinnerSchema = new Schema<AwardTenderWinner>(
 
 const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
   {
-    id: { type: String, required: true, unique: true, index: true },
+    id: { type: String, required: true, index: true },
     sourceNoticeId: { type: String, index: true },
     publicationNumber: { type: String, index: true },
     noticeType: { type: String, index: true },
@@ -135,8 +139,12 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
       default: [],
     },
     links: Schema.Types.Mixed,
-    rawNotice: Schema.Types.Mixed,
-    sourceHash: { type: String, required: true, index: true },
+    searchHash: { type: String, required: true, index: true },
+    searchCacheExpiresAt: {
+      type: Date,
+      required: true,
+      default: () => new Date(Date.now() + AWARD_SEARCH_CACHE_TTL_MS),
+    },
   },
   {
     collection: 'award_tenders',
@@ -150,13 +158,17 @@ AwardTenderSchema.index({
   contractNature: 1,
   publicationDate: -1,
 });
+AwardTenderSchema.index({ id: 1, searchHash: 1 }, { unique: true });
 AwardTenderSchema.index({ 'winners.identifier': 1 });
 AwardTenderSchema.index({ 'winners.name': 1 });
+AwardTenderSchema.index({ searchCacheExpiresAt: 1 }, { expireAfterSeconds: 0 });
 
-AwardTenderSchema.statics.serialize = function (
+AwardTenderSchema.statics.toDetailDto = function (
   tender: AwardTenderSerializable,
 ) {
-  return filterModel(tender, { excludeFields: ['rawNotice', 'sourceHash'] });
+  return filterModel(tender, {
+    excludeFields: ['searchHash', 'searchCacheExpiresAt', 'links', 'cpvCodes'],
+  });
 };
 
 export const AwardTenderModel: AwardTenderModelType =

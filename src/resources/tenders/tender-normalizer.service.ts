@@ -67,9 +67,7 @@ export class TenderNormalizerService {
     const titleLot = this.pickTextArray(rawNotice, ['title-lot', 'titleLot']);
     const description =
       this.pickLocalizedText(rawNotice['description-proc']) ??
-      this.pickLocalizedText(rawNotice.descriptionProc) ??
-      this.pickLocalizedText(rawNotice['description-lot']) ??
-      this.pickLocalizedText(rawNotice.descriptionLot);
+      this.pickLocalizedText(rawNotice.descriptionProc);
     const descriptionLot = this.pickTextArray(rawNotice, [
       'description-lot',
       'descriptionLot',
