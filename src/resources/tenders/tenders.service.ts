@@ -35,7 +35,7 @@ import {
   valueToString,
 } from '@/utils';
 import { tenderCpvPopulateFields } from '@/resources/tenders/utils/tender.utils';
-import { SortOrder } from 'mongoose';
+import { Mongoose, SortOrder, Types } from 'mongoose';
 import {
   TenderDeepAnalysisDocument,
   TenderDeepAnalysisModel,
@@ -168,6 +168,7 @@ export class TendersService {
         true,
         normalizedTender,
       );
+
     const estimatedValueEur =
       await this.calculateEstimatedValueEur(normalizedTender);
 
@@ -340,6 +341,19 @@ export class TendersService {
     );
 
     return localTender.populate(tenderCpvPopulateFields);
+  }
+
+  async getNormalizedTenderWithBaseAnalysis(tedTender: any) {
+    tedTender._id = new Types.ObjectId().toHexString();
+    const generalAnalysis =
+      await this.tenderGeneralAnalysisService.ensureAnalysisForTender(
+        tedTender as any,
+      );
+
+    tedTender.generalAnalysis =
+      TenderGeneralAnalysisModel.serializeDetail(generalAnalysis);
+
+    return tedTender;
   }
 
   async findMultipleLocalTendersWithBaseAnalysis(
