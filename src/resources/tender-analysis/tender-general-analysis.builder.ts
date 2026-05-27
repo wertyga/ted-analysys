@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { GeneralTenderAnalysisInput } from '@/openai/dto/openai-analysis.dto';
-import { TenderDocument } from '../tenders/schemas';
+import { TenderDocument, TenderLot } from '../tenders/schemas';
 import { isRecord } from '@/utils';
 import { BaseAnalysisBuilder } from '@/analysis-builder/base-analysis.builder';
 
@@ -18,9 +18,8 @@ export class TenderGeneralAnalysisBuilder extends BaseAnalysisBuilder {
         publicationNumber: tender.publicationNumber ?? null,
         title: tender.title ?? null,
         procedureTitle: tender.titleProc ?? null,
-        lotTitles: tender.titleLot ?? [],
         description: tender.description ?? null,
-        lotDescriptions: tender.descriptionLot ?? [],
+        lots: tender.lots?.map((lot) => this.buildLotInput(lot)) ?? [],
         buyerName: tender.buyerName ?? null,
         buyerIdentifier: tender.buyerIdentifier ?? null,
         country: tender.buyerCountry ?? null,
@@ -61,7 +60,6 @@ export class TenderGeneralAnalysisBuilder extends BaseAnalysisBuilder {
           countries: tender.placeOfPerformanceCountries ?? [],
           cities: tender.placeOfPerformanceCities ?? [],
         },
-        lotIdentifiers: tender.lotIdentifiers ?? [],
         internalLotIdentifiers: tender.internalLotIdentifiers ?? [],
         documentUrls: tender.documentUrls ?? [],
         submissionUrls: tender.submissionUrls ?? [],
@@ -82,6 +80,13 @@ export class TenderGeneralAnalysisBuilder extends BaseAnalysisBuilder {
 
   private formatDate(value: Date | undefined): string | null {
     return value?.toISOString() ?? null;
+  }
+
+  private buildLotInput(lot: TenderLot) {
+    return {
+      ...lot,
+      deadlineReceiptTender: this.formatDate(lot.deadlineReceiptTender),
+    };
   }
 
   private extractCpvCodes(tender: TenderDocument): string[] {

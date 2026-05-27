@@ -1,3 +1,5 @@
+import { TenderLotAnalysisInput } from './tenderAnalysis';
+
 export type TenderDeepRecommendation =
   | 'strong_go'
   | 'go'
@@ -595,9 +597,8 @@ export interface TenderAnalysisTenderDto {
   procedureType?: string;
   title?: string;
   titleProc?: string;
-  titleLot?: string[];
   description?: string;
-  descriptionLot?: string[];
+  lots?: TenderLotAnalysisInput[];
   estimatedValue?: {
     amount: number | null;
     currency: string | null;
@@ -629,7 +630,6 @@ export interface TenderAnalysisTenderDto {
   cpvCodes?: string[];
   placeOfPerformanceCountries?: string[];
   placeOfPerformanceCities?: string[];
-  lotIdentifiers?: string[];
   internalLotIdentifiers?: string[];
   documentUrls?: string[];
   submissionUrls?: string[];

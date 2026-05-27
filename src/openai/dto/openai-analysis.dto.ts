@@ -1,3 +1,5 @@
+import { TenderLotAnalysisInput } from '@/types';
+
 export const GENERAL_TENDER_ANALYSIS_PROMPT_VERSION =
   'general-tender-analysis-v1';
 
@@ -36,9 +38,8 @@ export interface GeneralTenderAnalysisInput {
     publicationNumber?: string | null;
     title?: string | null;
     procedureTitle?: string | null;
-    lotTitles?: string[];
     description?: string | null;
-    lotDescriptions?: string[];
+    lots?: TenderLotAnalysisInput[];
     buyerName?: string | null;
     buyerIdentifier?: string | null;
     country?: string | null;
@@ -75,7 +76,6 @@ export interface GeneralTenderAnalysisInput {
       countries?: string[];
       cities?: string[];
     };
-    lotIdentifiers?: string[];
     internalLotIdentifiers?: string[];
     documentUrls?: string[];
     submissionUrls?: string[];
@@ -86,7 +86,6 @@ export interface GeneralTenderAnalysisInput {
       isEuFunded?: boolean;
       electronicSubmission?: string | null;
     };
-    lots?: unknown;
     awardCriteria?: unknown;
     selectionCriteria?: unknown;
     languages?: string[];

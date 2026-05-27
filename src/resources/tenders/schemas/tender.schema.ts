@@ -11,6 +11,39 @@ export type TenderDocumentsLinks = Record<
   Record<string, string>
 >;
 
+export interface TenderLot {
+  identifier?: string;
+  internalIdentifier?: string;
+  title?: string;
+  description?: string;
+  mainClassification?: string[];
+  additionalClassifications?: string[];
+  contractNature?: string;
+  estimatedValue?: {
+    amount: number | null;
+    currency: string | null;
+  };
+  frameworkMaximumValue?: {
+    amount: number | null;
+    currency: string | null;
+  };
+  isFrameworkAgreement?: boolean;
+  isDps?: boolean;
+  durationPeriodValue?: string;
+  durationPeriodUnit?: string;
+  deadlineReceiptTender?: Date;
+  documentUrls?: string[];
+  submissionUrls?: string[];
+  electronicSubmission?: string;
+  submissionLanguages?: string[];
+  placeOfPerformanceCountries?: string[];
+  placeOfPerformanceSubdivisions?: string[];
+  placeOfPerformanceCities?: string[];
+  awardCriteria?: unknown[];
+  selectionCriteria?: unknown[];
+  selectionCriteriaSource?: string;
+}
+
 export interface Tender {
   _id: string;
   /** Local canonical id. For TED tenders this is the publication number. */
@@ -104,8 +137,8 @@ export interface Tender {
   placeOfPerformanceCountries?: string[];
   /** TED place-of-performance-city-* fields: cities where the contract is performed. */
   placeOfPerformanceCities?: string[];
-  /** TED identifier-lot: technical lot ids inside the notice, e.g. LOT-0001. */
-  lotIdentifiers?: string[];
+  /** TED lot-level fields grouped by lot index. */
+  lots?: TenderLot[];
   /** TED internal-identifier-lot: stable lot references across notices/stages. */
   internalLotIdentifiers?: string[];
   /** TED document-url-lot: procurement document URLs. */
@@ -222,7 +255,7 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
     },
     placeOfPerformanceCountries: { type: [String], default: undefined },
     placeOfPerformanceCities: { type: [String], default: undefined },
-    lotIdentifiers: { type: [String], default: undefined },
+    lots: { type: [Schema.Types.Mixed], default: undefined },
     internalLotIdentifiers: { type: [String], default: undefined },
     documentUrls: { type: [String], default: undefined },
     submissionUrls: { type: [String], default: undefined },
@@ -282,7 +315,7 @@ TenderSchema.statics.serializeList = function (
     durationPeriodUnit,
     legalBasis,
     additionalClassificationLot,
-    lotIdentifiers,
+    lots,
     internalLotIdentifiers,
     submissionUrls,
     selectionCriteria,

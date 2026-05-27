@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { createHash } from 'crypto';
 import {
   BidNoBidDecision,
   CompanyAnalysisDto,
@@ -15,7 +14,7 @@ import {
   TenderRequirement,
 } from '@/types';
 import { isRecord } from '@/utils';
-import { Tender, TenderDocument } from '../tenders/schemas';
+import { Tender, TenderDocument, TenderLot } from '../tenders/schemas';
 import { UserDocument } from '../user/user.types';
 import { TenderGeneralAnalysis } from '../tender-analysis/schemas';
 import {
@@ -110,9 +109,8 @@ export class TenderDeepAnalysisBuilder {
       procedureType: tender.procedureType,
       title: tender.title,
       titleProc: tender.titleProc,
-      titleLot: tender.titleLot ?? [],
       description: tender.description,
-      descriptionLot: tender.descriptionLot ?? [],
+      lots: tender.lots?.map((lot) => buildLotDto(lot)) ?? [],
       estimatedValue: tender.estimatedValue,
       noticeLanguage: tender.noticeLanguage,
       submissionLanguages: tender.submissionLanguages ?? [],
@@ -141,7 +139,6 @@ export class TenderDeepAnalysisBuilder {
       cpvCodes: extractCpvCodes(tender),
       placeOfPerformanceCountries: tender.placeOfPerformanceCountries ?? [],
       placeOfPerformanceCities: tender.placeOfPerformanceCities ?? [],
-      lotIdentifiers: tender.lotIdentifiers ?? [],
       internalLotIdentifiers: tender.internalLotIdentifiers ?? [],
       documentUrls: tender.documentUrls ?? [],
       submissionUrls: tender.submissionUrls ?? [],
@@ -177,8 +174,8 @@ export class TenderDeepAnalysisBuilder {
       daysUntilQuestionsDeadline: questionsDays,
       isDeadlineExpired,
       isQuestionsDeadlineExpired,
-      hasLots: (params.tender.lotIdentifiers?.length ?? 0) > 0,
-      lotCount: params.tender.lotIdentifiers?.length ?? 0,
+      hasLots: (params.tender.lots?.length ?? 0) > 0,
+      lotCount: params.tender.lots?.length ?? 0,
       hasEstimatedValue:
         typeof params.tender.estimatedValue?.amount === 'number',
       hasDocumentUrls: documentUrlsCount > 0,
@@ -440,16 +437,11 @@ function applyTenderIntelligenceSourceFields(
   result.tenderIntelligence.title ||= originalTitle ?? '';
   result.tenderIntelligence.lotsSummary ||= '';
 
-  const sourceLotTitles = input.tender.titleLot ?? [];
-  const sourceLotIds = input.tender.lotIdentifiers ?? [];
+  const sourceLots = input.tender.lots ?? [];
   const existingLots = Array.isArray(result.tenderIntelligence.lots)
     ? result.tenderIntelligence.lots
     : [];
-  const lotCount = Math.max(
-    existingLots.length,
-    sourceLotTitles.length,
-    sourceLotIds.length,
-  );
+  const lotCount = Math.max(existingLots.length, sourceLots.length);
 
   if (lotCount === 0) {
     result.tenderIntelligence.lots = [];
@@ -459,8 +451,9 @@ function applyTenderIntelligenceSourceFields(
   result.tenderIntelligence.lots = Array.from({ length: lotCount }).map(
     (_, index) => {
       const existing = existingLots[index];
-      const sourceTitle = sourceLotTitles[index];
-      const sourceId = sourceLotIds[index];
+      const sourceLot = sourceLots[index];
+      const sourceTitle = sourceLot?.title;
+      const sourceId = sourceLot?.identifier;
 
       return {
         id: existing?.id ?? sourceId,
@@ -2155,6 +2148,13 @@ function extractCpvCodes(tender: Tender): string[] {
         .filter((code): code is string => Boolean(code)),
     ),
   );
+}
+
+function buildLotDto(lot: TenderLot) {
+  return {
+    ...lot,
+    deadlineReceiptTender: formatDate(lot.deadlineReceiptTender),
+  };
 }
 
 function extractCpvCode(value: unknown): string | undefined {

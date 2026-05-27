@@ -26,6 +26,80 @@ export class TenderEstimatedValueDto {
   currency!: string | null;
 }
 
+export class TenderLotDto {
+  @ApiPropertyOptional({ example: 'LOT-0001' })
+  identifier?: string;
+
+  @ApiPropertyOptional({ example: 'BT-001' })
+  internalIdentifier?: string;
+
+  @ApiPropertyOptional({ example: 'Software development services' })
+  title?: string;
+
+  @ApiPropertyOptional({ example: 'Lot-specific description.' })
+  description?: string;
+
+  @ApiPropertyOptional({ type: [String], example: ['72000000'] })
+  mainClassification?: string[];
+
+  @ApiPropertyOptional({ type: [String], example: ['48000000'] })
+  additionalClassifications?: string[];
+
+  @ApiPropertyOptional({ example: 'services' })
+  contractNature?: string;
+
+  @ApiPropertyOptional({ type: TenderEstimatedValueDto })
+  estimatedValue?: TenderEstimatedValueDto;
+
+  @ApiPropertyOptional({ type: TenderEstimatedValueDto })
+  frameworkMaximumValue?: TenderEstimatedValueDto;
+
+  @ApiPropertyOptional({ example: false })
+  isFrameworkAgreement?: boolean;
+
+  @ApiPropertyOptional({ example: false })
+  isDps?: boolean;
+
+  @ApiPropertyOptional({ example: '12' })
+  durationPeriodValue?: string;
+
+  @ApiPropertyOptional({ example: 'month' })
+  durationPeriodUnit?: string;
+
+  @ApiPropertyOptional({ example: '2029-12-17T12:00:00+02:00' })
+  deadlineReceiptTender?: Date;
+
+  @ApiPropertyOptional({ type: [String] })
+  documentUrls?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  submissionUrls?: string[];
+
+  @ApiPropertyOptional({ example: 'required' })
+  electronicSubmission?: string;
+
+  @ApiPropertyOptional({ type: [String], example: ['ENG'] })
+  submissionLanguages?: string[];
+
+  @ApiPropertyOptional({ type: [String], example: ['FIN'] })
+  placeOfPerformanceCountries?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  placeOfPerformanceSubdivisions?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  placeOfPerformanceCities?: string[];
+
+  @ApiPropertyOptional({ type: [Object] })
+  awardCriteria?: unknown[];
+
+  @ApiPropertyOptional({ type: [Object] })
+  selectionCriteria?: unknown[];
+
+  @ApiPropertyOptional({ example: 'notice' })
+  selectionCriteriaSource?: string;
+}
+
 export class TenderDto {
   _id: string;
 
@@ -330,11 +404,10 @@ export class TenderDto {
   placeOfPerformanceCities?: string[];
 
   @ApiPropertyOptional({
-    type: [String],
-    description:
-      'TED identifier-lot: technical lot ids inside the notice, e.g. LOT-0001.',
+    type: [TenderLotDto],
+    description: 'TED lot-level fields grouped by lot index.',
   })
-  lotIdentifiers?: string[];
+  lots?: TenderLotDto[];
 
   @ApiPropertyOptional({
     type: [String],
@@ -432,7 +505,7 @@ export type TenderListDto = Omit<
   | 'durationPeriodUnit'
   | 'legalBasis'
   | 'additionalClassificationLot'
-  | 'lotIdentifiers'
+  | 'lots'
   | 'internalLotIdentifiers'
   | 'submissionUrls'
   | 'selectionCriteria'
