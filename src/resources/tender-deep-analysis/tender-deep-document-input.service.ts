@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { TenderDocument } from '../tenders/schemas';
-import { BaseAnalysisBuilder } from '@/analysis-builder/base-analysis.builder';
 import { DocumentInputAnalysis } from '@/openai/dto/openai-analysis.dto';
+import { DocumentExtractor } from '@/document-extractor';
 
 export interface DeepDocumentInput {
   documentMetadata: unknown[];
@@ -10,15 +10,16 @@ export interface DeepDocumentInput {
 }
 
 @Injectable()
-export class TenderDeepDocumentInputService extends BaseAnalysisBuilder {
+export class TenderDeepDocumentInputService {
+  private readonly documentExtractor = new DocumentExtractor();
+
   async buildDeepDocumentInput(
     tender: TenderDocument,
   ): Promise<DeepDocumentInput> {
-    const documents = await this.buildAnalysisDocuments(tender, [
-      'xml',
-      'pdf',
-      'pdfs',
-    ]);
+    const documents = await this.documentExtractor.buildAnalysisDocuments(
+      tender,
+      ['xml', 'pdf', 'pdfs'],
+    );
 
     return {
       documentMetadata: documents.map((document) =>

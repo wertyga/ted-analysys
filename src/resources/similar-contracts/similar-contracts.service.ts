@@ -74,7 +74,7 @@ export class SimilarContractsService {
     const awardXml = await fetchXmlContentFromNotice(notice.links);
 
     const xmlAwardValue = extractXmlAwardValue(awardXml);
-    console.log({ xmlAwardValue });
+
     const xmlWinners = extractXmlAwardWinners(awardXml);
 
     const normalizedAward = {

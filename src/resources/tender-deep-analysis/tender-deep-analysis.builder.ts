@@ -166,7 +166,7 @@ export class TenderDeepAnalysisBuilder {
     const isQuestionsDeadlineExpired = params.tender.questionsDeadline
       ? params.tender.questionsDeadline.getTime() < now.getTime()
       : null;
-    const documentUrlsCount = params.tender.documentUrls?.length ?? 0;
+    const documentUrlsCount = countTenderDocumentUrls(params.tender);
 
     return {
       currentDate: now.toISOString().slice(0, 10),
@@ -2155,6 +2155,19 @@ function buildLotDto(lot: TenderLot) {
     ...lot,
     deadlineReceiptTender: formatDate(lot.deadlineReceiptTender),
   };
+}
+
+function countTenderDocumentUrls(tender: Tender): number {
+  const urls = [
+    ...(tender.documentUrls ?? []),
+    ...(tender.lots?.flatMap((lot) => lot.documentUrls ?? []) ?? []),
+  ];
+
+  return new Set(
+    urls
+      .map((url) => url.trim().toLowerCase())
+      .filter((url) => /^https?:\/\//i.test(url)),
+  ).size;
 }
 
 function extractCpvCode(value: unknown): string | undefined {

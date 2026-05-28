@@ -2,14 +2,19 @@ import { Injectable } from '@nestjs/common';
 import { GeneralTenderAnalysisInput } from '@/openai/dto/openai-analysis.dto';
 import { TenderDocument, TenderLot } from '../tenders/schemas';
 import { isRecord } from '@/utils';
-import { BaseAnalysisBuilder } from '@/analysis-builder/base-analysis.builder';
+import { DocumentExtractor } from '@/document-extractor';
 
 @Injectable()
-export class TenderGeneralAnalysisBuilder extends BaseAnalysisBuilder {
+export class TenderGeneralAnalysisBuilder {
+  private readonly documentExtractor = new DocumentExtractor();
+
   async buildAnalysisInput(
     tender: TenderDocument,
   ): Promise<GeneralTenderAnalysisInput> {
-    const documents = await this.buildAnalysisDocuments(tender, ['xml']);
+    const documents = await this.documentExtractor.buildAnalysisDocuments(
+      tender,
+      ['xml'],
+    );
 
     return {
       tender: {
