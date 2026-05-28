@@ -4,9 +4,8 @@
 - FE - self - withDescription
 
 - BE - Tidy up tender-matching.service
-- BE - optimize documents text
+- BE - optimize documents text ??
 - BE - deep analysis restriction - pro/business
-- BE - Deep analysis - look at lot's documentsUrl
 
 buyerProfile: https://ch-giorgi.sudest-marchespublics.com
 пробовать доставать portalUrl для deep analysis

@@ -112,7 +112,7 @@ export class PaymentsService {
     const activeEntitlement = await this.getUserEntitlement(user);
 
     if (!activeEntitlement) {
-      return;
+      throw new NotFoundException('Subscription not found.');
     }
 
     // const sub = await this.createNewSubscription(user, {
