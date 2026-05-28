@@ -38,7 +38,7 @@
 
 Управляет wishlist пользователя по тендерам. Добавляет/удаляет tender items и считает сохраненные тендеры для user metadata.
 
-## TenderAnalysisModule
+## TenderGeneralAnalysisModule
 
 Делает общий анализ тендера без учета конкретной компании. Генерирует structured analysis через LLM, сохраняет результат и переиспользуется deep analysis.
 

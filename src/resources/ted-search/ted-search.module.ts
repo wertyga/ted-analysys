@@ -1,5 +1,5 @@
 import { forwardRef, Module } from '@nestjs/common';
-import { TenderAnalysisModule } from '../tender-analysis/tender-analysis.module';
+import { TenderGeneralAnalysisModule } from '../tender-analysis/tender-general-analysis.module';
 import { TendersModule } from '../tenders/tenders.module';
 import { TedSearchController } from './ted-search.controller';
 import { TedSearchService } from './ted-search.service';
@@ -9,7 +9,7 @@ import { TariffModule } from '@/resources/tariff';
 
 @Module({
   imports: [
-    forwardRef(() => TenderAnalysisModule),
+    forwardRef(() => TenderGeneralAnalysisModule),
     forwardRef(() => TendersModule),
     TenderWishlistModule,
     CurrencyExchangeRatesModule,

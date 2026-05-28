@@ -117,33 +117,32 @@ export abstract class BaseLlmAnalysisService {
     prompt: string,
     context: string,
     purpose: LlmAnalysisPurpose,
+    attempt = 1,
   ): Promise<string> {
     let lastError: unknown;
 
-    for (let attempt = 0; attempt <= this.retryDelaysMs.length; attempt += 1) {
-      try {
-        return await this.createProviderJsonResponse(prompt, context, purpose);
-      } catch (error: unknown) {
-        lastError = error;
-        this.logger.warn(
-          `${this.providerName} createJsonResponse failed on attempt ${attempt + 1}: ${getSafeErrorMessage(
-            error,
+    try {
+      return await this.createProviderJsonResponse(prompt, context, purpose);
+    } catch (error: unknown) {
+      lastError = error;
+      this.logger.warn(
+        `${this.providerName} createJsonResponse failed on attempt ${attempt + 1}: ${getSafeErrorMessage(
+          error,
+        )}`,
+      );
+
+      if (attempt >= this.retryDelaysMs.length) {
+        throw new ServiceUnavailableException(
+          `${this.providerName} tender analysis failed: ${getSafeErrorMessage(
+            lastError,
           )}`,
         );
-
-        if (attempt === this.retryDelaysMs.length) {
-          break;
-        }
-
-        await this.delay(this.retryDelaysMs[attempt]);
       }
-    }
 
-    throw new ServiceUnavailableException(
-      `${this.providerName} tender analysis failed: ${getSafeErrorMessage(
-        lastError,
-      )}`,
-    );
+      await this.delay(this.retryDelaysMs[attempt]);
+
+      return this.createJsonResponse(prompt, context, purpose, attempt + 1);
+    }
   }
 
   protected buildTenderContext(input: GeneralTenderAnalysisInput): string {
@@ -369,9 +368,7 @@ export abstract class BaseLlmAnalysisService {
         source !== 'XML_NOTICE' &&
         source !== 'DOCUMENT_TEXT'
       ) {
-        throw new Error(
-          `${this.providerName} analysis lot source is invalid`,
-        );
+        throw new Error(`${this.providerName} analysis lot source is invalid`);
       }
 
       return {
