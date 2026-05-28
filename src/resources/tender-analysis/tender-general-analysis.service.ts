@@ -28,6 +28,7 @@ import {
   sleep,
 } from '@/utils';
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
+import { TENDER_ANALYSIS_CONFIG } from '@/config/tender-analysis.config';
 
 export interface TenderAnalysisExecutionResult {
   result: GeneralTenderAnalysisResult;
@@ -35,39 +36,10 @@ export interface TenderAnalysisExecutionResult {
   model: string;
 }
 
-const ANALYSIS_WAIT_TIMEOUT_MS = 10 * 60 * 1000;
-const ANALYSIS_WAIT_INTERVAL_MS = 1000;
-const BASE_ANALYSIS_CONCURRENCY = 20;
-const FREE_BASIC_ANALYSIS_FIELDS = [
-  'summary',
-  {
-    name: 'lots',
-    len: 3,
-  },
-  {
-    name: 'scopeOfWork',
-    len: 2,
-  },
-  {
-    name: 'keyRequirements',
-    len: 3,
-  },
-  { name: 'risks', len: 2 },
-  'deadlines',
-  'estimatedValue',
-  'complexityScore',
-  'opportunityScore',
-  'confidenceScore',
-  'generalRecommendation',
-  'analysisDepth',
-  'documentsAnalyzedCount',
-  'missingDocumentsWarning',
-] as const;
-
 @Injectable()
 export class TenderGeneralAnalysisService {
   private readonly baseAnalysisQueue = new QueueAsyncConcurrency(
-    BASE_ANALYSIS_CONCURRENCY,
+    TENDER_ANALYSIS_CONFIG.baseAnalysis.concurrency,
   );
 
   constructor(
@@ -201,7 +173,7 @@ export class TenderGeneralAnalysisService {
 
   async getFinishedGeneralAnalysis(tender: TenderDocument) {
     let analysis = await this.ensureAnalysisForTender(tender);
-    const waitUntil = Date.now() + ANALYSIS_WAIT_TIMEOUT_MS;
+    const waitUntil = Date.now() + TENDER_ANALYSIS_CONFIG.wait.timeoutMs;
 
     while (analysis.status !== TenderGeneralAnalysisStatus.DONE) {
       if (Date.now() >= waitUntil) {
@@ -222,7 +194,7 @@ export class TenderGeneralAnalysisService {
         );
       }
 
-      await sleep(ANALYSIS_WAIT_INTERVAL_MS);
+      await sleep(TENDER_ANALYSIS_CONFIG.wait.intervalMs);
     }
 
     return analysis;
@@ -267,7 +239,7 @@ export class TenderGeneralAnalysisService {
 
     const resultJson: Partial<T> = {};
 
-    FREE_BASIC_ANALYSIS_FIELDS.forEach((field) => {
+    TENDER_ANALYSIS_CONFIG.freeBasicAnalysisFields.forEach((field) => {
       if (typeof field === 'string') {
         resultJson[field] = analysis.resultJson[field];
       }

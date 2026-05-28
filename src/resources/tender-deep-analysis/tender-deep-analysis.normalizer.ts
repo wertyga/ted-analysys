@@ -1,20 +1,10 @@
 import { CompanyFitScoreKey, TenderDeepAnalysisResult } from '@/types';
 import { normalizeMissingDocuments } from './missing-tender-documents.utils';
+import { TENDER_DEEP_ANALYSIS_CONFIG } from '@/config/tender-deep-analysis.config';
 
-const SCORE_KEYS: CompanyFitScoreKey[] = [
-  'scopeFit',
-  'capabilityFit',
-  'cpvFit',
-  'geographicFit',
-  'languageFit',
-  'eligibilityFit',
-  'certificationFit',
-  'experienceFit',
-  'financialFit',
-  'commercialFit',
-  'deadlineFit',
-  'riskFit',
-];
+const SCORE_KEYS = Object.keys(
+  TENDER_DEEP_ANALYSIS_CONFIG.scoring.companyFitWeights,
+) as CompanyFitScoreKey[];
 
 export function normalizeResultJsonScoreBreakdown(
   resultJson: TenderDeepAnalysisResult,
@@ -951,22 +941,7 @@ function severityRank(severity: string): number {
 }
 
 function getScoreWeight(key: CompanyFitScoreKey): number {
-  const weights: Record<CompanyFitScoreKey, number> = {
-    scopeFit: 18,
-    capabilityFit: 16,
-    cpvFit: 8,
-    geographicFit: 8,
-    languageFit: 7,
-    eligibilityFit: 12,
-    certificationFit: 7,
-    experienceFit: 8,
-    financialFit: 6,
-    commercialFit: 4,
-    deadlineFit: 4,
-    riskFit: 2,
-  };
-
-  return weights[key];
+  return TENDER_DEEP_ANALYSIS_CONFIG.scoring.companyFitWeights[key];
 }
 
 function hasStringValue(value: unknown, expected: string): boolean {

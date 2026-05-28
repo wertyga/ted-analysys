@@ -42,9 +42,7 @@ type CompanyProfileType = Pick<
   | 'notifications'
 >;
 
-export class UserNotificationSettingsDto
-  implements TUserNotificationSettings
-{
+export class UserNotificationSettingsDto implements TUserNotificationSettings {
   @ApiPropertyOptional({
     enum: UserNotificationFrequency,
     example: UserNotificationFrequency.WEEKLY,

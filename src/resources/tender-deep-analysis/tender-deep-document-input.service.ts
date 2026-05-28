@@ -18,7 +18,7 @@ export class TenderDeepDocumentInputService {
   ): Promise<DeepDocumentInput> {
     const documents = await this.documentExtractor.buildAnalysisDocuments(
       tender,
-      ['xml', 'pdf', 'pdfs'],
+      ['xml', 'pdf', 'pdfs', 'tenderDocuments'],
     );
 
     return {

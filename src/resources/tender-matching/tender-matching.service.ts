@@ -36,21 +36,16 @@ import {
   TenderCompanyMatchDocument,
   TenderCompanyMatchModel,
 } from './schemas/tender-company-match.schema';
-import { gfTime } from '@/goldfish';
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 import { COMPANY_TENDER_FIT_SYSTEM_PROMPT } from './company-tender-fit.prompt';
 import { UserModel } from '@/resources/user/user.schema';
 import { TariffService } from '@/resources/tariff';
-
-const ACTIVE_COMPETITION_TENDERS_MATCH_BATCH_SIZE = 100;
-const COMPANY_PROFILE_REMATCH_DEBOUNCE_MS = gfTime.minute;
-const COMPANY_PROFILE_REMATCH_CONCURRENCY = 5;
-const COMPANY_TENDER_AI_FIT_CONCURRENCY = 5;
+import { TENDER_MATCHING_CONFIG } from '@/config/tender-matching.config';
 
 @Injectable()
 export class TenderMatchingService {
   private readonly companyTenderAiFitQueue = new QueueAsyncConcurrency(
-    COMPANY_TENDER_AI_FIT_CONCURRENCY,
+    TENDER_MATCHING_CONFIG.companyTenderAiFit.concurrency,
   );
   private readonly companyProfileRematches: DebouncedAsyncLatestQueueByKey<
     string,
@@ -63,8 +58,8 @@ export class TenderMatchingService {
     private readonly tariffService: TariffService,
   ) {
     this.companyProfileRematches = new DebouncedAsyncLatestQueueByKey({
-      delayMs: COMPANY_PROFILE_REMATCH_DEBOUNCE_MS,
-      concurrency: COMPANY_PROFILE_REMATCH_CONCURRENCY,
+      delayMs: TENDER_MATCHING_CONFIG.companyProfileRematch.debounceMs,
+      concurrency: TENDER_MATCHING_CONFIG.companyProfileRematch.concurrency,
       runner: (filter) =>
         this.rematchActiveCompetitionTendersWithCompanyFilter(filter),
     });
@@ -321,7 +316,7 @@ export class TenderMatchingService {
 
     return TenderModel.find(query)
       .sort({ _id: 1 })
-      .limit(ACTIVE_COMPETITION_TENDERS_MATCH_BATCH_SIZE)
+      .limit(TENDER_MATCHING_CONFIG.activeCompetitionTendersMatchBatchSize)
       .exec();
   }
 

@@ -35,13 +35,12 @@ import {
   normalizeDeepAnalysisLanguage,
 } from '@/resources/tender-deep-analysis/tender-deep-analysis.utils';
 import { CompanyProfileDocumentsService } from '@/resources/company-profile-documents/company-profile-documents.service';
-
-const TENDER_DEEP_COMPANY_FIT_ANALYSIS_CONCURRENCY = 5;
+import { TENDER_DEEP_ANALYSIS_CONFIG } from '@/config/tender-deep-analysis.config';
 
 @Injectable()
 export class TenderDeepAnalysisService {
   private readonly deepCompanyFitAnalysisQueue = new QueueAsyncConcurrency(
-    TENDER_DEEP_COMPANY_FIT_ANALYSIS_CONCURRENCY,
+    TENDER_DEEP_ANALYSIS_CONFIG.companyFitAnalysis.concurrency,
   );
 
   constructor(

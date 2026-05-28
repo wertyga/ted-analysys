@@ -20,15 +20,7 @@ import { SimilarContractsService } from '@/resources/similar-contracts/similar-c
 import { searchTendersDefaultFields } from '@/resources/ted-search/utils';
 import { winnerFields } from '@/resources/similar-contracts/similar-contracts.utils';
 import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
-
-const DEFAULT_PAGE_LIMIT = 100;
-const DEFAULT_MAX_PAGES = 10000;
-
-const MAX_PAGES_HISTORY_RESULT = 100000;
-const HISTORY_RESULT_PAGE_LIMIT = 20;
-
-const RECENT_TENDERS_LOOKBACK_DAYS = 2;
-const RESULT_TENDERS_HISTORY_YEARS_BACK = 3;
+import { TED_OPEN_TENDERS_COLLECTOR_CONFIG } from '@/config/ted-open-tenders-collector.config';
 
 export interface TedOpenTendersCollectorOptions {
   pageLimit?: number;
@@ -85,7 +77,8 @@ export class TedOpenTendersCollectorService {
     const publicationDateFrom = new Date();
 
     publicationDateFrom.setDate(
-      publicationDateFrom.getDate() - RECENT_TENDERS_LOOKBACK_DAYS,
+      publicationDateFrom.getDate() -
+        TED_OPEN_TENDERS_COLLECTOR_CONFIG.recentCompetition.lookbackDays,
     );
 
     const query = buildTedTenderSearchQuery({
@@ -108,7 +101,8 @@ export class TedOpenTendersCollectorService {
     const publicationDateFrom = new Date();
 
     publicationDateFrom.setFullYear(
-      publicationDateFrom.getFullYear() - RESULT_TENDERS_HISTORY_YEARS_BACK,
+      publicationDateFrom.getFullYear() -
+        TED_OPEN_TENDERS_COLLECTOR_CONFIG.historyResult.yearsBack,
     );
 
     const query = buildTedTenderSearchQuery({
@@ -119,8 +113,8 @@ export class TedOpenTendersCollectorService {
     });
 
     const searchOptions: TedOpenTendersCollectorOptions = {
-      maxPages: MAX_PAGES_HISTORY_RESULT,
-      pageLimit: HISTORY_RESULT_PAGE_LIMIT,
+      maxPages: TED_OPEN_TENDERS_COLLECTOR_CONFIG.historyResult.maxPages,
+      pageLimit: TED_OPEN_TENDERS_COLLECTOR_CONFIG.historyResult.pageLimit,
     };
 
     return this.collectResultTendersFromTed(
@@ -198,8 +192,10 @@ export class TedOpenTendersCollectorService {
     options,
     saveNotices,
   }: TedIterationCollectorParams): Promise<TedOpenTendersCollectorResult> {
-    const pageLimit = options.pageLimit ?? DEFAULT_PAGE_LIMIT;
-    const maxPages = options.maxPages ?? DEFAULT_MAX_PAGES;
+    const pageLimit =
+      options.pageLimit ?? TED_OPEN_TENDERS_COLLECTOR_CONFIG.defaultPageLimit;
+    const maxPages =
+      options.maxPages ?? TED_OPEN_TENDERS_COLLECTOR_CONFIG.defaultMaxPages;
     let iterationNextToken = options.iterationNextToken?.trim() || undefined;
     let pagesFetched = 0;
     let noticesFetched = 0;

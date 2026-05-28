@@ -43,19 +43,12 @@ import {
   CompanyProfileDocumentType,
 } from './schemas';
 import { delay } from 'rxjs';
-
-const MAX_DOCUMENTS = 10;
-const MAX_CONTEXT_CHARS = 80_000;
-const MAX_SINGLE_DOCUMENT_CONTEXT_CHARS = 40_000;
-const MAX_DOCUMENT_EVIDENCE_ITEMS = 10;
-const DOCUMENT_ANALYSIS_CONCURRENCY = 20;
-const DOCUMENT_ANALYSIS_WAIT_TIMEOUT_MS = 10 * 60 * 1000;
-const DOCUMENT_ANALYSIS_WAIT_INTERVAL_MS = 1000;
+import { COMPANY_PROFILE_DOCUMENTS_CONFIG } from '@/config/company-profile-documents.config';
 
 @Injectable()
 export class CompanyProfileDocumentsService {
   private readonly documentAnalysisQueue = new QueueAsyncConcurrency(
-    DOCUMENT_ANALYSIS_CONCURRENCY,
+    COMPANY_PROFILE_DOCUMENTS_CONFIG.analysis.concurrency,
   );
 
   constructor(
@@ -65,7 +58,8 @@ export class CompanyProfileDocumentsService {
   ) {}
 
   async getFinishedCompanyDocumentsAnalysis(user: UserDocument) {
-    const waitUntil = Date.now() + DOCUMENT_ANALYSIS_WAIT_TIMEOUT_MS;
+    const waitUntil =
+      Date.now() + COMPANY_PROFILE_DOCUMENTS_CONFIG.analysis.waitTimeoutMs;
 
     while (true) {
       const docs = await CompanyProfileDocumentAnalysisModel.find({
@@ -92,7 +86,7 @@ export class CompanyProfileDocumentsService {
         );
       }
 
-      await sleep(DOCUMENT_ANALYSIS_WAIT_INTERVAL_MS);
+      await sleep(COMPANY_PROFILE_DOCUMENTS_CONFIG.analysis.waitIntervalMs);
     }
   }
 
@@ -104,9 +98,9 @@ export class CompanyProfileDocumentsService {
       throw new BadRequestException('At least one document is required');
     }
 
-    if (files.length > MAX_DOCUMENTS) {
+    if (files.length > COMPANY_PROFILE_DOCUMENTS_CONFIG.upload.maxDocuments) {
       throw new BadRequestException(
-        `At most ${MAX_DOCUMENTS} documents allowed`,
+        `At most ${COMPANY_PROFILE_DOCUMENTS_CONFIG.upload.maxDocuments} documents allowed`,
       );
     }
 
@@ -156,7 +150,7 @@ export class CompanyProfileDocumentsService {
       status: CompanyProfileDocumentAnalysisStatus.DONE,
     })
       .sort({ updatedAt: -1 })
-      .limit(MAX_DOCUMENT_EVIDENCE_ITEMS)
+      .limit(COMPANY_PROFILE_DOCUMENTS_CONFIG.context.maxEvidenceItems)
       .lean()
       .exec();
 
@@ -232,7 +226,7 @@ export class CompanyProfileDocumentsService {
         ].join('\n');
       })
       .join('\n\n---\n\n')
-      .slice(0, MAX_CONTEXT_CHARS);
+      .slice(0, COMPANY_PROFILE_DOCUMENTS_CONFIG.context.maxChars);
 
     return this.deepSeekAnalysisService.createGeneralJsonResponse(
       COMPANY_PROFILE_DOCUMENT_SYSTEM_PROMPT,
@@ -286,7 +280,7 @@ export class CompanyProfileDocumentsService {
             '',
             document.extraction.aiText.slice(
               0,
-              MAX_SINGLE_DOCUMENT_CONTEXT_CHARS,
+              COMPANY_PROFILE_DOCUMENTS_CONFIG.context.maxSingleDocumentChars,
             ),
           ].join('\n'),
         );

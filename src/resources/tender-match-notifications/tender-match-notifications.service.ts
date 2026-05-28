@@ -22,10 +22,7 @@ import { UserModel } from '@/resources/user/user.schema';
 import { getSafeErrorMessage, isDuplicateKeyError, logger } from '@/utils';
 import { TenderMatchNotificationLogModel } from './schemas';
 import { TariffService } from '@/resources/tariff';
-
-const DAILY_TENDER_MATCH_NOTIFICATIONS_CRON = '0 8 * * *';
-const WEEKLY_TENDER_MATCH_NOTIFICATIONS_CRON = '0 8 * * 1';
-const MAX_DETAILED_MATCHES_PER_REPORT = 3;
+import { TENDER_MATCH_NOTIFICATIONS_CONFIG } from '@/config/tender-match-notifications.config';
 
 type NotifiableFrequency =
   | UserNotificationFrequency.INSTANT
@@ -73,8 +70,8 @@ export class TenderMatchNotificationsService {
     }
   }
 
-  @Cron(DAILY_TENDER_MATCH_NOTIFICATIONS_CRON, {
-    timeZone: 'Europe/Warsaw',
+  @Cron(TENDER_MATCH_NOTIFICATIONS_CONFIG.cron.daily, {
+    timeZone: TENDER_MATCH_NOTIFICATIONS_CONFIG.timeZone,
   })
   async sendDailyReportsCron(): Promise<void> {
     if (this.isSendingDailyReports) {
@@ -99,8 +96,8 @@ export class TenderMatchNotificationsService {
     }
   }
 
-  @Cron(WEEKLY_TENDER_MATCH_NOTIFICATIONS_CRON, {
-    timeZone: 'Europe/Warsaw',
+  @Cron(TENDER_MATCH_NOTIFICATIONS_CONFIG.cron.weekly, {
+    timeZone: TENDER_MATCH_NOTIFICATIONS_CONFIG.timeZone,
   })
   async sendWeeklyReportsCron(): Promise<void> {
     if (this.isSendingWeeklyReports) {
@@ -205,7 +202,10 @@ export class TenderMatchNotificationsService {
         reportTitle: this.buildReportTitle(matches, frequency),
         highestScore: this.buildHighestScore(matches),
         highlightedCount: String(
-          Math.min(matches.length, MAX_DETAILED_MATCHES_PER_REPORT),
+          Math.min(
+            matches.length,
+            TENDER_MATCH_NOTIFICATIONS_CONFIG.maxDetailedMatchesPerReport,
+          ),
         ),
         dashboardUrl: this.buildDashboardUrl(),
         matchesHtml: this.buildMatchesHtml(matches),
@@ -356,7 +356,10 @@ export class TenderMatchNotificationsService {
   }
 
   private buildMatchesHtml(matches: PopulatedTenderMatch[]): string {
-    const detailedMatches = matches.slice(0, MAX_DETAILED_MATCHES_PER_REPORT);
+    const detailedMatches = matches.slice(
+      0,
+      TENDER_MATCH_NOTIFICATIONS_CONFIG.maxDetailedMatchesPerReport,
+    );
     const remainingCount = matches.length - detailedMatches.length;
     const detailedMatchesHtml = detailedMatches
       .map((match) => {

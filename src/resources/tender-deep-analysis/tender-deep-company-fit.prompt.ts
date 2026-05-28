@@ -1,10 +1,8 @@
 import { TenderDeepCompanyFitAnalysisInput } from '@/types';
+import { TENDER_DEEP_ANALYSIS_CONFIG } from '@/config/tender-deep-analysis.config';
 
 export const TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION =
   'tender-deep-company-fit-v1.0.9';
-
-const MAX_JSON_CHARS = 60_000;
-const MAX_SNIPPETS_JSON_CHARS = 40_000;
 
 export function buildTenderDeepCompanyFitSystemPrompt(): string {
   return [
@@ -87,7 +85,10 @@ export function buildTenderDeepCompanyFitUserPrompt(
     safeStringify(input.documentMetadata ?? []),
     '',
     '7. Raw extracted document snippets, if available:',
-    safeStringify(input.documentTextSnippets ?? [], MAX_SNIPPETS_JSON_CHARS),
+    safeStringify(
+      input.documentTextSnippets ?? [],
+      TENDER_DEEP_ANALYSIS_CONFIG.companyFitAnalysis.maxSnippetsJsonChars,
+    ),
     '',
     'Your task:',
     '',
@@ -181,7 +182,10 @@ export function buildTenderDeepCompanyFitUserPrompt(
   ].join('\n');
 }
 
-function safeStringify(value: unknown, maxChars = MAX_JSON_CHARS): string {
+function safeStringify(
+  value: unknown,
+  maxChars = TENDER_DEEP_ANALYSIS_CONFIG.companyFitAnalysis.maxJsonChars,
+): string {
   const json = JSON.stringify(value ?? null, null, 2);
 
   return json.length > maxChars

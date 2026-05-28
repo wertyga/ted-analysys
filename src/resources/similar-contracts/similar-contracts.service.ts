@@ -28,11 +28,7 @@ import {
   XmlAwardWinner,
 } from './similar-contracts.xml';
 import { TendersService } from '@/resources/tenders/tenders.service';
-import {
-  AwardTenderModel,
-  AwardTenderWinner,
-  AWARD_SEARCH_CACHE_TTL_MS,
-} from './schemas';
+import { AwardTenderModel, AwardTenderWinner } from './schemas';
 import {
   getPaginationMeta,
   readDate,
@@ -40,9 +36,7 @@ import {
   tenderCpvPopulateFields,
 } from '@/utils';
 import { buildTedTenderSearchQuery } from '@/resources/ted-search/ted-builders';
-
-const HISTORY_YEARS_BACK = 3;
-const COUNT_OF_AWARD_TENDERS_SEARCH = 1;
+import { SIMILAR_CONTRACTS_CONFIG } from '@/config/similar-contracts.config';
 
 export type normalizedAwardTenderDto = NormalizedTenderDto & {
   winnerName?: string | string[];
@@ -131,7 +125,7 @@ export class SimilarContractsService {
       checkQuerySyntax: false,
       onlyLatestVersions: true,
       paginationMode: TedPaginationMode.PAGE_NUMBER,
-      limit: COUNT_OF_AWARD_TENDERS_SEARCH,
+      limit: SIMILAR_CONTRACTS_CONFIG.awardTenderSearchLimit,
       page: 1,
       fields: [...searchTendersDefaultFields, ...winnerFields],
     });
@@ -234,7 +228,9 @@ export class SimilarContractsService {
 
   private get publicationDateFromHistoryTedDate(): string {
     const date = new Date();
-    date.setFullYear(date.getFullYear() - HISTORY_YEARS_BACK);
+    date.setFullYear(
+      date.getFullYear() - SIMILAR_CONTRACTS_CONFIG.historyYearsBack,
+    );
 
     return getTedDate(date);
   }
@@ -243,7 +239,7 @@ export class SimilarContractsService {
     return createHash('sha256')
       .update(
         JSON.stringify({
-          historyYearsBack: HISTORY_YEARS_BACK,
+          historyYearsBack: SIMILAR_CONTRACTS_CONFIG.historyYearsBack,
           cpvCodes: this.normalizeHashArray(dto.cpvCodes),
           buyerCountries: this.normalizeHashArray(dto.buyerCountries),
           contractNature: this.normalizeHashArray(dto.contractNature),
@@ -311,7 +307,7 @@ export class SimilarContractsService {
     if (searchHash) {
       awardTender.searchHash = searchHash;
       awardTender.searchCacheExpiresAt = new Date(
-        Date.now() + AWARD_SEARCH_CACHE_TTL_MS,
+        Date.now() + SIMILAR_CONTRACTS_CONFIG.awardSearchCacheTtlMs,
       );
     }
 

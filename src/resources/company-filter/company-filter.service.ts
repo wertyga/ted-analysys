@@ -36,11 +36,7 @@ import { TenderMatchingService } from '@/resources/tender-matching/tender-matchi
 import { CpvCategoryModel } from '@/resources/cpv/schemas';
 import { CompanyProfileDocumentsService } from '@/resources/company-profile-documents/company-profile-documents.service';
 import { CompanyDocumentEvidence } from '@/resources/company-profile-documents/company-profile-documents.types';
-
-const COMPANY_FILTER_WAIT_TIMEOUT_MS = 10 * 60 * 1000;
-const COMPANY_FILTER_WAIT_INTERVAL_MS = 1000;
-const COMPANY_FILTER_GENERATION_DEBOUNCE_MS = 5 * 1000;
-const COMPANY_FILTER_GENERATION_CONCURRENCY = 5;
+import { COMPANY_FILTER_CONFIG } from '@/config/company-filter.config';
 
 interface CompanyFilterCpvPayload {
   name?: string;
@@ -115,8 +111,8 @@ export class CompanyFilterService {
     private readonly companyProfileDocumentsService: CompanyProfileDocumentsService,
   ) {
     this.companyFilterGenerations = new DebouncedAsyncLatestQueueByKey({
-      delayMs: COMPANY_FILTER_GENERATION_DEBOUNCE_MS,
-      concurrency: COMPANY_FILTER_GENERATION_CONCURRENCY,
+      delayMs: COMPANY_FILTER_CONFIG.generation.debounceMs,
+      concurrency: COMPANY_FILTER_CONFIG.generation.concurrency,
       runner: (input) => this.runCompanyFilterGeneration(input),
     });
   }
@@ -156,7 +152,7 @@ export class CompanyFilterService {
     user: UserDocument,
   ): Promise<CompanyTenderFilterDocument> {
     let companyAnalysis = await this.generateAnalysisForCompany(user);
-    const waitUntil = Date.now() + COMPANY_FILTER_WAIT_TIMEOUT_MS;
+    const waitUntil = Date.now() + COMPANY_FILTER_CONFIG.wait.timeoutMs;
 
     while (
       companyAnalysis.generationStatus !==
@@ -176,7 +172,7 @@ export class CompanyFilterService {
         .orFail()
         .exec()) as CompanyTenderFilterDocument;
 
-      await sleep(COMPANY_FILTER_WAIT_INTERVAL_MS);
+      await sleep(COMPANY_FILTER_CONFIG.wait.intervalMs);
     }
 
     if (

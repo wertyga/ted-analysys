@@ -1,14 +1,8 @@
 import { TedTenderSearchRequestDto } from './dto/ted-tender-search-request.dto';
 import { TedSortOrder, TedTenderSortColumn } from './types/ted-search.types';
+import { TED_SEARCH_CONFIG } from '@/config/ted-search.config';
 
 type MongoSort = Record<string, 1 | -1>;
-
-const LOCAL_SORT_FIELDS: Record<TedTenderSortColumn, string> = {
-  [TedTenderSortColumn.PUBLICATION_DATE]: 'publicationDate',
-  [TedTenderSortColumn.DEADLINE]: 'submissionDeadline',
-  [TedTenderSortColumn.BUYER_COUNTRY]: 'buyerCountry',
-  [TedTenderSortColumn.BUDGET]: 'estimatedValue.amount',
-};
 
 export class TedSearchSorting {
   buildLocalTenderSort(filters: TedTenderSearchRequestDto): MongoSort {
@@ -25,10 +19,13 @@ export class TedSearchSorting {
     sortColumn: TedTenderSortColumn | undefined,
   ): string {
     if (!sortColumn) {
-      return 'publicationDate';
+      return TED_SEARCH_CONFIG.defaultLocalSortField;
     }
 
-    return LOCAL_SORT_FIELDS[sortColumn] ?? 'publicationDate';
+    return (
+      TED_SEARCH_CONFIG.localSortFields[sortColumn] ??
+      TED_SEARCH_CONFIG.defaultLocalSortField
+    );
   }
 
   private resolveSortDirection(sortOrder: TedSortOrder | undefined): 1 | -1 {

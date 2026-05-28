@@ -15,13 +15,15 @@ import {
   fetchXmlContentFromNotice,
   findXmlUrl,
 } from '@/resources/tenders/tender-normalizer-xml';
+import { DOCUMENT_EXTRACTOR_CONFIG } from '@/config/document-extractor.config';
 
 export type TenderAnalysisDocumentSource =
   | 'xml'
   | 'pdf'
   | 'pdfs'
   | 'html'
-  | 'htmlDirect';
+  | 'htmlDirect'
+  | 'tenderDocuments';
 
 export interface TenderLinkDocumentCandidate {
   sourceUrl: string;
@@ -37,8 +39,6 @@ interface DownloadedTenderDocument {
   filename?: string;
 }
 
-const MAX_ANALYSIS_DOCUMENTS = 8;
-
 export class DocumentExtractor {
   private readonly textExtractor = new TenderDocumentTextExtractorService();
 
@@ -47,30 +47,28 @@ export class DocumentExtractor {
     whatNeedToTake: TenderAnalysisDocumentSource[],
   ): Promise<DocumentInputAnalysis[]> {
     const xmlDocument = whatNeedToTake.includes('xml')
-      ? await this.buildXmlDocument(tender)
-      : undefined;
+      ? [await this.buildXmlDocument(tender)]
+      : [];
+    const tenderDocs = whatNeedToTake.includes('tenderDocuments')
+      ? this.extractDocumentCandidatesFromTenderDocumentUrls(tender)
+      : [];
+
+    const restTypes = whatNeedToTake.filter(
+      (key) => key !== 'xml' && key !== 'tenderDocuments',
+    );
     const candidates = this.extractDocumentCandidatesFromLinks(
       tender.links,
-      whatNeedToTake,
-    )
-      .filter((candidate) => {
-        return (
-          candidate.documentType !== TenderSourceDocumentType.TED_XML_NOTICE
-        );
-      })
-      .concat(
-        this.shouldIncludeProcurementDocumentUrls(whatNeedToTake)
-          ? this.extractDocumentCandidatesFromTenderDocumentUrls(tender)
-          : [],
-      );
+      restTypes,
+    ).concat(tenderDocs);
 
-    const documents: GeneralTenderAnalysisInput['documents'] = xmlDocument
-      ? [xmlDocument]
-      : [];
+    const documents: GeneralTenderAnalysisInput['documents'] = [
+      ...xmlDocument,
+    ].filter(Boolean) as GeneralTenderAnalysisInput['documents'];
 
     for (const candidate of this.uniqueDocumentCandidates(candidates).slice(
       0,
-      MAX_ANALYSIS_DOCUMENTS - documents.length,
+      DOCUMENT_EXTRACTOR_CONFIG.analysisDocuments.maxDocuments -
+        documents.length,
     )) {
       try {
         const downloaded = await this.downloadTenderDocument(
@@ -111,6 +109,7 @@ export class DocumentExtractor {
     whatNeedToTake: TenderAnalysisDocumentSource[],
   ): TenderLinkDocumentCandidate[] {
     return whatNeedToTake
+      .filter((key) => key !== 'tenderDocuments')
       .map((key) => links?.[key])
       .filter(Boolean)
       .map((url) => {
@@ -133,13 +132,13 @@ export class DocumentExtractor {
   ): Promise<DownloadedTenderDocument> {
     const response = await axios.get<ArrayBuffer>(sourceUrl, {
       responseType: 'arraybuffer',
-      timeout: 30_000,
+      timeout: DOCUMENT_EXTRACTOR_CONFIG.download.timeoutMs,
       headers: {
-        Accept:
-          'application/pdf, application/xml, text/xml, text/html, text/plain, */*',
+        Accept: DOCUMENT_EXTRACTOR_CONFIG.download.acceptHeader,
       },
-      maxContentLength: 25 * 1024 * 1024,
-      maxBodyLength: 25 * 1024 * 1024,
+      maxContentLength:
+        DOCUMENT_EXTRACTOR_CONFIG.download.maxContentLengthBytes,
+      maxBodyLength: DOCUMENT_EXTRACTOR_CONFIG.download.maxBodyLengthBytes,
     });
 
     return {
@@ -204,14 +203,6 @@ export class DocumentExtractor {
     ])
       .map((url) => this.addProcurementDocumentCandidate(url))
       .filter(Boolean) as TenderLinkDocumentCandidate[];
-  }
-
-  private shouldIncludeProcurementDocumentUrls(
-    whatNeedToTake: TenderAnalysisDocumentSource[],
-  ): boolean {
-    return whatNeedToTake.some((key) =>
-      ['pdf', 'pdfs', 'html', 'htmlDirect'].includes(key),
-    );
   }
 
   private async buildXmlDocument(

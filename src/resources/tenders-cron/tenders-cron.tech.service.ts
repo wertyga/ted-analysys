@@ -4,8 +4,7 @@ import { logger } from '@/utils';
 import { TenderModel } from '@/resources/tenders/schemas';
 import { TendersCronService } from '@/resources/tenders-cron/tenders-cron.service';
 import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rates/currency-exchange-rates.service';
-
-const ESTIMATED_VALUE_EUR_UPDATE_BATCH_SIZE = 500;
+import { TENDERS_CRON_CONFIG } from '@/config/tenders-cron.config';
 
 interface UpdateTenderEstimatedValueEurResult {
   scanned: number;
@@ -36,7 +35,7 @@ export class TendersCronTechService {
       if (process.env.NEED_TO_UPDATE_TENDER_ESTIMATED_VALUE_EUR_INITIALY) {
         await this.updateExistingTenderEstimatedValuesEur();
       }
-    }, 2000);
+    }, TENDERS_CRON_CONFIG.tech.initialRunDelayMs);
   }
 
   async updateExistingTenderEstimatedValuesEur(): Promise<void> {
@@ -51,7 +50,7 @@ export class TendersCronTechService {
 
     try {
       const result = await this.updateTenderEstimatedValuesEur(
-        ESTIMATED_VALUE_EUR_UPDATE_BATCH_SIZE,
+        TENDERS_CRON_CONFIG.tech.estimatedValueEurUpdateBatchSize,
       );
 
       await logger.info('TENDER_ESTIMATED_VALUE_EUR_UPDATED', result);

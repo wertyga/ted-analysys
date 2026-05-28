@@ -22,21 +22,10 @@ import {
   collectTenderDocumentAccessUrls,
   normalizeMissingDocuments,
 } from './missing-tender-documents.utils';
+import { TENDER_DEEP_ANALYSIS_CONFIG } from '@/config/tender-deep-analysis.config';
 
-export const COMPANY_FIT_WEIGHTS = {
-  scopeFit: 18,
-  capabilityFit: 16,
-  cpvFit: 8,
-  geographicFit: 8,
-  languageFit: 7,
-  eligibilityFit: 12,
-  certificationFit: 7,
-  experienceFit: 8,
-  financialFit: 6,
-  commercialFit: 4,
-  deadlineFit: 4,
-  riskFit: 2,
-} as const satisfies Record<CompanyFitScoreKey, number>;
+export const COMPANY_FIT_WEIGHTS =
+  TENDER_DEEP_ANALYSIS_CONFIG.scoring.companyFitWeights;
 
 const SCORE_KEYS = Object.keys(COMPANY_FIT_WEIGHTS) as CompanyFitScoreKey[];
 
