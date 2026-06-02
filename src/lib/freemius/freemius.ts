@@ -82,7 +82,8 @@ export class FreemiumClient {
   async createCheckout(data: FreemiumCheckoutData) {
     const checkout = await this.freemius.checkout.create({
       user: data.user,
-      isSandbox: process.env.NODE_ENV !== 'production',
+      // TODO: Remove when done
+      isSandbox: true,
       planId: data.planId,
       licenseId: data.licenseId,
       quota: data.quota,
