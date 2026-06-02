@@ -169,7 +169,7 @@ export class PaymentsService {
 
   async syncEntitlementFromLicense(licenseId: string) {
     const purchase = await freemiusClient.retrievePurchase(licenseId);
-
+    console.log({ purchase });
     if (!purchase) {
       throw new NotFoundException('Freemius purchase was not found');
     }
