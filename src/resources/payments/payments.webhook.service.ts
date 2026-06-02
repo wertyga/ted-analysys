@@ -60,7 +60,6 @@ export class PaymentsWebhookService {
     // });
 
     listener.on(subscriptionSyncEvents, async (event: WebhookEvent) => {
-      console.log(JSON.stringify(event, null, 2));
       const data = (event as unknown as { data?: { license_id?: string } })
         .data;
       const licenseId = data?.license_id;
