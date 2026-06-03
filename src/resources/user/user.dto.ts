@@ -268,9 +268,12 @@ export class UserAuthDto extends UserDto {
 }
 
 export class UserMetaResponse {
-  @ApiProperty()
+  @ApiProperty({ example: 3 })
   wishlistCount: number;
 
-  @ApiProperty()
+  @ApiProperty({ example: 5 })
   deepAnalysisCount: number;
+
+  @ApiProperty({ example: 12 })
+  aiFitMatchesCount: number;
 }

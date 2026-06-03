@@ -23,11 +23,14 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiDefaultResponse,
+  ApiOperation,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { TenderWishlistService } from '@/resources/tender-wishlist/tender-wishlist.service';
 import { TenderDeepAnalysisModel } from '@/resources/tender-deep-analysis/schemas';
+import { TenderMatchingService } from '@/resources/tender-matching/tender-matching.service';
+import { TenderCompanyMatchModel } from '@/resources/tender-matching/schemas/tender-company-match.schema';
 
 @ApiTags('Users')
 @UseFilters(HttpErrorLoggingFilter)
@@ -36,19 +39,28 @@ export class UsersController {
   constructor(
     private usersService: UsersService,
     private tenderWishlistService: TenderWishlistService,
+    private tenderMatchingService: TenderMatchingService,
   ) {}
 
   @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user metadata counters' })
   @ApiDefaultResponse({ type: UserMetaResponse })
   @UseGuards(AuthGuard)
   @Get('/meta-data')
   async getUserMetaData(@Req() req) {
-    const [wishlistCount, deepAnalysisCount] = await Promise.all([
-      this.tenderWishlistService.countUserTenders(req.user),
-      TenderDeepAnalysisModel.countDocuments({ company: req.user._id }),
-    ]);
+    const aiFitMatchesQuery = this.tenderMatchingService.getAiFitMatchesQuery(
+      req.user._id,
+      65,
+    );
 
-    return { wishlistCount, deepAnalysisCount };
+    const [wishlistCount, deepAnalysisCount, aiFitMatchesCount] =
+      await Promise.all([
+        this.tenderWishlistService.countUserTenders(req.user),
+        TenderDeepAnalysisModel.countDocuments({ company: req.user._id }),
+        TenderCompanyMatchModel.countDocuments(aiFitMatchesQuery),
+      ]);
+
+    return { wishlistCount, deepAnalysisCount, aiFitMatchesCount };
   }
 
   @ApiBearerAuth()

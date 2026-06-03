@@ -72,6 +72,18 @@ export class TenderMatchingService {
     return matchTenderWithCompanyFilter(mapTenderForMatching(tender), filter);
   }
 
+  getAiFitMatchesQuery(
+    companyId: Types.ObjectId | string,
+    minAiFitScore = 65,
+  ): QueryFilter<TenderCompanyMatchDocument> {
+    return {
+      company: companyId,
+      hardMatchStatus: HardMatchStatus.MATCHED,
+      aiFitStatus: AiFitStatus.COMPLETED,
+      aiFitScore: { $gte: minAiFitScore },
+    };
+  }
+
   async findCompletedAiFitMatchesForUser(
     companyId: Types.ObjectId | string,
     minAiFitScore = 65,
@@ -86,12 +98,7 @@ export class TenderMatchingService {
       return { items: [], total: 0 };
     }
 
-    const query: QueryFilter<TenderCompanyMatchDocument> = {
-      company: companyId,
-      hardMatchStatus: HardMatchStatus.MATCHED,
-      aiFitStatus: AiFitStatus.COMPLETED,
-      aiFitScore: { $gte: minAiFitScore },
-    };
+    const query = this.getAiFitMatchesQuery(companyId, minAiFitScore);
 
     const [items, total] = await Promise.all([
       TenderCompanyMatchModel.find(query)

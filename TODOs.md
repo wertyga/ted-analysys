@@ -1,7 +1,13 @@
 - FE to implement notification user's settings
 - FE - deep analysis isOutOfDate
-- FE - deep analysis forceUpdate
-- FE - self - withDescription
+- FE - awardCriteria
+- FE - buyer fields - может отдельно показывать
+- FE - estimatedValue - если нет в тендере, вытягивать из generalAnalysis
+- FE - lots (tender -> generalAnalysis)
+- FE - generalAnalysis -> scopeOfWork
+- FE - generalAnalysis -> eligibilityCriteria
+- FE - generalAnalysis -> awardCriteria
+- FE - tender-match - Tender details are currently unavailable - show a tender info
 
 - BE - Tidy up tender-matching.service
 - BE - optimize documents text ??
