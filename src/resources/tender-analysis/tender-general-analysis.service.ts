@@ -72,8 +72,6 @@ export class TenderGeneralAnalysisService {
             resultJson: result,
             summary: result.summary,
 
-            estimatedValue: result.estimatedValue,
-
             complexityScore: result.complexityScore,
             opportunityScore: result.opportunityScore,
             generalRecommendation: result.generalRecommendation,
@@ -89,6 +87,7 @@ export class TenderGeneralAnalysisService {
           },
           $unset: {
             errorMessage: '',
+            estimatedValue: '',
           },
         },
       );
