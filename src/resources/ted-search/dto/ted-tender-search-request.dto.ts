@@ -77,6 +77,14 @@ export class TedTenderSearchRequestDto implements TedTenderSearchFilters {
   @IsNotEmpty({ each: true })
   cpvCodes?: string[];
 
+  @ApiPropertyOptional({ type: [String], example: ['47039-2025'] })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  publicationNumber?: string[];
+
   @ApiPropertyOptional({
     enum: TED_ELIGIBLE_COUNTRY_CODES,
     isArray: true,

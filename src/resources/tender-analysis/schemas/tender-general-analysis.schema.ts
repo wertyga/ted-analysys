@@ -51,7 +51,7 @@ export interface TenderGeneralAnalysis {
 
   status: TenderGeneralAnalysisStatus;
 
-  resultJson?: unknown;
+  resultJson?: any;
   summary?: string;
 
   estimatedValue?: TenderEstimatedValue;

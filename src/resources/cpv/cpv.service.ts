@@ -104,6 +104,7 @@ export class CpvService {
     })
       .select(CPV_CODES_LIST_FIELDS)
       .lean();
+
     const byCode = new Map(
       items.map((item) => [item.code, this.toResponseItem(item)]),
     );
@@ -123,26 +124,6 @@ export class CpvService {
     }).select('_id code');
 
     return items.map((code) => code._id);
-  }
-
-  async findDescendantCodes(codes: string[]): Promise<string[]> {
-    const normalizedCodes = this.normalizeCodes(codes);
-
-    if (normalizedCodes.length === 0) {
-      return [];
-    }
-
-    const descendants = await CpvCategoryModel.find({
-      $or: normalizedCodes.map((code) => ({
-        code: { $regex: `^${this.getSignificantPrefix(code)}` },
-      })),
-    })
-      .select('code -_id')
-      .lean();
-
-    return Array.from(
-      new Set([...normalizedCodes, ...descendants.map((item) => item.code)]),
-    ).sort();
   }
 
   async findDescendants(codes: string[]): Promise<CpvCategoriesResponse> {
@@ -173,7 +154,9 @@ export class CpvService {
   private normalizeCodes(codes: string[]): string[] {
     return Array.from(
       new Set(
-        codes.map((code) => code.trim()).filter((code) => /^\d{8}$/.test(code)),
+        codes
+          .map((code) => code.toString().trim())
+          .filter((code) => /^\d{8}$/.test(code)),
       ),
     );
   }

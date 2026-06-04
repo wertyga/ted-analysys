@@ -1,7 +1,7 @@
 import { TenderLotAnalysisInput } from '@/types';
 
 export const GENERAL_TENDER_ANALYSIS_PROMPT_VERSION =
-  'general-tender-analysis-v1';
+  'general-tender-analysis-v2';
 
 export type AnalysisOutputLanguage = 'en' | 'ru' | 'pl' | 'de' | 'fr';
 export type RiskSeverity = 'LOW' | 'MEDIUM' | 'HIGH';

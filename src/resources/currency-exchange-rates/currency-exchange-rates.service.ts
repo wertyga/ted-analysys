@@ -105,21 +105,23 @@ export class CurrencyExchangeRatesService {
   }
 
   async convertToEur(
-    amount: number,
-    currency: CurrencySign,
+    amount: number | null | undefined,
+    currency: CurrencySign | null | undefined | string,
     date?: Date,
   ): Promise<number | null> {
-    if (!Number.isFinite(amount)) {
+    const normalizedCurrency = currency?.trim().toUpperCase() as CurrencySign;
+
+    if (!Number.isFinite(amount) || !CurrencySign[normalizedCurrency]) {
       return null;
     }
 
-    if (currency === CurrencySign.EUR) {
-      return amount;
+    if (normalizedCurrency === CurrencySign.EUR) {
+      return amount as number;
     }
 
-    const rate = await this.findRate(currency, date);
+    const rate = await this.findRate(normalizedCurrency, date);
 
-    return rate ? amount * rate.eurPerUnit : null;
+    return rate ? (amount as number) * rate.eurPerUnit : null;
   }
 
   async findRate(

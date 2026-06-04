@@ -20,22 +20,20 @@ import {
   TenderGeneralAnalysisModel,
 } from '../tender-analysis/schemas';
 import { TenderListDto } from './dto/tender.dto';
-import { TenderDocument, TenderModel, TenderWithWishlist } from './schemas';
+import { TenderDocument, TenderModel } from './schemas';
 import {
   NormalizedTenderDto,
   TenderNormalizerService,
 } from './tender-normalizer.service';
-import { TedPublicationNumbersSearchRequestDto } from '@/resources/ted-search/dto/ted-publication-numbers-search-request.dto';
 import {
   areTedNoticeVersionsDifferent,
   extractPublicationNumberFromNotice,
   isRecord,
   isTedNotice,
   isTedPublicationNumber,
-  valueToString,
 } from '@/utils';
 import { tenderCpvPopulateFields } from '@/resources/tenders/utils/tender.utils';
-import { Mongoose, SortOrder, Types } from 'mongoose';
+import { SortOrder, Types } from 'mongoose';
 import {
   TenderDeepAnalysisDocument,
   TenderDeepAnalysisModel,

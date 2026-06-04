@@ -18,9 +18,9 @@ import { TendersService } from '@/resources/tenders/tenders.service';
 import { isRecord } from '@/utils';
 import { SimilarContractsService } from '@/resources/similar-contracts/similar-contracts.service';
 import { searchTendersDefaultFields } from '@/resources/ted-search/utils';
-import { winnerFields } from '@/resources/similar-contracts/similar-contracts.utils';
 import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
 import { TED_OPEN_TENDERS_COLLECTOR_CONFIG } from '@/config/ted-open-tenders-collector.config';
+import { AWARD_HISTORY_FIELDS } from '@/config/similar-contracts.config';
 
 export interface TedOpenTendersCollectorOptions {
   pageLimit?: number;
@@ -179,7 +179,7 @@ export class TedOpenTendersCollectorService {
     return this.collectTedNoticesByIteration({
       query,
       scope: TedScope.ALL,
-      fields: [...searchTendersDefaultFields, ...winnerFields],
+      fields: AWARD_HISTORY_FIELDS,
       options,
       saveNotices,
     });
