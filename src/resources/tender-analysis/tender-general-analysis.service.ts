@@ -1,9 +1,4 @@
-import {
-  forwardRef,
-  Inject,
-  Injectable,
-  RequestTimeoutException,
-} from '@nestjs/common';
+import { Injectable, RequestTimeoutException } from '@nestjs/common';
 import mongoose from 'mongoose';
 import {
   TenderGeneralAnalysisDocument,
@@ -15,7 +10,6 @@ import { TenderGeneralAnalysisDetailDto } from './dto/tender-general-analysis.dt
 import { TenderDocument } from '../tenders/schemas';
 import { TenderGeneralAnalysisBuilder } from './tender-general-analysis.builder';
 import {
-  GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
   GeneralTenderAnalysisInput,
   GeneralTenderAnalysisResult,
 } from '@/openai/dto/openai-analysis.dto';
@@ -29,6 +23,7 @@ import {
 } from '@/utils';
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 import { TENDER_ANALYSIS_CONFIG } from '@/config/tender-analysis.config';
+import { GENERAL_TENDER_ANALYSIS_PROMPT_VERSION } from '@/resources/tender-analysis/general-tender-analysis.prompt';
 
 export interface TenderAnalysisExecutionResult {
   result: GeneralTenderAnalysisResult;

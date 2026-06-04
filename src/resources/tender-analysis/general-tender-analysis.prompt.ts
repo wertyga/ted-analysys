@@ -1,3 +1,6 @@
+export const GENERAL_TENDER_ANALYSIS_PROMPT_VERSION =
+  'general-tender-analysis-v2';
+
 export function buildGeneralTenderAnalysisPrompt(
   outputLanguage: string,
 ): string {
