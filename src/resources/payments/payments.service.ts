@@ -152,19 +152,16 @@ export class PaymentsService {
     const purchase = await freemiusClient.retrievePurchase(
       activeEntitlement.licenseId,
     );
+
     if (!purchase || !purchase?.subscriptionId) {
       throw new BadRequestException(
         'Active Freemius subscription was not found',
       );
     }
 
-    const result = await freemiusClient.cancelSubscription(
-      purchase.subscriptionId,
-    );
+    await freemiusClient.cancelSubscription(purchase.subscriptionId);
 
-    await this.syncEntitlementFromLicense(activeEntitlement.licenseId);
-
-    return result;
+    return this.syncEntitlementFromLicense(activeEntitlement.licenseId);
   }
 
   async syncEntitlementFromLicense(licenseId: string) {
