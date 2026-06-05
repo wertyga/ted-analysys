@@ -3,6 +3,7 @@ import { Transform } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
+  IsEnum,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -11,6 +12,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { FreemiusBillingCycle } from '@/lib/freemius/freemius';
 
 export class CreatePaymentCheckoutDto {
   @ApiPropertyOptional({
@@ -21,6 +23,25 @@ export class CreatePaymentCheckoutDto {
   @IsString()
   @IsNotEmpty()
   planId: string;
+
+  @ApiPropertyOptional({
+    description: 'Freemius coupon code to apply automatically in checkout.',
+    example: 'BLACKFRIDAY2024',
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  coupon?: string;
+
+  @ApiPropertyOptional({
+    description: 'billingCycle',
+    enum: FreemiusBillingCycle,
+    example: FreemiusBillingCycle.monthly,
+  })
+  @IsOptional()
+  @IsNotEmpty()
+  @IsEnum(FreemiusBillingCycle)
+  billingCycle: FreemiusBillingCycle = FreemiusBillingCycle.monthly;
 }
 
 export class ChangePaymentSubscriptionDto {

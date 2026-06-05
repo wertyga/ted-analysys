@@ -47,7 +47,7 @@ export class PaymentsService {
     }
 
     if (!activeEntitlement.isCanceled) {
-      return this.upgradeSubscription(user, data.planId);
+      return this.upgradeSubscription(user, data);
     }
 
     if (activeEntitlement.isCanceled && !areTariffTypesTheSame) {
@@ -57,7 +57,7 @@ export class PaymentsService {
 
   async createNewSubscription(
     user: UserDocument,
-    data: CreatePaymentCheckoutDto & { licenseId?: string },
+    data: CreatePaymentCheckoutDto,
   ) {
     return this.createFreemiusCheckout(user, data);
   }
@@ -73,6 +73,8 @@ export class PaymentsService {
       },
       planId: data.planId,
       licenseId: data.licenseId,
+      coupon: data.coupon,
+      billingCycle: data.billingCycle,
     });
   }
 
@@ -127,7 +129,10 @@ export class PaymentsService {
     return activeEntitlement;
   }
 
-  async upgradeSubscription(user: UserDocument, planId: string) {
+  async upgradeSubscription(
+    user: UserDocument,
+    data: CreatePaymentCheckoutDto,
+  ) {
     const entitlement = await PaymentEntitlementModel.findOne({
       user: user._id,
       isCanceled: false,
@@ -138,8 +143,10 @@ export class PaymentsService {
     }
 
     return this.createFreemiusCheckout(user, {
-      planId,
+      planId: data.planId,
       licenseId: entitlement.licenseId,
+      coupon: data.coupon,
+      billingCycle: data.billingCycle,
     });
   }
 
