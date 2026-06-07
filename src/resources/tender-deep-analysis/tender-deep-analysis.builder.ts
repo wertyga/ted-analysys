@@ -224,7 +224,7 @@ export class TenderDeepAnalysisBuilder {
     applyMissingCompanyInfo(result, input);
     applyScoreBreakdown(result);
     applyGuardrails(result, input);
-    applyEvidenceBasedScoreFallbacks(result, input);
+    validateRequiredScoreBreakdown(result);
     applyScoreBreakdown(result);
 
     const recommendation = calculateFinalRecommendation(result, input);
@@ -383,19 +383,8 @@ function ensureResultShape(
   result.finalRecommendation ||=
     {} as TenderDeepAnalysisResult['finalRecommendation'];
   migrateLegacyScoreBreakdown(result);
+  validateScoreBreakdownShape(result);
   applyDocumentCounts(result, input);
-
-  const scoreBreakdown = getScoreBreakdownRecord(result);
-  for (const key of SCORE_KEYS) {
-    scoreBreakdown[key] ||= {
-      score: 0,
-      weight: COMPANY_FIT_WEIGHTS[key],
-      weightedScore: 0,
-      explanation: '',
-      evidence: ['backend_fallback'],
-      missingInformation: [],
-    };
-  }
 }
 
 function normalizeRiskAnalysisShape(result: TenderDeepAnalysisResult): void {
@@ -644,6 +633,98 @@ function deriveScoreFromWeightedScore(
   return (weightedScore * 100) / COMPANY_FIT_WEIGHTS[key];
 }
 
+function validateScoreBreakdownShape(result: TenderDeepAnalysisResult): void {
+  const rawScoreBreakdown = (result as MutableDeepResult).scores.scoreBreakdown;
+
+  if (!Array.isArray(rawScoreBreakdown)) {
+    throw new Error(
+      'Deep tender analysis result must include scores.scoreBreakdown as an array',
+    );
+  }
+
+  const seenCriteria = new Set<CompanyFitScoreKey>();
+
+  for (const item of rawScoreBreakdown) {
+    if (!isRecord(item)) {
+      throw new Error(
+        'Deep tender analysis result scores.scoreBreakdown items must be objects',
+      );
+    }
+
+    if (
+      typeof item.criterion !== 'string' ||
+      !SCORE_KEYS.includes(item.criterion as CompanyFitScoreKey)
+    ) {
+      throw new Error(
+        'Deep tender analysis result scores.scoreBreakdown item has an unknown criterion',
+      );
+    }
+
+    const criterion = item.criterion as CompanyFitScoreKey;
+
+    if (seenCriteria.has(criterion)) {
+      throw new Error(
+        `Deep tender analysis result has duplicate scores.scoreBreakdown.${criterion}`,
+      );
+    }
+
+    seenCriteria.add(criterion);
+
+    if (typeof item.score !== 'number' || !Number.isFinite(item.score)) {
+      throw new Error(
+        `Deep tender analysis result is missing numeric scores.scoreBreakdown.${criterion}.score`,
+      );
+    }
+
+    if (typeof item.weight !== 'number' || !Number.isFinite(item.weight)) {
+      throw new Error(
+        `Deep tender analysis result is missing numeric scores.scoreBreakdown.${criterion}.weight`,
+      );
+    }
+
+    if (
+      typeof item.weightedScore !== 'number' ||
+      !Number.isFinite(item.weightedScore)
+    ) {
+      throw new Error(
+        `Deep tender analysis result is missing numeric scores.scoreBreakdown.${criterion}.weightedScore`,
+      );
+    }
+
+    const hasExplanation =
+      typeof item.explanation === 'string' && item.explanation.trim().length > 0;
+
+    if (!hasExplanation) {
+      throw new Error(
+        `Deep tender analysis result is missing scores.scoreBreakdown.${criterion}.explanation`,
+      );
+    }
+
+    if (!Array.isArray(item.evidence) || item.evidence.length === 0) {
+      throw new Error(
+        `Deep tender analysis result is missing scores.scoreBreakdown.${criterion}.evidence`,
+      );
+    }
+
+    if (!Array.isArray(item.missingInformation)) {
+      throw new Error(
+        `Deep tender analysis result is missing scores.scoreBreakdown.${criterion}.missingInformation`,
+      );
+    }
+  }
+
+  const scoreBreakdown = getScoreBreakdownRecord(result);
+  const missingKeys = SCORE_KEYS.filter((key) => !scoreBreakdown[key]);
+
+  if (missingKeys.length > 0) {
+    throw new Error(
+      `Deep tender analysis result is missing scores.scoreBreakdown items: ${missingKeys.join(
+        ', ',
+      )}`,
+    );
+  }
+}
+
 function removeDuplicateScoreBreakdowns(
   result: TenderDeepAnalysisResult,
 ): void {
@@ -694,53 +775,10 @@ function applyConfidence(
   result.companyFitAnalysis.confidenceScore = scoringConfidence;
 }
 
-function applyEvidenceBasedScoreFallbacks(
+function validateRequiredScoreBreakdown(
   result: TenderDeepAnalysisResult,
-  input: TenderDeepCompanyFitAnalysisInput,
 ): void {
-  const scoreBreakdown = getScoreBreakdownRecord(result);
-
-  if (
-    isDefaultedScore(scoreBreakdown.languageFit) &&
-    hasLanguageOverlap(input)
-  ) {
-    scoreBreakdown.languageFit.score = 100;
-    scoreBreakdown.languageFit.explanation =
-      'English is accepted for submission and the company supports English.';
-    scoreBreakdown.languageFit.evidence = ['structured_ted', 'company_profile'];
-    scoreBreakdown.languageFit.missingInformation = [];
-  }
-
-  if (
-    isDefaultedScore(scoreBreakdown.financialFit) &&
-    hasTypicalContractSize(input.company)
-  ) {
-    scoreBreakdown.financialFit.score = input.tender.estimatedValue?.amount
-      ? 50
-      : 40;
-    scoreBreakdown.financialFit.explanation = input.tender.estimatedValue
-      ?.amount
-      ? 'Company typical contract range is declared, but financial fit remains uncertain.'
-      : 'Estimated value is missing. Company typical contract range is declared, but no reliable comparison is possible.';
-    scoreBreakdown.financialFit.evidence = ['company_profile', 'missing'];
-    scoreBreakdown.financialFit.missingInformation = ['estimated_tender_value'];
-  }
-
-  if (
-    isDefaultedScore(scoreBreakdown.deadlineFit) &&
-    input.derived.deadlineUrgency !== 'expired'
-  ) {
-    scoreBreakdown.deadlineFit.score =
-      input.derived.deadlineUrgency === 'critical'
-        ? 30
-        : input.derived.deadlineUrgency === 'short'
-          ? 55
-          : 70;
-    scoreBreakdown.deadlineFit.explanation =
-      'Submission deadline is not expired; timing is usable if other blockers were resolved.';
-    scoreBreakdown.deadlineFit.evidence = ['derived'];
-    scoreBreakdown.deadlineFit.missingInformation = [];
-  }
+  validateScoreBreakdownShape(result);
 }
 
 function applyDecisionFactors(
@@ -1108,25 +1146,6 @@ function hasOnlyWeakCpvRefs(company: CompanyAnalysisDto): boolean {
     refs.length > 0 &&
     refs.every((ref) => !ref.code && !ref.name && !ref.description)
   );
-}
-
-function isDefaultedScore(item: {
-  score: number;
-  explanation?: string;
-  evidence?: unknown;
-  source?: unknown;
-  explanationCode?: unknown;
-}): boolean {
-  return (
-    item.score === 0 &&
-    (item.source === 'backend_fallback' ||
-      item.explanationCode === 'MISSING_LLM_SCORE' ||
-      normalizeStringList(item.evidence).includes('backend_fallback'))
-  );
-}
-
-function hasLanguageOverlap(input: TenderDeepCompanyFitAnalysisInput): boolean {
-  return input.derived.preliminarySignals.languageOverlap === true;
 }
 
 function addBidDecisionBlockers(

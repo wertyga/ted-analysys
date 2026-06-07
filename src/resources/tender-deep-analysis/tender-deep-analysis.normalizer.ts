@@ -25,32 +25,26 @@ export function normalizeResultJsonScoreBreakdown(
       ? mutable.companyFitAnalysis.scoreBreakdown
       : {};
 
-    mutable.scores.scoreBreakdown = SCORE_KEYS.map((criterion) => {
+    mutable.scores.scoreBreakdown = SCORE_KEYS.flatMap((criterion) => {
       const score =
         mutable.companyFitAnalysis[criterion] ??
         legacyCompanyBreakdown[criterion] ??
         mutable.scores[criterion];
 
-      return {
-        criterion,
-        ...(isRecordLike(score)
-          ? score
-          : {
-              score: 0,
-              weight: getScoreWeight(criterion),
-              weightedScore: 0,
-              explanation: '',
-              evidence: ['backend_fallback'],
-              missingInformation: [],
-            }),
-      };
+      return isRecordLike(score)
+        ? [
+            {
+              criterion,
+              ...score,
+            },
+          ]
+        : [];
     });
   }
 
   const scoreItems = Array.isArray(mutable.scores.scoreBreakdown)
     ? mutable.scores.scoreBreakdown
     : [];
-  applySerializedScoreFallbacks(normalized, scoreItems);
   applySerializedScoreExplanations(scoreItems, normalized.language);
   const weightedSum = roundScore(
     scoreItems.reduce((sum, item) => {
@@ -96,48 +90,6 @@ export function normalizeResultJsonScoreBreakdown(
   }
 
   return normalized;
-}
-
-function applySerializedScoreFallbacks(
-  resultJson: TenderDeepAnalysisResult,
-  scoreItems: unknown[],
-): void {
-  const languageFit = findScoreItem(scoreItems, 'languageFit');
-  const financialFit = findScoreItem(scoreItems, 'financialFit');
-  const deadlineFit = findScoreItem(scoreItems, 'deadlineFit');
-
-  if (
-    languageFit &&
-    isDefaultedSerializedScore(languageFit) &&
-    hasStringValue(resultJson, 'ENG')
-  ) {
-    languageFit.score = 100;
-    languageFit.weightedScore = 7;
-    languageFit.explanation =
-      'English is accepted for submission and the company supports English.';
-    languageFit.evidence = ['structured_ted', 'company_profile'];
-  }
-
-  if (
-    financialFit &&
-    isDefaultedSerializedScore(financialFit) &&
-    hasMissingEstimatedValue(resultJson)
-  ) {
-    financialFit.score = 40;
-    financialFit.weightedScore = 2.4;
-    financialFit.explanation =
-      'Estimated value is missing. Company typical contract range is declared, but no reliable comparison is possible.';
-    financialFit.evidence = ['company_profile', 'missing'];
-    financialFit.missingInformation = ['estimated_tender_value'];
-  }
-
-  if (deadlineFit && isDefaultedSerializedScore(deadlineFit)) {
-    deadlineFit.score = 70;
-    deadlineFit.weightedScore = 2.8;
-    deadlineFit.explanation =
-      'Submission deadline is not expired; timing is usable if other blockers were resolved.';
-    deadlineFit.evidence = ['derived'];
-  }
 }
 
 function applySerializedScoreExplanations(
@@ -546,16 +498,6 @@ function normalizeSerializedBlockerSeverity(value: unknown): string {
     : 'HIGH';
 }
 
-function isDefaultedSerializedScore(item: Record<string, unknown>): boolean {
-  return (
-    item.score === 0 &&
-    (item.source === 'backend_fallback' ||
-      item.explanationCode === 'MISSING_LLM_SCORE' ||
-      (Array.isArray(item.evidence) &&
-        item.evidence.includes('backend_fallback')))
-  );
-}
-
 function compactSerializedBlockers(blockers: unknown[]): unknown[] {
   const byType = new Map<string, Record<string, unknown>>();
   const otherBlockers: Record<string, unknown>[] = [];
@@ -940,10 +882,6 @@ function severityRank(severity: string): number {
   return 1;
 }
 
-function getScoreWeight(key: CompanyFitScoreKey): number {
-  return TENDER_DEEP_ANALYSIS_CONFIG.scoring.companyFitWeights[key];
-}
-
 function hasStringValue(value: unknown, expected: string): boolean {
   if (typeof value === 'string') {
     return value === expected;
@@ -958,19 +896,6 @@ function hasStringValue(value: unknown, expected: string): boolean {
   }
 
   return Object.values(value).some((item) => hasStringValue(item, expected));
-}
-
-function hasMissingEstimatedValue(
-  resultJson: TenderDeepAnalysisResult,
-): boolean {
-  const estimatedValue = resultJson.tenderIntelligence
-    ?.estimatedValue as unknown;
-
-  if (!isRecordLike(estimatedValue)) {
-    return true;
-  }
-
-  return estimatedValue.amount === null || estimatedValue.amount === undefined;
 }
 
 function hasMissingSelectionCriteria(
