@@ -36,6 +36,7 @@ import {
 } from '@/resources/tender-deep-analysis/tender-deep-analysis.utils';
 import { CompanyProfileDocumentsService } from '@/resources/company-profile-documents/company-profile-documents.service';
 import { TENDER_DEEP_ANALYSIS_CONFIG } from '@/config/tender-deep-analysis.config';
+import fs from 'node:fs';
 
 @Injectable()
 export class TenderDeepAnalysisService {
@@ -179,6 +180,14 @@ export class TenderDeepAnalysisService {
         purpose: 'Complete deep company-fit tender analysis',
       });
     } catch (error: unknown) {
+      await this.logDeepAnalysisEvent('TENDER_DEEP_ANALYSIS_FAILED', {
+        companyId,
+        tenderId,
+        outputLanguage: language,
+        deepAnalysisId: String(localDeepAnalysis._id),
+        errorMessage: error,
+        purpose: 'Create deep company-fit tender analysis',
+      });
       const errorMessage = getSafeErrorMessage(error);
 
       await this.markProcessingAnalysisFailed({
@@ -188,14 +197,14 @@ export class TenderDeepAnalysisService {
         tenderId,
       });
 
-      await this.logDeepAnalysisEvent('TENDER_DEEP_ANALYSIS_FAILED', {
-        companyId,
-        tenderId,
-        outputLanguage: language,
-        deepAnalysisId: String(localDeepAnalysis._id),
-        errorMessage,
-        purpose: 'Create deep company-fit tender analysis',
-      });
+      // await this.logDeepAnalysisEvent('TENDER_DEEP_ANALYSIS_FAILED', {
+      //   companyId,
+      //   tenderId,
+      //   outputLanguage: language,
+      //   deepAnalysisId: String(localDeepAnalysis._id),
+      //   errorMessage,
+      //   purpose: 'Create deep company-fit tender analysis',
+      // });
     }
   }
 
