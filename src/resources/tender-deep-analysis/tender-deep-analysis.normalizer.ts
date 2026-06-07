@@ -228,15 +228,40 @@ function normalizeSerializedDocumentationAndClarity(
   mutable.documentationAnalysis.missingDocumentsWarning = hasMissingDocs;
   mutable.documentationAnalysis.documentationCompletenessScore =
     overallDocumentationCompletenessScore;
+  const noticeDocumentsAnalyzedCount =
+    typeof mutable.documentationAnalysis.noticeDocumentsAnalyzedCount ===
+    'number'
+      ? mutable.documentationAnalysis.noticeDocumentsAnalyzedCount
+      : typeof mutable.documentationAnalysis.documentsAnalyzedCount === 'number'
+        ? mutable.documentationAnalysis.documentsAnalyzedCount
+        : 0;
+  const procurementDocumentsAnalyzedCount =
+    typeof mutable.documentationAnalysis.procurementDocumentsAnalyzedCount ===
+    'number'
+      ? mutable.documentationAnalysis.procurementDocumentsAnalyzedCount
+      : 0;
+
   mutable.documentationAnalysis.noticeDocumentsAnalyzedCount =
-    mutable.documentationAnalysis.documentsAnalyzedCount ?? 0;
-  mutable.documentationAnalysis.procurementDocumentsAnalyzedCount = 0;
+    noticeDocumentsAnalyzedCount;
+  mutable.documentationAnalysis.procurementDocumentsAnalyzedCount =
+    procurementDocumentsAnalyzedCount;
   mutable.documentationAnalysis.procurementDocumentsAvailable = hasMissingDocs;
   mutable.documentationAnalysis.procurementDocumentsAccess =
     getSerializedProcurementDocumentsAccess(normalizedMissingDocuments);
-  mutable.documentationAnalysis.documentsAnalyzedCount = 0;
-  mutable.documentationAnalysis.documentsTotalCount =
-    normalizedMissingDocuments.length;
+  const documentsAnalyzedCount =
+    noticeDocumentsAnalyzedCount + procurementDocumentsAnalyzedCount;
+
+  mutable.documentationAnalysis.documentsAnalyzedCount = documentsAnalyzedCount;
+  const existingDocumentsTotalCount =
+    typeof mutable.documentationAnalysis.documentsTotalCount === 'number'
+      ? mutable.documentationAnalysis.documentsTotalCount
+      : 0;
+
+  mutable.documentationAnalysis.documentsTotalCount = Math.max(
+    existingDocumentsTotalCount,
+    documentsAnalyzedCount,
+    normalizedMissingDocuments.length,
+  );
   mutable.scores.documentationCompletenessScore =
     overallDocumentationCompletenessScore;
   mutable.decisionFactors.missingDocumentsImpact = {

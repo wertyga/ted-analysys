@@ -488,9 +488,15 @@ function applyDocumentCounts(
 
   result.documentationAnalysis.noticeDocumentsAnalyzedCount =
     noticeDocumentsAnalyzedCount;
-  result.documentationAnalysis.procurementDocumentsAnalyzedCount = 0;
-  result.documentationAnalysis.documentsAnalyzedCount = 0;
-  result.documentationAnalysis.documentsTotalCount = 0;
+  const procurementDocumentsAnalyzedCount = 0;
+  result.documentationAnalysis.procurementDocumentsAnalyzedCount =
+    procurementDocumentsAnalyzedCount;
+  result.documentationAnalysis.documentsAnalyzedCount =
+    noticeDocumentsAnalyzedCount + procurementDocumentsAnalyzedCount;
+  result.documentationAnalysis.documentsTotalCount = Math.max(
+    input.derived.documentUrlsCount,
+    result.documentationAnalysis.documentsAnalyzedCount,
+  );
   result.documentationAnalysis.documentsAvailable =
     noticeDocumentsAnalyzedCount > 0;
   result.documentationAnalysis.missingDocumentsWarning = false;
@@ -927,14 +933,21 @@ function applyDocumentationAndClarity(
     hasMissingProcurementDocs;
   result.documentationAnalysis.noticeDocumentsAnalyzedCount =
     input.derived.documentsAnalyzedCount;
-  result.documentationAnalysis.procurementDocumentsAnalyzedCount = 0;
+  const procurementDocumentsAnalyzedCount = 0;
+  result.documentationAnalysis.procurementDocumentsAnalyzedCount =
+    procurementDocumentsAnalyzedCount;
   result.documentationAnalysis.procurementDocumentsAvailable =
     procurementDocumentsAccess !== 'MISSING' &&
     procurementDocumentsAccess !== 'UNKNOWN';
   result.documentationAnalysis.procurementDocumentsAccess =
     procurementDocumentsAccess;
-  result.documentationAnalysis.documentsAnalyzedCount = 0;
-  result.documentationAnalysis.documentsTotalCount = missingDocuments.length;
+  result.documentationAnalysis.documentsAnalyzedCount =
+    input.derived.documentsAnalyzedCount + procurementDocumentsAnalyzedCount;
+  result.documentationAnalysis.documentsTotalCount = Math.max(
+    input.derived.documentUrlsCount,
+    result.documentationAnalysis.documentsAnalyzedCount,
+    missingDocuments.length,
+  );
   delete (
     result.documentationAnalysis as unknown as {
       missingDocumentsImpactOnDecision?: unknown;
