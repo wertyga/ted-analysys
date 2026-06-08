@@ -23,6 +23,7 @@ import { PaymentsModule } from './resources/payments/payments.module';
 import { FeedbackModule } from './resources/feedback/feedback.module';
 import { TariffModule } from './resources/tariff';
 import { SimilarContractsModule } from './resources/similar-contracts/similar-contracts.module';
+import { TechModule } from './resources/tech/tech.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { SimilarContractsModule } from './resources/similar-contracts/similar-co
     FeedbackModule,
     TariffModule,
     SimilarContractsModule,
+    TechModule,
   ],
   controllers: [AppController],
   providers: [AppService],

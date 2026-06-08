@@ -18,7 +18,7 @@ import { TariffModule } from '@/resources/tariff';
     CurrencyExchangeRatesModule,
     TariffModule,
   ],
-  controllers: [TendersController, TendersAdmController],
+  controllers: [TendersAdmController, TendersController],
   providers: [
     TendersService,
     TenderNormalizerService,
