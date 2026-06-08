@@ -13,6 +13,7 @@ export interface CompanyProfileAiResult {
   country?: string | null;
   operatingCountries?: string[];
   companySize?: number | null;
+  summary?: string | null;
   companyDescription?: string | null;
   industries?: string[];
   mainServices?: string[];
@@ -30,7 +31,6 @@ export interface CompanyProfileAiResult {
 }
 
 export interface CompanyProfileDocumentUploadResult {
-  profile: CompanyProfileAiResult;
   resolvedProfile: Omit<
     CompanyProfileAiResult,
     'industries' | 'mainServices'
@@ -67,8 +67,7 @@ export interface CompanyProfileDocumentAnalysisResult {
   analyzedAt?: Date | null;
 }
 
-export interface CompanyDocumentEvidenceItem
-  extends CompanyProfileDocumentAnalysisResult {
+export interface CompanyDocumentEvidenceItem extends CompanyProfileDocumentAnalysisResult {
   filename: string;
   textHash: string;
 }

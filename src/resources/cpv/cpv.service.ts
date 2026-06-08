@@ -114,14 +114,28 @@ export class CpvService {
       .filter((item): item is CpvCategoryResponseItem => !!item);
   }
 
-  async resolveCpvCodeIds(codes: string[]): Promise<Types.ObjectId[]> {
+  async resolveCpvCodeIds(codes: string[]): Promise<Types.ObjectId[]>;
+  async resolveCpvCodeIds(
+    codes: string[],
+    fullResponse: true,
+  ): Promise<CpvCategory[]>;
+  async resolveCpvCodeIds(
+    codes: string[],
+    fullResponse = false,
+  ): Promise<Types.ObjectId[] | CpvCategory[]> {
     if (codes.length === 0) {
       return [];
     }
 
     const items = await CpvCategoryModel.find({
       code: { $in: codes },
-    }).select('_id code');
+    })
+      .select(CPV_CODES_LIST_FIELDS)
+      .lean();
+
+    if (fullResponse) {
+      return items;
+    }
 
     return items.map((code) => code._id);
   }

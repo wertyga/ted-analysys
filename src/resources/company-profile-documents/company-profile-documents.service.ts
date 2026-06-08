@@ -9,7 +9,6 @@ import {
   TenderSourceDocumentType,
 } from '@/resources/tenders/tender-document-text-extractor.service';
 import {
-  getCpvCodeArray,
   getNormalizedStringArray,
   getOptionalNonNegativeNumber,
   getOptionalPositiveNumber,
@@ -120,16 +119,15 @@ export class CompanyProfileDocumentsService {
     const profile = this.normalizeProfile(aiResult);
 
     const [industries, mainServices] = await Promise.all([
-      this.cpvService.resolveCpvCodeIds(profile.industries ?? []),
-      this.cpvService.resolveCpvCodeIds(profile.mainServices ?? []),
+      this.cpvService.resolveCpvCodeIds(profile.industries ?? [], true),
+      this.cpvService.resolveCpvCodeIds(profile.mainServices ?? [], true),
     ]);
 
     return {
-      profile,
       resolvedProfile: {
         ...profile,
-        industries: industries.map((id) => id.toString()),
-        mainServices: mainServices.map((id) => id.toString()),
+        industries: industries.map(({ code }) => code),
+        mainServices: mainServices.map(({ code }) => code),
       },
       documents: extractedDocuments.map(({ file, extraction }, index) => ({
         filename: file.originalname,
@@ -403,19 +401,30 @@ export class CompanyProfileDocumentsService {
     return {
       companyName: getOptionalString(value.companyName),
       country: getOptionalString(value.country),
-      operatingCountries: getNormalizedStringArray(value.operatingCountries),
-      companySize: getOptionalPositiveNumber(value.companySize),
-      companyDescription: getOptionalString(value.companyDescription),
-      industries: getCpvCodeArray(value.industries),
-      mainServices: getCpvCodeArray(value.mainServices),
-      languages: getNormalizedStringArray(value.languages).map((item) =>
-        item.toUpperCase(),
+      operatingCountries: Array.from(
+        new Set(getNormalizedStringArray(value.operatingCountries)),
       ),
+      companySize: getOptionalPositiveNumber(value.companySize),
+      summary: getOptionalString(value.summary),
+      companyDescription: getOptionalString(value.companyDescription),
+      industries: Array.from(
+        new Set(getNormalizedStringArray(value.industries)),
+      ),
+      mainServices: Array.from(
+        new Set(getNormalizedStringArray(value.mainServices)),
+      ),
+      languages: Array.from(
+        new Set(getNormalizedStringArray(value.languages)),
+      ).map((item) => item.toUpperCase()),
       minDaysBeforeDeadline: getOptionalNonNegativeNumber(
         value.minDaysBeforeDeadline,
       ),
-      certifications: getNormalizedStringArray(value.certifications),
-      capabilities: getNormalizedStringArray(value.capabilities),
+      certifications: Array.from(
+        new Set(getNormalizedStringArray(value.certifications)),
+      ),
+      capabilities: Array.from(
+        new Set(getNormalizedStringArray(value.capabilities)),
+      ),
       yearsOfExperience: getOptionalNonNegativeNumber(value.yearsOfExperience),
       publicProcurementExperience:
         typeof value.publicProcurementExperience === 'boolean'

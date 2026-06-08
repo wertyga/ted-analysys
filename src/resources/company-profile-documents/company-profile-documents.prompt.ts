@@ -15,9 +15,13 @@ export const COMPANY_PROFILE_DOCUMENT_SYSTEM_PROMPT = [
   '- Generic readiness statements are not proof of public procurement experience.',
   '- Do not add generic capabilities such as "supports multiple languages", "multi-country coverage", "prepared for tenders", or "configured for procurement". These belong to derived readiness, not capabilities.',
   '- Capabilities must describe concrete products, services, delivery abilities, technical abilities, logistics abilities, production abilities, certifications, compliance abilities, or operational abilities supported by the document.',
+  '- Extract capabilities from any concrete product, service, supply category, delivery ability, production ability, technical ability, logistics ability, maintenance ability, consulting ability, operational ability, or compliance ability that is explicitly supported anywhere in the document.',
+  '- The document may be unstructured or use arbitrary headings. Do not rely on specific section names when deciding capabilities.',
+  '- Do not copy broad procurement-readiness bullets into capabilities unless they contain a concrete product, service, delivery ability, or operational ability.',
+  '- summary must be a concise 1-2 sentence company summary based only on document evidence. It should be suitable for quickly previewing the uploaded company profile.',
   '- companyDescription must be a detailed procurement-facing company summary based only on document evidence. Write 2-4 compact paragraphs or 120-220 words when enough evidence exists.',
   '- companyDescription should describe what the company does, concrete services/products, delivery capabilities, industries/sectors, operating geography, certifications/compliance, procurement/public-sector evidence, languages, experience, and contract-size evidence when supported.',
-  '- If the source text is empty, test-like, placeholder-like, too generic, or does not contain enough evidence for a detailed summary, return null for companyDescription. Do not pad it with generic procurement wording.',
+  '- If the source text is empty, test-like, placeholder-like, too generic, or does not contain enough evidence for a useful summary or description, return null for summary and companyDescription. Do not pad them with generic procurement wording.',
   '- certifications must include only explicitly named certifications, standards, licenses, permits, or formal qualifications.',
   '- typicalContractSize must be returned only if the document explicitly states a contract size, project size, order value, turnover range, or bidding range.',
   '',
@@ -48,6 +52,7 @@ export const COMPANY_PROFILE_DOCUMENT_SYSTEM_PROMPT = [
     country: 'string|null',
     operatingCountries: ['string'],
     companySize: 'number|null',
+    summary: 'string|null',
     companyDescription: 'string|null',
     industries: ['00000000'],
     mainServices: ['00000000'],
@@ -66,7 +71,7 @@ export const COMPANY_PROFILE_DOCUMENT_SYSTEM_PROMPT = [
   }),
 ].join('\n');
 
-export const COMPANY_PROFILE_DOCUMENT_ANALYSIS_PROMPT_VERSION = '2026-05-24';
+export const COMPANY_PROFILE_DOCUMENT_ANALYSIS_PROMPT_VERSION = '2026-06-08';
 
 export const COMPANY_PROFILE_SINGLE_DOCUMENT_ANALYSIS_PROMPT = [
   'You analyze one uploaded company document for procurement and tender-fit evidence.',
@@ -79,6 +84,7 @@ export const COMPANY_PROFILE_SINGLE_DOCUMENT_ANALYSIS_PROMPT = [
   'Extract evidence that can help decide whether this company is suitable for public tenders:',
   '- concrete capabilities, products, services, delivery abilities, technical abilities, logistics abilities, production abilities, compliance abilities, or operational abilities',
   '- certifications, standards, licenses, permits, or formal qualifications',
+  '- concrete products, services, supply categories, delivery abilities, production abilities, technical abilities, logistics abilities, maintenance abilities, consulting abilities, operational abilities, or compliance abilities explicitly supported anywhere in the document, regardless of headings or structure',
   '- industries/sectors explicitly supported by the document',
   '- technologies, platforms, methods, equipment, or tools',
   '- countries, regions, languages, and delivery geography',
