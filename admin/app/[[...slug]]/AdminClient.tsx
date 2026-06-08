@@ -44,6 +44,8 @@ type SitemapResult = {
   downloadUrl: string;
   tendersCount: number;
   urlsCount: number;
+  sitemapFilesCount: number;
+  isSitemapIndex: boolean;
   domain: string;
   locales: string[];
 };
@@ -660,6 +662,13 @@ export default function AdminApp() {
                       <div>
                         <dt>URLs</dt>
                         <dd>{sitemapResult.urlsCount}</dd>
+                      </div>
+                      <div>
+                        <dt>Sitemap files</dt>
+                        <dd>
+                          {sitemapResult.sitemapFilesCount}
+                          {sitemapResult.isSitemapIndex ? ' + index' : ''}
+                        </dd>
                       </div>
                       <div>
                         <dt>Tenders</dt>

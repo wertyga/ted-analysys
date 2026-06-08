@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { mkdir, writeFile } from 'fs/promises';
-import { dirname, isAbsolute, join, normalize } from 'path';
+import { basename, dirname, isAbsolute, join, normalize, parse, relative } from 'path';
 import { TenderModel } from '@/resources/tenders/schemas';
 
 type SitemapTender = {
@@ -8,6 +8,8 @@ type SitemapTender = {
   publicationNumber?: string;
   updatedAt?: Date;
 };
+
+const SITEMAP_MAX_URLS = 50_000;
 
 @Injectable()
 export class TechService {
@@ -25,16 +27,36 @@ export class TechService {
     const urls = tenders.flatMap((tender) =>
       this.buildTenderSitemapUrls(domain, locales, tender),
     );
-    const xml = this.buildSitemapXml(urls);
+    const sitemapFiles = this.buildSitemapFiles(outputPath, urls);
 
     await mkdir(dirname(outputPath), { recursive: true });
-    await writeFile(outputPath, xml, 'utf8');
+
+    if (sitemapFiles.length === 1) {
+      await writeFile(outputPath, this.buildSitemapXml(urls), 'utf8');
+    } else {
+      await Promise.all(
+        sitemapFiles.map((file) => writeFile(file.outputPath, file.xml, 'utf8')),
+      );
+      await writeFile(
+        outputPath,
+        this.buildSitemapIndexXml(
+          sitemapFiles.map((file) => ({
+            loc: this.buildPublicSitemapUrl(domain, file.outputPath),
+            lastmod: new Date().toISOString(),
+          })),
+        ),
+        'utf8',
+      );
+    }
 
     return {
       outputPath,
       downloadUrl: '/adm/tech/sitemap/download',
       tendersCount: tenders.length,
       urlsCount: urls.length,
+      sitemapFilesCount: sitemapFiles.length,
+      sitemapFiles: sitemapFiles.map((file) => file.outputPath),
+      isSitemapIndex: sitemapFiles.length > 1,
       domain,
       locales,
     };
@@ -69,6 +91,65 @@ export class TechService {
       .join('\n');
 
     return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urlEntries}\n</urlset>\n`;
+  }
+
+  private buildSitemapIndexXml(
+    sitemaps: Array<{ loc: string; lastmod?: string }>,
+  ) {
+    const sitemapEntries = sitemaps
+      .map((sitemap) => {
+        const lastmod = sitemap.lastmod
+          ? `\n    <lastmod>${this.escapeXml(sitemap.lastmod)}</lastmod>`
+          : '';
+
+        return `  <sitemap>\n    <loc>${this.escapeXml(sitemap.loc)}</loc>${lastmod}\n  </sitemap>`;
+      })
+      .join('\n');
+
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${sitemapEntries}\n</sitemapindex>\n`;
+  }
+
+  private buildSitemapFiles(
+    outputPath: string,
+    urls: Array<{ loc: string; lastmod?: string }>,
+  ) {
+    if (urls.length <= SITEMAP_MAX_URLS) {
+      return [
+        {
+          outputPath,
+          xml: this.buildSitemapXml(urls),
+        },
+      ];
+    }
+
+    const parsedOutputPath = parse(outputPath);
+    const chunks: Array<{ outputPath: string; xml: string }> = [];
+
+    for (let index = 0; index < urls.length; index += SITEMAP_MAX_URLS) {
+      const chunkUrls = urls.slice(index, index + SITEMAP_MAX_URLS);
+      const chunkNumber = chunks.length + 1;
+      const chunkOutputPath = join(
+        parsedOutputPath.dir,
+        `${parsedOutputPath.name}-${chunkNumber}${parsedOutputPath.ext}`,
+      );
+
+      chunks.push({
+        outputPath: chunkOutputPath,
+        xml: this.buildSitemapXml(chunkUrls),
+      });
+    }
+
+    return chunks;
+  }
+
+  private buildPublicSitemapUrl(domain: string, sitemapPath: string) {
+    const relativePath = relative(process.cwd(), sitemapPath);
+    const publicPath =
+      relativePath && !relativePath.startsWith('..') && !isAbsolute(relativePath)
+        ? relativePath
+        : basename(sitemapPath);
+
+    return `${domain}/${publicPath.replace(/\\/g, '/')}`;
   }
 
   private getSitemapLocales(localesInput?: string | string[]) {
