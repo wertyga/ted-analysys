@@ -41,8 +41,7 @@ async function bootstrap() {
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('swagger', app, swaggerDocument);
 
-  const sitemapOutputPath =
-    process.env.SITEMAP_OUTPUT_PATH || 'sitemaps/tenders-sitemap.xml';
+  const sitemapOutputPath = 'sitemaps/tenders-sitemap.xml';
   const sitemapOutputAbsolutePath = isAbsolute(sitemapOutputPath)
     ? normalize(sitemapOutputPath)
     : join(process.cwd(), sitemapOutputPath);
@@ -55,7 +54,7 @@ async function bootstrap() {
     '/sitemaps',
     express.static(sitemapOutDir, {
       extensions: ['xml'],
-      fallthrough: false,
+      fallthrough: true,
       index: false,
     }),
   );
