@@ -51,9 +51,12 @@ export class TechController {
   @ApiDefaultResponse({ description: 'Download generated tender sitemap.' })
   @Header('Content-Type', 'application/xml')
   @Get('/sitemap/download')
-  async downloadTenderSitemap(@Res() res: Response) {
-    const outputPath = this.techService.getSitemapOutputPath();
+  async downloadTenderSitemap(
+    @Query('file') file: string | undefined,
+    @Res() res: Response,
+  ) {
+    const outputPath = this.techService.getSitemapDownloadPath(file);
 
-    return res.download(outputPath, 'tenders-sitemap.xml');
+    return res.download(outputPath, file || 'tenders-sitemap.xml');
   }
 }

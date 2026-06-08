@@ -45,6 +45,11 @@ type SitemapResult = {
   tendersCount: number;
   urlsCount: number;
   sitemapFilesCount: number;
+  sitemapFiles: Array<{
+    filename: string;
+    outputPath: string;
+    downloadUrl: string;
+  }>;
   isSitemapIndex: boolean;
   domain: string;
   locales: string[];
@@ -428,15 +433,21 @@ export default function AdminApp() {
     }
   }
 
-  async function downloadSitemap() {
+  async function downloadSitemap(file?: {
+    filename: string;
+    downloadUrl: string;
+  }) {
     setMessage('');
 
     try {
-      const response = await fetch(getApiUrl('/adm/tech/sitemap/download'), {
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const response = await fetch(
+        getApiUrl(file?.downloadUrl ?? '/adm/tech/sitemap/download'),
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      });
+      );
 
       if (!response.ok) {
         throw new Error(await response.text());
@@ -446,7 +457,7 @@ export default function AdminApp() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'tenders-sitemap.xml';
+      link.download = file?.filename ?? 'tenders-sitemap.xml';
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -643,9 +654,25 @@ export default function AdminApp() {
 
                 {sitemapResult ? (
                   <>
-                    <button className="secondaryButton" onClick={downloadSitemap}>
+                    <button
+                      className="secondaryButton"
+                      onClick={() => downloadSitemap()}
+                    >
                       Download sitemap
                     </button>
+                    {sitemapResult.sitemapFiles.length > 1 ? (
+                      <div className="sitemapFiles">
+                        {sitemapResult.sitemapFiles.map((file) => (
+                          <button
+                            className="secondaryButton"
+                            key={file.filename}
+                            onClick={() => downloadSitemap(file)}
+                          >
+                            Download {file.filename}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
                     <dl className="stats">
                       <div>
                         <dt>File</dt>

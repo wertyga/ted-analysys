@@ -1,6 +1,19 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { existsSync } from 'fs';
 import { mkdir, writeFile } from 'fs/promises';
-import { basename, dirname, isAbsolute, join, normalize, parse, relative } from 'path';
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  normalize,
+  parse,
+  relative,
+} from 'path';
 import { TenderModel } from '@/resources/tenders/schemas';
 
 type SitemapTender = {
@@ -55,7 +68,13 @@ export class TechService {
       tendersCount: tenders.length,
       urlsCount: urls.length,
       sitemapFilesCount: sitemapFiles.length,
-      sitemapFiles: sitemapFiles.map((file) => file.outputPath),
+      sitemapFiles: sitemapFiles.map((file) => ({
+        filename: basename(file.outputPath),
+        outputPath: file.outputPath,
+        downloadUrl: `/adm/tech/sitemap/download?file=${encodeURIComponent(
+          basename(file.outputPath),
+        )}`,
+      })),
       isSitemapIndex: sitemapFiles.length > 1,
       domain,
       locales,
@@ -173,6 +192,26 @@ export class TechService {
     }
 
     return join(process.cwd(), configuredPath);
+  }
+
+  getSitemapDownloadPath(filename?: string) {
+    const outputPath = this.getSitemapOutputPath();
+
+    if (!filename) {
+      return outputPath;
+    }
+
+    if (filename !== basename(filename) || !/^[\w.-]+\.xml$/i.test(filename)) {
+      throw new BadRequestException('Invalid sitemap filename.');
+    }
+
+    const downloadPath = normalize(join(dirname(outputPath), filename));
+
+    if (!existsSync(downloadPath)) {
+      throw new NotFoundException('Sitemap file was not found.');
+    }
+
+    return downloadPath;
   }
 
   private trimTrailingSlash(value: string) {

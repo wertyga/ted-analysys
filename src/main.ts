@@ -3,7 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import express from 'express';
 import { existsSync } from 'fs';
-import { join } from 'path';
+import { dirname, isAbsolute, join, normalize } from 'path';
 import { AppModule } from './app.module';
 import mongooseConnect from './mongoose/mongoose';
 import { HttpErrorLoggingFilter } from '@/http-logger/HTTPLogger';
@@ -41,9 +41,24 @@ async function bootstrap() {
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('swagger', app, swaggerDocument);
 
+  const sitemapOutputPath =
+    process.env.SITEMAP_OUTPUT_PATH || 'sitemaps/tenders-sitemap.xml';
+  const sitemapOutputAbsolutePath = isAbsolute(sitemapOutputPath)
+    ? normalize(sitemapOutputPath)
+    : join(process.cwd(), sitemapOutputPath);
+  const sitemapOutDir = dirname(sitemapOutputAbsolutePath);
   const adminOutDir = join(process.cwd(), 'admin', 'out');
   const adminIndexPath = join(adminOutDir, 'index.html');
   const expressApp = app.getHttpAdapter().getInstance();
+
+  expressApp.use(
+    '/sitemaps',
+    express.static(sitemapOutDir, {
+      extensions: ['xml'],
+      fallthrough: false,
+      index: false,
+    }),
+  );
 
   if (existsSync(adminIndexPath)) {
     expressApp.use('/admin', express.static(adminOutDir));
