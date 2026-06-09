@@ -66,6 +66,12 @@ type ShortTitlesResult = {
   }>;
 };
 
+type DbCopyResult = {
+  filename: string;
+  url: string;
+  deletedCount: number;
+};
+
 const tokenStorageKey = 'ted-admin-token';
 
 class ApiRequestError extends Error {
@@ -151,6 +157,8 @@ export default function AdminApp() {
   const [shortTitlesResult, setShortTitlesResult] =
     useState<ShortTitlesResult | null>(null);
   const [shortTitlesLoading, setShortTitlesLoading] = useState(false);
+  const [dbCopyResult, setDbCopyResult] = useState<DbCopyResult | null>(null);
+  const [dbCopyLoading, setDbCopyLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -438,6 +446,7 @@ export default function AdminApp() {
     setTendersPageSize(20);
     setSitemapResult(null);
     setShortTitlesResult(null);
+    setDbCopyResult(null);
   }
 
   async function generateSitemap(event: FormEvent<HTMLFormElement>) {
@@ -528,6 +537,26 @@ export default function AdminApp() {
       );
     } finally {
       setShortTitlesLoading(false);
+    }
+  }
+
+  async function copyDatabaseDumpToCdn() {
+    setDbCopyLoading(true);
+    setMessage('');
+
+    try {
+      const result = await request<DbCopyResult>('/adm/tech/db-copy', {
+        method: 'POST',
+        token,
+      });
+
+      setDbCopyResult(result);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : 'Failed to copy database dump',
+      );
+    } finally {
+      setDbCopyLoading(false);
     }
   }
 
@@ -745,6 +774,50 @@ export default function AdminApp() {
                         </div>
                       ))}
                     </div>
+                  ) : null}
+                </section>
+
+                <section className="panel panelWide">
+                  <div className="panelHeader">
+                    <div>
+                      <h2>Database dump copy</h2>
+                      <p>
+                        Create a MongoDB dump and upload it to CDN using the
+                        configured backup prefix.
+                      </p>
+                    </div>
+                    <button
+                      disabled={dbCopyLoading}
+                      onClick={copyDatabaseDumpToCdn}
+                      type="button"
+                    >
+                      {dbCopyLoading ? 'Copying...' : 'Copy database dump'}
+                    </button>
+                  </div>
+
+                  {dbCopyResult ? (
+                    <dl className="stats">
+                      <div>
+                        <dt>File</dt>
+                        <dd className="smallStat">{dbCopyResult.filename}</dd>
+                      </div>
+                      <div>
+                        <dt>Deleted old copies</dt>
+                        <dd>{dbCopyResult.deletedCount}</dd>
+                      </div>
+                      <div>
+                        <dt>URL</dt>
+                        <dd className="smallStat">
+                          <a
+                            href={dbCopyResult.url}
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            {dbCopyResult.url}
+                          </a>
+                        </dd>
+                      </div>
+                    </dl>
                   ) : null}
                 </section>
 
