@@ -5,8 +5,6 @@ import {
   TedPaginationMode,
   TedScope,
   TedSearchResponse,
-  TedSortOrder,
-  TedTenderSortColumn,
 } from '@/resources/ted-search/types/ted-search.types';
 import { getTedDate } from '@/resources/ted-search/utils';
 import {

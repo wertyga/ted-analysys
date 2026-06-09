@@ -25,17 +25,7 @@ export class TendersCronService {
     private readonly tenderMatchingService: TenderMatchingService,
     private readonly tenderMatchNotificationsService: TenderMatchNotificationsService,
     private readonly similarContractsService: SimilarContractsService,
-  ) {
-    // setTimeout(async () => {
-    //   const result = await new TedOpenTendersCollectorService(
-    //     this.tedSearchService,
-    //     this.tendersService,
-    //     this.similarContractsService,
-    //   ).collectResultTendersHistoryFromTed();
-    //
-    //   await logger.info('TED_ALL_RESULT_COLLECTED', result);
-    // }, 3000);
-  }
+  ) {}
 
   @Cron(TENDERS_CRON_CONFIG.cron.allCompetitionTenders, {
     timeZone: TENDERS_CRON_CONFIG.timeZone,
