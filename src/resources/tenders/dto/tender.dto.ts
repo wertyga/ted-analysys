@@ -100,6 +100,23 @@ export class TenderLotDto {
   selectionCriteriaSource?: string;
 }
 
+export class TenderShortTitleDto {
+  @ApiProperty({ example: 'Software development services' })
+  en!: string;
+
+  @ApiProperty({ example: 'Softwareentwicklungsdienste' })
+  de!: string;
+
+  @ApiProperty({ example: 'Services de developpement logiciel' })
+  fr!: string;
+
+  @ApiProperty({ example: 'Uslugi tworzenia oprogramowania' })
+  pl!: string;
+
+  @ApiProperty({ example: 'Uslugi po razrabotke PO' })
+  ru!: string;
+}
+
 export class TenderDto {
   _id: string;
 
@@ -158,6 +175,12 @@ export class TenderDto {
       'Main display title, normally notice-title with procedure/lot title fallback.',
   })
   title?: string;
+
+  @ApiPropertyOptional({
+    type: TenderShortTitleDto,
+    description: 'AI-generated short tender title translations.',
+  })
+  shortTitle?: TenderShortTitleDto;
 
   @ApiPropertyOptional({
     example: 'Software development services',

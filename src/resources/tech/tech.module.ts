@@ -1,10 +1,15 @@
 import { Module } from '@nestjs/common';
-import { TechController } from './tech.controller';
-import { TechService } from './tech.service';
-import { SitemapsController } from './sitemaps.controller';
+import { OpenAiModule } from '@/openai/openai.module';
+import { CpvAdmController } from './cpv/cpv.adm.controller';
+import { CpvTechService } from './cpv/cpv.tech.service';
+import { SitemapTechController } from './sitemap/sitemap.tech.controller';
+import { SitemapTechService } from './sitemap/sitemap.tech.service';
+import { TendersTechController } from './tenders/tenders.tech.controller';
+import { TendersTechService } from './tenders/tenders.tech.service';
 
 @Module({
-  controllers: [TechController, SitemapsController],
-  providers: [TechService],
+  imports: [OpenAiModule],
+  controllers: [SitemapTechController, TendersTechController, CpvAdmController],
+  providers: [CpvTechService, SitemapTechService, TendersTechService],
 })
 export class TechModule {}

@@ -55,6 +55,17 @@ type SitemapResult = {
   locales: string[];
 };
 
+type ShortTitlesResult = {
+  matchedCount: number;
+  updatedCount: number;
+  failedCount: number;
+  batchSize: number;
+  errors: Array<{
+    id: string;
+    message: string;
+  }>;
+};
+
 const tokenStorageKey = 'ted-admin-token';
 
 function getApiUrl(path: string) {
@@ -126,6 +137,11 @@ export default function AdminApp() {
     null,
   );
   const [sitemapLoading, setSitemapLoading] = useState(false);
+  const [shortTitlesLimit, setShortTitlesLimit] = useState('100');
+  const [shortTitlesBatchSize, setShortTitlesBatchSize] = useState('20');
+  const [shortTitlesResult, setShortTitlesResult] =
+    useState<ShortTitlesResult | null>(null);
+  const [shortTitlesLoading, setShortTitlesLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -406,6 +422,7 @@ export default function AdminApp() {
     setTendersPage(1);
     setTendersPageSize(20);
     setSitemapResult(null);
+    setShortTitlesResult(null);
   }
 
   async function generateSitemap(event: FormEvent<HTMLFormElement>) {
@@ -466,6 +483,36 @@ export default function AdminApp() {
       setMessage(
         error instanceof Error ? error.message : 'Failed to download sitemap',
       );
+    }
+  }
+
+  async function generateShortTitles(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setShortTitlesLoading(true);
+    setMessage('');
+
+    try {
+      const result = await request<ShortTitlesResult>(
+        '/adm/tech/tenders/short-titles',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            limit: Number(shortTitlesLimit) || undefined,
+            batchSize: Number(shortTitlesBatchSize) || undefined,
+          }),
+          token,
+        },
+      );
+
+      setShortTitlesResult(result);
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Failed to generate short titles',
+      );
+    } finally {
+      setShortTitlesLoading(false);
     }
   }
 
@@ -611,85 +658,162 @@ export default function AdminApp() {
             ) : null}
 
             {activeSection === 'tech' ? (
-              <section className="panel panelWide">
-                <div className="panelHeader">
-                  <div>
-                    <h2>Tender sitemap</h2>
-                    <p>
-                      Generate a sitemap file from all saved tenders. Domain
-                      and languages are passed to the backend as request
-                      parameters.
-                    </p>
+              <>
+                <section className="panel panelWide">
+                  <div className="panelHeader">
+                    <div>
+                      <h2>Tender short titles</h2>
+                      <p>
+                        Generate missing AI short titles for tenders in EN, DE,
+                        FR, PL, and RU.
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                <form className="techForm" onSubmit={generateSitemap}>
-                  <label>
-                    Domain
-                    <input
-                      onChange={(event) =>
-                        setSitemapDomain(event.target.value)
-                      }
-                      placeholder="https://example.com"
-                      required
-                      type="url"
-                      value={sitemapDomain}
-                    />
-                  </label>
-                  <label>
-                    Languages
-                    <input
-                      onChange={(event) =>
-                        setSitemapLocales(event.target.value)
-                      }
-                      placeholder="en,pl,de"
-                      required
-                      value={sitemapLocales}
-                    />
-                  </label>
-                  <button disabled={sitemapLoading} type="submit">
-                    {sitemapLoading ? 'Generating...' : 'Generate sitemap'}
-                  </button>
-                </form>
-
-                {sitemapResult ? (
-                  <>
-                    <button
-                      className="secondaryButton"
-                      onClick={() => downloadSitemap()}
-                    >
-                      Download sitemap
+                  <form className="techForm techFormCompact" onSubmit={generateShortTitles}>
+                    <label>
+                      Limit
+                      <input
+                        min="1"
+                        onChange={(event) =>
+                          setShortTitlesLimit(event.target.value)
+                        }
+                        type="number"
+                        value={shortTitlesLimit}
+                      />
+                    </label>
+                    <label>
+                      Batch size
+                      <input
+                        max="100"
+                        min="1"
+                        onChange={(event) =>
+                          setShortTitlesBatchSize(event.target.value)
+                        }
+                        type="number"
+                        value={shortTitlesBatchSize}
+                      />
+                    </label>
+                    <button disabled={shortTitlesLoading} type="submit">
+                      {shortTitlesLoading
+                        ? 'Generating...'
+                        : 'Generate short titles'}
                     </button>
-                    {sitemapResult.sitemapFiles.length > 1 ? (
-                      <div className="sitemapFiles">
-                        {sitemapResult.sitemapFiles.map((file) => (
-                          <button
-                            className="secondaryButton"
-                            key={file.filename}
-                            onClick={() => downloadSitemap(file)}
-                          >
-                            Download {file.filename}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
+                  </form>
+
+                  {shortTitlesResult ? (
                     <dl className="stats">
                       <div>
-                        <dt>File</dt>
-                        <dd className="smallStat">{sitemapResult.outputPath}</dd>
+                        <dt>Matched</dt>
+                        <dd>{shortTitlesResult.matchedCount}</dd>
                       </div>
                       <div>
-                        <dt>Domain</dt>
-                        <dd className="smallStat">{sitemapResult.domain}</dd>
+                        <dt>Updated</dt>
+                        <dd>{shortTitlesResult.updatedCount}</dd>
                       </div>
                       <div>
-                        <dt>Languages</dt>
-                        <dd>{sitemapResult.locales.join(', ')}</dd>
+                        <dt>Failed</dt>
+                        <dd>{shortTitlesResult.failedCount}</dd>
                       </div>
                       <div>
-                        <dt>URLs</dt>
-                        <dd>{sitemapResult.urlsCount}</dd>
+                        <dt>Batch size</dt>
+                        <dd>{shortTitlesResult.batchSize}</dd>
                       </div>
+                    </dl>
+                  ) : null}
+
+                  {shortTitlesResult?.errors.length ? (
+                    <div className="errorList">
+                      {shortTitlesResult.errors.slice(0, 10).map((error) => (
+                        <div key={`${error.id}-${error.message}`}>
+                          <strong>{error.id}</strong>: {error.message}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+
+                <section className="panel panelWide">
+                  <div className="panelHeader">
+                    <div>
+                      <h2>Tender sitemap</h2>
+                      <p>
+                        Generate a sitemap file from all saved tenders. Domain
+                        and languages are passed to the backend as request
+                        parameters.
+                      </p>
+                    </div>
+                  </div>
+
+                  <form className="techForm" onSubmit={generateSitemap}>
+                    <label>
+                      Domain
+                      <input
+                        onChange={(event) =>
+                          setSitemapDomain(event.target.value)
+                        }
+                        placeholder="https://example.com"
+                        required
+                        type="url"
+                        value={sitemapDomain}
+                      />
+                    </label>
+                    <label>
+                      Languages
+                      <input
+                        onChange={(event) =>
+                          setSitemapLocales(event.target.value)
+                        }
+                        placeholder="en,pl,de"
+                        required
+                        value={sitemapLocales}
+                      />
+                    </label>
+                    <button disabled={sitemapLoading} type="submit">
+                      {sitemapLoading ? 'Generating...' : 'Generate sitemap'}
+                    </button>
+                  </form>
+
+                  {sitemapResult ? (
+                    <>
+                      <button
+                        className="secondaryButton"
+                        onClick={() => downloadSitemap()}
+                      >
+                        Download sitemap
+                      </button>
+                      {sitemapResult.sitemapFiles.length > 1 ? (
+                        <div className="sitemapFiles">
+                          {sitemapResult.sitemapFiles.map((file) => (
+                            <button
+                              className="secondaryButton"
+                              key={file.filename}
+                              onClick={() => downloadSitemap(file)}
+                            >
+                              Download {file.filename}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                      <dl className="stats">
+                        <div>
+                          <dt>File</dt>
+                          <dd className="smallStat">
+                            {sitemapResult.outputPath}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Domain</dt>
+                          <dd className="smallStat">{sitemapResult.domain}</dd>
+                        </div>
+                        <div>
+                          <dt>Languages</dt>
+                          <dd>{sitemapResult.locales.join(', ')}</dd>
+                        </div>
+                        <div>
+                          <dt>URLs</dt>
+                          <dd>{sitemapResult.urlsCount}</dd>
+                        </div>
                       <div>
                         <dt>Sitemap files</dt>
                         <dd>
@@ -702,9 +826,10 @@ export default function AdminApp() {
                         <dd>{sitemapResult.tendersCount}</dd>
                       </div>
                     </dl>
-                  </>
-                ) : null}
-              </section>
+                    </>
+                  ) : null}
+                </section>
+              </>
             ) : null}
           </div>
         )}

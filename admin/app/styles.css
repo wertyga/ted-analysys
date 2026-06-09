@@ -202,6 +202,20 @@ h2 {
   margin-bottom: 20px;
 }
 
+.techFormCompact {
+  grid-template-columns: minmax(120px, 180px) minmax(120px, 180px) max-content;
+}
+
+.errorList {
+  border: 1px solid #ffc9c9;
+  border-radius: 8px;
+  color: var(--danger-text);
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px;
+}
+
 .sitemapFiles {
   display: flex;
   flex-wrap: wrap;

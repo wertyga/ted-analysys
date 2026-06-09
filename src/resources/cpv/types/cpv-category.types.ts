@@ -9,6 +9,11 @@ export interface CpvCategorySyncResult {
   matchedCount: number;
 }
 
+export interface CpvCategorySlugSyncResult {
+  matchedCount: number;
+  modifiedCount: number;
+}
+
 export class CpvCategoryResponseItem {
   @ApiProperty({ example: '72000000' })
   code!: string;
@@ -18,6 +23,11 @@ export class CpvCategoryResponseItem {
       'IT services: consulting, software development, Internet and support',
   })
   name!: string;
+
+  @ApiPropertyOptional({
+    example: 'it-services-consulting-software-development-internet-and-support',
+  })
+  slug?: string;
 
   @ApiPropertyOptional({ example: '72000000' })
   parentCode?: string;

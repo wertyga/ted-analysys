@@ -44,6 +44,14 @@ export interface TenderLot {
   selectionCriteriaSource?: string;
 }
 
+export interface TenderShortTitle {
+  en: string;
+  de: string;
+  fr: string;
+  pl: string;
+  ru: string;
+}
+
 export interface Tender {
   _id: string;
   /** Local canonical id. For TED tenders this is the publication number. */
@@ -62,6 +70,8 @@ export interface Tender {
   procedureType?: string;
   /** Main card title, normally notice-title with procedure/lot title fallback. */
   title?: string;
+  /** AI-generated short tender title translations for list/card display. */
+  shortTitle?: TenderShortTitle;
   /** TED title-proc: title at procedure level. */
   titleProc?: string;
   /** TED title-lot: titles of individual lots. */
@@ -186,6 +196,13 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
     noticeVersion: String,
     procedureType: String,
     title: String,
+    shortTitle: {
+      en: String,
+      de: String,
+      fr: String,
+      pl: String,
+      ru: String,
+    },
     titleProc: String,
     titleLot: { type: [String], default: undefined },
     description: String,

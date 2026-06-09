@@ -2,13 +2,14 @@ import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import axios from 'axios';
 import { Types } from 'mongoose';
 import { CpvCategoryModel, CpvCategory } from './schemas';
+import { string_to_slug } from '@/utils/string';
 import {
   CpvCategoriesResponse,
   CpvCategoryResponseItem,
   CpvCategorySyncResult,
 } from './types';
 
-export const CPV_CODES_LIST_FIELDS = 'code name parentCode level';
+export const CPV_CODES_LIST_FIELDS = 'code name slug parentCode level';
 
 @Injectable()
 export class CpvService {
@@ -68,6 +69,7 @@ export class CpvService {
     const existingCodes = new Set(categories.map((category) => category.code));
     const categoriesWithParents = categories.map((category) => ({
       ...category,
+      slug: this.getCpvCategorySlug(category.name),
       parentCode: this.findCpvParentCode(category.code, existingCodes),
     }));
 
@@ -303,6 +305,10 @@ export class CpvService {
 
       return acc;
     }, {} as CpvCategoryResponseItem);
+  }
+
+  private getCpvCategorySlug(name: string): string {
+    return string_to_slug(name);
   }
 
   private escapeRegex(value: string): string {

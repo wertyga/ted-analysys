@@ -3,6 +3,7 @@ import mongoose, { Document, Model, Schema } from 'mongoose';
 export interface CpvCategory {
   code: string;
   name: string;
+  slug?: string;
   parentCode?: string;
   level: number;
   sourceVersion: string;
@@ -14,6 +15,7 @@ const CpvCategorySchema = new Schema<CpvCategoryDocument>(
   {
     code: { type: String, required: true, unique: true, index: true },
     name: { type: String, required: true, index: true },
+    slug: { type: String, index: true },
     parentCode: { type: String, index: true },
     level: { type: Number, required: true, index: true },
     sourceVersion: { type: String, required: true },

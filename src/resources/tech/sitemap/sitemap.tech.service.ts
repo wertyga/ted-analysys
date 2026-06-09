@@ -25,7 +25,7 @@ type SitemapTender = {
 const SITEMAP_MAX_URLS = 50_000;
 
 @Injectable()
-export class TechService {
+export class SitemapTechService {
   async generateTenderSitemap(options: {
     domain: string;
     locales?: string | string[];
@@ -48,7 +48,9 @@ export class TechService {
       await writeFile(outputPath, this.buildSitemapXml(urls), 'utf8');
     } else {
       await Promise.all(
-        sitemapFiles.map((file) => writeFile(file.outputPath, file.xml, 'utf8')),
+        sitemapFiles.map((file) =>
+          writeFile(file.outputPath, file.xml, 'utf8'),
+        ),
       );
       await writeFile(
         outputPath,
@@ -79,6 +81,37 @@ export class TechService {
       domain,
       locales,
     };
+  }
+
+  getSitemapOutputPath() {
+    const configuredPath =
+      process.env.SITEMAP_OUTPUT_PATH || 'sitemaps/tenders-sitemap.xml';
+
+    if (isAbsolute(configuredPath)) {
+      return normalize(configuredPath);
+    }
+
+    return join(process.cwd(), configuredPath);
+  }
+
+  getSitemapDownloadPath(filename?: string) {
+    const outputPath = this.getSitemapOutputPath();
+
+    if (!filename) {
+      return outputPath;
+    }
+
+    if (filename !== basename(filename) || !/^[\w.-]+\.xml$/i.test(filename)) {
+      throw new BadRequestException('Invalid sitemap filename.');
+    }
+
+    const downloadPath = normalize(join(dirname(outputPath), filename));
+
+    if (!existsSync(downloadPath)) {
+      throw new NotFoundException('Sitemap file was not found.');
+    }
+
+    return downloadPath;
   }
 
   private buildTenderSitemapUrls(
@@ -164,7 +197,9 @@ export class TechService {
   private buildPublicSitemapUrl(domain: string, sitemapPath: string) {
     const relativePath = relative(process.cwd(), sitemapPath);
     const publicPath =
-      relativePath && !relativePath.startsWith('..') && !isAbsolute(relativePath)
+      relativePath &&
+      !relativePath.startsWith('..') &&
+      !isAbsolute(relativePath)
         ? relativePath
         : basename(sitemapPath);
 
@@ -181,37 +216,6 @@ export class TechService {
       .filter(Boolean);
 
     return locales.length > 0 ? locales : ['en'];
-  }
-
-  getSitemapOutputPath() {
-    const configuredPath =
-      process.env.SITEMAP_OUTPUT_PATH || 'sitemaps/tenders-sitemap.xml';
-
-    if (isAbsolute(configuredPath)) {
-      return normalize(configuredPath);
-    }
-
-    return join(process.cwd(), configuredPath);
-  }
-
-  getSitemapDownloadPath(filename?: string) {
-    const outputPath = this.getSitemapOutputPath();
-
-    if (!filename) {
-      return outputPath;
-    }
-
-    if (filename !== basename(filename) || !/^[\w.-]+\.xml$/i.test(filename)) {
-      throw new BadRequestException('Invalid sitemap filename.');
-    }
-
-    const downloadPath = normalize(join(dirname(outputPath), filename));
-
-    if (!existsSync(downloadPath)) {
-      throw new NotFoundException('Sitemap file was not found.');
-    }
-
-    return downloadPath;
   }
 
   private trimTrailingSlash(value: string) {
