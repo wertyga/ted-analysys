@@ -9,7 +9,7 @@ import { TendersService } from './tenders.service';
 import { TenderWishlistModule } from '@/resources/tender-wishlist/tender-wishlist.module';
 import { CurrencyExchangeRatesModule } from '@/resources/currency-exchange-rates/currency-exchange-rates.module';
 import { TariffModule } from '@/resources/tariff';
-import { OpenAiModule } from '@/openai/openai.module';
+import { DeepSeekModule } from '@/deepseek/deepseek.module';
 
 @Module({
   imports: [
@@ -17,7 +17,7 @@ import { OpenAiModule } from '@/openai/openai.module';
     forwardRef(() => TenderGeneralAnalysisModule),
     forwardRef(() => TenderWishlistModule),
     CurrencyExchangeRatesModule,
-    OpenAiModule,
+    DeepSeekModule,
     TariffModule,
   ],
   controllers: [TendersAdmController, TendersController],

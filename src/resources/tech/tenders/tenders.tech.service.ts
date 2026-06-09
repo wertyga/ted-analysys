@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { OpenAiService } from '@/openai/openai.service';
+import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 import { TenderModel } from '@/resources/tenders/schemas';
 
 @Injectable()
 export class TendersTechService {
-  constructor(private readonly openAiService: OpenAiService) {}
+  constructor(private readonly deepSeekAnalysisService: DeepSeekAnalysisService) {}
 
   async generateMissingTenderShortTitles(options: {
     limit?: number;
@@ -34,12 +34,13 @@ export class TendersTechService {
       const batch = tenders.slice(index, index + batchSize);
 
       try {
-        const generated = await this.openAiService.generateTenderShortTitles(
-          batch.map((tender) => ({
-            id: tender.id,
-            title: tender.title ?? '',
-          })),
-        );
+        const generated =
+          await this.deepSeekAnalysisService.generateTenderShortTitles(
+            batch.map((tender) => ({
+              id: tender.id,
+              title: tender.title ?? '',
+            })),
+          );
         const byId = new Map(generated.map((item) => [item.id, item]));
 
         await Promise.all(
@@ -49,7 +50,7 @@ export class TendersTechService {
             if (!item) {
               errors.push({
                 id: tender.id,
-                message: 'OpenAI response did not include tender id',
+                message: 'DeepSeek response did not include tender id',
               });
 
               return;

@@ -84,8 +84,7 @@ export class SitemapTechService {
   }
 
   getSitemapOutputPath() {
-    const configuredPath =
-      process.env.SITEMAP_OUTPUT_PATH || 'sitemaps/tenders-sitemap.xml';
+    const configuredPath = 'sitemaps/tenders-sitemap.xml';
 
     if (isAbsolute(configuredPath)) {
       return normalize(configuredPath);
@@ -209,7 +208,7 @@ export class SitemapTechService {
   private getSitemapLocales(localesInput?: string | string[]) {
     const rawLocales = Array.isArray(localesInput)
       ? localesInput.join(',')
-      : localesInput || process.env.SITEMAP_LOCALES || 'en';
+      : localesInput || 'en';
     const locales = rawLocales
       .split(',')
       .map((locale) => locale.trim().replace(/^\/+|\/+$/g, ''))

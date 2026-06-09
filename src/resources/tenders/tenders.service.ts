@@ -45,7 +45,7 @@ import {
 import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rates/currency-exchange-rates.service';
 import { CurrencySign } from '@/resources/codelist';
 import { searchTendersDefaultFields } from '@/resources/ted-search/utils';
-import { OpenAiService } from '@/openai/openai.service';
+import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 
 export interface GatherActiveTendersResult {
   completed?: boolean;
@@ -86,7 +86,7 @@ export class TendersService {
     private readonly tedSearchService: TedSearchService,
     private readonly tenderNormalizer: TenderNormalizerService,
     private readonly currencyExchangeRatesService: CurrencyExchangeRatesService,
-    private readonly openAiService: OpenAiService,
+    private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
     @Inject(forwardRef(() => TenderGeneralAnalysisService))
     private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
   ) {}
@@ -279,12 +279,13 @@ export class TendersService {
       );
 
       try {
-        const generated = await this.openAiService.generateTenderShortTitles(
-          batch.map((tender) => ({
-            id: tender.id,
-            title: tender.title ?? '',
-          })),
-        );
+        const generated =
+          await this.deepSeekAnalysisService.generateTenderShortTitles(
+            batch.map((tender) => ({
+              id: tender.id,
+              title: tender.title ?? '',
+            })),
+          );
         const byId = new Map(generated.map((item) => [item.id, item]));
 
         await Promise.all(
