@@ -68,6 +68,15 @@ type ShortTitlesResult = {
 
 const tokenStorageKey = 'ted-admin-token';
 
+class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
 function getApiUrl(path: string) {
   const configuredOrigin = process.env.NEXT_PUBLIC_ADMIN_API_ORIGIN;
 
@@ -103,7 +112,7 @@ async function request<T>(
   });
 
   if (!response.ok) {
-    throw new Error(await response.text());
+    throw new ApiRequestError(await response.text(), response.status);
   }
 
   const text = await response.text();
@@ -285,6 +294,12 @@ export default function AdminApp() {
     try {
       const self = await request<AdminUser>('/users/adm/self', {
         token: authToken,
+      }).catch((error) => {
+        if (error instanceof ApiRequestError && error.status === 403) {
+          signOut();
+        }
+
+        throw error;
       });
 
       setCurrentUser(self);
