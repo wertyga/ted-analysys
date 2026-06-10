@@ -32,6 +32,7 @@ import {
   AwardTenderModel,
   AwardTenderWinner,
   AWARD_SEARCH_CACHE_TTL_MS,
+  AwardTenderDocument,
 } from './schemas';
 import {
   getPaginationMeta,
@@ -40,6 +41,7 @@ import {
   tenderCpvPopulateFields,
 } from '@/utils';
 import { buildTedTenderSearchQuery } from '@/resources/ted-search/ted-builders';
+import { QueryFilter } from 'mongoose';
 
 const HISTORY_YEARS_BACK = 3;
 const COUNT_OF_AWARD_TENDERS_SEARCH = 1;
@@ -74,7 +76,6 @@ export class SimilarContractsService {
     const awardXml = await fetchXmlContentFromNotice(notice.links);
 
     const xmlAwardValue = extractXmlAwardValue(awardXml);
-    console.log({ xmlAwardValue });
     const xmlWinners = extractXmlAwardWinners(awardXml);
 
     const normalizedAward = {
@@ -137,7 +138,7 @@ export class SimilarContractsService {
     });
   }
 
-  async searchAwardsAndUpsertIfNeeded(
+  async searchAwardsLocally(
     tenderId: string,
     pagination: { page?: number; limit?: number } = {},
   ) {
@@ -148,62 +149,39 @@ export class SimilarContractsService {
       throw new NotFoundException('Tender not found');
     }
 
-    const filters: SimilarContractAwardsRequestDto = {
-      cpvCodes: tender.cpvCodes,
-      buyerCountries: [tender.buyerCountry],
-      contractNature: [tender.contractNature],
-    } as SimilarContractAwardsRequestDto;
+    const query: QueryFilter<AwardTenderDocument> = {
+      cpvCodes: { $in: tender.cpvCodes as string[] },
+      buyerCountry: tender.buyerCountry,
+      contractNature: tender.contractNature,
+    };
 
-    const searchHash = this.buildAwardSearchHash(filters);
     const { skip, limit } = getPaginationMeta(pagination);
-    const savedTenders = await AwardTenderModel.find({ searchHash })
-      .sort({ publicationDate: -1 })
-      .skip(skip)
-      .limit(limit)
-      .populate(tenderCpvPopulateFields)
-      .lean()
-      .exec();
-
-    if (savedTenders.length > 0) {
-      return {
-        totalNoticeCount: await AwardTenderModel.countDocuments({
-          searchHash,
-        }).exec(),
-        notices: savedTenders,
-      };
-    }
-
-    const { totalNoticeCount, normalizedTenders } =
-      await this.searchAwardsFromTed(filters);
-
-    const awardTendersDocuments = await Promise.all(
-      normalizedTenders.map((tender) =>
-        this.upsertAwardTender(tender, searchHash),
-      ),
-    );
+    const [savedTenders, totalCount] = await Promise.all([
+      AwardTenderModel.find(query)
+        .sort({ publicationDate: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate(tenderCpvPopulateFields)
+        .lean(),
+      AwardTenderModel.countDocuments(query),
+    ]);
 
     return {
-      totalNoticeCount,
-      notices: awardTendersDocuments,
+      totalNoticeCount: totalCount,
+      notices: savedTenders,
     };
   }
 
-  async upsertAwardTender(
-    normalizedTender: normalizedAwardTenderDto,
-    searchHash?: string,
-  ) {
+  async upsertAwardTender(normalizedTender: normalizedAwardTenderDto) {
     const estimatedValueEur =
       await this.tendersService.calculateEstimatedValueEur(normalizedTender);
 
     const awardTender = this.toAwardTenderDocument(
       normalizedTender,
-      searchHash,
       estimatedValueEur,
     );
 
-    const filter = searchHash
-      ? { id: normalizedTender.id, searchHash }
-      : { id: normalizedTender.id, searchHash: { $exists: false } };
+    const filter = { id: normalizedTender.id, searchHash: { $exists: false } };
 
     const savedTender = await AwardTenderModel.findOneAndUpdate(
       filter,
@@ -274,7 +252,6 @@ export class SimilarContractsService {
 
   private toAwardTenderDocument(
     normalizedTender: normalizedAwardTenderDto,
-    searchHash: string | undefined,
     estimatedValueEur: number | null,
   ): Record<string, unknown> {
     const {
@@ -307,13 +284,6 @@ export class SimilarContractsService {
         winnerDecisionDate,
       }),
     };
-
-    if (searchHash) {
-      awardTender.searchHash = searchHash;
-      awardTender.searchCacheExpiresAt = new Date(
-        Date.now() + AWARD_SEARCH_CACHE_TTL_MS,
-      );
-    }
 
     return awardTender;
   }
