@@ -31,7 +31,6 @@ import { TendersService } from '@/resources/tenders/tenders.service';
 import {
   AwardTenderModel,
   AwardTenderWinner,
-  AWARD_SEARCH_CACHE_TTL_MS,
   AwardTenderDocument,
 } from './schemas';
 import {
@@ -41,10 +40,11 @@ import {
   tenderCpvPopulateFields,
 } from '@/utils';
 import { buildTedTenderSearchQuery } from '@/resources/ted-search/ted-builders';
+import {
+  AWARD_HISTORY_FIELDS,
+  SIMILAR_CONTRACTS_CONFIG,
+} from '@/config/similar-contracts.config';
 import { QueryFilter } from 'mongoose';
-
-const HISTORY_YEARS_BACK = 3;
-const COUNT_OF_AWARD_TENDERS_SEARCH = 1;
 
 export type normalizedAwardTenderDto = NormalizedTenderDto & {
   winnerName?: string | string[];
@@ -76,6 +76,7 @@ export class SimilarContractsService {
     const awardXml = await fetchXmlContentFromNotice(notice.links);
 
     const xmlAwardValue = extractXmlAwardValue(awardXml);
+
     const xmlWinners = extractXmlAwardWinners(awardXml);
 
     const normalizedAward = {
@@ -132,9 +133,9 @@ export class SimilarContractsService {
       checkQuerySyntax: false,
       onlyLatestVersions: true,
       paginationMode: TedPaginationMode.PAGE_NUMBER,
-      limit: COUNT_OF_AWARD_TENDERS_SEARCH,
+      limit: SIMILAR_CONTRACTS_CONFIG.awardTenderSearchLimit,
       page: 1,
-      fields: [...searchTendersDefaultFields, ...winnerFields],
+      fields: AWARD_HISTORY_FIELDS,
     });
   }
 
@@ -212,7 +213,9 @@ export class SimilarContractsService {
 
   private get publicationDateFromHistoryTedDate(): string {
     const date = new Date();
-    date.setFullYear(date.getFullYear() - HISTORY_YEARS_BACK);
+    date.setFullYear(
+      date.getFullYear() - SIMILAR_CONTRACTS_CONFIG.historyYearsBack,
+    );
 
     return getTedDate(date);
   }
@@ -221,7 +224,7 @@ export class SimilarContractsService {
     return createHash('sha256')
       .update(
         JSON.stringify({
-          historyYearsBack: HISTORY_YEARS_BACK,
+          historyYearsBack: SIMILAR_CONTRACTS_CONFIG.historyYearsBack,
           cpvCodes: this.normalizeHashArray(dto.cpvCodes),
           buyerCountries: this.normalizeHashArray(dto.buyerCountries),
           contractNature: this.normalizeHashArray(dto.contractNature),

@@ -14,6 +14,12 @@ import {
   WebhookListenerResponse,
 } from '@freemius/sdk';
 import { IncomingHttpHeaders } from 'http';
+import { isDev } from '@/utils';
+
+export enum FreemiusBillingCycle {
+  monthly = 'monthly',
+  annual = 'annual',
+}
 
 type FreemiumCheckoutData = {
   user: {
@@ -23,7 +29,8 @@ type FreemiumCheckoutData = {
   planId?: string;
   licenseId?: string;
   quota?: number;
-  withRecommendation?: boolean;
+  coupon?: string;
+  billingCycle: FreemiusBillingCycle;
 };
 
 type FreemiumPagination = {
@@ -31,8 +38,65 @@ type FreemiumPagination = {
   offset?: number;
 };
 
+export type FreemiumCouponFilters = FreemiumPagination & {
+  code?: string;
+  is_enriched?: boolean;
+  prefix?: string;
+  search?: string;
+};
+
+export type FreemiumCoupon = {
+  id?: string | number;
+  created?: string;
+  updated?: string;
+  entity_id?: string;
+  entity_type?: 'plugin' | 'store' | 'marketplace';
+  plans?: string | null;
+  licenses?: string | null;
+  billing_cycles?: string | null;
+  code?: string;
+  discount?: number;
+  discount_type?: 'percentage' | 'dollar' | string;
+  start_date?: string;
+  end_date?: string;
+  redemptions?: number;
+  redemptions_limit?: number | null;
+  has_renewals_discount?: boolean;
+  has_addons_discount?: boolean;
+  is_one_per_user?: boolean;
+  is_active?: boolean;
+  user_type?: 'all' | 'new' | 'current' | 'previous' | 'customer' | 'migrated';
+  source?: string | null;
+  discounts?: Record<string, never>;
+};
+
 type FreemiumWebhookListenerConfig = {
   onError?: (error: unknown) => Promise<void>;
+};
+
+type FreemiusCouponsResponse = {
+  coupons?: FreemiumCoupon[];
+};
+
+type FreemiusApiResponse<T> = {
+  data?: T;
+  response: {
+    status: number;
+  };
+};
+
+type FreemiusApiClient = {
+  GET(
+    path: '/products/{product_id}/coupons.json',
+    options: {
+      params: {
+        path: {
+          product_id: string;
+        };
+        query?: FreemiumCouponFilters;
+      };
+    },
+  ): Promise<FreemiusApiResponse<FreemiusCouponsResponse>>;
 };
 
 type FreemiumWebhookListener = {
@@ -79,21 +143,72 @@ export class FreemiumClient {
     return this._freemius;
   }
 
+  async getCoupons(
+    filters: FreemiumCouponFilters = {},
+  ): Promise<FreemiumCoupon[]> {
+    const apiClient = this.freemius.api
+      .__unstable_ApiClient as FreemiusApiClient;
+    const response = await apiClient.GET(
+      '/products/{product_id}/coupons.json',
+      {
+        params: {
+          path: {
+            product_id: this.freemius.api.productId,
+          },
+          query: filters,
+        },
+      },
+    );
+
+    if (response.response.status < 200 || response.response.status >= 300) {
+      return [];
+    }
+
+    return response.data?.coupons ?? [];
+  }
+
   async createCheckout(data: FreemiumCheckoutData) {
     const checkout = await this.freemius.checkout.create({
       user: data.user,
-      isSandbox: process.env.NODE_ENV !== 'production',
+      isSandbox: isDev,
       planId: data.planId,
       licenseId: data.licenseId,
       quota: data.quota,
-      withRecommendation: data.withRecommendation,
     });
+
+    checkout.setBillingCycle(data.billingCycle);
+
+    if (data.coupon) {
+      checkout.setCoupon({
+        code: data.coupon,
+      });
+    }
 
     return checkout.serialize();
   }
 
-  getPricingList(): Promise<PricingData> {
-    return this.freemius.pricing.retrieve();
+  async getPricingList(): Promise<
+    PricingData & { coupon?: string; couponDiscount?: number }
+  > {
+    const [[coupon], pricing] = await Promise.all([
+      this.getCoupons(),
+      this.freemius.pricing.retrieve(),
+    ]);
+
+    if (coupon?.is_active) {
+      return {
+        ...pricing,
+        plans: pricing.plans.map((plan) => {
+          return {
+            ...plan,
+            coupon: coupon.code,
+            couponDiscount: coupon.discount,
+          };
+        }),
+      };
+    }
+
+    return pricing;
   }
 
   async getPricing(

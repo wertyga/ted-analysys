@@ -6,7 +6,7 @@ import { AppService } from './app.service';
 import { DeepSeekModule } from './deepseek/deepseek.module';
 import { CpvModule } from './resources/cpv/cpv.module';
 import { TedSearchModule } from './resources/ted-search/ted-search.module';
-import { TenderAnalysisModule } from './resources/tender-analysis/tender-analysis.module';
+import { TenderGeneralAnalysisModule } from './resources/tender-analysis/tender-general-analysis.module';
 import { TenderDeepAnalysisModule } from './resources/tender-deep-analysis/tender-deep-analysis.module';
 import { TendersCronModule } from './resources/tenders-cron/tenders-cron.module';
 import { TendersModule } from './resources/tenders/tenders.module';
@@ -23,6 +23,7 @@ import { PaymentsModule } from './resources/payments/payments.module';
 import { FeedbackModule } from './resources/feedback/feedback.module';
 import { TariffModule } from './resources/tariff';
 import { SimilarContractsModule } from './resources/similar-contracts/similar-contracts.module';
+import { TechModule } from './resources/tech/tech.module';
 
 @Module({
   imports: [
@@ -33,7 +34,7 @@ import { SimilarContractsModule } from './resources/similar-contracts/similar-co
     TenderWishlistModule,
     TendersModule,
     TendersCronModule,
-    TenderAnalysisModule,
+    TenderGeneralAnalysisModule,
     TenderDeepAnalysisModule,
     DeepSeekModule,
     AuthModule,
@@ -47,6 +48,7 @@ import { SimilarContractsModule } from './resources/similar-contracts/similar-co
     FeedbackModule,
     TariffModule,
     SimilarContractsModule,
+    TechModule,
   ],
   controllers: [AppController],
   providers: [AppService],

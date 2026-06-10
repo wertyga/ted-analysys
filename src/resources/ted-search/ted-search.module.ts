@@ -1,21 +1,22 @@
 import { forwardRef, Module } from '@nestjs/common';
-import { TenderAnalysisModule } from '../tender-analysis/tender-analysis.module';
+import { TenderGeneralAnalysisModule } from '../tender-analysis/tender-general-analysis.module';
 import { TendersModule } from '../tenders/tenders.module';
 import { TedSearchController } from './ted-search.controller';
 import { TedSearchService } from './ted-search.service';
 import { TenderWishlistModule } from '@/resources/tender-wishlist/tender-wishlist.module';
 import { CurrencyExchangeRatesModule } from '@/resources/currency-exchange-rates/currency-exchange-rates.module';
 import { TariffModule } from '@/resources/tariff';
+import { TedSearchAdminController } from './ted-search.adm.controller';
 
 @Module({
   imports: [
-    forwardRef(() => TenderAnalysisModule),
+    forwardRef(() => TenderGeneralAnalysisModule),
     forwardRef(() => TendersModule),
     TenderWishlistModule,
     CurrencyExchangeRatesModule,
     TariffModule,
   ],
-  controllers: [TedSearchController],
+  controllers: [TedSearchController, TedSearchAdminController],
   providers: [TedSearchService],
   exports: [TedSearchService],
 })

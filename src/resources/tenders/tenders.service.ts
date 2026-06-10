@@ -20,22 +20,20 @@ import {
   TenderGeneralAnalysisModel,
 } from '../tender-analysis/schemas';
 import { TenderListDto } from './dto/tender.dto';
-import { TenderDocument, TenderModel, TenderWithWishlist } from './schemas';
+import { TenderDocument, TenderModel } from './schemas';
 import {
   NormalizedTenderDto,
   TenderNormalizerService,
 } from './tender-normalizer.service';
-import { TedPublicationNumbersSearchRequestDto } from '@/resources/ted-search/dto/ted-publication-numbers-search-request.dto';
 import {
   areTedNoticeVersionsDifferent,
   extractPublicationNumberFromNotice,
   isRecord,
   isTedNotice,
   isTedPublicationNumber,
-  valueToString,
 } from '@/utils';
 import { tenderCpvPopulateFields } from '@/resources/tenders/utils/tender.utils';
-import { Mongoose, SortOrder, Types } from 'mongoose';
+import { SortOrder, Types } from 'mongoose';
 import {
   TenderDeepAnalysisDocument,
   TenderDeepAnalysisModel,
@@ -47,6 +45,7 @@ import {
 import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rates/currency-exchange-rates.service';
 import { CurrencySign } from '@/resources/codelist';
 import { searchTendersDefaultFields } from '@/resources/ted-search/utils';
+import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 
 export interface GatherActiveTendersResult {
   completed?: boolean;
@@ -76,6 +75,8 @@ export type TenderDocumentWithGeneralAnalysis = TenderDocument & {
   generalAnalysis?: TenderGeneralAnalysisDetailDto | null;
 };
 
+const SHORT_TITLE_GENERATION_BATCH_SIZE = 20;
+
 @Injectable()
 export class TendersService {
   private readonly logger = new Logger(TendersService.name);
@@ -85,6 +86,7 @@ export class TendersService {
     private readonly tedSearchService: TedSearchService,
     private readonly tenderNormalizer: TenderNormalizerService,
     private readonly currencyExchangeRatesService: CurrencyExchangeRatesService,
+    private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
     @Inject(forwardRef(() => TenderGeneralAnalysisService))
     private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
   ) {}
@@ -197,7 +199,7 @@ export class TendersService {
     const existingTenders = await TenderModel.find({
       id: { $in: publicationNumbers },
     })
-      .select('id publicationNumber noticeVersion sourceHash')
+      .select('id publicationNumber noticeVersion sourceHash title shortTitle')
       .exec();
 
     const existingTendersByPublicationNumber = new Map(
@@ -211,6 +213,7 @@ export class TendersService {
     let updated = 0;
     let skipped = notices.length - noticesByPublicationNumber.size;
     const changedTenders: TenderDocument[] = [];
+    const tendersForShortTitle: TenderDocument[] = [];
 
     for (const [publicationNumber, notice] of noticesByPublicationNumber) {
       const existingTender =
@@ -222,6 +225,10 @@ export class TendersService {
       );
 
       if (existingTender && !shouldUpdateExistingTender) {
+        if (!existingTender.shortTitle) {
+          tendersForShortTitle.push(existingTender);
+        }
+
         skipped += 1;
         continue;
       }
@@ -229,6 +236,10 @@ export class TendersService {
       const savedTender = await this.upsertTender(notice);
 
       if (savedTender) {
+        if (!savedTender.shortTitle) {
+          tendersForShortTitle.push(savedTender);
+        }
+
         changedTenders.push(savedTender);
 
         if (existingTender) {
@@ -241,7 +252,69 @@ export class TendersService {
       }
     }
 
+    await this.fillMissingShortTitles(tendersForShortTitle);
+
     return { saved, updated, skipped, changedTenders };
+  }
+
+  private async fillMissingShortTitles(
+    tenders: Array<Pick<TenderDocument, 'id' | 'title' | 'shortTitle'>>,
+  ) {
+    const tendersWithoutShortTitle = tenders.filter((tender) => {
+      return tender.title && !tender.shortTitle;
+    });
+
+    if (!tendersWithoutShortTitle.length) {
+      return;
+    }
+
+    for (
+      let index = 0;
+      index < tendersWithoutShortTitle.length;
+      index += SHORT_TITLE_GENERATION_BATCH_SIZE
+    ) {
+      const batch = tendersWithoutShortTitle.slice(
+        index,
+        index + SHORT_TITLE_GENERATION_BATCH_SIZE,
+      );
+
+      try {
+        const generated =
+          await this.deepSeekAnalysisService.generateTenderShortTitles(
+            batch.map((tender) => ({
+              id: tender.id,
+              title: tender.title ?? '',
+            })),
+          );
+        const byId = new Map(generated.map((item) => [item.id, item]));
+
+        await Promise.all(
+          batch.map(async (tender) => {
+            const item = byId.get(tender.id);
+
+            if (!item) {
+              return;
+            }
+
+            await TenderModel.updateOne(
+              {
+                id: tender.id,
+                $or: [{ shortTitle: { $exists: false } }, { shortTitle: null }],
+              },
+              { $set: { shortTitle: item.shortTitle } },
+            ).exec();
+
+            tender.shortTitle = item.shortTitle;
+          }),
+        );
+      } catch (error: unknown) {
+        this.logger.warn(
+          `Failed to generate tender short titles: ${
+            error instanceof Error ? error.message : 'unknown error'
+          }`,
+        );
+      }
+    }
   }
 
   private shouldUpdateTenderFromTedNotice(

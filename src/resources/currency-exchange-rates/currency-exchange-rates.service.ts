@@ -8,10 +8,7 @@ import {
   CurrencyExchangeRateDocument,
   CurrencyExchangeRateModel,
 } from './schemas';
-
-const ECB_DAILY_RATES_URL =
-  'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml';
-const CURRENCY_EXCHANGE_RATES_CRON = '30 16 * * *';
+import { CURRENCY_EXCHANGE_RATES_CONFIG } from '@/config/currency-exchange-rates.config';
 
 interface EcbExchangeRate {
   currency: CurrencySign;
@@ -28,8 +25,8 @@ export class CurrencyExchangeRatesService {
   private readonly logger = new Logger(CurrencyExchangeRatesService.name);
   private isSyncing = false;
 
-  @Cron(CURRENCY_EXCHANGE_RATES_CRON, {
-    timeZone: 'Europe/Warsaw',
+  @Cron(CURRENCY_EXCHANGE_RATES_CONFIG.cron, {
+    timeZone: CURRENCY_EXCHANGE_RATES_CONFIG.timeZone,
   })
   async syncLatestRatesCron(): Promise<void> {
     if (this.isSyncing) {
@@ -54,10 +51,13 @@ export class CurrencyExchangeRatesService {
   }
 
   async syncLatestRatesFromEcb(): Promise<CurrencyExchangeRateSyncResult> {
-    const response = await axios.get<string>(ECB_DAILY_RATES_URL, {
-      timeout: 30000,
-      responseType: 'text',
-    });
+    const response = await axios.get<string>(
+      CURRENCY_EXCHANGE_RATES_CONFIG.ecbDailyRatesUrl,
+      {
+        timeout: CURRENCY_EXCHANGE_RATES_CONFIG.requestTimeoutMs,
+        responseType: 'text',
+      },
+    );
     const { date, rates } = this.parseEcbDailyRates(response.data);
     const fetchedAt = new Date();
     const baseCurrency: CurrencySign.EUR = CurrencySign.EUR;
@@ -105,21 +105,23 @@ export class CurrencyExchangeRatesService {
   }
 
   async convertToEur(
-    amount: number,
-    currency: CurrencySign,
+    amount: number | null | undefined,
+    currency: CurrencySign | null | undefined | string,
     date?: Date,
   ): Promise<number | null> {
-    if (!Number.isFinite(amount)) {
+    const normalizedCurrency = currency?.trim().toUpperCase() as CurrencySign;
+
+    if (!Number.isFinite(amount) || !CurrencySign[normalizedCurrency]) {
       return null;
     }
 
-    if (currency === CurrencySign.EUR) {
-      return amount;
+    if (normalizedCurrency === CurrencySign.EUR) {
+      return amount as number;
     }
 
-    const rate = await this.findRate(currency, date);
+    const rate = await this.findRate(normalizedCurrency, date);
 
-    return rate ? amount * rate.eurPerUnit : null;
+    return rate ? (amount as number) * rate.eurPerUnit : null;
   }
 
   async findRate(

@@ -1,10 +1,8 @@
 import { TenderDeepCompanyFitAnalysisInput } from '@/types';
+import { TENDER_DEEP_ANALYSIS_CONFIG } from '@/config/tender-deep-analysis.config';
 
 export const TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION =
   'tender-deep-company-fit-v1.0.9';
-
-const MAX_JSON_CHARS = 60_000;
-const MAX_SNIPPETS_JSON_CHARS = 40_000;
 
 export function buildTenderDeepCompanyFitSystemPrompt(): string {
   return [
@@ -87,7 +85,10 @@ export function buildTenderDeepCompanyFitUserPrompt(
     safeStringify(input.documentMetadata ?? []),
     '',
     '7. Raw extracted document snippets, if available:',
-    safeStringify(input.documentTextSnippets ?? [], MAX_SNIPPETS_JSON_CHARS),
+    safeStringify(
+      input.documentTextSnippets ?? [],
+      TENDER_DEEP_ANALYSIS_CONFIG.companyFitAnalysis.maxSnippetsJsonChars,
+    ),
     '',
     'Your task:',
     '',
@@ -110,11 +111,12 @@ export function buildTenderDeepCompanyFitUserPrompt(
     '- riskFit: 2',
     '',
     'For each criterion assign score from 0 to 100, set integer weight percentage, calculate weightedScore = score * weight / 100, explain the score, provide evidence, and list missing information.',
+    'scores.scoreBreakdown must contain exactly 12 items, one for each criterion listed above. Do not omit any criterion and do not duplicate criteria.',
     'Every scores.scoreBreakdown item must include a non-empty explanation written in the requested output language. Do not leave explanation empty.',
     'Never return scores.scoreBreakdown[*].explanation as an empty string. If a score is obvious from structured data, still explain the evidence and reasoning.',
     'fitScore must be the weighted sum of scoreBreakdown weightedScore values. Do not set fitScore to 0 only because finalRecommendation is no_go or because a critical blocker exists.',
     'Use only scores.scoreBreakdown as the canonical score breakdown. Do not put scopeFit, capabilityFit, cpvFit, geographicFit, languageFit, eligibilityFit, certificationFit, experienceFit, financialFit, commercialFit, deadlineFit, riskFit, or scoreBreakdown inside companyFitAnalysis.',
-    'If a criterion has enough structured evidence, score it directly. Do not leave languageFit, financialFit, or deadlineFit as a backend fallback when tender/company fields provide evidence.',
+    'If a criterion has enough structured evidence, score it directly. Do not return backend_fallback, MISSING_LLM_SCORE, empty explanations, or placeholder evidence for any scoreBreakdown item.',
     'If English is accepted by the tender and the company supports ENG/English, languageFit should normally be high, often 90-100.',
     'If estimated value is missing but company typicalContractSize exists, financialFit should be neutral/low-confidence, normally 30-50, not automatically 0.',
     'Return a top-level confidence object with recommendationConfidence, tenderDataConfidence, companyProfileConfidence, and scoringConfidence. These fields measure different things and must not be collapsed into one score.',
@@ -131,7 +133,8 @@ export function buildTenderDeepCompanyFitUserPrompt(
     `- Write all generated analysis text in "${input.outputLanguage ?? 'en'}", including tenderIntelligence.title, tenderIntelligence.lots[*].title, tenderIntelligence.lots[*].summary, lotsSummary, clarificationQuestions, summaries, rationales, risks, gaps, assumptions, evidence claims, and next steps.`,
     '- Preserve official tender names, lot names, identifiers, CPV codes, buyer names, URLs, and legal/procedure labels only when they are legally meaningful or exact source evidence.',
     '- For tenderIntelligence.title, write a user-facing translated/localized title in the requested language and store the source title in tenderIntelligence.originalTitle.',
-    '- For tenderIntelligence.lots, write each lot title/summary in the requested language and store the source lot title in originalTitle when available. Preserve lot identifiers exactly.',
+    '- Use tender.lots as the source of lot structure. For tenderIntelligence.lots, write each lot title/summary in the requested language, store the source lot title in originalTitle when available, and preserve lot identifiers exactly.',
+    '- Analyze lot-specific CPV codes, descriptions, estimated values, framework values, deadlines, locations, submission channels, selection criteria, and award criteria when tender.lots provides them. Do not collapse materially different lots into one generic scope.',
     '- Clarification questions must be written in the requested language; do not leave them in the tender source language unless the requested language is the same.',
     '- Do not assume capabilities from companyName alone.',
     '- Interpret empty capabilities/certifications carefully: write "No declared food supply capabilities" or "No declared certifications" instead of absolute claims such as "Company cannot provide quality specification".',
@@ -180,7 +183,10 @@ export function buildTenderDeepCompanyFitUserPrompt(
   ].join('\n');
 }
 
-function safeStringify(value: unknown, maxChars = MAX_JSON_CHARS): string {
+function safeStringify(
+  value: unknown,
+  maxChars = TENDER_DEEP_ANALYSIS_CONFIG.companyFitAnalysis.maxJsonChars,
+): string {
   const json = JSON.stringify(value ?? null, null, 2);
 
   return json.length > maxChars

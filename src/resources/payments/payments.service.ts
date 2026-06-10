@@ -47,7 +47,7 @@ export class PaymentsService {
     }
 
     if (!activeEntitlement.isCanceled) {
-      return this.upgradeSubscription(user, data.planId);
+      return this.upgradeSubscription(user, data);
     }
 
     if (activeEntitlement.isCanceled && !areTariffTypesTheSame) {
@@ -57,7 +57,7 @@ export class PaymentsService {
 
   async createNewSubscription(
     user: UserDocument,
-    data: CreatePaymentCheckoutDto & { licenseId?: string },
+    data: CreatePaymentCheckoutDto,
   ) {
     return this.createFreemiusCheckout(user, data);
   }
@@ -73,6 +73,8 @@ export class PaymentsService {
       },
       planId: data.planId,
       licenseId: data.licenseId,
+      coupon: data.coupon,
+      billingCycle: data.billingCycle,
     });
   }
 
@@ -112,7 +114,7 @@ export class PaymentsService {
     const activeEntitlement = await this.getUserEntitlement(user);
 
     if (!activeEntitlement) {
-      return;
+      throw new NotFoundException('Subscription not found.');
     }
 
     // const sub = await this.createNewSubscription(user, {
@@ -127,7 +129,10 @@ export class PaymentsService {
     return activeEntitlement;
   }
 
-  async upgradeSubscription(user: UserDocument, planId: string) {
+  async upgradeSubscription(
+    user: UserDocument,
+    data: CreatePaymentCheckoutDto,
+  ) {
     const entitlement = await PaymentEntitlementModel.findOne({
       user: user._id,
       isCanceled: false,
@@ -138,8 +143,10 @@ export class PaymentsService {
     }
 
     return this.createFreemiusCheckout(user, {
-      planId,
+      planId: data.planId,
       licenseId: entitlement.licenseId,
+      coupon: data.coupon,
+      billingCycle: data.billingCycle,
     });
   }
 
@@ -152,19 +159,16 @@ export class PaymentsService {
     const purchase = await freemiusClient.retrievePurchase(
       activeEntitlement.licenseId,
     );
+
     if (!purchase || !purchase?.subscriptionId) {
       throw new BadRequestException(
         'Active Freemius subscription was not found',
       );
     }
 
-    const result = await freemiusClient.cancelSubscription(
-      purchase.subscriptionId,
-    );
+    await freemiusClient.cancelSubscription(purchase.subscriptionId);
 
-    await this.syncEntitlementFromLicense(activeEntitlement.licenseId);
-
-    return result;
+    return this.syncEntitlementFromLicense(activeEntitlement.licenseId);
   }
 
   async syncEntitlementFromLicense(licenseId: string) {

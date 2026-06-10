@@ -25,19 +25,35 @@ export function normalizeMissingDocuments(
     .filter((item): item is MissingTenderDocument => item !== null);
 }
 
-export function collectTenderDocumentAccessUrls(tender: unknown): {
+export function collectTenderDocumentAccessUrls(tender: any): {
   portalUrls: string[];
   directFileUrls: string[];
 } {
   const directFileUrls: string[] = [];
   const portalUrls: string[] = [];
 
+  const tenderLotsDocumentUrls = Array.from(
+    new Set(tender?.lots?.flatMap(({ documentUrls }) => documentUrls) ?? []),
+  ).filter(Boolean) as string[];
+  const tenderLotsSubmissionDocumentUrls = Array.from(
+    new Set(
+      tender?.lots?.flatMap(({ submissionUrls }) => submissionUrls) ?? [],
+    ),
+  ).filter(Boolean) as string[];
+
   collectUrlsFromValue(getRecordValue(tender, 'documentUrls')).forEach((url) =>
     pushUrl(url, directFileUrls, portalUrls, true),
+  );
+  tenderLotsDocumentUrls.forEach((url) =>
+    pushUrl(url, directFileUrls, portalUrls, true),
+  );
+  tenderLotsSubmissionDocumentUrls.forEach((url) =>
+    pushUrl(url, directFileUrls, portalUrls, false),
   );
   collectUrlsFromValue(getRecordValue(tender, 'submissionUrls')).forEach(
     (url) => pushUrl(url, directFileUrls, portalUrls, false),
   );
+
   collectUrlsFromValue(getRecordValue(tender, 'documentAccess')).forEach(
     (url) => pushUrl(url, directFileUrls, portalUrls, true),
   );

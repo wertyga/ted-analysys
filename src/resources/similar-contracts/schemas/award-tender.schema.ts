@@ -66,8 +66,6 @@ export interface AwardTenderModelType extends Model<AwardTenderDocument> {
   toDetailDto(tender: AwardTenderSerializable): Partial<AwardTender>;
 }
 
-export const AWARD_SEARCH_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-
 const AwardTenderWinnerSchema = new Schema<AwardTenderWinner>(
   {
     name: { type: String, trim: true, default: undefined },

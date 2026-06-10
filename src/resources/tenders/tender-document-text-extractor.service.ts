@@ -4,7 +4,7 @@ import { createHash } from 'crypto';
 import { isTag, type AnyNode, type Element } from 'domhandler';
 import * as mammoth from 'mammoth';
 import { PDFParse } from 'pdf-parse';
-import { Language } from '@/resources/codelist';
+import { DOCUMENT_EXTRACTOR_CONFIG } from '@/config/document-extractor.config';
 
 export enum TenderSourceDocumentType {
   TED_XML_NOTICE = 'TED_XML_NOTICE',
@@ -54,125 +54,6 @@ interface XmlReadableTenderTextResult {
   detectedLanguages: string[];
   warnings: string[];
 }
-
-const DEFAULT_MAX_CHARS_PER_DOCUMENT = 30_000;
-const BEGINNING_CHARS_WHEN_TRUNCATED = 10_000;
-const TRUNCATION_MARKER = '[...document truncated for AI input...]';
-
-const LANGUAGE_ALIASES: Record<string, string> = {
-  en: Language.ENG,
-  eng: Language.ENG,
-  fi: Language.FIN,
-  fin: Language.FIN,
-  sv: Language.SWE,
-  swe: Language.SWE,
-  se: Language.SWE,
-  de: Language.DEU,
-  deu: Language.DEU,
-  ger: Language.DEU,
-  fr: Language.FRA,
-  fra: Language.FRA,
-  fre: Language.FRA,
-  pl: Language.POL,
-  pol: Language.POL,
-  es: Language.SPA,
-  spa: Language.SPA,
-  it: Language.ITA,
-  ita: Language.ITA,
-  nl: Language.NLD,
-  nld: Language.NLD,
-  dut: Language.NLD,
-  da: Language.DAN,
-  dan: Language.DAN,
-  et: Language.EST,
-  est: Language.EST,
-  lv: Language.LAV,
-  lav: Language.LAV,
-  lt: Language.LIT,
-  lit: Language.LIT,
-  cs: Language.CES,
-  ces: Language.CES,
-  cze: Language.CES,
-  sk: Language.SLK,
-  slk: Language.SLK,
-  slo: Language.SLK,
-  sl: Language.SLV,
-  slv: Language.SLV,
-  hu: Language.HUN,
-  hun: Language.HUN,
-  pt: Language.POR,
-  por: Language.POR,
-  ro: Language.RON,
-  ron: Language.RON,
-  rum: Language.RON,
-  bg: Language.BUL,
-  bul: Language.BUL,
-  el: Language.ELL,
-  ell: Language.ELL,
-  gre: Language.ELL,
-  hr: Language.HRV,
-  hrv: Language.HRV,
-  mt: Language.MLT,
-  mlt: Language.MLT,
-  ga: Language.GLE,
-  gle: Language.GLE,
-  mul: Language.MUL,
-  unknown: 'UNKNOWN',
-};
-
-const TED_LANGUAGE_CODES: Set<string> = new Set(Object.values(Language));
-
-const AI_RETENTION_KEYWORDS = [
-  'eligibility',
-  'selection criteria',
-  'award criteria',
-  'submission',
-  'deadline',
-  'tender',
-  'procurement',
-  'contract',
-  'framework',
-  'dynamic purchasing system',
-  'DPS',
-  'requirement',
-  'requirements',
-  'technical',
-  'specification',
-  'price',
-  'pricing',
-  'liability',
-  'penalty',
-  'SLA',
-  'subcontracting',
-  'consortium',
-  'reference',
-  'references',
-  'certificate',
-  'certification',
-  'ESPD',
-  'exclusion',
-  'turnover',
-  'insurance',
-  'maintenance',
-  'support',
-  'testing',
-  'security',
-  'data protection',
-  'GDPR',
-  'language',
-  'vaatimus',
-  'vaatimukset',
-  'hankinta',
-  'sopimus',
-  'tarjous',
-  'määräaika',
-  'soveltuvuus',
-  'vertailuperuste',
-  'hinta',
-  'ylläpito',
-  'testaus',
-  'tietoturva',
-];
 
 @Injectable()
 export class TenderDocumentTextExtractorService {
@@ -371,7 +252,8 @@ export class TenderDocumentTextExtractorService {
     options: PrepareTextForAiOptions = {},
   ): string {
     const maxChars =
-      options.maxCharsPerDocument ?? DEFAULT_MAX_CHARS_PER_DOCUMENT;
+      options.maxCharsPerDocument ??
+      DOCUMENT_EXTRACTOR_CONFIG.aiText.defaultMaxCharsPerDocument;
     const cleaned = this.removeRepeatedPdfArtifacts(
       this.normalizeRawText(text),
     );
@@ -382,26 +264,32 @@ export class TenderDocumentTextExtractorService {
 
     const beginning = cleaned.slice(
       0,
-      Math.min(BEGINNING_CHARS_WHEN_TRUNCATED, maxChars),
+      Math.min(
+        DOCUMENT_EXTRACTOR_CONFIG.aiText.beginningCharsWhenTruncated,
+        maxChars,
+      ),
     );
     const remainingBudget =
-      maxChars - beginning.length - TRUNCATION_MARKER.length - 4;
+      maxChars -
+      beginning.length -
+      DOCUMENT_EXTRACTOR_CONFIG.aiText.truncationMarker.length -
+      4;
 
     if (remainingBudget <= 0) {
       return this.normalizeRawText(
-        `${beginning.slice(0, maxChars - TRUNCATION_MARKER.length - 2)}\n\n${TRUNCATION_MARKER}`,
+        `${beginning.slice(0, maxChars - DOCUMENT_EXTRACTOR_CONFIG.aiText.truncationMarker.length - 2)}\n\n${DOCUMENT_EXTRACTOR_CONFIG.aiText.truncationMarker}`,
       ).slice(0, maxChars);
     }
 
     const snippets = this.buildKeywordSnippets(
       cleaned,
-      AI_RETENTION_KEYWORDS,
+      DOCUMENT_EXTRACTOR_CONFIG.retentionKeywords,
       remainingBudget,
       beginning.length,
     );
 
     return this.normalizeRawText(
-      `${beginning}\n\n${TRUNCATION_MARKER}\n\n${snippets}`,
+      `${beginning}\n\n${DOCUMENT_EXTRACTOR_CONFIG.aiText.truncationMarker}\n\n${snippets}`,
     ).slice(0, maxChars);
   }
 
@@ -418,7 +306,11 @@ export class TenderDocumentTextExtractorService {
 
     for (const line of withoutPageMarkers) {
       const trimmed = line.trim();
-      if (trimmed.length > 0 && trimmed.length <= 80) {
+      if (
+        trimmed.length > 0 &&
+        trimmed.length <=
+          DOCUMENT_EXTRACTOR_CONFIG.pdfArtifacts.maxRepeatedLineChars
+      ) {
         counts.set(trimmed, (counts.get(trimmed) ?? 0) + 1);
       }
     }
@@ -429,9 +321,12 @@ export class TenderDocumentTextExtractorService {
       const count = counts.get(trimmed) ?? 0;
       return !(
         trimmed.length > 0 &&
-        trimmed.length <= 80 &&
-        count >= 4 &&
-        count / Math.max(totalLines, 1) > 0.05
+        trimmed.length <=
+          DOCUMENT_EXTRACTOR_CONFIG.pdfArtifacts.maxRepeatedLineChars &&
+        count >=
+          DOCUMENT_EXTRACTOR_CONFIG.pdfArtifacts.minRepeatedLineOccurrences &&
+        count / Math.max(totalLines, 1) >
+          DOCUMENT_EXTRACTOR_CONFIG.pdfArtifacts.minRepeatedLineRatio
       );
     });
 
@@ -446,7 +341,8 @@ export class TenderDocumentTextExtractorService {
   ): string {
     const lowerText = text.toLowerCase();
     const ranges: Array<{ start: number; end: number }> = [];
-    const contextChars = 900;
+    const contextChars =
+      DOCUMENT_EXTRACTOR_CONFIG.aiText.keywordSnippetContextChars;
 
     for (const keyword of keywords) {
       let searchIndex = startAfterIndex;
@@ -501,7 +397,12 @@ export class TenderDocumentTextExtractorService {
 
     for (const range of sorted) {
       const previous = merged[merged.length - 1];
-      if (previous && range.start <= previous.end + 200) {
+      if (
+        previous &&
+        range.start <=
+          previous.end +
+            DOCUMENT_EXTRACTOR_CONFIG.aiText.keywordSnippetMergeGapChars
+      ) {
         previous.end = Math.max(previous.end, range.end);
       } else {
         merged.push({ ...range });
@@ -520,13 +421,15 @@ export class TenderDocumentTextExtractorService {
       return undefined;
     }
 
-    const alias = LANGUAGE_ALIASES[normalized];
+    const alias = DOCUMENT_EXTRACTOR_CONFIG.languages.aliases[normalized];
     if (alias) {
       return alias;
     }
 
     const upperCode = normalized.toUpperCase();
-    return TED_LANGUAGE_CODES.has(upperCode) ? upperCode : undefined;
+    return DOCUMENT_EXTRACTOR_CONFIG.languages.tedCodes.has(upperCode)
+      ? upperCode
+      : undefined;
   }
 
   private getKnownInputLanguage(code?: string): string | undefined {
@@ -538,26 +441,11 @@ export class TenderDocumentTextExtractorService {
 
   private getBuyerPreferredLanguages(buyerCountry?: string): string[] {
     const country = buyerCountry?.trim().toUpperCase();
-    const countryLanguageMap: Record<string, string[]> = {
-      FIN: ['ENG', 'FIN', 'SWE'],
-      FI: ['ENG', 'FIN', 'SWE'],
-      SWE: ['ENG', 'SWE'],
-      SE: ['ENG', 'SWE'],
-      DEU: ['ENG', 'DEU'],
-      DE: ['ENG', 'DEU'],
-      FRA: ['ENG', 'FRA'],
-      FR: ['ENG', 'FRA'],
-      POL: ['ENG', 'POL'],
-      PL: ['ENG', 'POL'],
-      ESP: ['ENG', 'SPA'],
-      ES: ['ENG', 'SPA'],
-      ITA: ['ENG', 'ITA'],
-      IT: ['ENG', 'ITA'],
-      NLD: ['ENG', 'NLD'],
-      NL: ['ENG', 'NLD'],
-    };
-
-    return country ? (countryLanguageMap[country] ?? ['ENG']) : ['ENG'];
+    return country
+      ? (DOCUMENT_EXTRACTOR_CONFIG.languages.buyerCountryPreferredLanguages[
+          country
+        ] ?? ['ENG'])
+      : ['ENG'];
   }
 
   private buildPreferredLanguages(
@@ -710,7 +598,7 @@ export class TenderDocumentTextExtractorService {
     const nodeLanguage = this.getElementLanguage($, element);
     if (
       nodeLanguage &&
-      TED_LANGUAGE_CODES.has(nodeLanguage) &&
+      DOCUMENT_EXTRACTOR_CONFIG.languages.tedCodes.has(nodeLanguage) &&
       preferredLanguages.length > 0 &&
       !preferredLanguages.includes(nodeLanguage)
     ) {
@@ -748,13 +636,8 @@ export class TenderDocumentTextExtractorService {
     element: Element,
   ): string | undefined {
     const node = $(element);
-    const languageAttributes = [
-      'xml:lang',
-      'lang',
-      'languageID',
-      'language',
-      'locale',
-    ];
+    const languageAttributes =
+      DOCUMENT_EXTRACTOR_CONFIG.languages.xmlLanguageAttributes;
 
     for (const attribute of languageAttributes) {
       const normalized = this.normalizeLanguageCode(node.attr(attribute));

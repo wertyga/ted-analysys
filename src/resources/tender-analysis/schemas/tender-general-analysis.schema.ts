@@ -51,10 +51,8 @@ export interface TenderGeneralAnalysis {
 
   status: TenderGeneralAnalysisStatus;
 
-  resultJson?: unknown;
+  resultJson?: any;
   summary?: string;
-
-  estimatedValue?: TenderEstimatedValue;
 
   complexityScore?: number;
   opportunityScore?: number;
@@ -132,11 +130,6 @@ const TenderGeneralAnalysisSchema = new Schema<
     resultJson: { type: Schema.Types.Mixed, default: undefined },
 
     summary: String,
-
-    estimatedValue: {
-      type: EstimatedValueSchema,
-      default: undefined,
-    },
 
     complexityScore: {
       type: Number,

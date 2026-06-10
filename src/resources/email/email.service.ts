@@ -18,7 +18,7 @@ export class EmailService {
     string,
     { timer: NodeJS.Timeout; timeEnd: number }
   >;
-  private from: string = 'AI Tenders <no-reply@zws.ink>';
+  private from: string = `${process.env.APP_NAME ?? ''} <no-reply@tenderwize.com>`;
 
   constructor() {
     this.emailSentTimers = {};
@@ -27,9 +27,7 @@ export class EmailService {
 
   private getMailerConfig() {
     const host = process.env.MAIL_SMPT_SERVER;
-    const port = Number(
-      process.env.MAIL_SMPT_PORT ?? process.env.MAIL_SMTP_PORT,
-    );
+    const port = Number(process.env.MAIL_SMPT_PORT);
     const user = process.env.MAIL_USERNAME;
     const pass = process.env.MAIL_PASSWORD;
 

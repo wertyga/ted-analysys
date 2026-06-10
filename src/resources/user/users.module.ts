@@ -7,9 +7,16 @@ import { CompanyFilterModule } from '@/resources/company-filter/company-filter.m
 import { TenderWishlistModule } from '@/resources/tender-wishlist/tender-wishlist.module';
 import { CpvModule } from '@/resources/cpv/cpv.module';
 import { TariffModule } from '@/resources/tariff';
+import { TenderMatchingModule } from '@/resources/tender-matching/tender-matching.module';
 
 @Module({
-  imports: [CompanyFilterModule, TenderWishlistModule, CpvModule, TariffModule],
+  imports: [
+    CompanyFilterModule,
+    TenderWishlistModule,
+    CpvModule,
+    TariffModule,
+    TenderMatchingModule,
+  ],
   controllers: [UsersController, UsersAdmController],
   providers: [UsersService, UsersServiceUtils],
   exports: [UsersService, UsersServiceUtils],

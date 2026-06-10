@@ -15,8 +15,17 @@ import {
   fetchXmlContentFromNotice,
   findXmlUrl,
 } from '@/resources/tenders/tender-normalizer-xml';
+import { DOCUMENT_EXTRACTOR_CONFIG } from '@/config/document-extractor.config';
 
-interface TenderLinkDocumentCandidate {
+export type TenderAnalysisDocumentSource =
+  | 'xml'
+  | 'pdf'
+  | 'pdfs'
+  | 'html'
+  | 'htmlDirect'
+  | 'tenderDocuments';
+
+export interface TenderLinkDocumentCandidate {
   sourceUrl: string;
   filename?: string;
   mimeType?: string;
@@ -30,32 +39,36 @@ interface DownloadedTenderDocument {
   filename?: string;
 }
 
-const MAX_ANALYSIS_DOCUMENTS = 8;
-
-export class BaseAnalysisBuilder {
-  textExtractor = new TenderDocumentTextExtractorService();
+export class DocumentExtractor {
+  private readonly textExtractor = new TenderDocumentTextExtractorService();
 
   async buildAnalysisDocuments(
     tender: TenderDocument,
-    whatNeedToTake: ('xml' | 'pdf' | 'pdfs' | 'html' | 'htmlDirect')[],
+    whatNeedToTake: TenderAnalysisDocumentSource[],
   ): Promise<DocumentInputAnalysis[]> {
     const xmlDocument = whatNeedToTake.includes('xml')
-      ? await this.buildXmlDocument(tender)
-      : undefined;
-    const candidates = this.extractDocumentCandidatesFromLinks(
-      tender.links,
-      whatNeedToTake,
-    ).filter((candidate) => {
-      return candidate.documentType !== TenderSourceDocumentType.TED_XML_NOTICE;
-    });
-
-    const documents: GeneralTenderAnalysisInput['documents'] = xmlDocument
-      ? [xmlDocument]
+      ? [await this.buildXmlDocument(tender)]
+      : [];
+    const tenderDocs = whatNeedToTake.includes('tenderDocuments')
+      ? this.extractDocumentCandidatesFromTenderDocumentUrls(tender)
       : [];
 
-    for (const candidate of candidates.slice(
+    const restTypes = whatNeedToTake.filter(
+      (key) => key !== 'xml' && key !== 'tenderDocuments',
+    );
+    const candidates = this.extractDocumentCandidatesFromLinks(
+      tender.links,
+      restTypes,
+    ).concat(tenderDocs);
+
+    const documents: GeneralTenderAnalysisInput['documents'] = [
+      ...xmlDocument,
+    ].filter(Boolean) as GeneralTenderAnalysisInput['documents'];
+
+    for (const candidate of this.uniqueDocumentCandidates(candidates).slice(
       0,
-      MAX_ANALYSIS_DOCUMENTS - documents.length,
+      DOCUMENT_EXTRACTOR_CONFIG.analysisDocuments.maxDocuments -
+        documents.length,
     )) {
       try {
         const downloaded = await this.downloadTenderDocument(
@@ -91,47 +104,12 @@ export class BaseAnalysisBuilder {
     return documents;
   }
 
-  private async buildXmlDocument(
-    tender: TenderDocument,
-  ): Promise<DocumentInputAnalysis | undefined> {
-    const xmlContent = await fetchXmlContentFromNotice(tender.links);
-    const xmlSourceUrl = findXmlUrl(tender.links);
-
-    if (!xmlContent || !xmlSourceUrl) {
-      return undefined;
-    }
-
-    try {
-      const extraction = await this.textExtractor.extractAndPrepareText({
-        sourceUrl: xmlSourceUrl,
-        mimeType: 'application/xml',
-        language: undefined,
-        documentType: TenderSourceDocumentType.TED_XML_NOTICE,
-        content: Buffer.from(xmlContent, 'utf8'),
-        buyerCountry: tender.buyerCountry,
-      });
-
-      if (extraction.aiText.length === 0) {
-        return undefined;
-      }
-
-      return {
-        id: xmlSourceUrl,
-        filename: xmlSourceUrl ? undefined : 'ted-notice.xml',
-        language: extraction.detectedLanguages?.[0] ?? null,
-        documentType: TenderSourceDocumentType.TED_XML_NOTICE,
-        extractedText: extraction.aiText,
-      };
-    } catch {
-      return undefined;
-    }
-  }
-
   extractDocumentCandidatesFromLinks(
     links: TenderDocumentsLinks | undefined,
-    whatNeedToTake: ('xml' | 'pdf' | 'pdfs' | 'html' | 'htmlDirect')[],
+    whatNeedToTake: TenderAnalysisDocumentSource[],
   ): TenderLinkDocumentCandidate[] {
     return whatNeedToTake
+      .filter((key) => key !== 'tenderDocuments')
       .map((key) => links?.[key])
       .filter(Boolean)
       .map((url) => {
@@ -154,13 +132,13 @@ export class BaseAnalysisBuilder {
   ): Promise<DownloadedTenderDocument> {
     const response = await axios.get<ArrayBuffer>(sourceUrl, {
       responseType: 'arraybuffer',
-      timeout: 30_000,
+      timeout: DOCUMENT_EXTRACTOR_CONFIG.download.timeoutMs,
       headers: {
-        Accept:
-          'application/pdf, application/xml, text/xml, text/html, text/plain, */*',
+        Accept: DOCUMENT_EXTRACTOR_CONFIG.download.acceptHeader,
       },
-      maxContentLength: 25 * 1024 * 1024,
-      maxBodyLength: 25 * 1024 * 1024,
+      maxContentLength:
+        DOCUMENT_EXTRACTOR_CONFIG.download.maxContentLengthBytes,
+      maxBodyLength: DOCUMENT_EXTRACTOR_CONFIG.download.maxBodyLengthBytes,
     });
 
     return {
@@ -214,6 +192,136 @@ export class BaseAnalysisBuilder {
       documentType,
       mimeType: 'text/html',
     };
+  }
+
+  private extractDocumentCandidatesFromTenderDocumentUrls(
+    tender: TenderDocument,
+  ): TenderLinkDocumentCandidate[] {
+    return this.uniqueUrls([
+      ...(tender.documentUrls ?? []),
+      ...(tender.lots?.flatMap((lot) => lot.documentUrls ?? []) ?? []),
+    ])
+      .map((url) => this.addProcurementDocumentCandidate(url))
+      .filter(Boolean) as TenderLinkDocumentCandidate[];
+  }
+
+  private async buildXmlDocument(
+    tender: TenderDocument,
+  ): Promise<DocumentInputAnalysis | undefined> {
+    const xmlContent = await fetchXmlContentFromNotice(tender.links);
+    const xmlSourceUrl = findXmlUrl(tender.links);
+
+    if (!xmlContent || !xmlSourceUrl) {
+      return undefined;
+    }
+
+    try {
+      const extraction = await this.textExtractor.extractAndPrepareText({
+        sourceUrl: xmlSourceUrl,
+        mimeType: 'application/xml',
+        language: undefined,
+        documentType: TenderSourceDocumentType.TED_XML_NOTICE,
+        content: Buffer.from(xmlContent, 'utf8'),
+        buyerCountry: tender.buyerCountry,
+      });
+
+      if (extraction.aiText.length === 0) {
+        return undefined;
+      }
+
+      return {
+        id: xmlSourceUrl,
+        filename: xmlSourceUrl ? undefined : 'ted-notice.xml',
+        language: extraction.detectedLanguages?.[0] ?? null,
+        documentType: TenderSourceDocumentType.TED_XML_NOTICE,
+        extractedText: extraction.aiText,
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
+  private addProcurementDocumentCandidate(
+    url: string,
+  ): TenderLinkDocumentCandidate | undefined {
+    if (!/^https?:\/\//i.test(url)) {
+      return;
+    }
+
+    const sourceUrl = url.trim();
+    const lowered = sourceUrl.toLowerCase();
+    const language = this.languageFromUrl(lowered);
+
+    if (lowered.includes('pdf')) {
+      return {
+        sourceUrl,
+        language,
+        documentType: TenderSourceDocumentType.PROCUREMENT_PDF,
+        mimeType: 'application/pdf',
+      };
+    }
+
+    if (lowered.includes('xml')) {
+      return {
+        sourceUrl,
+        language,
+        documentType: TenderSourceDocumentType.PROCUREMENT_TEXT,
+        mimeType: 'application/xml',
+      };
+    }
+
+    if (lowered.includes('text/plain') || lowered.endsWith('.txt')) {
+      return {
+        sourceUrl,
+        language,
+        documentType: TenderSourceDocumentType.PROCUREMENT_TEXT,
+        mimeType: 'text/plain',
+      };
+    }
+
+    return {
+      sourceUrl,
+      language,
+      documentType: TenderSourceDocumentType.PROCUREMENT_HTML,
+      mimeType: 'text/html',
+    };
+  }
+
+  private uniqueDocumentCandidates(
+    candidates: TenderLinkDocumentCandidate[],
+  ): TenderLinkDocumentCandidate[] {
+    const seen = new Set<string>();
+    const result: TenderLinkDocumentCandidate[] = [];
+
+    for (const candidate of candidates) {
+      const key = candidate.sourceUrl.trim().toLowerCase();
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      result.push(candidate);
+    }
+
+    return result;
+  }
+
+  private uniqueUrls(urls: string[]): string[] {
+    const seen = new Set<string>();
+    const result: string[] = [];
+
+    for (const url of urls) {
+      const trimmed = url.trim();
+      const key = trimmed.toLowerCase();
+
+      if (!/^https?:\/\//i.test(trimmed) || seen.has(key)) {
+        continue;
+      }
+
+      seen.add(key);
+      result.push(trimmed);
+    }
+
+    return result;
   }
 
   private headerToString(value: unknown): string | undefined {

@@ -7,20 +7,17 @@ import {
   normalizeTedCountryCodes,
   type TedEligibleCountryCode,
 } from '@/resources/codelist';
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNumber, IsOptional, Min } from 'class-validator';
-import { Type } from 'class-transformer';
 import {
   TedContractNature,
   TedDeadlineRange,
   TedProcedureType,
 } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
 import { resolveDeadlineRange } from '@/resources/ted-search/utils';
-import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 
 export interface TedTenderSearchFilters {
   text?: string;
   cpvCodes?: string[];
+  publicationNumber?: string[];
   buyerCountries?: TedEligibleCountryCode[];
   buyerName?: string;
   buyerIdentifier?: string;
@@ -47,6 +44,7 @@ export interface TedTenderSearchFilters {
 export function buildTedTenderSearchQuery(
   filters: TedTenderSearchFilters,
 ): string {
+  console.log({ filters });
   const {
     text,
     cpvCodes,
@@ -67,6 +65,7 @@ export function buildTedTenderSearchQuery(
     submissionDeadlineTo,
     contractAwardFrom,
     contractAwardTo,
+    publicationNumber,
   } = resolveDeadlineRange(filters);
 
   const parts = [
@@ -83,6 +82,7 @@ export function buildTedTenderSearchQuery(
     buildInPart('procedure-type', procedureType),
     buildInPart('contract-nature', contractNature),
     buildInPart('total-value-cur', currency),
+    buildInPart('publication-number', publicationNumber),
     buildInPart('winner-selection-status', [
       ...(filters.winnerSelectionStatus ? [filters.winnerSelectionStatus] : []),
     ]),

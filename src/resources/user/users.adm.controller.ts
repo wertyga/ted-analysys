@@ -35,6 +35,6 @@ export class UsersAdmController {
   @ApiDefaultResponse({ description: 'Current admin user.' })
   @Get('/self')
   async getSelfUser(@Req() req) {
-    return UserModel.serializeUser(req.use);
+    return UserModel.serializeUser(req.user);
   }
 }

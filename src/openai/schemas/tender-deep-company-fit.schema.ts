@@ -122,6 +122,8 @@ export const TENDER_DEEP_COMPANY_FIT_JSON_SCHEMA = {
       properties: {
         scoreBreakdown: {
           type: 'array',
+          minItems: 12,
+          maxItems: 12,
           items: {
             type: 'object',
             additionalProperties: true,
@@ -158,6 +160,7 @@ export const TENDER_DEEP_COMPANY_FIT_JSON_SCHEMA = {
               explanation: { type: 'string', minLength: 1 },
               evidence: {
                 type: 'array',
+                minItems: 1,
                 items: { type: 'string' },
               },
               missingInformation: {

@@ -276,10 +276,7 @@ export class TenderNormalizerService {
         'place-of-performance-city-lot',
         'placeOfPerformanceCityLot',
       ]),
-      lotIdentifiers: this.pickTextArray(rawNotice, [
-        'identifier-lot',
-        'identifierLot',
-      ]),
+      lots: this.pickLots(rawNotice),
       internalLotIdentifiers: this.pickTextArray(rawNotice, [
         'internal-identifier-lot',
         'internalIdentifierLot',
@@ -480,6 +477,16 @@ export class TenderNormalizerService {
     return uniqueValues.length > 0 ? uniqueValues : undefined;
   }
 
+  private pickTextValues(raw: Record<string, unknown>, paths: string[]): string[] {
+    const values: string[] = [];
+
+    for (const path of paths) {
+      this.collectTextValues(raw[path], values);
+    }
+
+    return values.map((value) => value.trim()).filter(Boolean);
+  }
+
   private pickLocalizedText(
     value: unknown,
     noticeLanguage?: string,
@@ -675,6 +682,281 @@ export class TenderNormalizerService {
 
   private normalizeEstimatedAmount(amount: number | undefined): number | null {
     return amount && amount > 0 ? amount : null;
+  }
+
+  private wrapDefined<T>(value: T | undefined): T[] | undefined {
+    return value === undefined ? undefined : [value];
+  }
+
+  private buildLotAwardCriteria(criterion: {
+    name?: string;
+    description?: string;
+    type?: string;
+    weight?: string;
+  }): Array<{
+    name?: string;
+    description?: string;
+    type?: string;
+    weight?: string;
+  }> | undefined {
+    const normalizedCriterion = this.stripUndefinedFields(criterion);
+
+    return Object.keys(normalizedCriterion).length > 0
+      ? [normalizedCriterion]
+      : undefined;
+  }
+
+  private buildLotSelectionCriteria(criterion: {
+    name?: string;
+    description?: string;
+  }): Array<{ name?: string; description?: string }> | undefined {
+    const normalizedCriterion = this.stripUndefinedFields(criterion);
+
+    return Object.keys(normalizedCriterion).length > 0
+      ? [normalizedCriterion]
+      : undefined;
+  }
+
+  private stripUndefinedFields<T extends Record<string, unknown>>(value: T): T {
+    const result = {} as T;
+
+    for (const [key, fieldValue] of Object.entries(value)) {
+      if (fieldValue !== undefined) {
+        result[key as keyof T] = fieldValue as T[keyof T];
+      }
+    }
+
+    return result;
+  }
+
+  private pickLots(raw: Record<string, unknown>): TenderDto['lots'] {
+    const identifiers = this.pickTextValues(raw, [
+      'identifier-lot',
+      'identifierLot',
+    ]);
+    const internalIdentifiers = this.pickTextValues(raw, [
+      'internal-identifier-lot',
+      'internalIdentifierLot',
+    ]);
+    const titles = this.pickTextValues(raw, ['title-lot', 'titleLot']);
+    const descriptions = this.pickTextValues(raw, [
+      'description-lot',
+      'descriptionLot',
+    ]);
+    const mainClassifications = this.pickTextValues(raw, [
+      'main-classification-lot',
+      'mainClassificationLot',
+    ]);
+    const additionalClassifications = this.pickTextValues(raw, [
+      'additional-classification-lot',
+      'additionalClassificationLot',
+    ]);
+    const contractNatures = this.pickTextValues(raw, [
+      'contract-nature-main-lot',
+      'contractNatureMainLot',
+    ]);
+    const estimatedValues = this.pickTextValues(raw, [
+      'estimated-value-lot',
+      'estimatedValueLot',
+    ]);
+    const estimatedValueCurrencies = this.pickTextValues(raw, [
+      'estimated-value-cur-lot',
+      'estimatedValueCurLot',
+    ]);
+    const frameworkMaximumValues = this.pickTextValues(raw, [
+      'framework-maximum-value-lot',
+      'frameworkMaximumValueLot',
+    ]);
+    const frameworkMaximumValueCurrencies = this.pickTextValues(raw, [
+      'framework-maximum-value-cur-lot',
+      'frameworkMaximumValueCurLot',
+    ]);
+    const frameworkAgreements = this.pickTextValues(raw, [
+      'framework-agreement-lot',
+      'frameworkAgreementLot',
+    ]);
+    const dpsUsages = this.pickTextValues(raw, ['dps-usage-lot', 'dpsUsageLot']);
+    const durationPeriodValues = this.pickTextValues(raw, [
+      'duration-period-value-lot',
+      'durationPeriodValueLot',
+    ]);
+    const durationPeriodUnits = this.pickTextValues(raw, [
+      'duration-period-unit-lot',
+      'durationPeriodUnitLot',
+    ]);
+    const deadlineDates = this.pickTextValues(raw, [
+      'deadline-receipt-tender-date-lot',
+      'deadlineReceiptTenderDateLot',
+    ]);
+    const deadlineTimes = this.pickTextValues(raw, [
+      'deadline-receipt-tender-time-lot',
+      'deadlineReceiptTenderTimeLot',
+    ]);
+    const documentUrls = this.pickTextValues(raw, [
+      'document-url-lot',
+      'documentUrlLot',
+    ]);
+    const submissionUrls = this.pickTextValues(raw, [
+      'submission-url-lot',
+      'submissionUrlLot',
+    ]);
+    const electronicSubmissions = this.pickTextValues(raw, [
+      'electronic-submission-lot',
+      'electronicSubmissionLot',
+    ]);
+    const submissionLanguages = this.pickTextValues(raw, [
+      'submission-language',
+      'submissionLanguage',
+    ]);
+    const placeOfPerformanceCountries = this.pickTextValues(raw, [
+      'place-of-performance-country-lot',
+      'placeOfPerformanceCountryLot',
+    ]);
+    const placeOfPerformanceSubdivisions = this.pickTextValues(raw, [
+      'place-of-performance-subdiv-lot',
+      'placeOfPerformanceSubdivLot',
+    ]);
+    const placeOfPerformanceCities = this.pickTextValues(raw, [
+      'place-of-performance-city-lot',
+      'placeOfPerformanceCityLot',
+    ]);
+    const awardCriterionTypes = this.pickTextValues(raw, [
+      'award-criterion-type-lot',
+      'awardCriterionTypeLot',
+    ]);
+    const awardCriterionNames = this.pickTextValues(raw, [
+      'award-criterion-name-lot',
+      'awardCriterionNameLot',
+    ]);
+    const awardCriterionDescriptions = this.pickTextValues(raw, [
+      'award-criterion-description-lot',
+      'awardCriterionDescriptionLot',
+    ]);
+    const awardCriterionWeights = this.pickTextValues(raw, [
+      'award-criterion-number-weight-lot',
+      'awardCriterionNumberWeightLot',
+    ]);
+    const selectionCriterionNames = this.pickTextValues(raw, [
+      'selection-criterion-name-lot',
+      'selectionCriterionNameLot',
+    ]);
+    const selectionCriterionDescriptions = this.pickTextValues(raw, [
+      'selection-criterion-description-lot',
+      'selectionCriterionDescriptionLot',
+    ]);
+    const selectionCriteriaSources = this.pickTextValues(raw, [
+      'selection-criteria-source',
+      'selectionCriteriaSource',
+    ]);
+    const length = Math.max(
+      identifiers.length,
+      internalIdentifiers.length,
+      titles.length,
+      descriptions.length,
+      mainClassifications.length,
+      additionalClassifications.length,
+      contractNatures.length,
+      estimatedValues.length,
+      estimatedValueCurrencies.length,
+      frameworkMaximumValues.length,
+      frameworkMaximumValueCurrencies.length,
+      frameworkAgreements.length,
+      dpsUsages.length,
+      durationPeriodValues.length,
+      durationPeriodUnits.length,
+      deadlineDates.length,
+      deadlineTimes.length,
+      documentUrls.length,
+      submissionUrls.length,
+      electronicSubmissions.length,
+      submissionLanguages.length,
+      placeOfPerformanceCountries.length,
+      placeOfPerformanceSubdivisions.length,
+      placeOfPerformanceCities.length,
+      awardCriterionTypes.length,
+      awardCriterionNames.length,
+      awardCriterionDescriptions.length,
+      awardCriterionWeights.length,
+      selectionCriterionNames.length,
+      selectionCriterionDescriptions.length,
+      selectionCriteriaSources.length,
+    );
+
+    if (length === 0) {
+      return undefined;
+    }
+
+    const lots = Array.from({ length }, (_, index) => {
+      const estimatedAmount = this.numberFromValue(estimatedValues[index]);
+      const frameworkMaximumAmount = this.numberFromValue(
+        frameworkMaximumValues[index],
+      );
+      const lot = {
+        identifier: identifiers[index],
+        internalIdentifier: internalIdentifiers[index],
+        title: titles[index],
+        description: descriptions[index],
+        mainClassification: this.wrapDefined(mainClassifications[index]),
+        additionalClassifications: this.wrapDefined(
+          additionalClassifications[index],
+        ),
+        contractNature: contractNatures[index],
+        estimatedValue:
+          estimatedAmount !== undefined || estimatedValueCurrencies[index]
+            ? {
+                amount: this.normalizeEstimatedAmount(estimatedAmount),
+                currency: estimatedValueCurrencies[index] ?? null,
+              }
+            : undefined,
+        frameworkMaximumValue:
+          frameworkMaximumAmount !== undefined ||
+          frameworkMaximumValueCurrencies[index]
+            ? {
+                amount: this.normalizeEstimatedAmount(frameworkMaximumAmount),
+                currency: frameworkMaximumValueCurrencies[index] ?? null,
+              }
+            : undefined,
+        isFrameworkAgreement: this.systemCodeFlagFromValue(
+          frameworkAgreements[index],
+        ),
+        isDps: this.systemCodeFlagFromValue(dpsUsages[index]),
+        durationPeriodValue: durationPeriodValues[index],
+        durationPeriodUnit: durationPeriodUnits[index],
+        deadlineReceiptTender: this.parseTenderDate(
+          this.combineDateAndTime(deadlineDates[index], deadlineTimes[index]),
+        ),
+        documentUrls: this.wrapDefined(documentUrls[index]),
+        submissionUrls: this.wrapDefined(submissionUrls[index]),
+        electronicSubmission: electronicSubmissions[index],
+        submissionLanguages: this.wrapDefined(submissionLanguages[index]),
+        placeOfPerformanceCountries: this.wrapDefined(
+          placeOfPerformanceCountries[index],
+        ),
+        placeOfPerformanceSubdivisions: this.wrapDefined(
+          placeOfPerformanceSubdivisions[index],
+        ),
+        placeOfPerformanceCities: this.wrapDefined(
+          placeOfPerformanceCities[index],
+        ),
+        awardCriteria: this.buildLotAwardCriteria({
+          type: awardCriterionTypes[index],
+          name: awardCriterionNames[index],
+          description: awardCriterionDescriptions[index],
+          weight: awardCriterionWeights[index],
+        }),
+        selectionCriteria: this.buildLotSelectionCriteria({
+          name: selectionCriterionNames[index],
+          description: selectionCriterionDescriptions[index],
+        }),
+        selectionCriteriaSource: selectionCriteriaSources[index],
+      };
+
+      return this.stripUndefinedFields(lot);
+    });
+
+    const nonEmptyLots = lots.filter((lot) => Object.keys(lot).length > 0);
+
+    return nonEmptyLots.length > 0 ? nonEmptyLots : undefined;
   }
 
   private pickCriteria(

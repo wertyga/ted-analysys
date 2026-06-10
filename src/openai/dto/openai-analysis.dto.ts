@@ -1,5 +1,4 @@
-export const GENERAL_TENDER_ANALYSIS_PROMPT_VERSION =
-  'general-tender-analysis-v1';
+import { TenderLotAnalysisInput } from '@/types';
 
 export type AnalysisOutputLanguage = 'en' | 'ru' | 'pl' | 'de' | 'fr';
 export type RiskSeverity = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -20,6 +19,11 @@ export type EstimatedValueSource =
   | 'DOCUMENT_TEXT'
   | 'NOT_FOUND';
 
+export type TenderAnalysisLotSource =
+  | 'STRUCTURED_DATA'
+  | 'XML_NOTICE'
+  | 'DOCUMENT_TEXT';
+
 export type DocumentInputAnalysis = {
   id?: string;
   filename?: string | null;
@@ -36,9 +40,8 @@ export interface GeneralTenderAnalysisInput {
     publicationNumber?: string | null;
     title?: string | null;
     procedureTitle?: string | null;
-    lotTitles?: string[];
     description?: string | null;
-    lotDescriptions?: string[];
+    lots?: TenderLotAnalysisInput[];
     buyerName?: string | null;
     buyerIdentifier?: string | null;
     country?: string | null;
@@ -75,7 +78,6 @@ export interface GeneralTenderAnalysisInput {
       countries?: string[];
       cities?: string[];
     };
-    lotIdentifiers?: string[];
     internalLotIdentifiers?: string[];
     documentUrls?: string[];
     submissionUrls?: string[];
@@ -86,7 +88,6 @@ export interface GeneralTenderAnalysisInput {
       isEuFunded?: boolean;
       electronicSubmission?: string | null;
     };
-    lots?: unknown;
     awardCriteria?: unknown;
     selectionCriteria?: unknown;
     languages?: string[];
@@ -96,6 +97,20 @@ export interface GeneralTenderAnalysisInput {
 
 export interface GeneralTenderAnalysisResult {
   summary: string;
+
+  lots: Array<{
+    identifier: string | null;
+    title: string | null;
+    summary: string;
+    cpvCodes: string[];
+    estimatedValue: {
+      amount: number | null;
+      currency: string | null;
+      description: string | null;
+    } | null;
+    deadline: string | null;
+    source: TenderAnalysisLotSource;
+  }>;
 
   scopeOfWork: string[];
   keyRequirements: string[];

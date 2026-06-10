@@ -2,13 +2,14 @@ import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import axios from 'axios';
 import { Types } from 'mongoose';
 import { CpvCategoryModel, CpvCategory } from './schemas';
+import { string_to_slug } from '@/utils/string';
 import {
   CpvCategoriesResponse,
   CpvCategoryResponseItem,
   CpvCategorySyncResult,
 } from './types';
 
-export const CPV_CODES_LIST_FIELDS = 'code name parentCode level';
+export const CPV_CODES_LIST_FIELDS = 'code name slug parentCode level';
 
 @Injectable()
 export class CpvService {
@@ -68,6 +69,7 @@ export class CpvService {
     const existingCodes = new Set(categories.map((category) => category.code));
     const categoriesWithParents = categories.map((category) => ({
       ...category,
+      slug: this.getCpvCategorySlug(category.name),
       parentCode: this.findCpvParentCode(category.code, existingCodes),
     }));
 
@@ -104,6 +106,7 @@ export class CpvService {
     })
       .select(CPV_CODES_LIST_FIELDS)
       .lean();
+
     const byCode = new Map(
       items.map((item) => [item.code, this.toResponseItem(item)]),
     );
@@ -113,36 +116,30 @@ export class CpvService {
       .filter((item): item is CpvCategoryResponseItem => !!item);
   }
 
-  async resolveCpvCodeIds(codes: string[]): Promise<Types.ObjectId[]> {
+  async resolveCpvCodeIds(codes: string[]): Promise<Types.ObjectId[]>;
+  async resolveCpvCodeIds(
+    codes: string[],
+    fullResponse: true,
+  ): Promise<CpvCategory[]>;
+  async resolveCpvCodeIds(
+    codes: string[],
+    fullResponse = false,
+  ): Promise<Types.ObjectId[] | CpvCategory[]> {
     if (codes.length === 0) {
       return [];
     }
 
     const items = await CpvCategoryModel.find({
       code: { $in: codes },
-    }).select('_id code');
-
-    return items.map((code) => code._id);
-  }
-
-  async findDescendantCodes(codes: string[]): Promise<string[]> {
-    const normalizedCodes = this.normalizeCodes(codes);
-
-    if (normalizedCodes.length === 0) {
-      return [];
-    }
-
-    const descendants = await CpvCategoryModel.find({
-      $or: normalizedCodes.map((code) => ({
-        code: { $regex: `^${this.getSignificantPrefix(code)}` },
-      })),
     })
-      .select('code -_id')
+      .select(CPV_CODES_LIST_FIELDS)
       .lean();
 
-    return Array.from(
-      new Set([...normalizedCodes, ...descendants.map((item) => item.code)]),
-    ).sort();
+    if (fullResponse) {
+      return items;
+    }
+
+    return items.map((code) => code._id);
   }
 
   async findDescendants(codes: string[]): Promise<CpvCategoriesResponse> {
@@ -173,7 +170,9 @@ export class CpvService {
   private normalizeCodes(codes: string[]): string[] {
     return Array.from(
       new Set(
-        codes.map((code) => code.trim()).filter((code) => /^\d{8}$/.test(code)),
+        codes
+          .map((code) => code.toString().trim())
+          .filter((code) => /^\d{8}$/.test(code)),
       ),
     );
   }
@@ -306,6 +305,10 @@ export class CpvService {
 
       return acc;
     }, {} as CpvCategoryResponseItem);
+  }
+
+  private getCpvCategorySlug(name: string): string {
+    return string_to_slug(name);
   }
 
   private escapeRegex(value: string): string {

@@ -1,20 +1,10 @@
 import { CompanyFitScoreKey, TenderDeepAnalysisResult } from '@/types';
 import { normalizeMissingDocuments } from './missing-tender-documents.utils';
+import { TENDER_DEEP_ANALYSIS_CONFIG } from '@/config/tender-deep-analysis.config';
 
-const SCORE_KEYS: CompanyFitScoreKey[] = [
-  'scopeFit',
-  'capabilityFit',
-  'cpvFit',
-  'geographicFit',
-  'languageFit',
-  'eligibilityFit',
-  'certificationFit',
-  'experienceFit',
-  'financialFit',
-  'commercialFit',
-  'deadlineFit',
-  'riskFit',
-];
+const SCORE_KEYS = Object.keys(
+  TENDER_DEEP_ANALYSIS_CONFIG.scoring.companyFitWeights,
+) as CompanyFitScoreKey[];
 
 export function normalizeResultJsonScoreBreakdown(
   resultJson: TenderDeepAnalysisResult,
@@ -35,32 +25,26 @@ export function normalizeResultJsonScoreBreakdown(
       ? mutable.companyFitAnalysis.scoreBreakdown
       : {};
 
-    mutable.scores.scoreBreakdown = SCORE_KEYS.map((criterion) => {
+    mutable.scores.scoreBreakdown = SCORE_KEYS.flatMap((criterion) => {
       const score =
         mutable.companyFitAnalysis[criterion] ??
         legacyCompanyBreakdown[criterion] ??
         mutable.scores[criterion];
 
-      return {
-        criterion,
-        ...(isRecordLike(score)
-          ? score
-          : {
-              score: 0,
-              weight: getScoreWeight(criterion),
-              weightedScore: 0,
-              explanation: '',
-              evidence: ['backend_fallback'],
-              missingInformation: [],
-            }),
-      };
+      return isRecordLike(score)
+        ? [
+            {
+              criterion,
+              ...score,
+            },
+          ]
+        : [];
     });
   }
 
   const scoreItems = Array.isArray(mutable.scores.scoreBreakdown)
     ? mutable.scores.scoreBreakdown
     : [];
-  applySerializedScoreFallbacks(normalized, scoreItems);
   applySerializedScoreExplanations(scoreItems, normalized.language);
   const weightedSum = roundScore(
     scoreItems.reduce((sum, item) => {
@@ -106,48 +90,6 @@ export function normalizeResultJsonScoreBreakdown(
   }
 
   return normalized;
-}
-
-function applySerializedScoreFallbacks(
-  resultJson: TenderDeepAnalysisResult,
-  scoreItems: unknown[],
-): void {
-  const languageFit = findScoreItem(scoreItems, 'languageFit');
-  const financialFit = findScoreItem(scoreItems, 'financialFit');
-  const deadlineFit = findScoreItem(scoreItems, 'deadlineFit');
-
-  if (
-    languageFit &&
-    isDefaultedSerializedScore(languageFit) &&
-    hasStringValue(resultJson, 'ENG')
-  ) {
-    languageFit.score = 100;
-    languageFit.weightedScore = 7;
-    languageFit.explanation =
-      'English is accepted for submission and the company supports English.';
-    languageFit.evidence = ['structured_ted', 'company_profile'];
-  }
-
-  if (
-    financialFit &&
-    isDefaultedSerializedScore(financialFit) &&
-    hasMissingEstimatedValue(resultJson)
-  ) {
-    financialFit.score = 40;
-    financialFit.weightedScore = 2.4;
-    financialFit.explanation =
-      'Estimated value is missing. Company typical contract range is declared, but no reliable comparison is possible.';
-    financialFit.evidence = ['company_profile', 'missing'];
-    financialFit.missingInformation = ['estimated_tender_value'];
-  }
-
-  if (deadlineFit && isDefaultedSerializedScore(deadlineFit)) {
-    deadlineFit.score = 70;
-    deadlineFit.weightedScore = 2.8;
-    deadlineFit.explanation =
-      'Submission deadline is not expired; timing is usable if other blockers were resolved.';
-    deadlineFit.evidence = ['derived'];
-  }
 }
 
 function applySerializedScoreExplanations(
@@ -286,15 +228,40 @@ function normalizeSerializedDocumentationAndClarity(
   mutable.documentationAnalysis.missingDocumentsWarning = hasMissingDocs;
   mutable.documentationAnalysis.documentationCompletenessScore =
     overallDocumentationCompletenessScore;
+  const noticeDocumentsAnalyzedCount =
+    typeof mutable.documentationAnalysis.noticeDocumentsAnalyzedCount ===
+    'number'
+      ? mutable.documentationAnalysis.noticeDocumentsAnalyzedCount
+      : typeof mutable.documentationAnalysis.documentsAnalyzedCount === 'number'
+        ? mutable.documentationAnalysis.documentsAnalyzedCount
+        : 0;
+  const procurementDocumentsAnalyzedCount =
+    typeof mutable.documentationAnalysis.procurementDocumentsAnalyzedCount ===
+    'number'
+      ? mutable.documentationAnalysis.procurementDocumentsAnalyzedCount
+      : 0;
+
   mutable.documentationAnalysis.noticeDocumentsAnalyzedCount =
-    mutable.documentationAnalysis.documentsAnalyzedCount ?? 0;
-  mutable.documentationAnalysis.procurementDocumentsAnalyzedCount = 0;
+    noticeDocumentsAnalyzedCount;
+  mutable.documentationAnalysis.procurementDocumentsAnalyzedCount =
+    procurementDocumentsAnalyzedCount;
   mutable.documentationAnalysis.procurementDocumentsAvailable = hasMissingDocs;
   mutable.documentationAnalysis.procurementDocumentsAccess =
     getSerializedProcurementDocumentsAccess(normalizedMissingDocuments);
-  mutable.documentationAnalysis.documentsAnalyzedCount = 0;
-  mutable.documentationAnalysis.documentsTotalCount =
-    normalizedMissingDocuments.length;
+  const documentsAnalyzedCount =
+    noticeDocumentsAnalyzedCount + procurementDocumentsAnalyzedCount;
+
+  mutable.documentationAnalysis.documentsAnalyzedCount = documentsAnalyzedCount;
+  const existingDocumentsTotalCount =
+    typeof mutable.documentationAnalysis.documentsTotalCount === 'number'
+      ? mutable.documentationAnalysis.documentsTotalCount
+      : 0;
+
+  mutable.documentationAnalysis.documentsTotalCount = Math.max(
+    existingDocumentsTotalCount,
+    documentsAnalyzedCount,
+    normalizedMissingDocuments.length,
+  );
   mutable.scores.documentationCompletenessScore =
     overallDocumentationCompletenessScore;
   mutable.decisionFactors.missingDocumentsImpact = {
@@ -554,16 +521,6 @@ function normalizeSerializedBlockerSeverity(value: unknown): string {
   return ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(normalized)
     ? normalized
     : 'HIGH';
-}
-
-function isDefaultedSerializedScore(item: Record<string, unknown>): boolean {
-  return (
-    item.score === 0 &&
-    (item.source === 'backend_fallback' ||
-      item.explanationCode === 'MISSING_LLM_SCORE' ||
-      (Array.isArray(item.evidence) &&
-        item.evidence.includes('backend_fallback')))
-  );
 }
 
 function compactSerializedBlockers(blockers: unknown[]): unknown[] {
@@ -950,25 +907,6 @@ function severityRank(severity: string): number {
   return 1;
 }
 
-function getScoreWeight(key: CompanyFitScoreKey): number {
-  const weights: Record<CompanyFitScoreKey, number> = {
-    scopeFit: 18,
-    capabilityFit: 16,
-    cpvFit: 8,
-    geographicFit: 8,
-    languageFit: 7,
-    eligibilityFit: 12,
-    certificationFit: 7,
-    experienceFit: 8,
-    financialFit: 6,
-    commercialFit: 4,
-    deadlineFit: 4,
-    riskFit: 2,
-  };
-
-  return weights[key];
-}
-
 function hasStringValue(value: unknown, expected: string): boolean {
   if (typeof value === 'string') {
     return value === expected;
@@ -983,19 +921,6 @@ function hasStringValue(value: unknown, expected: string): boolean {
   }
 
   return Object.values(value).some((item) => hasStringValue(item, expected));
-}
-
-function hasMissingEstimatedValue(
-  resultJson: TenderDeepAnalysisResult,
-): boolean {
-  const estimatedValue = resultJson.tenderIntelligence
-    ?.estimatedValue as unknown;
-
-  if (!isRecordLike(estimatedValue)) {
-    return true;
-  }
-
-  return estimatedValue.amount === null || estimatedValue.amount === undefined;
 }
 
 function hasMissingSelectionCriteria(

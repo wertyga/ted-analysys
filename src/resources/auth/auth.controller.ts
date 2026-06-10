@@ -127,8 +127,8 @@ export class AuthController {
       logger.info('CONFIRM_EMAIL', { email: user.email });
 
       html = replaceTemplateVars(EMAIL_TEMPLATES.ConfirmedEmail, {
-        companyName: user.tempEmail ?? '',
-        origin: getOrigin(req),
+        companyName: user.email ?? '',
+        origin: process.env.USER_DASHBOARD_URL ?? '',
       });
     }
 

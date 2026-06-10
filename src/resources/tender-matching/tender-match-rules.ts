@@ -9,8 +9,7 @@ import {
   HardMatchStatus,
 } from './tender-match.types';
 import fs from 'node:fs';
-
-const MAX_SCORE = 100;
+import { TENDER_MATCHING_CONFIG } from '@/config/tender-matching.config';
 
 export function normalizeCpv(cpv: string): string {
   return cpv.replace(/\D/g, '').slice(0, 8);
@@ -505,7 +504,7 @@ function hardReject(
 }
 
 function clampScore(score: number): number {
-  return Math.max(0, Math.min(score, MAX_SCORE));
+  return Math.max(0, Math.min(score, TENDER_MATCHING_CONFIG.scoring.maxScore));
 }
 
 function normalizeCountry(country: string | null | undefined): string {

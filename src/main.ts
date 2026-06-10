@@ -1,9 +1,14 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import express from 'express';
+import { existsSync } from 'fs';
+import { dirname, isAbsolute, join, normalize } from 'path';
 import { AppModule } from './app.module';
 import mongooseConnect from './mongoose/mongoose';
 import { HttpErrorLoggingFilter } from '@/http-logger/HTTPLogger';
+import { TenderModel } from '@/resources/tenders/schemas';
+import fs from 'node:fs';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
@@ -38,12 +43,56 @@ async function bootstrap() {
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('swagger', app, swaggerDocument);
 
+  const sitemapOutputPath = 'sitemaps/tenders-sitemap.xml';
+  const sitemapOutputAbsolutePath = isAbsolute(sitemapOutputPath)
+    ? normalize(sitemapOutputPath)
+    : join(process.cwd(), sitemapOutputPath);
+  const sitemapOutDir = dirname(sitemapOutputAbsolutePath);
+  const adminOutDir = join(process.cwd(), 'admin', 'out');
+  const adminIndexPath = join(adminOutDir, 'index.html');
+  const expressApp = app.getHttpAdapter().getInstance();
+
+  expressApp.use(
+    '/sitemaps',
+    express.static(sitemapOutDir, {
+      extensions: ['xml'],
+      fallthrough: true,
+      index: false,
+    }),
+  );
+
+  if (existsSync(adminIndexPath)) {
+    expressApp.use('/admin', express.static(adminOutDir));
+    expressApp.get(/^\/admin(?:\/.*)?$/, (_req, res) => {
+      res.sendFile(adminIndexPath);
+    });
+  } else {
+    expressApp.get(/^\/admin(?:\/.*)?$/, (_req, res) => {
+      res.status(503).send('Admin app is not built. Run npm run admin:build.');
+    });
+  }
+
   await app.listen(port, () => {
     console.log(`Server ran on :${port}`);
     console.log(`Swagger docs: http://localhost:${port}/swagger`);
+    console.log(`Admin app: http://localhost:${port}/admin`);
 
-    mongooseConnect(() => {
+    mongooseConnect(async () => {
       console.log(`Connected to ${process.env.DB_NAME} database`);
+
+      const c = await TenderModel.find({
+        placeOfPerformanceCountries: { $exists: true },
+      }).select('placeOfPerformanceCountries');
+
+      const cc = Array.from(
+        new Set(
+          c.flatMap(
+            ({ placeOfPerformanceCountries }) => placeOfPerformanceCountries,
+          ),
+        ),
+      );
+
+      fs.writeFileSync('countries.json', JSON.stringify(cc, null, 2));
     });
   });
 }

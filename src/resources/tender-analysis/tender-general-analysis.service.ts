@@ -1,9 +1,4 @@
-import {
-  forwardRef,
-  Inject,
-  Injectable,
-  RequestTimeoutException,
-} from '@nestjs/common';
+import { Injectable, RequestTimeoutException } from '@nestjs/common';
 import mongoose from 'mongoose';
 import {
   TenderGeneralAnalysisDocument,
@@ -12,53 +7,39 @@ import {
   TenderGeneralAnalysisStatus,
 } from './schemas';
 import { TenderGeneralAnalysisDetailDto } from './dto/tender-general-analysis.dto';
-import { TenderAnalysisService } from './tender-analysis.service';
 import { TenderDocument } from '../tenders/schemas';
 import { TenderGeneralAnalysisBuilder } from './tender-general-analysis.builder';
-import { GENERAL_TENDER_ANALYSIS_PROMPT_VERSION } from '@/openai/dto/openai-analysis.dto';
+import {
+  GeneralTenderAnalysisInput,
+  GeneralTenderAnalysisResult,
+} from '@/openai/dto/openai-analysis.dto';
 import { createHash } from 'crypto';
 import {
+  devLog,
   getSafeErrorMessage,
   isDuplicateKeyError,
   QueueAsyncConcurrency,
   sleep,
 } from '@/utils';
+import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
+import { TENDER_ANALYSIS_CONFIG } from '@/config/tender-analysis.config';
+import { GENERAL_TENDER_ANALYSIS_PROMPT_VERSION } from '@/resources/tender-analysis/general-tender-analysis.prompt';
 
-const ANALYSIS_WAIT_TIMEOUT_MS = 10 * 60 * 1000;
-const ANALYSIS_WAIT_INTERVAL_MS = 1000;
-const BASE_ANALYSIS_CONCURRENCY = 20;
-const FREE_BASIC_ANALYSIS_FIELDS = [
-  'summary',
-  {
-    name: 'scopeOfWork',
-    len: 2,
-  },
-  {
-    name: 'keyRequirements',
-    len: 3,
-  },
-  { name: 'risks', len: 2 },
-  'deadlines',
-  'estimatedValue',
-  'complexityScore',
-  'opportunityScore',
-  'confidenceScore',
-  'generalRecommendation',
-  'analysisDepth',
-  'documentsAnalyzedCount',
-  'missingDocumentsWarning',
-] as const;
+export interface TenderAnalysisExecutionResult {
+  result: GeneralTenderAnalysisResult;
+  promptVersion: string;
+  model: string;
+}
 
 @Injectable()
 export class TenderGeneralAnalysisService {
   private readonly baseAnalysisQueue = new QueueAsyncConcurrency(
-    BASE_ANALYSIS_CONCURRENCY,
+    TENDER_ANALYSIS_CONFIG.baseAnalysis.concurrency,
   );
 
   constructor(
-    @Inject(forwardRef(() => TenderAnalysisService))
-    private readonly tenderAnalysisService: TenderAnalysisService,
     private readonly analysisBuilder: TenderGeneralAnalysisBuilder,
+    private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
   ) {}
 
   async fetchBaseAnalysis(
@@ -69,11 +50,9 @@ export class TenderGeneralAnalysisService {
       const analysisInput =
         await this.analysisBuilder.buildAnalysisInput(tender);
 
-      const execution =
-        await this.tenderAnalysisService.analyzeTenderGeneral(analysisInput);
+      const execution = await this.analyzeTenderGeneral(analysisInput);
 
-      const sourceHash =
-        this.tenderAnalysisService.getBaseAnalysisSourceHash(tender);
+      const sourceHash = this.buildGeneralTenderAnalysisSourceHash(tender);
 
       const result = execution.result;
 
@@ -87,8 +66,6 @@ export class TenderGeneralAnalysisService {
 
             resultJson: result,
             summary: result.summary,
-
-            estimatedValue: result.estimatedValue,
 
             complexityScore: result.complexityScore,
             opportunityScore: result.opportunityScore,
@@ -105,6 +82,7 @@ export class TenderGeneralAnalysisService {
           },
           $unset: {
             errorMessage: '',
+            estimatedValue: '',
           },
         },
       );
@@ -127,8 +105,7 @@ export class TenderGeneralAnalysisService {
     isForceBaseAnalysis = false,
   ): Promise<TenderGeneralAnalysisDocument> {
     const tenderObjectId = tender._id as mongoose.Types.ObjectId;
-    const sourceHash =
-      this.tenderAnalysisService.getBaseAnalysisSourceHash(tender);
+    const sourceHash = this.buildGeneralTenderAnalysisSourceHash(tender);
 
     const existingBaseAnalysis = await TenderGeneralAnalysisModel.findOne({
       tenderId: tender.id,
@@ -190,7 +167,7 @@ export class TenderGeneralAnalysisService {
 
   async getFinishedGeneralAnalysis(tender: TenderDocument) {
     let analysis = await this.ensureAnalysisForTender(tender);
-    const waitUntil = Date.now() + ANALYSIS_WAIT_TIMEOUT_MS;
+    const waitUntil = Date.now() + TENDER_ANALYSIS_CONFIG.wait.timeoutMs;
 
     while (analysis.status !== TenderGeneralAnalysisStatus.DONE) {
       if (Date.now() >= waitUntil) {
@@ -211,7 +188,7 @@ export class TenderGeneralAnalysisService {
         );
       }
 
-      await sleep(ANALYSIS_WAIT_INTERVAL_MS);
+      await sleep(TENDER_ANALYSIS_CONFIG.wait.intervalMs);
     }
 
     return analysis;
@@ -256,7 +233,7 @@ export class TenderGeneralAnalysisService {
 
     const resultJson: Partial<T> = {};
 
-    FREE_BASIC_ANALYSIS_FIELDS.forEach((field) => {
+    TENDER_ANALYSIS_CONFIG.freeBasicAnalysisFields.forEach((field) => {
       if (typeof field === 'string') {
         resultJson[field] = analysis.resultJson[field];
       }
@@ -275,18 +252,34 @@ export class TenderGeneralAnalysisService {
 
   buildGeneralTenderAnalysisSourceHash(
     tender: Pick<TenderDocument, 'sourceHash'>,
-    providerName: string,
-    model: string,
   ): string {
     return createHash('sha256')
       .update(
         JSON.stringify({
           promptVersion: GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
-          provider: providerName,
+          provider: 'deepseek',
           tenderSourceHash: tender.sourceHash,
-          model,
+          model: this.deepSeekAnalysisService.getGeneralAnalysisModel(),
         }),
       )
       .digest('hex');
+  }
+
+  private async analyzeTenderGeneral(
+    input: GeneralTenderAnalysisInput,
+  ): Promise<TenderAnalysisExecutionResult> {
+    const result =
+      await this.deepSeekAnalysisService.analyzeTenderGeneral(input);
+
+    devLog(
+      `General tender analysis completed: tender=${input.tender.id}`,
+      TenderGeneralAnalysisService.name,
+    );
+
+    return {
+      result,
+      promptVersion: GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
+      model: this.deepSeekAnalysisService.getGeneralAnalysisModel(),
+    };
   }
 }

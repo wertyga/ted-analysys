@@ -10,9 +10,7 @@ import { TedOpenTendersCollectorService } from '@/resources/ted-open-tenders-col
 import { TenderMatchSource } from '@/resources/tender-matching/tender-match.types';
 import { TenderMatchNotificationsService } from '@/resources/tender-match-notifications/tender-match-notifications.service';
 import { SimilarContractsService } from '@/resources/similar-contracts/similar-contracts.service';
-
-const RECENT_TENDERS_CRON = '0 1 * * *';
-const ALL_COMPETITION_TENDERS_CRON = '0 3 * * *';
+import { TENDERS_CRON_CONFIG } from '@/config/tenders-cron.config';
 
 @Injectable()
 export class TendersCronService {
@@ -27,20 +25,10 @@ export class TendersCronService {
     private readonly tenderMatchingService: TenderMatchingService,
     private readonly tenderMatchNotificationsService: TenderMatchNotificationsService,
     private readonly similarContractsService: SimilarContractsService,
-  ) {
-    // setTimeout(async () => {
-    //   const result = await new TedOpenTendersCollectorService(
-    //     this.tedSearchService,
-    //     this.tendersService,
-    //     this.similarContractsService,
-    //   ).collectResultTendersHistoryFromTed();
-    //
-    //   await logger.info('TED_ALL_RESULT_COLLECTED', result);
-    // }, 3000);
-  }
+  ) {}
 
-  @Cron(ALL_COMPETITION_TENDERS_CRON, {
-    timeZone: 'Europe/Warsaw',
+  @Cron(TENDERS_CRON_CONFIG.cron.allCompetitionTenders, {
+    timeZone: TENDERS_CRON_CONFIG.timeZone,
   })
   async gatherAllCompetitionTenders(): Promise<void> {
     if (this.isGatheringAllCompetitionTenders) {
@@ -83,8 +71,8 @@ export class TendersCronService {
     }
   }
 
-  @Cron(RECENT_TENDERS_CRON, {
-    timeZone: 'Europe/Warsaw',
+  @Cron(TENDERS_CRON_CONFIG.cron.recentTenders, {
+    timeZone: TENDERS_CRON_CONFIG.timeZone,
   })
   async gatherRecentCompetitionTenders(): Promise<void> {
     if (this.isGatheringRecentTenders) {

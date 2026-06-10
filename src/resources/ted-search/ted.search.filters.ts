@@ -198,16 +198,6 @@ export class TedSearchFilters {
   private async buildContractAwardFilter(
     filters: TedTenderSearchRequestDto,
   ): Promise<MongoFilter | undefined> {
-    const hasRange = !!filters.contractAwardFrom || !!filters.contractAwardTo;
-
-    if (!hasRange) {
-      if (filters.currency?.length) {
-        return { 'estimatedValue.currency': { $in: filters.currency } };
-      }
-
-      return undefined;
-    }
-
     if (!filters.currency?.length) {
       const amountFilter = this.buildNumberRangeFilter(
         filters.contractAwardFrom,
@@ -215,7 +205,9 @@ export class TedSearchFilters {
       );
 
       return amountFilter
-        ? { 'estimatedValue.amount': amountFilter }
+        ? this.buildEstimatedValueWithMissingEurFilter({
+            'estimatedValue.amount': amountFilter,
+          })
         : undefined;
     }
 
@@ -237,9 +229,17 @@ export class TedSearchFilters {
       return undefined;
     }
 
+    return this.buildEstimatedValueWithMissingEurFilter(
+      validRanges.length === 1 ? validRanges[0] : { $or: validRanges },
+    );
+  }
+
+  private buildEstimatedValueWithMissingEurFilter(
+    valueFilter: MongoFilter,
+  ): MongoFilter {
     return {
       $or: [
-        ...(validRanges.length === 1 ? validRanges : [{ $or: validRanges }]),
+        valueFilter,
         { estimatedValueEur: null },
         { estimatedValueEur: { $exists: false } },
       ],

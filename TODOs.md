@@ -1,11 +1,35 @@
-- FE to implement notification user's settings
-- FE - deep analysis isOutOfDate
-- FE - deep analysis forceUpdate
-- FE - self - withDescription
+[//]: # (- FE to implement notification user's settings)
 
-- BE - Tidy up tender-matching.service
-- BE - optimize documents text
-- BE - deep analysis restriction - pro/business
+[//]: # (- FE - deep analysis isOutOfDate)
+
+[//]: # (- FE - awardCriteria)
+
+[//]: # (- FE - buyer fields - может отдельно показывать)
+
+[//]: # (- FE - estimatedValue - если нет в тендере, вытягивать из generalAnalysis)
+
+[//]: # (- FE - lots &#40;tender -> generalAnalysis&#41;)
+
+[//]: # (- FE - generalAnalysis -> scopeOfWork)
+
+[//]: # (- FE - generalAnalysis -> eligibilityCriteria)
+
+[//]: # (- FE - generalAnalysis -> awardCriteria)
+
+[//]: # (- FE - tender-match - Tender details are currently unavailable - show a tender info)
+
+[//]: # (- FE - tender-match - показывать isOutDated есть дедлайн кончился)
+
+- FE - generalanalysis.resultJson.lots (и в других местах) - резолвить cpvCodes
+- FE - Expired Deadline - если нет, показывать что нет
+- FE - generalanalysis.status:"PROCESSING" - loading
+
+- BE - Tidy up tender-matching.service ??
+- BE - optimize documents text ??
+- BE - collect result notices 3 years old (approx. 1kk)
+- BE - подумать про base analysis winners
+- BE - cron fetch result notices
+- BE - generalanalysis.resultJson.estimatedValue - добавить EUR
 
 buyerProfile: https://ch-giorgi.sudest-marchespublics.com
 пробовать доставать portalUrl для deep analysis

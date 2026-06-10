@@ -117,33 +117,32 @@ export abstract class BaseLlmAnalysisService {
     prompt: string,
     context: string,
     purpose: LlmAnalysisPurpose,
+    attempt = 1,
   ): Promise<string> {
     let lastError: unknown;
 
-    for (let attempt = 0; attempt <= this.retryDelaysMs.length; attempt += 1) {
-      try {
-        return await this.createProviderJsonResponse(prompt, context, purpose);
-      } catch (error: unknown) {
-        lastError = error;
-        this.logger.warn(
-          `${this.providerName} createJsonResponse failed on attempt ${attempt + 1}: ${getSafeErrorMessage(
-            error,
+    try {
+      return await this.createProviderJsonResponse(prompt, context, purpose);
+    } catch (error: unknown) {
+      lastError = error;
+      this.logger.warn(
+        `${this.providerName} createJsonResponse failed on attempt ${attempt + 1}: ${getSafeErrorMessage(
+          error,
+        )}`,
+      );
+
+      if (attempt >= this.retryDelaysMs.length) {
+        throw new ServiceUnavailableException(
+          `${this.providerName} tender analysis failed: ${getSafeErrorMessage(
+            lastError,
           )}`,
         );
-
-        if (attempt === this.retryDelaysMs.length) {
-          break;
-        }
-
-        await this.delay(this.retryDelaysMs[attempt]);
       }
-    }
 
-    throw new ServiceUnavailableException(
-      `${this.providerName} tender analysis failed: ${getSafeErrorMessage(
-        lastError,
-      )}`,
-    );
+      await this.delay(this.retryDelaysMs[attempt]);
+
+      return this.createJsonResponse(prompt, context, purpose, attempt + 1);
+    }
   }
 
   protected buildTenderContext(input: GeneralTenderAnalysisInput): string {
@@ -197,6 +196,7 @@ export abstract class BaseLlmAnalysisService {
 
     return {
       summary: this.requireString(value, 'summary'),
+      lots: this.requireLots(value.lots),
       scopeOfWork: this.requireStringArray(value, 'scopeOfWork'),
       keyRequirements: this.requireStringArray(value, 'keyRequirements'),
       eligibilityCriteria: this.requireStringArray(
@@ -323,6 +323,102 @@ export abstract class BaseLlmAnalysisService {
         description: this.requireString(item, 'description'),
       };
     });
+  }
+
+  protected requireLots(value: unknown): GeneralTenderAnalysisResult['lots'] {
+    if (!Array.isArray(value)) {
+      throw new Error(
+        `${this.providerName} analysis field lots must be an array`,
+      );
+    }
+
+    return value.map((item) => {
+      if (!isRecord(item)) {
+        throw new Error(
+          `${this.providerName} analysis lot item must be an object`,
+        );
+      }
+
+      const identifier = item.identifier;
+      const title = item.title;
+      const estimatedValue = item.estimatedValue;
+      const deadline = item.deadline;
+      const source = item.source;
+
+      if (identifier !== null && typeof identifier !== 'string') {
+        throw new Error(
+          `${this.providerName} analysis lot identifier must be string or null`,
+        );
+      }
+
+      if (title !== null && typeof title !== 'string') {
+        throw new Error(
+          `${this.providerName} analysis lot title must be string or null`,
+        );
+      }
+
+      if (deadline !== null && typeof deadline !== 'string') {
+        throw new Error(
+          `${this.providerName} analysis lot deadline must be string or null`,
+        );
+      }
+
+      if (
+        source !== 'STRUCTURED_DATA' &&
+        source !== 'XML_NOTICE' &&
+        source !== 'DOCUMENT_TEXT'
+      ) {
+        throw new Error(`${this.providerName} analysis lot source is invalid`);
+      }
+
+      return {
+        identifier,
+        title,
+        summary: this.requireString(item, 'summary'),
+        cpvCodes: this.requireStringArray(item, 'cpvCodes'),
+        estimatedValue: this.requireLotEstimatedValue(estimatedValue),
+        deadline,
+        source,
+      };
+    });
+  }
+
+  protected requireLotEstimatedValue(
+    value: unknown,
+  ): GeneralTenderAnalysisResult['lots'][number]['estimatedValue'] {
+    if (value === null) {
+      return null;
+    }
+
+    if (!isRecord(value)) {
+      throw new Error(
+        `${this.providerName} analysis lot estimatedValue must be object or null`,
+      );
+    }
+
+    const amount = value.amount;
+    const currency = value.currency;
+    const description = value.description;
+
+    if (amount !== null && typeof amount !== 'number') {
+      throw new Error(
+        `${this.providerName} analysis lot estimatedValue.amount is invalid`,
+      );
+    }
+
+    if (currency !== null && typeof currency !== 'string') {
+      throw new Error(
+        `${this.providerName} analysis lot estimatedValue.currency is invalid`,
+      );
+    }
+
+    if (description !== null && typeof description !== 'string') {
+      throw new Error(
+        `${this.providerName} analysis lot estimatedValue.description is invalid`,
+      );
+    }
+
+    return { amount, currency, description };
   }
 
   protected requireEstimatedValue(
