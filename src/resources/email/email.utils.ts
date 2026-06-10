@@ -53,7 +53,7 @@ export type EmailReplaceData<T extends EMAIL_TEMPLATES> = {
   brandName?: string;
 };
 
-export const getEmailBrandName = () => process.env.APP_NAME;
+export const getEmailBrandName = () => process.env.APP_NAME ?? '';
 
 export const getEmailTemplate = (type: EMAIL_TEMPLATES) => {
   let filename = '';
