@@ -455,7 +455,7 @@ export default function AdminApp() {
     setMessage('');
 
     try {
-      const result = await request<SitemapResult>('/adm/tech', {
+      const result = await request<SitemapResult>('/adm/tech/sitemap', {
         method: 'POST',
         body: JSON.stringify({
           domain: sitemapDomain,

@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import CPV_INDUSTRY_SLUGS from './cpv-slug.json';
 import { existsSync } from 'fs';
 import { mkdir, writeFile } from 'fs/promises';
 import {
@@ -37,9 +38,11 @@ export class SitemapTechService {
       .select('id publicationNumber updatedAt')
       .lean<SitemapTender[]>()
       .exec();
-    const urls = tenders.flatMap((tender) =>
+    const tenderUrls = tenders.flatMap((tender) =>
       this.buildTenderSitemapUrls(domain, locales, tender),
     );
+    const industryUrls = this.buildCpvIndustrySitemapUrls(domain, locales);
+    const urls = [...tenderUrls, ...industryUrls];
     const sitemapFiles = this.buildSitemapFiles(outputPath, urls);
 
     await mkdir(dirname(outputPath), { recursive: true });
@@ -68,6 +71,7 @@ export class SitemapTechService {
       outputPath,
       downloadUrl: '/adm/tech/sitemap/download',
       tendersCount: tenders.length,
+      industriesCount: CPV_INDUSTRY_SLUGS.length,
       urlsCount: urls.length,
       sitemapFilesCount: sitemapFiles.length,
       sitemapFiles: sitemapFiles.map((file) => ({
@@ -128,6 +132,14 @@ export class SitemapTechService {
       loc: `${domain}/${locale}/tenders/${encodeURIComponent(tenderId)}`,
       lastmod: tender.updatedAt?.toISOString(),
     }));
+  }
+
+  private buildCpvIndustrySitemapUrls(domain: string, locales: string[]) {
+    return locales.flatMap((locale) =>
+      CPV_INDUSTRY_SLUGS.map((slug) => ({
+        loc: `${domain}/${locale}/industries/${encodeURIComponent(slug)}`,
+      })),
+    );
   }
 
   private buildSitemapXml(urls: Array<{ loc: string; lastmod?: string }>) {
