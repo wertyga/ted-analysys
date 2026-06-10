@@ -6,7 +6,7 @@ import { CurrencyExchangeRatesModule } from '@/resources/currency-exchange-rates
 import { TendersCronService } from './tenders-cron.service';
 import { TendersCronTechService } from './tenders-cron.tech.service';
 import { TenderMatchNotificationsModule } from '@/resources/tender-match-notifications/tender-match-notifications.module';
-import { SimilarContractsModule } from '@/resources/similar-contracts/similar-contracts.module';
+import { AwardTenderModule } from '@/resources/award-tender/award-tender.module';
 
 @Module({
   imports: [
@@ -15,7 +15,7 @@ import { SimilarContractsModule } from '@/resources/similar-contracts/similar-co
     TenderMatchingModule,
     TenderMatchNotificationsModule,
     CurrencyExchangeRatesModule,
-    SimilarContractsModule,
+    AwardTenderModule,
   ],
   providers: [TendersCronService, TendersCronTechService],
 })

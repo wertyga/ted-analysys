@@ -182,10 +182,6 @@ export interface TenderModelType extends Model<TenderDocument> {
   serializeList(tender: TenderSerializable): TenderListDto;
 }
 
-export type TenderWithWishlist = Tender & {
-  isInWishlist: boolean;
-};
-
 const TenderSchema = new Schema<TenderDocument, TenderModelType>(
   {
     id: { type: String, required: true, unique: true, index: true },

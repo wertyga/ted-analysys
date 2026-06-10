@@ -11,7 +11,6 @@ export interface XmlAwardWinner {
   postCode?: string;
   size?: string;
   listed?: string;
-  selectionStatus?: string;
   decisionDate?: string;
 }
 
@@ -64,7 +63,6 @@ export function extractXmlAwardWinners(
 
   const $ = cheerio.load(xml, { xmlMode: true });
   const organizations = extractXmlOrganizations($);
-  const selectionStatus = extractXmlWinnerSelectionStatus($);
   const decisionDate = extractXmlAwardDecisionDate($);
   const winners: XmlAwardWinner[] = [];
 
@@ -106,7 +104,6 @@ export function extractXmlAwardWinners(
       city: organization?.city,
       postCode: organization?.postCode,
       size: organization?.size,
-      selectionStatus,
       decisionDate,
     };
 
@@ -130,31 +127,6 @@ function getAwardValuePriority(element: AnyNode): number {
   }
 
   return 2;
-}
-
-function extractXmlWinnerSelectionStatus(
-  $: cheerio.CheerioAPI,
-): string | undefined {
-  let result: string | undefined;
-
-  $('*').each((_, element) => {
-    if (
-      result !== undefined ||
-      getElementLocalName(element).toLowerCase() !== 'tenderresultcode' ||
-      getXmlAttr($, element, 'listName')?.toLowerCase() !==
-        'winner-selection-status'
-    ) {
-      return;
-    }
-
-    const text = $(element).text().trim();
-
-    if (text.length > 0) {
-      result = text;
-    }
-  });
-
-  return result;
 }
 
 function extractXmlAwardDecisionDate(
@@ -196,10 +168,10 @@ function extractXmlAwardDecisionDate(
 
 function extractXmlOrganizations(
   $: cheerio.CheerioAPI,
-): Map<string, Omit<XmlAwardWinner, 'selectionStatus' | 'decisionDate'>> {
+): Map<string, Omit<XmlAwardWinner, 'decisionDate'>> {
   const organizations = new Map<
     string,
-    Omit<XmlAwardWinner, 'selectionStatus' | 'decisionDate'>
+    Omit<XmlAwardWinner, 'decisionDate'>
   >();
 
   $('*').each((_, element) => {

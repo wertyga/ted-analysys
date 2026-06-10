@@ -44,7 +44,6 @@ export interface TedTenderSearchFilters {
 export function buildTedTenderSearchQuery(
   filters: TedTenderSearchFilters,
 ): string {
-  console.log({ filters });
   const {
     text,
     cpvCodes,

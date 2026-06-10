@@ -14,11 +14,11 @@ import {
 import { TenderDocument } from '@/resources/tenders/schemas';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { isRecord } from '@/utils';
-import { SimilarContractsService } from '@/resources/similar-contracts/similar-contracts.service';
+import { AwardTenderService } from '@/resources/award-tender/award-tender.service';
 import { searchTendersDefaultFields } from '@/resources/ted-search/utils';
 import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
 import { TED_OPEN_TENDERS_COLLECTOR_CONFIG } from '@/config/ted-open-tenders-collector.config';
-import { AWARD_HISTORY_FIELDS } from '@/config/similar-contracts.config';
+import { AWARD_HISTORY_FIELDS } from '@/config/award-tender.config';
 
 export interface TedOpenTendersCollectorOptions {
   pageLimit?: number;
@@ -55,7 +55,7 @@ export class TedOpenTendersCollectorService {
   constructor(
     private readonly tedSearchService: TedSearchService,
     private readonly tendersService: TendersService,
-    private readonly similarContractsService?: SimilarContractsService,
+    private readonly awardTenderService?: AwardTenderService,
   ) {}
 
   async collectOpenTendersFromTed(
@@ -90,10 +90,10 @@ export class TedOpenTendersCollectorService {
   }
 
   async collectResultTendersHistoryFromTed(
-    options: TedOpenTendersCollectorOptions = {},
+    onChangedTenders?: TedOpenTendersCollectorOptions['onChangedTenders'],
   ): Promise<TedOpenTendersCollectorResult> {
-    if (!this.similarContractsService) {
-      throw new Error('SimilarContractsService is required to collect results');
+    if (!this.awardTenderService) {
+      throw new Error('AwardTenderService is required to collect results');
     }
 
     const publicationDateFrom = new Date();
@@ -123,18 +123,21 @@ export class TedOpenTendersCollectorService {
       saveNotices: async (notices) => {
         const normalizedTenders = await Promise.all(
           notices.map((notice) => {
-            return this.similarContractsService!.normalizeResultTender(notice);
+            return this.awardTenderService!.normalizeResultTender(notice);
           }),
         );
 
         const saveResult = await Promise.all(
-          normalizedTenders.map((tender) =>
-            this.similarContractsService!.upsertAwardTender(tender),
+          normalizedTenders.map(({ normalizedAward, winners }) =>
+            this.awardTenderService!.upsertAwardTender(
+              normalizedAward,
+              winners,
+            ),
           ),
         );
 
         if (saveResult.length > 0) {
-          await options.onChangedTenders?.(saveResult);
+          await onChangedTenders?.(saveResult);
         }
 
         return {

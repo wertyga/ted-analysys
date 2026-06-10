@@ -1,20 +1,10 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
 import { TedContractNature } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
-import { TenderDocumentsLinks } from '@/resources/tenders/schemas';
+import { TenderDocumentsLinks, TenderLot } from '@/resources/tenders/schemas';
 import { filterModel } from '@/utils';
+import { Contractor, ContractorDocument } from '@/resources/contractor/schemas';
 
-export interface AwardTenderWinner {
-  name?: string;
-  identifier?: string;
-  country?: string;
-  countrySub?: string;
-  city?: string;
-  postCode?: string;
-  size?: string;
-  listed?: string;
-  selectionStatus?: string;
-  decisionDate?: Date;
-}
+export type AwardTenderWinner = Contractor;
 
 export interface AwardTender {
   _id: string;
@@ -34,10 +24,13 @@ export interface AwardTender {
   buyerIdentifier?: string;
   buyerCountry?: string;
   buyerCity?: string;
+  buyerMainActivities?: string[];
   publicationDate?: Date;
   dispatchDate?: Date;
+  submissionDeadline?: Date;
+  deadlineReceiptTender?: Date;
+  plannedEndDate?: Date;
   contractNature?: TedContractNature | string;
-  cpvDivision: string[];
   cpvCodes?: string[];
   classificationCpv?: unknown[];
   mainClassificationProc?: unknown[];
@@ -48,12 +41,14 @@ export interface AwardTender {
     currency: string | null;
   };
   estimatedValueEur?: number | null;
-  winners: AwardTenderWinner[];
+  awardDecisionDate?: Date;
+  placeOfPerformanceCountries?: string[];
+  placeOfPerformanceCities?: string[];
+  lots?: TenderLot[];
+  internalLotIdentifiers?: string[];
+  winners: Array<mongoose.Types.ObjectId | ContractorDocument>;
   links?: TenderDocumentsLinks;
-  rawNotice?: Record<string, unknown>;
   sourceHash: string;
-  searchHash?: string;
-  searchCacheExpiresAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -65,22 +60,6 @@ export type AwardTenderSerializable = AwardTenderDocument | AwardTenderRecord;
 export interface AwardTenderModelType extends Model<AwardTenderDocument> {
   toDetailDto(tender: AwardTenderSerializable): Partial<AwardTender>;
 }
-
-const AwardTenderWinnerSchema = new Schema<AwardTenderWinner>(
-  {
-    name: { type: String, trim: true, default: undefined },
-    identifier: { type: String, trim: true, default: undefined },
-    country: { type: String, trim: true, uppercase: true, default: undefined },
-    countrySub: { type: String, trim: true, default: undefined },
-    city: { type: String, trim: true, default: undefined },
-    postCode: { type: String, trim: true, default: undefined },
-    size: { type: String, trim: true, default: undefined },
-    listed: { type: String, trim: true, default: undefined },
-    selectionStatus: { type: String, trim: true, default: undefined },
-    decisionDate: { type: Date, default: undefined },
-  },
-  { _id: false },
-);
 
 const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
   {
@@ -100,8 +79,14 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
     buyerIdentifier: String,
     buyerCountry: { type: String, index: true },
     buyerCity: String,
+    buyerMainActivities: {
+      type: [String],
+    },
     publicationDate: { type: Date, index: true },
     dispatchDate: Date,
+    submissionDeadline: { type: Date, index: true },
+    deadlineReceiptTender: Date,
+    plannedEndDate: { type: Date, index: true },
     contractNature: {
       type: String,
       enum: TedContractNature,
@@ -132,15 +117,18 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
       currency: { type: String, default: null },
     },
     estimatedValueEur: { type: Number, default: null, index: true },
+    awardDecisionDate: { type: Date, index: true },
+    placeOfPerformanceCountries: { type: [String] },
+    placeOfPerformanceCities: { type: [String] },
+    lots: { type: [Schema.Types.Mixed] },
+    internalLotIdentifiers: { type: [String] },
     winners: {
-      type: [AwardTenderWinnerSchema],
+      type: [Schema.Types.ObjectId],
+      ref: 'Contractor',
       default: [],
     },
     links: Schema.Types.Mixed,
-    searchHash: { type: String, index: true },
-    searchCacheExpiresAt: {
-      type: Date,
-    },
+    sourceHash: { type: String, required: true, index: true },
   },
   {
     collection: 'award_tenders',
@@ -149,7 +137,7 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
 );
 
 AwardTenderSchema.index({
-  cpvDivision: 1,
+  cpvCodes: 1,
   buyerCountry: 1,
   contractNature: 1,
   publicationDate: -1,
@@ -163,13 +151,12 @@ AwardTenderSchema.index(
 );
 AwardTenderSchema.index({ 'winners.identifier': 1 });
 AwardTenderSchema.index({ 'winners.name': 1 });
-AwardTenderSchema.index({ searchCacheExpiresAt: 1 }, { expireAfterSeconds: 0 });
 
 AwardTenderSchema.statics.toDetailDto = function (
   tender: AwardTenderSerializable,
 ) {
   return filterModel(tender, {
-    excludeFields: ['searchHash', 'searchCacheExpiresAt', 'links', 'cpvCodes'],
+    excludeFields: ['links', 'cpvCodes'],
   });
 };
 

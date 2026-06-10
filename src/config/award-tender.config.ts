@@ -1,4 +1,4 @@
-export const SIMILAR_CONTRACTS_CONFIG = {
+export const AWARD_TENDER_CONFIG = {
   historyYearsBack: 3,
   awardTenderSearchLimit: 1,
   awardSearchCacheTtlMs: 7 * 24 * 60 * 60 * 1000,
@@ -9,8 +9,11 @@ export const AWARD_HISTORY_FIELDS = [
   'publication-number',
   'notice-type',
   'notice-subtype',
+  'notice-version',
   'notice-title',
   'publication-date',
+  'dispatch-date',
+  'deadline',
 
   'title-proc',
   'description-proc',
@@ -58,7 +61,11 @@ export const AWARD_HISTORY_FIELDS = [
   'contract-nature-main-lot',
   'estimated-value-lot',
   'estimated-value-cur-lot',
+  'contract-duration-end-date-lot',
+  'deadline-receipt-tender-date-lot',
+  'deadline-receipt-tender-time-lot',
   'place-of-performance-country-lot',
+  'place-of-performance-subdiv-lot',
   'place-of-performance-city-lot',
 
   'winner-name',
@@ -66,6 +73,7 @@ export const AWARD_HISTORY_FIELDS = [
   'winner-country',
   'winner-country-sub',
   'winner-city',
+  'winner-post-code',
   'winner-size',
   'winner-listed',
   'winner-selection-status',

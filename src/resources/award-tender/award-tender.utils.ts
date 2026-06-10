@@ -7,6 +7,5 @@ export const winnerFields = [
   'winner-post-code',
   'winner-size',
   'winner-listed',
-  'winner-selection-status',
   'winner-decision-date',
 ];

@@ -18,7 +18,7 @@ import {
   type TedEligibleCountryCode,
 } from '@/resources/codelist';
 
-export class SimilarContractAwardsRequestDto {
+export class AwardTenderAwardsRequestDto {
   @ApiProperty({
     type: [String],
     example: ['72000000', '48000000'],
