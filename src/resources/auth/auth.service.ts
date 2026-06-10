@@ -10,7 +10,10 @@ import { CreateUserDto, OauthSignInDto, SignInUserDto } from './auth.dto';
 import { gfEmail, gfErrors } from '@/goldfish';
 import { EmailService } from '@/resources/email/email.service';
 import { EMAIL_TEMPLATES } from '@/resources/email/type';
-import { getEmailTemplate } from '@/resources/email/email.utils';
+import {
+  getEmailBrandName,
+  getEmailTemplate,
+} from '@/resources/email/email.utils';
 import { AuthServiceUtils } from './auth.service.utils';
 
 @Injectable()
@@ -64,6 +67,7 @@ export class AuthService {
     const isRegister = emailTemplate === EMAIL_TEMPLATES.ConfirmEmail;
 
     const html = getEmailTemplate(emailTemplate)
+      .replace(/{{brandName}}/g, getEmailBrandName())
       .replace('{{confirmLink}}', recoveryLink)
       .replace('{{recoveryToken}}', replaceData.recoveryToken)
       .replace('{{companyName}}', replaceData.companyName);

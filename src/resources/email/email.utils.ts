@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const emailVariables = {
+  brandName: '{{brandName}}',
   companyName: '{{companyName}}',
   confirmLink: '{{confirmLink}}',
   origin: '{{origin}}',
@@ -48,7 +49,11 @@ export type EmailReplaceData<T extends EMAIL_TEMPLATES> = {
     TEmailTemplatesCompare[T],
     keyof typeof emailVariables
   >]: string;
+} & {
+  brandName?: string;
 };
+
+export const getEmailBrandName = () => process.env.APP_NAME;
 
 export const getEmailTemplate = (type: EMAIL_TEMPLATES) => {
   let filename = '';
@@ -90,10 +95,12 @@ export const replaceTemplateVars = <T extends EMAIL_TEMPLATES>(
 ) => {
   let stringTemplate = getEmailTemplate(template as EMAIL_TEMPLATES);
 
-  Object.entries(data || {}).forEach(([key, value]: [string, string]) => {
-    const regExp = new RegExp(emailVariables[key], 'g');
-    stringTemplate = stringTemplate.replace(regExp, value);
-  });
+  Object.entries({ brandName: getEmailBrandName(), ...(data || {}) }).forEach(
+    ([key, value]: [string, string]) => {
+      const regExp = new RegExp(emailVariables[key], 'g');
+      stringTemplate = stringTemplate.replace(regExp, value);
+    },
+  );
 
   return stringTemplate;
 };
