@@ -7,6 +7,8 @@ import { dirname, isAbsolute, join, normalize } from 'path';
 import { AppModule } from './app.module';
 import mongooseConnect from './mongoose/mongoose';
 import { HttpErrorLoggingFilter } from '@/http-logger/HTTPLogger';
+import { TenderModel } from '@/resources/tenders/schemas';
+import fs from 'node:fs';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
@@ -77,6 +79,20 @@ async function bootstrap() {
 
     mongooseConnect(async () => {
       console.log(`Connected to ${process.env.DB_NAME} database`);
+
+      const c = await TenderModel.find({
+        placeOfPerformanceCountries: { $exists: true },
+      }).select('placeOfPerformanceCountries');
+
+      const cc = Array.from(
+        new Set(
+          c.flatMap(
+            ({ placeOfPerformanceCountries }) => placeOfPerformanceCountries,
+          ),
+        ),
+      );
+
+      fs.writeFileSync('countries.json', JSON.stringify(cc, null, 2));
     });
   });
 }

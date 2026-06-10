@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import CPV_INDUSTRY_SLUGS from './cpv-slug.json';
+import COUNTRY_SLUGS from './countries-slug.json';
 import { existsSync } from 'fs';
 import { mkdir, writeFile } from 'fs/promises';
 import {
@@ -42,7 +43,8 @@ export class SitemapTechService {
       this.buildTenderSitemapUrls(domain, locales, tender),
     );
     const industryUrls = this.buildCpvIndustrySitemapUrls(domain, locales);
-    const urls = [...tenderUrls, ...industryUrls];
+    const countryUrls = this.buildCountrySitemapUrls(domain, locales);
+    const urls = [...tenderUrls, ...industryUrls, ...countryUrls];
     const sitemapFiles = this.buildSitemapFiles(outputPath, urls);
 
     await mkdir(dirname(outputPath), { recursive: true });
@@ -72,6 +74,7 @@ export class SitemapTechService {
       downloadUrl: '/adm/tech/sitemap/download',
       tendersCount: tenders.length,
       industriesCount: CPV_INDUSTRY_SLUGS.length,
+      countriesCount: COUNTRY_SLUGS.length,
       urlsCount: urls.length,
       sitemapFilesCount: sitemapFiles.length,
       sitemapFiles: sitemapFiles.map((file) => ({
@@ -138,6 +141,14 @@ export class SitemapTechService {
     return locales.flatMap((locale) =>
       CPV_INDUSTRY_SLUGS.map((slug) => ({
         loc: `${domain}/${locale}/industries/${encodeURIComponent(slug)}`,
+      })),
+    );
+  }
+
+  private buildCountrySitemapUrls(domain: string, locales: string[]) {
+    return locales.flatMap((locale) =>
+      COUNTRY_SLUGS.map((country) => ({
+        loc: `${domain}/${locale}/tenders/${encodeURIComponent(country)}`,
       })),
     );
   }

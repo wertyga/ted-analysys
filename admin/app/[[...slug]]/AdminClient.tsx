@@ -43,6 +43,8 @@ type SitemapResult = {
   outputPath: string;
   downloadUrl: string;
   tendersCount: number;
+  industriesCount: number;
+  countriesCount: number;
   urlsCount: number;
   sitemapFilesCount: number;
   sitemapFiles: Array<{
@@ -902,18 +904,26 @@ export default function AdminApp() {
                           <dt>URLs</dt>
                           <dd>{sitemapResult.urlsCount}</dd>
                         </div>
-                      <div>
-                        <dt>Sitemap files</dt>
-                        <dd>
-                          {sitemapResult.sitemapFilesCount}
-                          {sitemapResult.isSitemapIndex ? ' + index' : ''}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Tenders</dt>
-                        <dd>{sitemapResult.tendersCount}</dd>
-                      </div>
-                    </dl>
+                        <div>
+                          <dt>Sitemap files</dt>
+                          <dd>
+                            {sitemapResult.sitemapFilesCount}
+                            {sitemapResult.isSitemapIndex ? ' + index' : ''}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Tenders</dt>
+                          <dd>{sitemapResult.tendersCount}</dd>
+                        </div>
+                        <div>
+                          <dt>Industries</dt>
+                          <dd>{sitemapResult.industriesCount}</dd>
+                        </div>
+                        <div>
+                          <dt>Countries</dt>
+                          <dd>{sitemapResult.countriesCount}</dd>
+                        </div>
+                      </dl>
                     </>
                   ) : null}
                 </section>
