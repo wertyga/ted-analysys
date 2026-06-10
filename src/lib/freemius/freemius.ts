@@ -14,6 +14,7 @@ import {
   WebhookListenerResponse,
 } from '@freemius/sdk';
 import { IncomingHttpHeaders } from 'http';
+import { isDev } from '@/utils';
 
 export enum FreemiusBillingCycle {
   monthly = 'monthly',
@@ -169,8 +170,7 @@ export class FreemiumClient {
   async createCheckout(data: FreemiumCheckoutData) {
     const checkout = await this.freemius.checkout.create({
       user: data.user,
-      // TODO: Remove when done
-      isSandbox: true,
+      isSandbox: isDev,
       planId: data.planId,
       licenseId: data.licenseId,
       quota: data.quota,
