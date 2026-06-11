@@ -42,6 +42,8 @@ export interface AwardTender {
   };
   estimatedValueEur?: number | null;
   awardDecisionDate?: Date;
+  selectionStatus?: string[];
+  decisionDate?: string[];
   placeOfPerformanceCountries?: string[];
   placeOfPerformanceCities?: string[];
   lots?: TenderLot[];
@@ -118,6 +120,8 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
     },
     estimatedValueEur: { type: Number, default: null, index: true },
     awardDecisionDate: { type: Date, index: true },
+    selectionStatus: { type: [String] },
+    decisionDate: { type: [String] },
     placeOfPerformanceCountries: { type: [String] },
     placeOfPerformanceCities: { type: [String] },
     lots: { type: [Schema.Types.Mixed] },

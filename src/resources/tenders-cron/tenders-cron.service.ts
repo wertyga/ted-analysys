@@ -26,15 +26,15 @@ export class TendersCronService {
     private readonly tenderMatchNotificationsService: TenderMatchNotificationsService,
     private readonly awardTenderService: AwardTenderService,
   ) {
-    setTimeout(async () => {
-      const data = await new TedOpenTendersCollectorService(
-        this.tedSearchService,
-        this.tendersService,
-        this.awardTenderService,
-      ).collectResultTendersHistoryFromTed();
-
-      console.log({ data });
-    }, 3000);
+    // setTimeout(async () => {
+    //   const data = await new TedOpenTendersCollectorService(
+    //     this.tedSearchService,
+    //     this.tendersService,
+    //     this.awardTenderService,
+    //   ).collectResultTendersHistoryFromTed();
+    //
+    //   console.log({ data });
+    // }, 3000);
   }
 
   @Cron(TENDERS_CRON_CONFIG.cron.allCompetitionTenders, {

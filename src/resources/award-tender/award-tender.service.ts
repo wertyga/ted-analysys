@@ -24,10 +24,7 @@ import {
   XmlAwardWinner,
 } from './award-tender.xml';
 import { TendersService } from '@/resources/tenders/tenders.service';
-import {
-  AwardTenderModel,
-  AwardTenderDocument,
-} from './schemas';
+import { AwardTenderModel, AwardTenderDocument } from './schemas';
 import {
   ContractorNormalized,
   ContractorService,
@@ -70,12 +67,21 @@ export class AwardTenderService {
     const xmlAwardValue = extractXmlAwardValue(awardXml);
 
     const xmlWinners = extractXmlAwardWinners(awardXml);
-    const awardDecisionDate = this.pickAwardDecisionDate(notice, xmlWinners);
+    const awardDecisionDate = this.pickAwardDecisionDate(notice);
+    const selectionStatus = this.pickWinnerNoticeValues(
+      notice,
+      'winner-selection-status',
+    );
+    const decisionDate =
+      this.pickXmlWinnerField(xmlWinners, 'decisionDate') ??
+      this.pickWinnerNoticeValues(notice, 'winner-decision-date');
 
     const normalizedAward = {
       ...normalizedTenderDto,
       estimatedValue: xmlAwardValue ?? normalizedTenderDto.estimatedValue,
       awardDecisionDate,
+      selectionStatus,
+      decisionDate,
     };
 
     const winners = {
@@ -215,9 +221,7 @@ export class AwardTenderService {
 
   private get publicationDateFromHistoryTedDate(): string {
     const date = new Date();
-      date.setFullYear(
-      date.getFullYear() - AWARD_TENDER_CONFIG.historyYearsBack,
-    );
+    date.setFullYear(date.getFullYear() - AWARD_TENDER_CONFIG.historyYearsBack);
 
     return getTedDate(date);
   }
@@ -236,19 +240,21 @@ export class AwardTenderService {
     return values.length > 0 ? values : undefined;
   }
 
-  private pickAwardDecisionDate(
-    notice: TedNotice,
-    xmlWinners: XmlAwardWinner[],
-  ): Date | undefined {
-    const values =
-      this.pickXmlWinnerField(xmlWinners, 'decisionDate') ??
-      readStringArray(
-        Array.isArray(notice['winner-decision-date'])
-          ? notice['winner-decision-date']
-          : [notice['winner-decision-date']],
-      );
+  private pickAwardDecisionDate(notice: TedNotice): Date | undefined {
+    const values = this.pickWinnerNoticeValues(notice, 'winner-decision-date');
 
-    return readDate(values[0]) ?? undefined;
+    return readDate(values?.[0]) ?? undefined;
+  }
+
+  private pickWinnerNoticeValues(
+    notice: TedNotice,
+    field: 'winner-selection-status' | 'winner-decision-date',
+  ): string[] | undefined {
+    const values = readStringArray(
+      Array.isArray(notice[field]) ? notice[field] : [notice[field]],
+    );
+
+    return values.length > 0 ? values : undefined;
   }
 
   private buildAwardTenderSourceHash(

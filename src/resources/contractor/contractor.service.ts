@@ -103,6 +103,9 @@ export class ContractorService {
           winner.city,
           winner.postCode,
           winner.size,
+          winner.listed,
+          winner.internetAddress,
+          winner.email,
         ].some((value) => value !== undefined),
       );
   }
