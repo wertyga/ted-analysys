@@ -24,7 +24,7 @@ type SitemapTender = {
   updatedAt?: Date;
 };
 
-const SITEMAP_MAX_URLS = 50_000;
+const SITEMAP_MAX_URLS = 40_000;
 
 @Injectable()
 export class SitemapTechService {
