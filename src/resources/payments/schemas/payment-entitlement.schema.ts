@@ -66,14 +66,9 @@ const PaymentEntitlementSchema = new Schema<PaymentEntitlementDocument>(
     },
     expiration: {
       type: Date,
-      default: null,
     },
     isCanceled: {
       type: Boolean,
-      required: true,
-    },
-    createdAt: {
-      type: Date,
       required: true,
     },
   },

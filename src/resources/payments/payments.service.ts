@@ -11,6 +11,7 @@ import { UserDocument } from '@/resources/user/user.types';
 import { PaymentEntitlementModel } from './schemas/payment-entitlement.schema';
 import { resolveTariffTypeByFreemiusPlanName } from '@/resources/tariff/freemius-tariff';
 import { TariffType } from '@/resources/tariff/tariff.types';
+import type { CouponDocument } from '@/resources/coupon/schemas';
 import {
   CreatePaymentCheckoutDto,
   GetPaymentListDto,
@@ -31,6 +32,42 @@ type FreemiusCheckoutData = CreatePaymentCheckoutDto & {
 
 @Injectable()
 export class PaymentsService {
+  async createFreeCouponEntitlement(
+    user: UserDocument,
+    coupon: CouponDocument,
+  ) {
+    const now = new Date();
+    const registrationDate = user.createdAt ? new Date(user.createdAt) : now;
+    const expiration = new Date(registrationDate);
+    expiration.setDate(expiration.getDate() + 7);
+
+    const licenseId = this.buildFreeCouponLicenseId(coupon, user);
+
+    return PaymentEntitlementModel.findOneAndUpdate(
+      {
+        licenseId,
+      },
+      {
+        $set: {
+          user: user._id,
+          licenseId,
+          externalUserId: '10359035',
+          planId: '49360',
+          priceId: '64324',
+          subscriptionId: '791446',
+          tariffType: TariffType.pro,
+          type: 'subscription',
+          expiration,
+          isCanceled: false,
+        },
+      },
+      {
+        returnDocument: 'after',
+        upsert: true,
+      },
+    );
+  }
+
   async createCheckout(user: UserDocument, data: CreatePaymentCheckoutDto) {
     const activeEntitlement = await this.getUserEntitlement(user);
     const targetTariffType = await this.getTariffTypeByPlanId(data.planId);
@@ -221,5 +258,12 @@ export class PaymentsService {
     }
 
     return tariffType;
+  }
+
+  private buildFreeCouponLicenseId(
+    coupon: CouponDocument,
+    user: UserDocument,
+  ): string {
+    return `1977263-${coupon._id}-${user._id}`;
   }
 }

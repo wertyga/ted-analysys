@@ -15,19 +15,24 @@ import {
   getEmailTemplate,
 } from '@/resources/email/email.utils';
 import { AuthServiceUtils } from './auth.service.utils';
+import { CouponService } from '@/resources/coupon';
 
 @Injectable()
 export class AuthService {
   utils: AuthServiceUtils;
 
-  constructor(private emailService: EmailService) {
+  constructor(
+    private emailService: EmailService,
+    private readonly couponService: CouponService,
+  ) {
     this.utils = new AuthServiceUtils();
   }
 
   constructCreateTempUserPayload({
     email,
     password,
-  }: Pick<UserType, 'email' | 'password'>) {
+    tempFreeUseCouponCode,
+  }: Pick<UserType, 'email' | 'password' | 'tempFreeUseCouponCode'>) {
     const token = generateToken(email);
 
     const payload: Partial<UserType> = {
@@ -36,6 +41,7 @@ export class AuthService {
       recoveryToken: token,
       hashPassword: generateHash(password),
       status: USER_TYPE.TEMPORARY,
+      tempFreeUseCouponCode,
     };
 
     return payload;
@@ -87,8 +93,14 @@ export class AuthService {
     }
   }
 
-  async upsertTempUser(userPayload: CreateUserDto): Promise<UserDocument> {
-    const payload = this.constructCreateTempUserPayload(userPayload);
+  async upsertTempUser(
+    userPayload: CreateUserDto,
+    couponCode?: string,
+  ): Promise<UserDocument> {
+    const payload = this.constructCreateTempUserPayload({
+      ...userPayload,
+      tempFreeUseCouponCode: couponCode,
+    });
 
     return UserModel.findOneAndUpdate(
       { tempEmail: payload.tempEmail },
@@ -104,12 +116,22 @@ export class AuthService {
       return null;
     }
 
+    const freeUseCouponCode = user.tempFreeUseCouponCode;
+
     user.status = USER_TYPE.USER;
     user.email = user.tempEmail as string;
     user.tempEmail = '';
+    user.tempFreeUseCouponCode = '';
     user.recoveryToken = '';
     user.token = generateToken(user.email);
     await user.save();
+
+    if (freeUseCouponCode) {
+      await this.couponService.redeemFreeUseCouponForUser(
+        user,
+        freeUseCouponCode,
+      );
+    }
 
     return user;
   }
