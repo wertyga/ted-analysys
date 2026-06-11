@@ -47,6 +47,7 @@ type SitemapResult = {
   countriesCount: number;
   urlsCount: number;
   sitemapFilesCount: number;
+  maxUrlsPerFile: number;
   sitemapFiles: Array<{
     filename: string;
     outputPath: string;
@@ -150,6 +151,7 @@ export default function AdminApp() {
   const [tendersLoading, setTendersLoading] = useState(false);
   const [sitemapDomain, setSitemapDomain] = useState('');
   const [sitemapLocales, setSitemapLocales] = useState('en');
+  const [sitemapMaxUrlsPerFile, setSitemapMaxUrlsPerFile] = useState('40000');
   const [sitemapResult, setSitemapResult] = useState<SitemapResult | null>(
     null,
   );
@@ -222,7 +224,8 @@ export default function AdminApp() {
       dataIndex: 'email',
       key: 'email',
       render: (value?: string) => value || '-',
-      sorter: (left, right) => (left.email || '').localeCompare(right.email || ''),
+      sorter: (left, right) =>
+        (left.email || '').localeCompare(right.email || ''),
     },
     {
       title: 'Status',
@@ -322,7 +325,9 @@ export default function AdminApp() {
         await loadTenders(authToken, tendersPage, tendersPageSize);
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Failed to load data');
+      setMessage(
+        error instanceof Error ? error.message : 'Failed to load data',
+      );
     } finally {
       setIsLoading(false);
     }
@@ -349,7 +354,9 @@ export default function AdminApp() {
       setUsersPage(page);
       setUsersPageSize(pageSize);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Failed to load data');
+      setMessage(
+        error instanceof Error ? error.message : 'Failed to load data',
+      );
     } finally {
       setUsersLoading(false);
     }
@@ -462,6 +469,7 @@ export default function AdminApp() {
         body: JSON.stringify({
           domain: sitemapDomain,
           locales: sitemapLocales,
+          maxUrlsPerFile: Number(sitemapMaxUrlsPerFile) || undefined,
         }),
         token,
       });
@@ -716,7 +724,10 @@ export default function AdminApp() {
                     </div>
                   </div>
 
-                  <form className="techForm techFormCompact" onSubmit={generateShortTitles}>
+                  <form
+                    className="techForm techFormCompact"
+                    onSubmit={generateShortTitles}
+                  >
                     <label>
                       Limit
                       <input
@@ -835,7 +846,10 @@ export default function AdminApp() {
                     </div>
                   </div>
 
-                  <form className="techForm" onSubmit={generateSitemap}>
+                  <form
+                    className="techForm techFormSitemap"
+                    onSubmit={generateSitemap}
+                  >
                     <label>
                       Domain
                       <input
@@ -857,6 +871,19 @@ export default function AdminApp() {
                         placeholder="en,pl,de"
                         required
                         value={sitemapLocales}
+                      />
+                    </label>
+                    <label>
+                      URLs per file
+                      <input
+                        max="50000"
+                        min="1"
+                        onChange={(event) =>
+                          setSitemapMaxUrlsPerFile(event.target.value)
+                        }
+                        required
+                        type="number"
+                        value={sitemapMaxUrlsPerFile}
                       />
                     </label>
                     <button disabled={sitemapLoading} type="submit">
@@ -903,6 +930,10 @@ export default function AdminApp() {
                         <div>
                           <dt>URLs</dt>
                           <dd>{sitemapResult.urlsCount}</dd>
+                        </div>
+                        <div>
+                          <dt>URLs per file</dt>
+                          <dd>{sitemapResult.maxUrlsPerFile}</dd>
                         </div>
                         <div>
                           <dt>Sitemap files</dt>
