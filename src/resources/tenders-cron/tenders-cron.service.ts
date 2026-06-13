@@ -9,7 +9,7 @@ import { TenderMatchingService } from '@/resources/tender-matching/tender-matchi
 import { TedOpenTendersCollectorService } from '@/resources/ted-open-tenders-collector/ted-open-tenders-collector.service';
 import { TenderMatchSource } from '@/resources/tender-matching/tender-match.types';
 import { TenderMatchNotificationsService } from '@/resources/tender-match-notifications/tender-match-notifications.service';
-import { SimilarContractsService } from '@/resources/similar-contracts/similar-contracts.service';
+import { AwardTenderService } from '@/resources/award-tender/award-tender.service';
 import { TENDERS_CRON_CONFIG } from '@/config/tenders-cron.config';
 
 @Injectable()
@@ -24,7 +24,7 @@ export class TendersCronService {
     private readonly tendersService: TendersService,
     private readonly tenderMatchingService: TenderMatchingService,
     private readonly tenderMatchNotificationsService: TenderMatchNotificationsService,
-    private readonly similarContractsService: SimilarContractsService,
+    private readonly awardTenderService: AwardTenderService,
   ) {}
 
   @Cron(TENDERS_CRON_CONFIG.cron.allCompetitionTenders, {
@@ -46,7 +46,7 @@ export class TendersCronService {
       const result = await new TedOpenTendersCollectorService(
         this.tedSearchService,
         this.tendersService,
-        this.similarContractsService,
+        this.awardTenderService,
       ).collectOpenTendersFromTed({
         onChangedTenders: async (tenders) => {
           const matches = await this.matchChangedTenders(tenders);
@@ -88,7 +88,7 @@ export class TendersCronService {
       const result = await new TedOpenTendersCollectorService(
         this.tedSearchService,
         this.tendersService,
-        this.similarContractsService,
+        this.awardTenderService,
       ).collectRecentCompetitionTendersFromTed({
         onChangedTenders: async (tenders) => {
           const matches = await this.matchChangedTenders(tenders);

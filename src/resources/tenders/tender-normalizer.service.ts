@@ -168,19 +168,11 @@ export class TenderNormalizerService {
         this.parseTenderDate(
           this.pickDateTime(
             rawNotice,
-            [
-              'deadline-receipt-tender-date-lot',
-              'deadlineReceiptTenderDateLot',
-            ],
-            [
-              'deadline-receipt-tender-time-lot',
-              'deadlineReceiptTenderTimeLot',
-            ],
+            ['deadline-receipt-tender-date-lot'],
+            ['deadline-receipt-tender-time-lot'],
           ),
         ) ??
-        this.parseTenderDate(
-          this.pickText(rawNotice, ['deadline', 'deadlineDate']),
-        ),
+        this.parseTenderDate(this.pickText(rawNotice, ['deadline'])),
       deadlineReceiptTender: this.parseTenderDate(
         this.pickDateTime(
           rawNotice,
@@ -477,7 +469,10 @@ export class TenderNormalizerService {
     return uniqueValues.length > 0 ? uniqueValues : undefined;
   }
 
-  private pickTextValues(raw: Record<string, unknown>, paths: string[]): string[] {
+  private pickTextValues(
+    raw: Record<string, unknown>,
+    paths: string[],
+  ): string[] {
     const values: string[] = [];
 
     for (const path of paths) {
@@ -652,6 +647,14 @@ export class TenderNormalizerService {
         ['estimated-value-cur-lot', 'estimatedValueCurLot'],
       ],
       [
+        ['result-value-notice', 'resultValueNotice'],
+        ['result-value-cur-notice', 'resultValueCurNotice'],
+      ],
+      [
+        ['result-value-lot', 'resultValueLot'],
+        ['result-value-cur-lot', 'resultValueCurLot'],
+      ],
+      [
         ['estimated-value-glo', 'estimatedValueGlo'],
         ['estimated-value-cur-glo', 'estimatedValueCurGlo'],
       ],
@@ -693,12 +696,14 @@ export class TenderNormalizerService {
     description?: string;
     type?: string;
     weight?: string;
-  }): Array<{
-    name?: string;
-    description?: string;
-    type?: string;
-    weight?: string;
-  }> | undefined {
+  }):
+    | Array<{
+        name?: string;
+        description?: string;
+        type?: string;
+        weight?: string;
+      }>
+    | undefined {
     const normalizedCriterion = this.stripUndefinedFields(criterion);
 
     return Object.keys(normalizedCriterion).length > 0
@@ -775,7 +780,10 @@ export class TenderNormalizerService {
       'framework-agreement-lot',
       'frameworkAgreementLot',
     ]);
-    const dpsUsages = this.pickTextValues(raw, ['dps-usage-lot', 'dpsUsageLot']);
+    const dpsUsages = this.pickTextValues(raw, [
+      'dps-usage-lot',
+      'dpsUsageLot',
+    ]);
     const durationPeriodValues = this.pickTextValues(raw, [
       'duration-period-value-lot',
       'durationPeriodValueLot',

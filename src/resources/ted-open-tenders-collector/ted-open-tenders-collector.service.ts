@@ -2,11 +2,17 @@ import { TedSearchService } from '@/resources/ted-search/ted-search.service';
 import { buildTedTenderSearchQuery } from '@/resources/ted-search/ted-builders';
 import { TedDeadlineRange } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
 import {
+  TedNotice,
   TedPaginationMode,
   TedScope,
   TedSearchResponse,
+  TedSortOrder,
+  TedTenderSortColumn,
 } from '@/resources/ted-search/types/ted-search.types';
-import { getTedDate } from '@/resources/ted-search/utils';
+import {
+  getTedDate,
+  searchTendersDefaultFields,
+} from '@/resources/ted-search/utils';
 import {
   TENDER_COMPETITION_NOTICE_TYPES,
   TENDER_RESULT_NOTICE_TYPES,
@@ -14,11 +20,10 @@ import {
 import { TenderDocument } from '@/resources/tenders/schemas';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { isRecord } from '@/utils';
-import { SimilarContractsService } from '@/resources/similar-contracts/similar-contracts.service';
-import { searchTendersDefaultFields } from '@/resources/ted-search/utils';
-import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
+import { AwardTenderService } from '@/resources/award-tender/award-tender.service';
 import { TED_OPEN_TENDERS_COLLECTOR_CONFIG } from '@/config/ted-open-tenders-collector.config';
-import { AWARD_HISTORY_FIELDS } from '@/config/similar-contracts.config';
+import { AWARD_HISTORY_FIELDS } from '@/config/award-tender.config';
+import { AwardTenderDocument } from '@/resources/award-tender/schemas';
 
 export interface TedOpenTendersCollectorOptions {
   pageLimit?: number;
@@ -55,7 +60,7 @@ export class TedOpenTendersCollectorService {
   constructor(
     private readonly tedSearchService: TedSearchService,
     private readonly tendersService: TendersService,
-    private readonly similarContractsService?: SimilarContractsService,
+    private readonly awardTenderService?: AwardTenderService,
   ) {}
 
   async collectOpenTendersFromTed(
@@ -90,10 +95,10 @@ export class TedOpenTendersCollectorService {
   }
 
   async collectResultTendersHistoryFromTed(
-    options: TedOpenTendersCollectorOptions = {},
+    onChangedTenders?: TedOpenTendersCollectorOptions['onChangedTenders'],
   ): Promise<TedOpenTendersCollectorResult> {
-    if (!this.similarContractsService) {
-      throw new Error('SimilarContractsService is required to collect results');
+    if (!this.awardTenderService) {
+      throw new Error('AwardTenderService is required to collect results');
     }
 
     const publicationDateFrom = new Date();
@@ -108,40 +113,47 @@ export class TedOpenTendersCollectorService {
       publicationDateFrom: getTedDate(publicationDateFrom),
       publicationDateTo: getTedDate(),
       winnerSelectionStatus: 'selec-w',
+      sortColumn: TedTenderSortColumn.PUBLICATION_DATE,
+      sortOrder: TedSortOrder.DESC,
     });
 
     const searchOptions: TedOpenTendersCollectorOptions = {
-      maxPages: TED_OPEN_TENDERS_COLLECTOR_CONFIG.historyResult.maxPages,
-      pageLimit: TED_OPEN_TENDERS_COLLECTOR_CONFIG.historyResult.pageLimit,
+      maxPages: 100_000,
+      pageLimit: 100,
     };
 
-    return this.collectResultTendersFromTed(
+    return this.collectTedNoticesByIteration({
       query,
-      searchOptions,
-      async (notices) => {
+      scope: TedScope.ALL,
+      fields: AWARD_HISTORY_FIELDS,
+      options: searchOptions,
+      saveNotices: async (notices) => {
         const normalizedTenders = await Promise.all(
           notices.map((notice) => {
-            return this.similarContractsService!.normalizeResultTender(notice);
+            return this.awardTenderService!.normalizeResultTender(notice);
           }),
         );
 
-        const saveResult = await Promise.all(
-          normalizedTenders.map((tender) =>
-            this.similarContractsService!.upsertAwardTender(tender),
+        const savedResults = (await Promise.all(
+          normalizedTenders.map(({ normalizedAward, winners }) =>
+            this.awardTenderService!.upsertAwardTender(
+              normalizedAward,
+              winners,
+            ),
           ),
-        );
+        ).then((results) => results.filter(Boolean))) as AwardTenderDocument[];
 
-        if (saveResult.length > 0) {
-          await options.onChangedTenders?.(saveResult);
+        if (savedResults.length > 0) {
+          await onChangedTenders?.(savedResults);
         }
 
         return {
-          saved: saveResult.length,
+          saved: savedResults.length,
           updated: 0,
           skipped: 0,
         };
       },
-    );
+    });
   }
 
   private async collectCompetitionTendersFromTed(
@@ -162,24 +174,6 @@ export class TedOpenTendersCollectorService {
 
         return saveResult;
       },
-    });
-  }
-
-  private async collectResultTendersFromTed(
-    query: string,
-    options: TedOpenTendersCollectorOptions,
-    saveNotices: TedIterationCollectorParams['saveNotices'],
-  ): Promise<TedOpenTendersCollectorResult> {
-    if (!this.similarContractsService) {
-      throw new Error('SimilarContractsService is required to collect results');
-    }
-
-    return this.collectTedNoticesByIteration({
-      query,
-      scope: TedScope.ALL,
-      fields: AWARD_HISTORY_FIELDS,
-      options,
-      saveNotices,
     });
   }
 

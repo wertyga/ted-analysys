@@ -23,7 +23,7 @@ import { PaymentsModule } from './resources/payments/payments.module';
 import { CouponModule } from './resources/coupon';
 import { FeedbackModule } from './resources/feedback/feedback.module';
 import { TariffModule } from './resources/tariff';
-import { SimilarContractsModule } from './resources/similar-contracts/similar-contracts.module';
+import { AwardTenderModule } from './resources/award-tender/award-tender.module';
 import { TechModule } from './resources/tech/tech.module';
 
 @Module({
@@ -49,7 +49,7 @@ import { TechModule } from './resources/tech/tech.module';
     CouponModule,
     FeedbackModule,
     TariffModule,
-    SimilarContractsModule,
+    AwardTenderModule,
     TechModule,
   ],
   controllers: [AppController],
