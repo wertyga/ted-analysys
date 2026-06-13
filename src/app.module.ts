@@ -34,7 +34,7 @@ import { TechModule } from './resources/tech/tech.module';
     CpvModule,
     TenderWishlistModule,
     TendersModule,
-    // TendersCronModule,
+    TendersCronModule,
     TenderGeneralAnalysisModule,
     TenderDeepAnalysisModule,
     DeepSeekModule,
