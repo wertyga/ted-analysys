@@ -3,6 +3,8 @@ import { readStringArray } from '@/utils';
 import { Contractor, ContractorDocument, ContractorModel } from './schemas';
 import { AwardTenderModel } from '@/resources/award-tender/schemas';
 import { QueryFilter } from 'mongoose';
+import { getPaginationMeta } from '@/utils';
+import { ContractorListRequestDto } from './dto/contractor-list-request.dto';
 
 export interface ContractorNormalized {
   winnerName: string[];
@@ -35,6 +37,42 @@ type AwardWinnerContractor = Pick<
 
 @Injectable()
 export class ContractorService {
+  async searchContractors({
+    cpvCodes,
+    countries,
+    page,
+    limit,
+  }: ContractorListRequestDto) {
+    const query: QueryFilter<ContractorDocument> = {};
+
+    if (cpvCodes?.length) {
+      query.cpvCodes = { $in: cpvCodes };
+    }
+
+    if (countries?.length) {
+      query.countries = { $in: countries };
+    }
+
+    const pagination = getPaginationMeta({ page, limit });
+    const [contractors, totalCount] = await Promise.all([
+      ContractorModel.find(query)
+        .sort({ name: 1 })
+        .skip(pagination.skip)
+        .limit(pagination.limit)
+        .lean(),
+      ContractorModel.countDocuments(query),
+    ]);
+
+    return {
+      totalCount,
+      contractors,
+    };
+  }
+
+  async getContractorByIdentifier(identifier: string) {
+    return ContractorModel.findOne({ identifier }).lean();
+  }
+
   async upsertListAwardWinners(
     contractorNormalized: ContractorNormalized,
     options: UpsertAwardWinnersOptions,
