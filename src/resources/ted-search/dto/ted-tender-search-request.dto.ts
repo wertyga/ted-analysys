@@ -267,7 +267,7 @@ export class TedTenderSearchRequestDto implements TedTenderSearchFilters {
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  contractAwardFrom?: number; // ++
+  contractAwardFrom?: number;
 
   @ApiPropertyOptional({ minimum: 0, example: 100 })
   @IsOptional()

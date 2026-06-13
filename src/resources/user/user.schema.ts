@@ -26,6 +26,7 @@ export const UserSchema = new Schema<UserType>(
       require: true,
     },
     tempEmail: String,
+    tempFreeUseCouponCode: String,
     token: {
       type: String,
     },
@@ -127,6 +128,7 @@ function serializeUser(
       'updatedAt',
       'recoveryToken',
       'tempEmail',
+      'tempFreeUseCouponCode',
       'status',
       'oauthId',
       ...(options?.excludeFields ?? []),

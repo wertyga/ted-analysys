@@ -20,6 +20,7 @@ import { TenderMatchingModule } from './resources/tender-matching/tender-matchin
 import { CompanyProfileDocumentsModule } from './resources/company-profile-documents/company-profile-documents.module';
 import { CurrencyExchangeRatesModule } from './resources/currency-exchange-rates/currency-exchange-rates.module';
 import { PaymentsModule } from './resources/payments/payments.module';
+import { CouponModule } from './resources/coupon';
 import { FeedbackModule } from './resources/feedback/feedback.module';
 import { TariffModule } from './resources/tariff';
 import { AwardTenderModule } from './resources/award-tender/award-tender.module';
@@ -45,6 +46,7 @@ import { TechModule } from './resources/tech/tech.module';
     CompanyProfileDocumentsModule,
     CurrencyExchangeRatesModule,
     PaymentsModule,
+    CouponModule,
     FeedbackModule,
     TariffModule,
     AwardTenderModule,

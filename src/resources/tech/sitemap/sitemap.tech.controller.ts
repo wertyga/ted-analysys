@@ -28,6 +28,7 @@ export class SitemapTechController {
     return this.sitemapTechService.generateTenderSitemap({
       domain: query.domain,
       locales: query.locales,
+      maxUrlsPerFile: query.maxUrlsPerFile,
     });
   }
 
@@ -37,6 +38,7 @@ export class SitemapTechController {
     return this.sitemapTechService.generateTenderSitemap({
       domain: body.domain,
       locales: body?.locales,
+      maxUrlsPerFile: body.maxUrlsPerFile,
     });
   }
 

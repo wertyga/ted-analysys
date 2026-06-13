@@ -37,6 +37,7 @@ export type TUser = {
   password: string;
   token?: string;
   tempEmail?: string;
+  tempFreeUseCouponCode?: string;
   recoveryToken?: string;
   oauthId?: string;
   status: USER_TYPE;

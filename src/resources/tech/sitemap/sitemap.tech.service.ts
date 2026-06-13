@@ -24,16 +24,18 @@ type SitemapTender = {
   updatedAt?: Date;
 };
 
-const SITEMAP_MAX_URLS = 40_000;
+const SITEMAP_ABSOLUTE_MAX_URLS = 40_000;
 
 @Injectable()
 export class SitemapTechService {
   async generateTenderSitemap(options: {
     domain: string;
     locales?: string | string[];
+    maxUrlsPerFile?: number;
   }) {
     const domain = this.normalizeSitemapDomain(options.domain);
     const locales = this.getSitemapLocales(options.locales);
+    const maxUrlsPerFile = this.normalizeMaxUrlsPerFile(options.maxUrlsPerFile);
     const outputPath = this.getSitemapOutputPath();
     const tenders = await TenderModel.find({})
       .select('id publicationNumber updatedAt')
@@ -45,7 +47,11 @@ export class SitemapTechService {
     const industryUrls = this.buildCpvIndustrySitemapUrls(domain, locales);
     const countryUrls = this.buildCountrySitemapUrls(domain, locales);
     const urls = [...tenderUrls, ...industryUrls, ...countryUrls];
-    const sitemapFiles = this.buildSitemapFiles(outputPath, urls);
+    const sitemapFiles = this.buildSitemapFiles(
+      outputPath,
+      urls,
+      maxUrlsPerFile,
+    );
 
     await mkdir(dirname(outputPath), { recursive: true });
 
@@ -77,6 +83,7 @@ export class SitemapTechService {
       countriesCount: COUNTRY_SLUGS.length,
       urlsCount: urls.length,
       sitemapFilesCount: sitemapFiles.length,
+      maxUrlsPerFile,
       sitemapFiles: sitemapFiles.map((file) => ({
         filename: basename(file.outputPath),
         outputPath: file.outputPath,
@@ -186,8 +193,9 @@ export class SitemapTechService {
   private buildSitemapFiles(
     outputPath: string,
     urls: Array<{ loc: string; lastmod?: string }>,
+    maxUrlsPerFile: number,
   ) {
-    if (urls.length <= SITEMAP_MAX_URLS) {
+    if (urls.length <= maxUrlsPerFile) {
       return [
         {
           outputPath,
@@ -199,8 +207,8 @@ export class SitemapTechService {
     const parsedOutputPath = parse(outputPath);
     const chunks: Array<{ outputPath: string; xml: string }> = [];
 
-    for (let index = 0; index < urls.length; index += SITEMAP_MAX_URLS) {
-      const chunkUrls = urls.slice(index, index + SITEMAP_MAX_URLS);
+    for (let index = 0; index < urls.length; index += maxUrlsPerFile) {
+      const chunkUrls = urls.slice(index, index + maxUrlsPerFile);
       const chunkNumber = chunks.length + 1;
       const chunkOutputPath = join(
         parsedOutputPath.dir,
@@ -238,6 +246,24 @@ export class SitemapTechService {
       .filter(Boolean);
 
     return locales.length > 0 ? locales : ['en'];
+  }
+
+  private normalizeMaxUrlsPerFile(maxUrlsPerFile?: number) {
+    if (!maxUrlsPerFile) {
+      return SITEMAP_ABSOLUTE_MAX_URLS;
+    }
+
+    if (
+      !Number.isInteger(maxUrlsPerFile) ||
+      maxUrlsPerFile < 1 ||
+      maxUrlsPerFile > SITEMAP_ABSOLUTE_MAX_URLS
+    ) {
+      throw new BadRequestException(
+        `Sitemap maxUrlsPerFile must be an integer from 1 to ${SITEMAP_ABSOLUTE_MAX_URLS}.`,
+      );
+    }
+
+    return maxUrlsPerFile;
   }
 
   private trimTrailingSlash(value: string) {
