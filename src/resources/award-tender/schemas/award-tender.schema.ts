@@ -95,23 +95,19 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
     },
     cpvCodes: { type: [String], index: true },
     classificationCpv: {
-      type: [Schema.Types.ObjectId],
-      ref: 'CpvCategory',
+      type: [String],
       default: [],
     },
     mainClassificationProc: {
-      type: [Schema.Types.ObjectId],
-      ref: 'CpvCategory',
+      type: [String],
       default: [],
     },
     mainClassificationLot: {
-      type: [Schema.Types.ObjectId],
-      ref: 'CpvCategory',
+      type: [String],
       default: [],
     },
     additionalClassificationLot: {
-      type: [Schema.Types.ObjectId],
-      ref: 'CpvCategory',
+      type: [String],
       default: [],
     },
     estimatedValue: {

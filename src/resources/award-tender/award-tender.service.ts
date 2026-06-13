@@ -60,7 +60,7 @@ export class AwardTenderService {
     winners: ContractorNormalized;
   }> {
     const normalizedTenderDto =
-      await this.tenderNormalizer.normalizeTedNoticeWithCpvCodes(notice, false);
+      this.tenderNormalizer.normalizeTedNotice(notice);
 
     const awardXml = await fetchXmlContentFromNotice(notice.links);
 
@@ -85,29 +85,59 @@ export class AwardTenderService {
     };
 
     const winners = {
-      winnerName:
-        this.pickXmlWinnerField(xmlWinners, 'name') ?? notice['winner-name'],
-      winnerIdentifier:
-        this.pickXmlWinnerField(xmlWinners, 'identifier') ??
-        notice['winner-identifier'],
-      winnerCountry:
-        this.pickXmlWinnerField(xmlWinners, 'country') ??
-        notice['winner-country'],
-      winnerCountrySub:
-        this.pickXmlWinnerField(xmlWinners, 'countrySub') ??
-        notice['winner-country-sub'],
-      winnerCity:
-        this.pickXmlWinnerField(xmlWinners, 'city') ?? notice['winner-city'],
-      winnerPostCode:
-        this.pickXmlWinnerField(xmlWinners, 'postCode') ??
-        notice['winner-post-code'],
-      winnerSize:
-        this.pickXmlWinnerField(xmlWinners, 'size') ?? notice['winner-size'],
-      winnerListed:
-        this.pickXmlWinnerField(xmlWinners, 'listed') ??
-        notice['winner-listed'],
-      winnerInternetAddress: notice['winner-internet-address'],
-      winnerEmail: notice['winner-email'],
+      winnerName: this.pickWinnerValues(
+        xmlWinners,
+        'name',
+        notice,
+        'winner-name',
+      ),
+      winnerIdentifier: this.pickWinnerValues(
+        xmlWinners,
+        'identifier',
+        notice,
+        'winner-identifier',
+      ),
+      winnerCountry: this.pickWinnerValues(
+        xmlWinners,
+        'country',
+        notice,
+        'winner-country',
+      ),
+      winnerCountrySub: this.pickWinnerValues(
+        xmlWinners,
+        'countrySub',
+        notice,
+        'winner-country-sub',
+      ),
+      winnerCity: this.pickWinnerValues(
+        xmlWinners,
+        'city',
+        notice,
+        'winner-city',
+      ),
+      winnerPostCode: this.pickWinnerValues(
+        xmlWinners,
+        'postCode',
+        notice,
+        'winner-post-code',
+      ),
+      winnerSize: this.pickWinnerValues(
+        xmlWinners,
+        'size',
+        notice,
+        'winner-size',
+      ),
+      winnerListed: this.pickWinnerValues(
+        xmlWinners,
+        'listed',
+        notice,
+        'winner-listed',
+      ),
+      winnerInternetAddress: this.pickNoticeStringValues(
+        notice,
+        'winner-internet-address',
+      ),
+      winnerEmail: this.pickNoticeStringValues(notice, 'winner-email'),
     };
 
     return { normalizedAward, winners };
@@ -138,7 +168,7 @@ export class AwardTenderService {
     });
   }
 
-  async searchAwardsLocally(
+  async searchAwardTendersLocal(
     tenderId: string,
     pagination: { page?: number; limit?: number } = {},
   ) {
@@ -161,7 +191,7 @@ export class AwardTenderService {
         .sort({ publicationDate: -1 })
         .skip(skip)
         .limit(limit)
-        .populate(tenderCpvPopulateFields)
+        .populate('winners')
         .lean(),
       AwardTenderModel.countDocuments(query),
     ]);
@@ -175,31 +205,49 @@ export class AwardTenderService {
   async upsertAwardTender(
     normalizedTender: NormalizedAwardTender,
     winners: ContractorNormalized,
-  ) {
+  ): Promise<AwardTenderDocument | null> {
     const estimatedValueEur =
       await this.tendersService.calculateEstimatedValueEur(normalizedTender);
 
-    const winnerIds = await this.contractorService
-      .upsertAwardWinners(winners)
-      .then((winners) => winners.map((winner) => winner._id));
+    const result = (await AwardTenderModel.findOneAndUpdate(
+      {
+        id: normalizedTender.id,
+      },
+      {
+        $setOnInsert: {
+          ...normalizedTender,
+          estimatedValueEur,
+          sourceHash:
+            this.tendersService.buildTenderSourceHash(normalizedTender),
+          winners: [],
+        },
+      },
+      { returnDocument: 'after', upsert: true, includeResultMetadata: true },
+    ).select('_id')) as any;
 
-    const awardTender = {
-      ...normalizedTender,
-      estimatedValueEur,
-      sourceHash: this.tendersService.buildTenderSourceHash(normalizedTender),
-      winners: winnerIds,
-    };
+    const wasTenderCreated = result?.lastErrorObject?.updatedExisting === false;
+    const awardTender = result?.value;
 
-    const savedTender = await AwardTenderModel.findOneAndUpdate(
-      { id: normalizedTender.id },
-      { $set: awardTender },
-      { returnDocument: 'after', upsert: true, strict: false },
-    )
-      .populate(tenderCpvPopulateFields)
-      .lean()
-      .exec();
+    if (!awardTender) {
+      return null;
+    }
 
-    return savedTender;
+    if (!wasTenderCreated) {
+      return awardTender;
+    }
+
+    const winnersDocs = await this.contractorService.upsertListAwardWinners(
+      winners,
+      {
+        awardTenderId: awardTender._id.toString(),
+        cpvCodes: normalizedTender.cpvCodes ?? [],
+      },
+    );
+
+    awardTender.winners = winnersDocs.map((winner) => winner._id);
+    await awardTender.save();
+
+    return awardTender;
   }
 
   async searchAwardsFromTed(filters: AwardTenderAwardsRequestDto) {
@@ -236,6 +284,24 @@ export class AwardTenderService {
       );
 
     return values.length > 0 ? values : undefined;
+  }
+
+  private pickWinnerValues(
+    winners: XmlAwardWinner[],
+    xmlField: keyof XmlAwardWinner,
+    notice: TedNotice,
+    noticeField: string,
+  ): string[] {
+    return (
+      this.pickXmlWinnerField(winners, xmlField) ??
+      this.pickNoticeStringValues(notice, noticeField)
+    );
+  }
+
+  private pickNoticeStringValues(notice: TedNotice, field: string): string[] {
+    return readStringArray(
+      Array.isArray(notice[field]) ? notice[field] : [notice[field]],
+    );
   }
 
   private pickAwardDecisionDate(notice: TedNotice): Date | undefined {

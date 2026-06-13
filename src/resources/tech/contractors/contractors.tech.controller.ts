@@ -17,4 +17,10 @@ export class ContractorsTechController {
   generateContractorsCsv() {
     return this.contractorsTechService.generateContractorsCsv();
   }
+
+  @ApiDefaultResponse({ description: 'Compressed contractors by email.' })
+  @Post('/compress')
+  compressContractors() {
+    return this.contractorsTechService.compressContractors();
+  }
 }

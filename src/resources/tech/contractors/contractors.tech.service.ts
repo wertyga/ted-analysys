@@ -6,6 +6,7 @@ import {
   ContractorDocument,
   ContractorModel,
 } from '@/resources/contractor/schemas';
+import { AwardTenderModel } from '@/resources/award-tender/schemas';
 
 type ContractorCsvRow = {
   email?: string;
@@ -24,8 +25,100 @@ type ExistingContractorCsvValues = {
   coupons: Set<string>;
 };
 
+type ContractorCompressGroup = {
+  email: string;
+  contractors: ContractorDocument[];
+};
+
+type AwardTenderCpvProjection = {
+  _id: unknown;
+  winners?: unknown[];
+  cpvCodes?: string[];
+};
+
 @Injectable()
 export class ContractorsTechService {
+  async compressContractors() {
+    const contractors = await ContractorModel.find({
+      email: { $exists: true, $ne: null },
+    });
+
+    const awardTenders = await AwardTenderModel.find({})
+      .select('_id winners cpvCodes')
+      .lean<AwardTenderCpvProjection[]>();
+    const awardTendersByWinnerId =
+      this.groupAwardTendersByWinnerId(awardTenders);
+
+    const contractorGroups = this.groupContractorsByEmail(contractors);
+
+    let deletedCount = 0;
+    let updatedAwardTendersCount = 0;
+
+    for (const { email, contractors } of contractorGroups) {
+      const [canonicalContractor, ...duplicateContractors] = contractors;
+      const contractorIds = contractors.map((contractor) => contractor._id);
+      const duplicateIds = duplicateContractors.map(
+        (contractor) => contractor._id,
+      );
+      const contractorAwardTenders = this.getAwardTendersForContractors(
+        awardTendersByWinnerId,
+        contractorIds,
+      );
+
+      const awardTenderIds = contractorAwardTenders
+        .map((tender) => this.toIdString(tender._id))
+        .filter(Boolean);
+
+      await ContractorModel.findByIdAndUpdate(canonicalContractor._id, {
+        $set: {
+          ...this.buildCompressedContractor(
+            contractors,
+            contractorAwardTenders,
+          ),
+          email,
+          awardTenders: awardTenderIds,
+        },
+      });
+
+      if (duplicateIds.length === 0) {
+        continue;
+      }
+
+      const updateAwardTendersResult = await AwardTenderModel.updateMany(
+        { winners: { $in: duplicateIds } },
+        [
+          {
+            $set: {
+              winners: {
+                $setUnion: [
+                  { $setDifference: ['$winners', duplicateIds] },
+                  [canonicalContractor._id],
+                ],
+              },
+            },
+          },
+        ],
+        { updatePipeline: true },
+      );
+      const deleteResult = await ContractorModel.deleteMany({
+        _id: { $in: duplicateIds },
+      });
+
+      updatedAwardTendersCount += updateAwardTendersResult.modifiedCount;
+      deletedCount += deleteResult.deletedCount;
+    }
+
+    return {
+      emailsCount: contractorGroups.length,
+      duplicateEmailsCount: contractorGroups.filter(
+        ({ contractors }) => contractors.length > 1,
+      ).length,
+      contractorsCount: contractors.length,
+      deletedCount,
+      updatedAwardTendersCount,
+    };
+  }
+
   async generateContractorsCsv() {
     const contractorsCsvDir = dirname(this.getContractorsCsvOutputPath());
 
@@ -130,11 +223,16 @@ export class ContractorsTechService {
         }, {});
 
       return Object.values(contractorByEmail).filter(
-        (contractor) => !!contractor.country && !!contractor.name,
+        (contractor) => !!contractor.countries?.[0] && !!contractor.name,
       );
     });
 
-    return Object.values(contractors);
+    return Object.values(contractors).map((contractor) => ({
+      email: contractor.email,
+      name: contractor.name,
+      country: contractor.countries?.[0],
+      cpv: contractor.cpvCodes,
+    }));
   }
 
   private async getExistingContractorCsvValues(
@@ -234,6 +332,164 @@ export class ContractorsTechService {
 
   private normalizeCoupon(coupon?: string) {
     return coupon?.trim().toUpperCase() ?? '';
+  }
+
+  private groupContractorsByEmail(
+    contractors: ContractorDocument[],
+  ): ContractorCompressGroup[] {
+    const contractorByEmail = contractors.reduce<
+      Record<string, ContractorDocument[]>
+    >((acc, contractor) => {
+      const email = this.normalizeEmail(contractor.email);
+
+      if (!email) {
+        return acc;
+      }
+
+      acc[email] = [...(acc[email] ?? []), contractor];
+
+      return acc;
+    }, {});
+
+    return Object.entries(contractorByEmail).map(([email, contractors]) => ({
+      email,
+      contractors,
+    }));
+  }
+
+  private buildCompressedContractor(
+    contractors: ContractorDocument[],
+    awardTenders: AwardTenderCpvProjection[],
+  ) {
+    const countries = this.uniqueContractorValues(contractors, 'countries');
+    const internetAddresses = this.uniqueContractorValues(
+      contractors,
+      'internetAddresses',
+    );
+    const postCodes = this.uniqueContractorValues(contractors, 'postCodes');
+    const cities = this.uniqueContractorValues(contractors, 'cities');
+    const countrySubs = this.uniqueContractorValues(contractors, 'countrySubs');
+
+    return {
+      name: this.firstContractorValue(contractors, 'name'),
+      identifier: this.firstContractorValue(contractors, 'identifier'),
+      countries,
+      countrySubs,
+      cities,
+      postCodes,
+      size: this.firstContractorValue(contractors, 'size'),
+      listed: this.firstContractorValue(contractors, 'listed'),
+      internetAddresses,
+      cpvCodes: this.uniqueCpvCodes(contractors, awardTenders),
+    };
+  }
+
+  private firstContractorValue(
+    contractors: ContractorDocument[],
+    field: keyof ContractorDocument,
+  ) {
+    return contractors
+      .map((contractor) => contractor[field])
+      .find((value) => typeof value === 'string' && value.trim());
+  }
+
+  private uniqueContractorValues(
+    contractors: ContractorDocument[],
+    arrayField: keyof ContractorDocument,
+  ) {
+    return Array.from(
+      new Set(
+        contractors.flatMap((contractor) =>
+          this.toStringArray(contractor[arrayField]),
+        ),
+      ),
+    );
+  }
+
+  private uniqueCpvCodes(
+    contractors: ContractorDocument[],
+    awardTenders: AwardTenderCpvProjection[],
+  ) {
+    return Array.from(
+      new Set([
+        ...contractors.flatMap((contractor) =>
+          this.toStringArray(contractor.cpvCodes),
+        ),
+        ...awardTenders.flatMap((awardTender) =>
+          this.toStringArray(awardTender.cpvCodes),
+        ),
+      ]),
+    );
+  }
+
+  private groupAwardTendersByWinnerId(
+    awardTenders: AwardTenderCpvProjection[],
+  ) {
+    const awardTendersByWinnerId = new Map<
+      string,
+      AwardTenderCpvProjection[]
+    >();
+
+    for (const awardTender of awardTenders) {
+      for (const winnerId of awardTender.winners ?? []) {
+        const key = this.toIdString(winnerId);
+
+        if (!key) {
+          continue;
+        }
+
+        awardTendersByWinnerId.set(key, [
+          ...(awardTendersByWinnerId.get(key) ?? []),
+          awardTender,
+        ]);
+      }
+    }
+
+    return awardTendersByWinnerId;
+  }
+
+  private getAwardTendersForContractors(
+    awardTendersByWinnerId: Map<string, AwardTenderCpvProjection[]>,
+    contractorIds: unknown[],
+  ) {
+    const awardTendersById = new Map<string, AwardTenderCpvProjection>();
+
+    for (const contractorId of contractorIds) {
+      const key = this.toIdString(contractorId);
+
+      for (const awardTender of awardTendersByWinnerId.get(key) ?? []) {
+        const awardTenderId = this.toIdString(awardTender._id);
+
+        if (awardTenderId) {
+          awardTendersById.set(awardTenderId, awardTender);
+        }
+      }
+    }
+
+    return Array.from(awardTendersById.values());
+  }
+
+  private toIdString(value: unknown) {
+    if (!value) {
+      return '';
+    }
+
+    if (typeof value === 'string') {
+      return value;
+    }
+
+    if (typeof value === 'object' && 'toString' in value) {
+      return value.toString();
+    }
+
+    return '';
+  }
+
+  private toStringArray(value: unknown) {
+    return (Array.isArray(value) ? value : [value])
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => value.trim())
+      .filter(Boolean);
   }
 
   private getTimestampPostfix() {

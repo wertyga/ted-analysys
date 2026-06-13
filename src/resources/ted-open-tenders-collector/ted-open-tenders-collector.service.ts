@@ -23,6 +23,7 @@ import { isRecord } from '@/utils';
 import { AwardTenderService } from '@/resources/award-tender/award-tender.service';
 import { TED_OPEN_TENDERS_COLLECTOR_CONFIG } from '@/config/ted-open-tenders-collector.config';
 import { AWARD_HISTORY_FIELDS } from '@/config/award-tender.config';
+import { AwardTenderDocument } from '@/resources/award-tender/schemas';
 
 export interface TedOpenTendersCollectorOptions {
   pageLimit?: number;
@@ -133,21 +134,21 @@ export class TedOpenTendersCollectorService {
           }),
         );
 
-        const saveResult = await Promise.all(
+        const savedResults = (await Promise.all(
           normalizedTenders.map(({ normalizedAward, winners }) =>
             this.awardTenderService!.upsertAwardTender(
               normalizedAward,
               winners,
             ),
           ),
-        );
+        ).then((results) => results.filter(Boolean))) as AwardTenderDocument[];
 
-        if (saveResult.length > 0) {
-          await onChangedTenders?.(saveResult);
+        if (savedResults.length > 0) {
+          await onChangedTenders?.(savedResults);
         }
 
         return {
-          saved: saveResult.length,
+          saved: savedResults.length,
           updated: 0,
           skipped: 0,
         };
