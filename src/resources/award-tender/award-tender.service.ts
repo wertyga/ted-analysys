@@ -12,6 +12,8 @@ import {
 } from '@/resources/ted-search/types/ted-search.types';
 import { getTedDate } from '@/resources/ted-search/utils';
 import { TENDER_RESULT_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
+import { TedContractNature } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
+import { TedEligibleCountryCode } from '@/resources/codelist';
 import { TenderDocument, TenderModel } from '@/resources/tenders/schemas';
 import {
   NormalizedTenderDto,
@@ -143,9 +145,18 @@ export class AwardTenderService {
     return { normalizedAward, winners };
   }
 
-  async searchHistoryAwards(
-    dto: AwardTenderAwardsRequestDto,
-  ): Promise<TedSearchResponse> {
+  async searchHistoryAwards(dto: AwardTenderAwardsRequestDto) {
+    return this.searchAwardTendersLocal(dto.tenderId, {
+      page: dto.page,
+      limit: dto.limit,
+    });
+  }
+
+  private async searchHistoryAwardsFromTed(dto: {
+    cpvCodes: string[];
+    buyerCountries?: TedEligibleCountryCode[];
+    contractNature: TedContractNature[];
+  }): Promise<TedSearchResponse> {
     return this.tedSearchService.searchNotices({
       query: buildTedTenderSearchQuery({
         cpvCodes: dto.cpvCodes,
@@ -250,8 +261,12 @@ export class AwardTenderService {
     return awardTender;
   }
 
-  async searchAwardsFromTed(filters: AwardTenderAwardsRequestDto) {
-    const tedTenders = await this.searchHistoryAwards(filters);
+  async searchAwardsFromTed(filters: {
+    cpvCodes: string[];
+    buyerCountries?: TedEligibleCountryCode[];
+    contractNature: TedContractNature[];
+  }) {
+    const tedTenders = await this.searchHistoryAwardsFromTed(filters);
 
     const normalizedTenders = await Promise.all(
       tedTenders.notices.map((tender) => {
