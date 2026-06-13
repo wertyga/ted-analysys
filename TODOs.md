@@ -26,10 +26,9 @@
 
 - BE - Tidy up tender-matching.service ??
 - BE - optimize documents text ??
-- BE - collect result notices 3 years old (approx. 1kk)
 - BE - подумать про base analysis winners
 - BE - cron fetch result notices
-- BE - generalanalysis.resultJson.estimatedValue - добавить EUR
+- BE - Email send - DEU/POL
 
 buyerProfile: https://ch-giorgi.sudest-marchespublics.com
 пробовать доставать portalUrl для deep analysis

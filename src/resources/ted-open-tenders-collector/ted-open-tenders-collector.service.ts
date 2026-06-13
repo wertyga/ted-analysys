@@ -2,11 +2,17 @@ import { TedSearchService } from '@/resources/ted-search/ted-search.service';
 import { buildTedTenderSearchQuery } from '@/resources/ted-search/ted-builders';
 import { TedDeadlineRange } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
 import {
+  TedNotice,
   TedPaginationMode,
   TedScope,
   TedSearchResponse,
+  TedSortOrder,
+  TedTenderSortColumn,
 } from '@/resources/ted-search/types/ted-search.types';
-import { getTedDate } from '@/resources/ted-search/utils';
+import {
+  getTedDate,
+  searchTendersDefaultFields,
+} from '@/resources/ted-search/utils';
 import {
   TENDER_COMPETITION_NOTICE_TYPES,
   TENDER_RESULT_NOTICE_TYPES,
@@ -15,8 +21,6 @@ import { TenderDocument } from '@/resources/tenders/schemas';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { isRecord } from '@/utils';
 import { AwardTenderService } from '@/resources/award-tender/award-tender.service';
-import { searchTendersDefaultFields } from '@/resources/ted-search/utils';
-import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
 import { TED_OPEN_TENDERS_COLLECTOR_CONFIG } from '@/config/ted-open-tenders-collector.config';
 import { AWARD_HISTORY_FIELDS } from '@/config/award-tender.config';
 
@@ -108,11 +112,13 @@ export class TedOpenTendersCollectorService {
       publicationDateFrom: getTedDate(publicationDateFrom),
       publicationDateTo: getTedDate(),
       winnerSelectionStatus: 'selec-w',
+      sortColumn: TedTenderSortColumn.PUBLICATION_DATE,
+      sortOrder: TedSortOrder.DESC,
     });
 
     const searchOptions: TedOpenTendersCollectorOptions = {
-      maxPages: TED_OPEN_TENDERS_COLLECTOR_CONFIG.historyResult.maxPages,
-      pageLimit: TED_OPEN_TENDERS_COLLECTOR_CONFIG.historyResult.pageLimit,
+      maxPages: 100_000,
+      pageLimit: 100,
     };
 
     return this.collectTedNoticesByIteration({

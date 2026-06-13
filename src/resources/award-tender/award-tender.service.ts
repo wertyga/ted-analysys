@@ -190,10 +190,8 @@ export class AwardTenderService {
       winners: winnerIds,
     };
 
-    const filter = { id: normalizedTender.id, searchHash: { $exists: false } };
-
     const savedTender = await AwardTenderModel.findOneAndUpdate(
-      filter,
+      { id: normalizedTender.id },
       { $set: awardTender },
       { returnDocument: 'after', upsert: true, strict: false },
     )
