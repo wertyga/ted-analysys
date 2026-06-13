@@ -49,9 +49,8 @@ export class TendersController {
     let generalAnalysis = TenderGeneralAnalysisModel.serializeDetail(
       tender.generalAnalysis,
     );
-    const tariff = await this.tariffService.getUserTariff(req.user);
 
-    if (tariff.type === TariffType.free) {
+    if (!req.user) {
       generalAnalysis =
         this.tenderGeneralAnalysisService.filterFreeBasicAnalysisFields(
           generalAnalysis,
