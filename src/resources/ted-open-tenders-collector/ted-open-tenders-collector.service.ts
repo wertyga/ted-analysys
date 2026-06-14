@@ -23,7 +23,6 @@ import { isRecord } from '@/utils';
 import { AwardTenderService } from '@/resources/award-tender/award-tender.service';
 import { TED_OPEN_TENDERS_COLLECTOR_CONFIG } from '@/config/ted-open-tenders-collector.config';
 import { AWARD_HISTORY_FIELDS } from '@/config/award-tender.config';
-import { AwardTenderDocument } from '@/resources/award-tender/schemas';
 
 export interface TedOpenTendersCollectorOptions {
   pageLimit?: number;
@@ -97,10 +96,6 @@ export class TedOpenTendersCollectorService {
   async collectResultTendersHistoryFromTed(
     onChangedTenders?: TedOpenTendersCollectorOptions['onChangedTenders'],
   ): Promise<TedOpenTendersCollectorResult> {
-    if (!this.awardTenderService) {
-      throw new Error('AwardTenderService is required to collect results');
-    }
-
     const publicationDateFrom = new Date();
 
     publicationDateFrom.setFullYear(
@@ -117,40 +112,60 @@ export class TedOpenTendersCollectorService {
       sortOrder: TedSortOrder.DESC,
     });
 
-    const searchOptions: TedOpenTendersCollectorOptions = {
+    return this.collectResultTendersFromTed(query, {
       maxPages: 100_000,
       pageLimit: 100,
-    };
+      onChangedTenders,
+    });
+  }
+
+  async collectRecentResultTendersFromTed(
+    options: TedOpenTendersCollectorOptions = {},
+  ): Promise<TedOpenTendersCollectorResult> {
+    const publicationDateFrom = new Date();
+
+    publicationDateFrom.setDate(
+      publicationDateFrom.getDate() -
+        TED_OPEN_TENDERS_COLLECTOR_CONFIG.recentResult.lookbackDays,
+    );
+
+    const query = buildTedTenderSearchQuery({
+      noticeTypes: TENDER_RESULT_NOTICE_TYPES,
+      publicationDateFrom: getTedDate(publicationDateFrom),
+      publicationDateTo: getTedDate(),
+      winnerSelectionStatus: 'selec-w',
+      sortColumn: TedTenderSortColumn.PUBLICATION_DATE,
+      sortOrder: TedSortOrder.DESC,
+    });
+
+    return this.collectResultTendersFromTed(query, options);
+  }
+
+  private async collectResultTendersFromTed(
+    query: string,
+    options: TedOpenTendersCollectorOptions,
+  ): Promise<TedOpenTendersCollectorResult> {
+    if (!this.awardTenderService) {
+      throw new Error('AwardTenderService is required to collect results');
+    }
 
     return this.collectTedNoticesByIteration({
       query,
       scope: TedScope.ALL,
       fields: AWARD_HISTORY_FIELDS,
-      options: searchOptions,
+      options,
       saveNotices: async (notices) => {
-        const normalizedTenders = await Promise.all(
-          notices.map((notice) => {
-            return this.awardTenderService!.normalizeResultTender(notice);
-          }),
-        );
+        const saveResult =
+          await this.awardTenderService!.saveResultTedTenders(notices);
 
-        const savedResults = (await Promise.all(
-          normalizedTenders.map(({ normalizedAward, winners }) =>
-            this.awardTenderService!.upsertAwardTender(
-              normalizedAward,
-              winners,
-            ),
-          ),
-        ).then((results) => results.filter(Boolean))) as AwardTenderDocument[];
-
-        if (savedResults.length > 0) {
-          await onChangedTenders?.(savedResults);
+        if (saveResult.changedTenders.length > 0) {
+          await options.onChangedTenders?.(saveResult.changedTenders);
         }
 
         return {
-          saved: savedResults.length,
-          updated: 0,
-          skipped: 0,
+          saved: saveResult.saved,
+          updated: saveResult.updated,
+          skipped: saveResult.skipped,
         };
       },
     });

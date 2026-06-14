@@ -18,6 +18,7 @@ export class TendersCronService {
 
   private isGatheringRecentTenders = false;
   private isGatheringAllCompetitionTenders = false;
+  private isGatheringRecentAwardTenders = false;
 
   constructor(
     private readonly tedSearchService: TedSearchService,
@@ -116,6 +117,44 @@ export class TendersCronService {
       await logger.error('TED_RECENT_COMPETITION_COLLECTED_FAILED', error);
     } finally {
       this.isGatheringRecentTenders = false;
+    }
+  }
+
+  @Cron(TENDERS_CRON_CONFIG.cron.recentAwardTenders, {
+    timeZone: TENDERS_CRON_CONFIG.timeZone,
+  })
+  async gatherRecentAwardTenders(): Promise<void> {
+    if (this.isGatheringRecentAwardTenders) {
+      this.logger.warn(
+        'Recent TED award tender gather is already running, skipping',
+      );
+      return;
+    }
+
+    this.isGatheringRecentAwardTenders = true;
+
+    try {
+      const result = await new TedOpenTendersCollectorService(
+        this.tedSearchService,
+        this.tendersService,
+        this.awardTenderService,
+      ).collectRecentResultTendersFromTed({
+        pageLimit: 1000,
+      });
+
+      devLog(
+        `Recent TED award tender gather completed: pages=${result.pagesFetched} fetched=${result.noticesFetched} saved=${result.saved} updated=${result.updated} skipped=${result.skipped}`,
+        TendersCronService.name,
+      );
+
+      await logger.info('TED_RECENT_AWARD_TENDERS_COLLECTED', result);
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e.message : 'unknown error';
+
+      this.logger.error(`Recent TED award tender gather failed: ${error}`);
+      await logger.error('TED_RECENT_AWARD_TENDERS_COLLECTED_FAILED', error);
+    } finally {
+      this.isGatheringRecentAwardTenders = false;
     }
   }
 

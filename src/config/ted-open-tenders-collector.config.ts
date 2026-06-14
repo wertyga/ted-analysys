@@ -4,6 +4,9 @@ export const TED_OPEN_TENDERS_COLLECTOR_CONFIG = {
   historyResult: {
     yearsBack: 3,
   },
+  recentResult: {
+    lookbackDays: 7,
+  },
   recentCompetition: {
     lookbackDays: 2,
   },

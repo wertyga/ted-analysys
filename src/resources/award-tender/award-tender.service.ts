@@ -32,10 +32,10 @@ import {
   ContractorService,
 } from '@/resources/contractor/contractor.service';
 import {
+  extractPublicationNumberFromNotice,
   getPaginationMeta,
   readDate,
   readStringArray,
-  tenderCpvPopulateFields,
 } from '@/utils';
 import { buildTedTenderSearchQuery } from '@/resources/ted-search/ted-builders';
 import {
@@ -47,6 +47,13 @@ import { QueryFilter } from 'mongoose';
 type NormalizedAwardTender = NormalizedTenderDto & {
   awardDecisionDate?: Date;
 };
+
+export interface SaveAwardTedTendersResult {
+  saved: number;
+  updated: number;
+  skipped: number;
+  changedTenders: AwardTenderDocument[];
+}
 
 @Injectable()
 export class AwardTenderService {
@@ -259,6 +266,69 @@ export class AwardTenderService {
     await awardTender.save();
 
     return awardTender;
+  }
+
+  async saveResultTedTenders(
+    notices: TedNotice[],
+  ): Promise<SaveAwardTedTendersResult> {
+    const noticesByPublicationNumber = new Map<string, TedNotice>();
+
+    for (const notice of notices) {
+      const publicationNumber = extractPublicationNumberFromNotice(notice);
+
+      if (publicationNumber) {
+        noticesByPublicationNumber.set(publicationNumber, notice);
+      }
+    }
+
+    if (noticesByPublicationNumber.size === 0) {
+      return {
+        saved: 0,
+        updated: 0,
+        skipped: notices.length,
+        changedTenders: [],
+      };
+    }
+
+    const publicationNumbers = Array.from(noticesByPublicationNumber.keys());
+    const existingTenders = await AwardTenderModel.find({
+      id: { $in: publicationNumbers },
+    })
+      .select('id')
+      .exec();
+    const existingTendersByPublicationNumber = new Map(
+      existingTenders.map((tender) => [tender.id, tender] as const),
+    );
+    let saved = 0;
+    const updated = 0;
+    let skipped = notices.length - noticesByPublicationNumber.size;
+    const changedTenders: AwardTenderDocument[] = [];
+
+    for (const [publicationNumber, notice] of noticesByPublicationNumber) {
+      const existingTender =
+        existingTendersByPublicationNumber.get(publicationNumber);
+
+      if (existingTender) {
+        skipped += 1;
+        continue;
+      }
+
+      const { normalizedAward, winners } =
+        await this.normalizeResultTender(notice);
+      const awardTender = await this.upsertAwardTender(
+        normalizedAward,
+        winners,
+      );
+
+      if (awardTender) {
+        changedTenders.push(awardTender);
+        saved += 1;
+      } else {
+        skipped += 1;
+      }
+    }
+
+    return { saved, updated, skipped, changedTenders };
   }
 
   async searchAwardsFromTed(filters: {

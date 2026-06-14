@@ -2,6 +2,7 @@ export const TENDERS_CRON_CONFIG = {
   cron: {
     recentTenders: '0 1 * * *',
     allCompetitionTenders: '0 3 * * *',
+    recentAwardTenders: '0 4 * * *',
   },
   tech: {
     estimatedValueEurUpdateBatchSize: 500,
