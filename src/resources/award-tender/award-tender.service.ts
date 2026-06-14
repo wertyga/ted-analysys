@@ -152,13 +152,6 @@ export class AwardTenderService {
     return { normalizedAward, winners };
   }
 
-  async searchHistoryAwards(dto: AwardTenderAwardsRequestDto) {
-    return this.searchAwardTendersLocal(dto.tenderId, {
-      page: dto.page,
-      limit: dto.limit,
-    });
-  }
-
   private async searchHistoryAwardsFromTed(dto: {
     cpvCodes: string[];
     buyerCountries?: TedEligibleCountryCode[];
