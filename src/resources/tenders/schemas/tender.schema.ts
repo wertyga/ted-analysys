@@ -56,8 +56,6 @@ export interface Tender {
   _id: string;
   /** Local canonical id. For TED tenders this is the publication number. */
   id: string;
-  /** TED/eForms notice-identifier: unique notice id in the source system. */
-  sourceNoticeId?: string;
   /** TED/OJ publication number, e.g. 756265-2023. Useful for display and manual search. */
   publicationNumber?: string;
   /** TED notice-type: notice kind such as contract notice, award notice, or planning notice. */
@@ -185,7 +183,6 @@ export interface TenderModelType extends Model<TenderDocument> {
 const TenderSchema = new Schema<TenderDocument, TenderModelType>(
   {
     id: { type: String, required: true, unique: true, index: true },
-    sourceNoticeId: { type: String, index: true },
     publicationNumber: { type: String, index: true },
     noticeType: String,
     noticeSubtype: String,
@@ -295,6 +292,37 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
   },
 );
 
+TenderSchema.index(
+  {
+    cpvCodes: 1,
+    noticeType: 1,
+    buyerCountry: 1,
+    publicationDate: -1,
+    _id: -1,
+  },
+  { name: 'idx_cpv_notice_country_pubdate' },
+);
+
+TenderSchema.index(
+  {
+    cpvCodes: 1,
+    noticeType: 1,
+    publicationDate: -1,
+    _id: -1,
+  },
+  { name: 'idx_cpv_notice_pubdate' },
+);
+
+TenderSchema.index(
+  {
+    noticeType: 1,
+    buyerCountry: 1,
+    publicationDate: -1,
+    _id: -1,
+  },
+  { name: 'idx_notice_country_pubdate' },
+);
+
 function serializeTender(tender: TenderSerializable): TenderDto {
   return filterModel(tender as TenderDocument, {
     excludeFields: ['cpvCodes', 'links', 'sourceHash'],
@@ -312,7 +340,6 @@ TenderSchema.statics.serializeList = function (
 ): TenderListDto {
   const {
     links,
-    sourceNoticeId,
     noticeVersion,
     titleProc,
     titleLot,

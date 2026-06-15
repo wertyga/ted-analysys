@@ -91,7 +91,6 @@ export class TenderDeepAnalysisBuilder {
     return {
       id: tender.id,
       publicationNumber: tender.publicationNumber,
-      sourceNoticeId: tender.sourceNoticeId,
       noticeType: tender.noticeType,
       noticeSubtype: tender.noticeSubtype,
       noticeVersion: tender.noticeVersion,

@@ -75,10 +75,6 @@ export class TenderNormalizerService {
 
     const dto: NormalizedTenderDto = {
       id: publicationNumber ?? this.createFallbackId(rawNotice),
-      sourceNoticeId: this.pickText(rawNotice, [
-        'notice-identifier',
-        'noticeIdentifier',
-      ]),
       publicationNumber,
       noticeType: this.pickText(rawNotice, ['notice-type', 'noticeType']),
       noticeSubtype: this.pickText(rawNotice, [

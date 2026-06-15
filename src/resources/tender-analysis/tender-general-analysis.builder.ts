@@ -19,7 +19,6 @@ export class TenderGeneralAnalysisBuilder {
     return {
       tender: {
         id: tender.id,
-        sourceNoticeId: tender.sourceNoticeId ?? null,
         publicationNumber: tender.publicationNumber ?? null,
         title: tender.title ?? null,
         procedureTitle: tender.titleProc ?? null,

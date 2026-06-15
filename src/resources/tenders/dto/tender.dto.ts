@@ -128,13 +128,6 @@ export class TenderDto {
   id!: string;
 
   @ApiPropertyOptional({
-    example: 'abc123-2024',
-    description:
-      'TED/eForms notice-identifier: unique notice id in the source system.',
-  })
-  sourceNoticeId?: string;
-
-  @ApiPropertyOptional({
     example: '756265-2023',
     description:
       'TED/OJ publication number. Useful for display and manual TED search.',
@@ -512,7 +505,6 @@ export type TenderDetailDto = Omit<TenderDto, 'cpvCodes'>;
 export type TenderListDto = Omit<
   TenderDetailDto,
   | 'links'
-  | 'sourceNoticeId'
   | 'noticeVersion'
   | 'titleProc'
   | 'titleLot'

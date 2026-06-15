@@ -74,8 +74,8 @@ export function buildGeneralTenderAnalysisPrompt(
     'If place of performance differs by lot, mention the lot-level performance locations.',
 
     'TRACEABILITY',
-    'Pay attention to noticeVersion and sourceNoticeId/publicationNumber for traceability.',
-    'Do not include noticeVersion or sourceNoticeId/publicationNumber unless relevant to the analysis, inconsistency, or traceability issue.',
+    'Pay attention to noticeVersion and publicationNumber for traceability.',
+    'Do not include noticeVersion or publicationNumber unless relevant to the analysis, inconsistency, or traceability issue.',
 
     'SCORING',
     'complexityScore, opportunityScore, and confidenceScore must be numbers from 0 to 100.',

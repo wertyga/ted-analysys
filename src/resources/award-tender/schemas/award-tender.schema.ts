@@ -9,7 +9,6 @@ export type AwardTenderWinner = Contractor;
 export interface AwardTender {
   _id: string;
   id: string;
-  sourceNoticeId?: string;
   publicationNumber?: string;
   noticeType?: string;
   noticeSubtype?: string;
@@ -66,7 +65,6 @@ export interface AwardTenderModelType extends Model<AwardTenderDocument> {
 const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
   {
     id: { type: String, required: true, index: true },
-    sourceNoticeId: { type: String, index: true },
     publicationNumber: { type: String, index: true },
     noticeType: { type: String, index: true },
     noticeSubtype: String,

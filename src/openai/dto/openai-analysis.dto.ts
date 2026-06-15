@@ -36,7 +36,6 @@ export interface GeneralTenderAnalysisInput {
   outputLanguage?: AnalysisOutputLanguage;
   tender: {
     id: string;
-    sourceNoticeId?: string | null;
     publicationNumber?: string | null;
     title?: string | null;
     procedureTitle?: string | null;
