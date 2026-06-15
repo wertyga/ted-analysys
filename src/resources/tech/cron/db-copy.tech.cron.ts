@@ -6,7 +6,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { CdnFile, CdnService } from '@/cdn';
 
-const DEFAULT_DB_COPY_CRON = '0 4 * * *';
+const DEFAULT_DB_COPY_CRON = '0 2 * * *';
 const DEFAULT_DB_COPY_MAX_COPIES = 10;
 
 type DumpFile = {
