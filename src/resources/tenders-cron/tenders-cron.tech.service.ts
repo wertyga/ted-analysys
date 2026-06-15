@@ -28,9 +28,9 @@ export class TendersCronTechService {
         await this.currencyExchangeRatesService.syncLatestRatesCron();
       }
 
-      if (process.env.NEED_TOGATHER_TED_BASE_INITIALY) {
-        await this.tendersCronService.gatherAllCompetitionTenders();
-      }
+      // if (process.env.NEED_TOGATHER_TED_BASE_INITIALY) {
+      //   await this.tendersCronService.gatherAllCompetitionTenders();
+      // }
 
       if (process.env.NEED_TO_UPDATE_TENDER_ESTIMATED_VALUE_EUR_INITIALY) {
         await this.updateExistingTenderEstimatedValuesEur();
