@@ -26,11 +26,9 @@ import {
   TenderNormalizerService,
 } from './tender-normalizer.service';
 import {
-  areTedNoticeVersionsDifferent,
   extractPublicationNumberFromNotice,
   isRecord,
   isTedNotice,
-  isTedPublicationNumber,
 } from '@/utils';
 import { tenderCpvPopulateFields } from '@/resources/tenders/utils/tender.utils';
 import { SortOrder, Types } from 'mongoose';
@@ -400,44 +398,14 @@ export class TendersService {
     });
   }
 
-  async findByTedIdOrCreateIfNeeded(id: string) {
-    const localTender = await this.findLocalTender(id);
+  async findById(id: string): Promise<TenderDocumentWithGeneralAnalysis> {
+    const tender = await this.findLocalTender(id);
 
-    if (localTender) {
-      return localTender;
-    }
-
-    return this.findByIdOrFetchFromTed(id);
-  }
-
-  async findByIdOrFetchFromTed(
-    id: string,
-  ): Promise<TenderDocumentWithGeneralAnalysis> {
-    const publicationNumber = id.trim();
-
-    if (!isTedPublicationNumber(publicationNumber)) {
+    if (!tender) {
       throw new NotFoundException(`Tender ${id} not found`);
     }
 
-    const [localTender, tedNotice] = await Promise.all([
-      this.findLocalTender(id),
-      this.fetchTedNoticeByPublicationNumber(publicationNumber),
-    ]);
-
-    const areVersionsDifferent = areTedNoticeVersionsDifferent(
-      localTender?.noticeVersion,
-      tedNotice,
-    );
-
-    if (localTender && !areVersionsDifferent) {
-      return this.getLocalTenderWithBaseAnalysis(localTender);
-    }
-
-    if (!tedNotice) {
-      throw new NotFoundException(`Tender ${id} not found`);
-    }
-
-    return this.upsertIfNeededTenderWithGeneralAnalysis(tedNotice);
+    return this.getLocalTenderWithBaseAnalysis(tender);
   }
 
   async fetchTedNoticeByPublicationNumber(

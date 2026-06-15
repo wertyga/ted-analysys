@@ -34,7 +34,7 @@ export class TendersController {
     @Param('id') id: string,
     @Req() req,
   ): Promise<TenderDetailDto> {
-    const tba = await this.tendersService.findByIdOrFetchFromTed(id);
+    const tba = await this.tendersService.findById(id);
     const tender = tba.toObject();
 
     const tenderSerialized = TenderModel.serializeDetail(tender);

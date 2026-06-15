@@ -209,7 +209,7 @@ export class TenderDeepAnalysisService {
     const language = normalizeDeepAnalysisLanguage(params.language);
 
     const [tender, company] = await Promise.all([
-      this.tendersService.findByTedIdOrCreateIfNeeded(params.tenderId),
+      this.tendersService.findLocalTender(params.tenderId),
       UserModel.findById(params.companyId),
     ]);
 

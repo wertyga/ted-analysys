@@ -21,7 +21,11 @@ export class TenderWishlistService {
   async addTender(user: UserDocument, tenderId: string) {
     await this.canAddTenderGuard(user, tenderId);
 
-    const tender = await this.findOrFetchTender(tenderId);
+    const tender = await this.tendersService.findLocalTender(tenderId);
+
+    if (!tender) {
+      throw new NotFoundException(`Tender ${tenderId} not found`);
+    }
 
     try {
       await TenderWishlistItemModel.create({
@@ -36,29 +40,6 @@ export class TenderWishlistService {
     }
 
     return this.getTenderStatus(user, tender.id);
-  }
-
-  private async findOrFetchTender(tenderId: string): Promise<TenderDocument> {
-    const localTender = await this.tendersService.findLocalTender(tenderId);
-
-    if (localTender) {
-      return localTender;
-    }
-
-    const tedNotice =
-      await this.tendersService.fetchTedNoticeByPublicationNumber(tenderId);
-
-    if (!tedNotice) {
-      throw new NotFoundException(`Tender ${tenderId} not found`);
-    }
-
-    const tender = await this.tendersService.upsertTender(tedNotice);
-
-    if (!tender) {
-      throw new NotFoundException(`Tender ${tenderId} not found`);
-    }
-
-    return tender;
   }
 
   async removeTender(user: UserDocument, tenderId: string) {
