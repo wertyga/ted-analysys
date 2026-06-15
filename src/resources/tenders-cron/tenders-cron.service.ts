@@ -28,49 +28,49 @@ export class TendersCronService {
     private readonly awardTenderService: AwardTenderService,
   ) {}
 
-  @Cron(TENDERS_CRON_CONFIG.cron.allCompetitionTenders, {
-    timeZone: TENDERS_CRON_CONFIG.timeZone,
-  })
-  async gatherAllCompetitionTenders(): Promise<void> {
-    if (this.isGatheringAllCompetitionTenders) {
-      this.logger.warn(
-        'All competition TED tender gather is already running, skipping',
-      );
-      return;
-    }
-
-    this.isGatheringAllCompetitionTenders = true;
-
-    try {
-      let matchesSaved = 0;
-
-      const result = await new TedOpenTendersCollectorService(
-        this.tedSearchService,
-        this.tendersService,
-        this.awardTenderService,
-      ).collectOpenTendersFromTed({
-        onChangedTenders: async (tenders) => {
-          const matches = await this.matchChangedTenders(tenders);
-
-          matchesSaved += matches.length;
-        },
-      });
-
-      await logger.info('TED_ALL_COMPETITION_COLLECTED', {
-        ...result,
-        matchesSaved,
-      });
-
-      await this.sendInstantTenderMatchReports();
-    } catch (e: unknown) {
-      const error = e instanceof Error ? e.message : 'unknown error';
-
-      this.logger.error(`All competition TED tender gather failed: ${error}`);
-      await logger.error('TED_ALL_COMPETITION_COLLECTED_FAILED', error);
-    } finally {
-      this.isGatheringAllCompetitionTenders = false;
-    }
-  }
+  // @Cron(TENDERS_CRON_CONFIG.cron.allCompetitionTenders, {
+  //   timeZone: TENDERS_CRON_CONFIG.timeZone,
+  // })
+  // async gatherAllCompetitionTenders(): Promise<void> {
+  //   if (this.isGatheringAllCompetitionTenders) {
+  //     this.logger.warn(
+  //       'All competition TED tender gather is already running, skipping',
+  //     );
+  //     return;
+  //   }
+  //
+  //   this.isGatheringAllCompetitionTenders = true;
+  //
+  //   try {
+  //     let matchesSaved = 0;
+  //
+  //     const result = await new TedOpenTendersCollectorService(
+  //       this.tedSearchService,
+  //       this.tendersService,
+  //       this.awardTenderService,
+  //     ).collectOpenTendersFromTed({
+  //       onChangedTenders: async (tenders) => {
+  //         const matches = await this.matchChangedTenders(tenders);
+  //
+  //         matchesSaved += matches.length;
+  //       },
+  //     });
+  //
+  //     await logger.info('TED_ALL_COMPETITION_COLLECTED', {
+  //       ...result,
+  //       matchesSaved,
+  //     });
+  //
+  //     await this.sendInstantTenderMatchReports();
+  //   } catch (e: unknown) {
+  //     const error = e instanceof Error ? e.message : 'unknown error';
+  //
+  //     this.logger.error(`All competition TED tender gather failed: ${error}`);
+  //     await logger.error('TED_ALL_COMPETITION_COLLECTED_FAILED', error);
+  //   } finally {
+  //     this.isGatheringAllCompetitionTenders = false;
+  //   }
+  // }
 
   @Cron(TENDERS_CRON_CONFIG.cron.recentTenders, {
     timeZone: TENDERS_CRON_CONFIG.timeZone,
