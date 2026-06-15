@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
 import { Types } from 'mongoose';
 import { EmailService } from '@/resources/email/email.service';
 import { EMAIL_TEMPLATES } from '@/resources/email/type';
@@ -70,10 +69,7 @@ export class TenderMatchNotificationsService {
     }
   }
 
-  @Cron(TENDER_MATCH_NOTIFICATIONS_CONFIG.cron.daily, {
-    timeZone: TENDER_MATCH_NOTIFICATIONS_CONFIG.timeZone,
-  })
-  async sendDailyReportsCron(): Promise<void> {
+  async sendDailyReports(): Promise<void> {
     if (this.isSendingDailyReports) {
       this.nestLogger.warn('Daily tender match reports are already running');
       return;
@@ -96,10 +92,7 @@ export class TenderMatchNotificationsService {
     }
   }
 
-  @Cron(TENDER_MATCH_NOTIFICATIONS_CONFIG.cron.weekly, {
-    timeZone: TENDER_MATCH_NOTIFICATIONS_CONFIG.timeZone,
-  })
-  async sendWeeklyReportsCron(): Promise<void> {
+  async sendWeeklyReports(): Promise<void> {
     if (this.isSendingWeeklyReports) {
       this.nestLogger.warn('Weekly tender match reports are already running');
       return;

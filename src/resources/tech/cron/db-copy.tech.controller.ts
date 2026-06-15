@@ -1,7 +1,7 @@
 import { Controller, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiDefaultResponse, ApiTags } from '@nestjs/swagger';
 import { AdminAccessGuard } from '@/guards';
-import { DbCopyTechCron } from './db-copy.tech.cron';
+import { DbCopyTechCron } from '@/resources/cron/db-copy-cron/db-copy.tech.cron';
 
 @ApiTags('Admin Tech DB Copy')
 @ApiBearerAuth()

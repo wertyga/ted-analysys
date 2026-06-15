@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
 import axios from 'axios';
 import { CurrencySign } from '@/resources/codelist';
 import { logger } from '@/utils';
@@ -25,10 +24,7 @@ export class CurrencyExchangeRatesService {
   private readonly logger = new Logger(CurrencyExchangeRatesService.name);
   private isSyncing = false;
 
-  @Cron(CURRENCY_EXCHANGE_RATES_CONFIG.cron, {
-    timeZone: CURRENCY_EXCHANGE_RATES_CONFIG.timeZone,
-  })
-  async syncLatestRatesCron(): Promise<void> {
+  async syncLatestRates(): Promise<void> {
     if (this.isSyncing) {
       this.logger.warn('Currency exchange rates sync is already running');
       return;

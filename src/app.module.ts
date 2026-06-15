@@ -8,7 +8,6 @@ import { CpvModule } from './resources/cpv/cpv.module';
 import { TedSearchModule } from './resources/ted-search/ted-search.module';
 import { TenderGeneralAnalysisModule } from './resources/tender-analysis/tender-general-analysis.module';
 import { TenderDeepAnalysisModule } from './resources/tender-deep-analysis/tender-deep-analysis.module';
-import { TendersCronModule } from './resources/tenders-cron/tenders-cron.module';
 import { TendersModule } from './resources/tenders/tenders.module';
 import { TenderWishlistModule } from './resources/tender-wishlist/tender-wishlist.module';
 import { AuthModule } from './resources/auth/auth.module';
@@ -25,16 +24,17 @@ import { FeedbackModule } from './resources/feedback/feedback.module';
 import { TariffModule } from './resources/tariff';
 import { AwardTenderModule } from './resources/award-tender/award-tender.module';
 import { TechModule } from './resources/tech/tech.module';
+import { CronModule } from './resources/cron/cron.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
+    CronModule,
     TedSearchModule,
     CpvModule,
     TenderWishlistModule,
     TendersModule,
-    TendersCronModule,
     TenderGeneralAnalysisModule,
     TenderDeepAnalysisModule,
     DeepSeekModule,

@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DeepSeekModule } from '@/deepseek/deepseek.module';
 import { DbCopyTechController } from './cron/db-copy.tech.controller';
-import { DbCopyTechCron } from './cron/db-copy.tech.cron';
+import { DbCopyCronModule } from '@/resources/cron/db-copy-cron/db-copy-cron.module';
 import { ContractorsTechController } from './contractors/contractors.tech.controller';
 import { ContractorsTechService } from './contractors/contractors.tech.service';
 import { CpvAdmController } from './cpv/cpv.adm.controller';
@@ -12,7 +12,7 @@ import { TendersTechController } from './tenders/tenders.tech.controller';
 import { TendersTechService } from './tenders/tenders.tech.service';
 
 @Module({
-  imports: [DeepSeekModule],
+  imports: [DeepSeekModule, DbCopyCronModule],
   controllers: [
     ContractorsTechController,
     DbCopyTechController,
@@ -23,7 +23,6 @@ import { TendersTechService } from './tenders/tenders.tech.service';
   providers: [
     ContractorsTechService,
     CpvTechService,
-    DbCopyTechCron,
     SitemapTechService,
     TendersTechService,
   ],

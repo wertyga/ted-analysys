@@ -10,7 +10,8 @@ import { TedOpenTendersCollectorService } from '@/resources/ted-open-tenders-col
 import { TenderMatchSource } from '@/resources/tender-matching/tender-match.types';
 import { TenderMatchNotificationsService } from '@/resources/tender-match-notifications/tender-match-notifications.service';
 import { AwardTenderService } from '@/resources/award-tender/award-tender.service';
-import { TENDERS_CRON_CONFIG } from '@/config/tenders-cron.config';
+import { CRON_CONFIG } from '@/config/cron.config';
+import { CronTaskQueueService } from '@/resources/cron/cron-task-queue/cron-task-queue.service';
 
 @Injectable()
 export class TendersCronService {
@@ -26,56 +27,64 @@ export class TendersCronService {
     private readonly tenderMatchingService: TenderMatchingService,
     private readonly tenderMatchNotificationsService: TenderMatchNotificationsService,
     private readonly awardTenderService: AwardTenderService,
+    private readonly cronTaskQueueService: CronTaskQueueService,
   ) {}
 
-  // @Cron(TENDERS_CRON_CONFIG.cron.allCompetitionTenders, {
-  //   timeZone: TENDERS_CRON_CONFIG.timeZone,
+  // @Cron(CRON_CONFIG.tenders.allCompetitionTenders, {
+  //   timeZone: CRON_CONFIG.timeZone,
   // })
-  // async gatherAllCompetitionTenders(): Promise<void> {
-  //   if (this.isGatheringAllCompetitionTenders) {
-  //     this.logger.warn(
-  //       'All competition TED tender gather is already running, skipping',
-  //     );
-  //     return;
-  //   }
-  //
-  //   this.isGatheringAllCompetitionTenders = true;
-  //
-  //   try {
-  //     let matchesSaved = 0;
-  //
-  //     const result = await new TedOpenTendersCollectorService(
-  //       this.tedSearchService,
-  //       this.tendersService,
-  //       this.awardTenderService,
-  //     ).collectOpenTendersFromTed({
-  //       onChangedTenders: async (tenders) => {
-  //         const matches = await this.matchChangedTenders(tenders);
-  //
-  //         matchesSaved += matches.length;
-  //       },
-  //     });
-  //
-  //     await logger.info('TED_ALL_COMPETITION_COLLECTED', {
-  //       ...result,
-  //       matchesSaved,
-  //     });
-  //
-  //     await this.sendInstantTenderMatchReports();
-  //   } catch (e: unknown) {
-  //     const error = e instanceof Error ? e.message : 'unknown error';
-  //
-  //     this.logger.error(`All competition TED tender gather failed: ${error}`);
-  //     await logger.error('TED_ALL_COMPETITION_COLLECTED_FAILED', error);
-  //   } finally {
-  //     this.isGatheringAllCompetitionTenders = false;
-  //   }
-  // }
+  async gatherAllCompetitionTenders(): Promise<void> {
+    if (this.isGatheringAllCompetitionTenders) {
+      this.logger.warn(
+        'All competition TED tender gather is already running, skipping',
+      );
+      return;
+    }
 
-  @Cron(TENDERS_CRON_CONFIG.cron.recentTenders, {
-    timeZone: TENDERS_CRON_CONFIG.timeZone,
+    this.isGatheringAllCompetitionTenders = true;
+
+    try {
+      let matchesSaved = 0;
+
+      const result = await new TedOpenTendersCollectorService(
+        this.tedSearchService,
+        this.tendersService,
+        this.awardTenderService,
+      ).collectOpenTendersFromTed({
+        onChangedTenders: async (tenders) => {
+          const matches = await this.matchChangedTenders(tenders);
+
+          matchesSaved += matches.length;
+        },
+      });
+
+      await logger.info('TED_ALL_COMPETITION_COLLECTED', {
+        ...result,
+        matchesSaved,
+      });
+
+      await this.sendInstantTenderMatchReports();
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e.message : 'unknown error';
+
+      this.logger.error(`All competition TED tender gather failed: ${error}`);
+      await logger.error('TED_ALL_COMPETITION_COLLECTED_FAILED', error);
+    } finally {
+      this.isGatheringAllCompetitionTenders = false;
+    }
+  }
+
+  @Cron(CRON_CONFIG.tenders.recentTenders, {
+    timeZone: CRON_CONFIG.timeZone,
   })
   async gatherRecentCompetitionTenders(): Promise<void> {
+    await this.cronTaskQueueService.runExclusive(
+      'gatherRecentCompetitionTenders',
+      () => this.gatherRecentCompetitionTendersUnsafe(),
+    );
+  }
+
+  private async gatherRecentCompetitionTendersUnsafe(): Promise<void> {
     if (this.isGatheringRecentTenders) {
       this.logger.warn('Recent TED tender gather is already running, skipping');
       return;
@@ -120,10 +129,17 @@ export class TendersCronService {
     }
   }
 
-  @Cron(TENDERS_CRON_CONFIG.cron.recentAwardTenders, {
-    timeZone: TENDERS_CRON_CONFIG.timeZone,
+  @Cron(CRON_CONFIG.tenders.recentAwardTenders, {
+    timeZone: CRON_CONFIG.timeZone,
   })
   async gatherRecentAwardTenders(): Promise<void> {
+    await this.cronTaskQueueService.runExclusive(
+      'gatherRecentAwardTenders',
+      () => this.gatherRecentAwardTendersUnsafe(),
+    );
+  }
+
+  private async gatherRecentAwardTendersUnsafe(): Promise<void> {
     if (this.isGatheringRecentAwardTenders) {
       this.logger.warn(
         'Recent TED award tender gather is already running, skipping',

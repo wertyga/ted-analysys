@@ -5,8 +5,9 @@ import { mkdtemp, readFile, rm, unlink } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { CdnFile, CdnService } from '@/cdn';
+import { CRON_CONFIG } from '@/config/cron.config';
+import { CronTaskQueueService } from '@/resources/cron/cron-task-queue/cron-task-queue.service';
 
-const DEFAULT_DB_COPY_CRON = '0 2 * * *';
 const DEFAULT_DB_COPY_MAX_COPIES = 10;
 
 type DumpFile = {
@@ -26,10 +27,19 @@ export class DbCopyTechCron {
   private readonly cdnService = new CdnService();
   private isRunning = false;
 
-  @Cron(DEFAULT_DB_COPY_CRON, {
-    timeZone: 'Europe/Warsaw',
+  constructor(private readonly cronTaskQueueService: CronTaskQueueService) {}
+
+  @Cron(CRON_CONFIG.databaseCopy.toCdn, {
+    timeZone: CRON_CONFIG.timeZone,
   })
   async copyDatabaseDumpToCdnCron() {
+    await this.cronTaskQueueService.runExclusive(
+      'copyDatabaseDumpToCdnCron',
+      () => this.copyDatabaseDumpToCdnCronUnsafe(),
+    );
+  }
+
+  private async copyDatabaseDumpToCdnCronUnsafe() {
     if (!process.env.DB_COPY_ENABLED) {
       return;
     }
@@ -38,8 +48,6 @@ export class DbCopyTechCron {
       this.logger.warn('Database dump copy is already running, skipping');
       return;
     }
-
-    const cdnPrefix = process.env.DB_COPY_CDN_PREFIX || '/db-dumps';
 
     if (!process.env.DNS_STORAGE || !process.env.DNS_PASSWORD) {
       this.logger.warn('CDN env is not configured, skipping DB copy');

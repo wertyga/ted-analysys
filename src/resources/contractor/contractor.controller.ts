@@ -1,19 +1,13 @@
-import {
-  Controller,
-  Get,
-  NotFoundException,
-  Param,
-  Query,
-} from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import {
   ApiOkResponse,
   ApiOperation,
-  ApiParam,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { ContractorService } from './contractor.service';
 import { ContractorListRequestDto } from './dto/contractor-list-request.dto';
+import { ContractorSearchRequestDto } from './dto/contractor-search-request.dto';
 
 @ApiTags('contractors')
 @Controller('contractors')
@@ -28,18 +22,18 @@ export class ContractorController {
     return this.contractorService.searchContractors(query);
   }
 
-  @Get('identifier/:identifier')
-  @ApiOperation({ summary: 'Get contractor by identifier' })
-  @ApiParam({ name: 'identifier', example: '123456789' })
-  @ApiOkResponse({ description: 'Contractor details.' })
-  async getContractorByIdentifier(@Param('identifier') identifier: string) {
-    const contractor =
-      await this.contractorService.getContractorByIdentifier(identifier);
+  @Get('search')
+  @ApiOperation({ summary: 'Search contractors by text query' })
+  @ApiQuery({ type: ContractorSearchRequestDto })
+  @ApiOkResponse({ description: 'Contractor search result.' })
+  searchContractorsByQuery(@Query() query: ContractorSearchRequestDto) {
+    return this.contractorService.searchContractorsByQuery(query);
+  }
 
-    if (!contractor) {
-      throw new NotFoundException('Contractor not found');
-    }
-
-    return contractor;
+  @Get('stats')
+  @ApiOperation({ summary: 'Get contractor collection stats' })
+  @ApiOkResponse({ description: 'Contractor stats.' })
+  getContractorStats() {
+    return this.contractorService.getContractorStats();
   }
 }

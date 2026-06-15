@@ -5,6 +5,7 @@ import { AwardTenderModel } from '@/resources/award-tender/schemas';
 import { QueryFilter } from 'mongoose';
 import { getPaginationMeta } from '@/utils';
 import { ContractorListRequestDto } from './dto/contractor-list-request.dto';
+import { ContractorSearchRequestDto } from './dto/contractor-search-request.dto';
 
 export interface ContractorNormalized {
   winnerName: string[];
@@ -69,8 +70,88 @@ export class ContractorService {
     };
   }
 
-  async getContractorByIdentifier(identifier: string) {
-    return ContractorModel.findOne({ identifier }).lean();
+  async searchContractorsByQuery({
+    q,
+    page,
+    limit,
+  }: ContractorSearchRequestDto) {
+    const trimmedQuery = q.trim();
+    const pagination = getPaginationMeta({ page, limit });
+
+    if (!trimmedQuery) {
+      return {
+        totalCount: 0,
+        contractors: [],
+      };
+    }
+
+    const searchPattern = new RegExp(this.escapeRegExp(trimmedQuery), 'i');
+    const query: QueryFilter<ContractorDocument> = {
+      $or: [
+        { name: searchPattern },
+        { identifier: searchPattern },
+        { email: searchPattern },
+        { countries: searchPattern },
+        { countrySubs: searchPattern },
+        { cities: searchPattern },
+        { postCodes: searchPattern },
+        { internetAddresses: searchPattern },
+      ],
+    };
+
+    const [contractors, totalCount] = await Promise.all([
+      ContractorModel.find(query)
+        .sort({ name: 1 })
+        .skip(pagination.skip)
+        .limit(pagination.limit)
+        .lean(),
+      ContractorModel.countDocuments(query),
+    ]);
+
+    return {
+      totalCount,
+      contractors,
+    };
+  }
+
+  async getContractorStats() {
+    const [
+      totalCount,
+      withEmailCount,
+      withAwardTendersCount,
+      byCountries,
+      byCpvCodes,
+    ] = await Promise.all([
+      ContractorModel.countDocuments({}),
+      ContractorModel.countDocuments({ email: { $type: 'string', $ne: '' } }),
+      ContractorModel.countDocuments({ 'awardTenders.0': { $exists: true } }),
+      ContractorModel.aggregate<{ value: string; count: number }>([
+        { $unwind: '$countries' },
+        { $match: { countries: { $type: 'string', $ne: '' } } },
+        { $group: { _id: '$countries', count: { $sum: 1 } } },
+        { $sort: { count: -1, _id: 1 } },
+        { $limit: 20 },
+        { $project: { _id: 0, value: '$_id', count: 1 } },
+      ]),
+      ContractorModel.aggregate<{ value: string; count: number }>([
+        { $unwind: '$cpvCodes' },
+        { $match: { cpvCodes: { $type: 'string', $ne: '' } } },
+        { $group: { _id: '$cpvCodes', count: { $sum: 1 } } },
+        { $sort: { count: -1, _id: 1 } },
+        { $limit: 20 },
+        { $project: { _id: 0, value: '$_id', count: 1 } },
+      ]),
+    ]);
+
+    return {
+      totalCount,
+      withEmailCount,
+      withoutEmailCount: totalCount - withEmailCount,
+      withAwardTendersCount,
+      withoutAwardTendersCount: totalCount - withAwardTendersCount,
+      byCountries,
+      byCpvCodes,
+    };
   }
 
   async upsertListAwardWinners(
@@ -287,6 +368,10 @@ export class ContractorService {
 
   private normalizeEmail(email?: string) {
     return email?.trim().toLowerCase() ?? '';
+  }
+
+  private escapeRegExp(value: string) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   private toAddToSetArray(value: unknown) {
