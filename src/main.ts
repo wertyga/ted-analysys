@@ -8,6 +8,7 @@ import { AppModule } from './app.module';
 import mongooseConnect from './mongoose/mongoose';
 import { HttpErrorLoggingFilter } from '@/http-logger/HTTPLogger';
 import { isSearchBot } from '@/utils/bots';
+import { logger } from '@/utils';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
@@ -33,6 +34,9 @@ async function bootstrap() {
     const ua = req.headers['user-agent'];
 
     req.isBot = isSearchBot(Array.isArray(ua) ? ua.join(' ') : ua);
+    if (req.isBot) {
+      logger.info('BOT', ua);
+    }
 
     next();
   });
