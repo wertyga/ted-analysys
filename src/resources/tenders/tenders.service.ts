@@ -17,6 +17,7 @@ import {
 import { TenderGeneralAnalysisService } from '../tender-analysis/tender-general-analysis.service';
 import {
   TenderGeneralAnalysis,
+  TenderGeneralAnalysisDocument,
   TenderGeneralAnalysisModel,
 } from '../tender-analysis/schemas';
 import { TenderListDto } from './dto/tender.dto';
@@ -333,13 +334,22 @@ export class TendersService {
 
   async getLocalTenderWithBaseAnalysis(
     localTender: TenderDocument,
+    withoutBaseAnalysisGenerating: boolean,
     isForceBaseAnalysis?: boolean,
   ): Promise<TenderDocumentWithGeneralAnalysis> {
-    const generalAnalysis =
-      await this.tenderGeneralAnalysisService.ensureAnalysisForTender(
-        localTender,
-        isForceBaseAnalysis,
-      );
+    let generalAnalysis: TenderGeneralAnalysisDocument | null = null;
+
+    if (withoutBaseAnalysisGenerating) {
+      generalAnalysis = await TenderGeneralAnalysisModel.findOne({
+        tenderId: localTender.id,
+      });
+    } else {
+      generalAnalysis =
+        await this.tenderGeneralAnalysisService.ensureAnalysisForTender(
+          localTender,
+          isForceBaseAnalysis,
+        );
+    }
 
     localTender.set(
       'generalAnalysis',
@@ -385,13 +395,23 @@ export class TendersService {
       skip?: number;
       limit?: number;
     } = {},
+    withoutBaseAnalysisGenerating?: boolean,
   ): Promise<TenderDocumentWithGeneralAnalysis[]> {
     const localTenders = await this.fineLocalTenders(tenderQuery, options);
 
-    const generalAnalyses =
-      await this.tenderGeneralAnalysisService.ensureBaseAnalysisForMultipleTenders(
-        localTenders,
-      );
+    let generalAnalyses: TenderGeneralAnalysisDocument[] = [];
+
+    if (withoutBaseAnalysisGenerating) {
+      generalAnalyses = await TenderGeneralAnalysisModel.find({
+        tenderId: { $in: localTenders.map((t) => t.id) },
+      });
+    } else {
+      generalAnalyses =
+        await this.tenderGeneralAnalysisService.ensureBaseAnalysisForMultipleTenders(
+          localTenders,
+        );
+    }
+
     const generalAnalysesByTenderId = new Map(
       generalAnalyses.map((analysis) => [analysis.tenderId, analysis]),
     );
@@ -409,14 +429,20 @@ export class TendersService {
     });
   }
 
-  async findById(id: string): Promise<TenderDocumentWithGeneralAnalysis> {
+  async findById(
+    id: string,
+    withoutBaseAnalysisGenerating: boolean,
+  ): Promise<TenderDocumentWithGeneralAnalysis> {
     const tender = await this.findLocalTender(id);
 
     if (!tender) {
       throw new NotFoundException(`Tender ${id} not found`);
     }
 
-    return this.getLocalTenderWithBaseAnalysis(tender);
+    return this.getLocalTenderWithBaseAnalysis(
+      tender,
+      withoutBaseAnalysisGenerating,
+    );
   }
 
   async fetchTedNoticeByPublicationNumber(
@@ -483,7 +509,11 @@ export class TendersService {
       throw new NotFoundException(`Tender ${publicationNumber} not found`);
     }
 
-    return this.getLocalTenderWithBaseAnalysis(savedTender, shouldUpsertTender);
+    return this.getLocalTenderWithBaseAnalysis(
+      savedTender,
+      false,
+      shouldUpsertTender,
+    );
   }
 
   async upsertIfNeededMultipleTendersWithGeneralAnalysis(notices: TedNotice[]) {
