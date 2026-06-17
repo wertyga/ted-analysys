@@ -34,6 +34,8 @@ async function bootstrap() {
     const ua = req.headers['user-agent'];
 
     req.isBot = isSearchBot(Array.isArray(ua) ? ua.join(' ') : ua);
+    logger.info('UA', ua);
+
     if (req.isBot) {
       logger.info('BOT', ua);
     }
