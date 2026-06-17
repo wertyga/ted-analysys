@@ -23,12 +23,16 @@ import { isRecord } from '@/utils';
 import { AwardTenderService } from '@/resources/award-tender/award-tender.service';
 import { TED_OPEN_TENDERS_COLLECTOR_CONFIG } from '@/config/ted-open-tenders-collector.config';
 import { AWARD_HISTORY_FIELDS } from '@/config/award-tender.config';
+import { AwardTenderDocument } from '@/resources/award-tender/schemas';
 
-export interface TedOpenTendersCollectorOptions {
+export interface TedOpenTendersCollectorOptions<
+  TChangedTender = TenderDocument,
+> {
   pageLimit?: number;
   maxPages?: number;
   iterationNextToken?: string;
-  onChangedTenders?: (tenders: TenderDocument[]) => Promise<void> | void;
+  updateExisting?: boolean;
+  onChangedTenders?: (tenders: TChangedTender[]) => Promise<void> | void;
 }
 
 export interface TedOpenTendersCollectorResult {
@@ -51,7 +55,10 @@ interface TedIterationCollectorParams {
   query: string;
   scope: TedScope;
   fields: string[];
-  options: TedOpenTendersCollectorOptions;
+  options: Pick<
+    TedOpenTendersCollectorOptions,
+    'pageLimit' | 'maxPages' | 'iterationNextToken'
+  >;
   saveNotices: (notices: TedNotice[]) => Promise<TedNoticeBatchSaveResult>;
 }
 
@@ -93,61 +100,34 @@ export class TedOpenTendersCollectorService {
     return this.collectCompetitionTendersFromTed(query, options);
   }
 
-  async collectResultTendersHistoryFromTed(
-    onChangedTenders?: TedOpenTendersCollectorOptions['onChangedTenders'],
+  async collectResultTendersFromTed(
+    {
+      lookbackDays,
+      lookbackYears,
+    }: {
+      lookbackDays?: number;
+      lookbackYears?: number;
+    } = {},
+    options: TedOpenTendersCollectorOptions<AwardTenderDocument>,
   ): Promise<TedOpenTendersCollectorResult> {
     const publicationDateFrom = new Date();
 
-    publicationDateFrom.setFullYear(
-      publicationDateFrom.getFullYear() -
-        TED_OPEN_TENDERS_COLLECTOR_CONFIG.historyResult.yearsBack,
-    );
-
-    const query = buildTedTenderSearchQuery({
-      noticeTypes: TENDER_RESULT_NOTICE_TYPES,
-      publicationDateFrom: getTedDate(publicationDateFrom),
-      publicationDateTo: getTedDate(),
-      winnerSelectionStatus: 'selec-w',
-      sortColumn: TedTenderSortColumn.PUBLICATION_DATE,
-      sortOrder: TedSortOrder.DESC,
-    });
-
-    return this.collectResultTendersFromTed(query, {
-      maxPages: 100_000,
-      pageLimit: 100,
-      onChangedTenders,
-    });
-  }
-
-  async collectRecentResultTendersFromTed(
-    options: TedOpenTendersCollectorOptions = {},
-  ): Promise<TedOpenTendersCollectorResult> {
-    const publicationDateFrom = new Date();
-
-    publicationDateFrom.setDate(
-      publicationDateFrom.getDate() -
-        TED_OPEN_TENDERS_COLLECTOR_CONFIG.recentResult.lookbackDays,
-    );
-
-    const query = buildTedTenderSearchQuery({
-      noticeTypes: TENDER_RESULT_NOTICE_TYPES,
-      publicationDateFrom: getTedDate(publicationDateFrom),
-      publicationDateTo: getTedDate(),
-      winnerSelectionStatus: 'selec-w',
-      sortColumn: TedTenderSortColumn.PUBLICATION_DATE,
-      sortOrder: TedSortOrder.DESC,
-    });
-
-    return this.collectResultTendersFromTed(query, options);
-  }
-
-  private async collectResultTendersFromTed(
-    query: string,
-    options: TedOpenTendersCollectorOptions,
-  ): Promise<TedOpenTendersCollectorResult> {
-    if (!this.awardTenderService) {
-      throw new Error('AwardTenderService is required to collect results');
+    if (lookbackDays) {
+      publicationDateFrom.setDate(publicationDateFrom.getDate() - lookbackDays);
+    } else if (lookbackYears) {
+      publicationDateFrom.setFullYear(
+        publicationDateFrom.getFullYear() - lookbackYears,
+      );
     }
+
+    const query = buildTedTenderSearchQuery({
+      noticeTypes: TENDER_RESULT_NOTICE_TYPES,
+      publicationDateFrom: getTedDate(publicationDateFrom),
+      publicationDateTo: getTedDate(),
+      winnerSelectionStatus: 'selec-w',
+      sortColumn: TedTenderSortColumn.PUBLICATION_DATE,
+      sortOrder: TedSortOrder.DESC,
+    });
 
     return this.collectTedNoticesByIteration({
       query,
@@ -155,18 +135,28 @@ export class TedOpenTendersCollectorService {
       fields: AWARD_HISTORY_FIELDS,
       options,
       saveNotices: async (notices) => {
-        const saveResult =
-          await this.awardTenderService!.saveResultTedTenders(notices);
+        try {
+          const saveResult =
+            await this.awardTenderService!.saveResultTedTenders(notices, {
+              updateExisting: options.updateExisting,
+            });
 
-        if (saveResult.changedTenders.length > 0) {
-          await options.onChangedTenders?.(saveResult.changedTenders);
+          if (saveResult.changedTenders.length > 0) {
+            await options.onChangedTenders?.(saveResult.changedTenders);
+          }
+
+          return {
+            saved: saveResult.saved,
+            updated: saveResult.updated,
+            skipped: saveResult.skipped,
+          };
+        } catch (e) {
+          return {
+            saved: 0,
+            updated: 0,
+            skipped: 0,
+          };
         }
-
-        return {
-          saved: saveResult.saved,
-          updated: saveResult.updated,
-          skipped: saveResult.skipped,
-        };
       },
     });
   }

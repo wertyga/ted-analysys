@@ -10,10 +10,22 @@ import { SitemapTechController } from './sitemap/sitemap.tech.controller';
 import { SitemapTechService } from './sitemap/sitemap.tech.service';
 import { TendersTechController } from './tenders/tenders.tech.controller';
 import { TendersTechService } from './tenders/tenders.tech.service';
+import { AwardTendersTechController } from './award-tenders/award-tenders.tech.controller';
+import { AwardTendersTechService } from './award-tenders/award-tenders.tech.service';
+import { AwardTenderModule } from '@/resources/award-tender/award-tender.module';
+import { TedSearchModule } from '@/resources/ted-search/ted-search.module';
+import { TendersModule } from '@/resources/tenders/tenders.module';
 
 @Module({
-  imports: [DeepSeekModule, DbCopyCronModule],
+  imports: [
+    DeepSeekModule,
+    DbCopyCronModule,
+    AwardTenderModule,
+    TedSearchModule,
+    TendersModule,
+  ],
   controllers: [
+    AwardTendersTechController,
     ContractorsTechController,
     DbCopyTechController,
     SitemapTechController,
@@ -21,6 +33,7 @@ import { TendersTechService } from './tenders/tenders.tech.service';
     CpvAdmController,
   ],
   providers: [
+    AwardTendersTechService,
     ContractorsTechService,
     CpvTechService,
     SitemapTechService,

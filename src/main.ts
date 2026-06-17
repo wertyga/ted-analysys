@@ -7,8 +7,6 @@ import { dirname, isAbsolute, join, normalize } from 'path';
 import { AppModule } from './app.module';
 import mongooseConnect from './mongoose/mongoose';
 import { HttpErrorLoggingFilter } from '@/http-logger/HTTPLogger';
-import { TenderModel } from '@/resources/tenders/schemas';
-import fs from 'node:fs';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });

@@ -12,6 +12,7 @@ import { TenderMatchNotificationsService } from '@/resources/tender-match-notifi
 import { AwardTenderService } from '@/resources/award-tender/award-tender.service';
 import { CRON_CONFIG } from '@/config/cron.config';
 import { CronTaskQueueService } from '@/resources/cron/cron-task-queue/cron-task-queue.service';
+import { TED_OPEN_TENDERS_COLLECTOR_CONFIG } from '@/config/ted-open-tenders-collector.config';
 
 @Injectable()
 export class TendersCronService {
@@ -154,9 +155,15 @@ export class TendersCronService {
         this.tedSearchService,
         this.tendersService,
         this.awardTenderService,
-      ).collectRecentResultTendersFromTed({
-        pageLimit: 1000,
-      });
+      ).collectResultTendersFromTed(
+        {
+          lookbackDays:
+            TED_OPEN_TENDERS_COLLECTOR_CONFIG.recentResult.lookbackDays,
+        },
+        {
+          pageLimit: 1000,
+        },
+      );
 
       devLog(
         `Recent TED award tender gather completed: pages=${result.pagesFetched} fetched=${result.noticesFetched} saved=${result.saved} updated=${result.updated} skipped=${result.skipped}`,

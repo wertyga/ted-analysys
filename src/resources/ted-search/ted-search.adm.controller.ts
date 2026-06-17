@@ -40,11 +40,6 @@ export class TedSearchAdminController {
       noticeTypes: body.noticeTypes ?? TENDER_COMPETITION_NOTICE_TYPES,
     });
 
-    fs.writeFileSync(
-      'ted.json',
-      JSON.stringify(noticeData.notices[0], null, 2),
-    );
-
     const tendersWithBaseAnalysis =
       await this.tendersService.upsertIfNeededMultipleTendersWithGeneralAnalysis(
         noticeData.notices ?? [],
