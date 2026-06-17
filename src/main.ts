@@ -35,12 +35,6 @@ async function bootstrap() {
 
     req.isBot = isSearchBot(Array.isArray(ua) ? ua.join(' ') : ua);
 
-    if (req.isBot) {
-      logger.info('BOT', ua);
-    } else {
-      logger.info('UA', ua);
-    }
-
     next();
   });
 
