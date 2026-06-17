@@ -77,11 +77,17 @@ export class TedSearchService {
     );
 
     const [notices, totalCount] = await Promise.all([
-      this.tendersService.findMultipleLocalTendersWithBaseAnalysis(query, {
-        sort,
-        skip,
-        limit,
-      }),
+      filters.withoutBaseAnalysis
+        ? this.tendersService.fineLocalTenders(query, {
+            sort,
+            skip,
+            limit,
+          })
+        : this.tendersService.findMultipleLocalTendersWithBaseAnalysis(query, {
+            sort,
+            skip,
+            limit,
+          }),
       TenderModel.countDocuments(query).exec(),
     ]);
 

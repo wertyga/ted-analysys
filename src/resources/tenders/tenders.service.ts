@@ -363,6 +363,21 @@ export class TendersService {
     return tedTender;
   }
 
+  async fineLocalTenders(
+    tenderQuery: Record<string, unknown>,
+    options: {
+      sort?: Record<string, SortOrder>;
+      skip?: number;
+      limit?: number;
+    } = {},
+  ) {
+    return TenderModel.find(tenderQuery)
+      .sort(options.sort ?? {})
+      .skip(options.skip ?? 0)
+      .limit(options.limit ?? 0)
+      .populate(tenderCpvPopulateFields);
+  }
+
   async findMultipleLocalTendersWithBaseAnalysis(
     tenderQuery: Record<string, unknown>,
     options: {
@@ -371,12 +386,8 @@ export class TendersService {
       limit?: number;
     } = {},
   ): Promise<TenderDocumentWithGeneralAnalysis[]> {
-    const localTenders = await TenderModel.find(tenderQuery)
-      .sort(options.sort ?? {})
-      .skip(options.skip ?? 0)
-      .limit(options.limit ?? 0)
-      .populate(tenderCpvPopulateFields)
-      .exec();
+    const localTenders = await this.fineLocalTenders(tenderQuery, options);
+
     const generalAnalyses =
       await this.tenderGeneralAnalysisService.ensureBaseAnalysisForMultipleTenders(
         localTenders,
