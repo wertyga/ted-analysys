@@ -1,4 +1,4 @@
-import { TenderLotAnalysisInput } from './tenderAnalysis';
+import { TenderLot } from '@/resources/tenders/schemas';
 
 export type TenderDeepRecommendation =
   | 'strong_go'
@@ -589,7 +589,6 @@ export interface CpvAnalysisRef {
 
 export interface TenderAnalysisTenderDto {
   id: string;
-  publicationNumber?: string;
   noticeType?: string;
   noticeSubtype?: string;
   noticeVersion?: string;
@@ -597,7 +596,7 @@ export interface TenderAnalysisTenderDto {
   title?: string;
   titleProc?: string;
   description?: string;
-  lots?: TenderLotAnalysisInput[];
+  lots: TenderLot[];
   estimatedValue?: {
     amount: number | null;
     currency: string | null;
@@ -618,8 +617,10 @@ export interface TenderAnalysisTenderDto {
   questionsDeadline?: string;
   plannedStartDate?: string;
   plannedEndDate?: string;
-  durationPeriodValue?: string;
-  durationPeriodUnit?: string;
+  duration?: {
+    value: number | null | undefined;
+    unit: string | null;
+  };
   contractNature?: string;
   legalBasis?: string;
   isDps?: boolean;
@@ -629,7 +630,6 @@ export interface TenderAnalysisTenderDto {
   cpvCodes?: string[];
   placeOfPerformanceCountries?: string[];
   placeOfPerformanceCities?: string[];
-  internalLotIdentifiers?: string[];
   documentUrls?: string[];
   submissionUrls?: string[];
   documentAccess?: unknown;

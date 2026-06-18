@@ -377,9 +377,52 @@ export abstract class BaseLlmAnalysisService {
         summary: this.requireString(item, 'summary'),
         cpvCodes: this.requireStringArray(item, 'cpvCodes'),
         estimatedValue: this.requireLotEstimatedValue(estimatedValue),
+        awardCriteria: this.requireLotAwardCriteria(item.awardCriteria),
         deadline,
         source,
       };
+    });
+  }
+
+  protected requireLotAwardCriteria(
+    value: unknown,
+  ): GeneralTenderAnalysisResult['lots'][number]['awardCriteria'] {
+    if (!Array.isArray(value)) {
+      throw new Error(
+        `${this.providerName} analysis lot awardCriteria must be an array`,
+      );
+    }
+
+    return value.map((item) => {
+      if (!isRecord(item)) {
+        throw new Error(
+          `${this.providerName} analysis lot awardCriteria item must be an object`,
+        );
+      }
+
+      const type = item.type;
+      const description = item.description;
+      const weight = item.weight;
+
+      if (type !== null && typeof type !== 'string') {
+        throw new Error(
+          `${this.providerName} analysis lot awardCriteria.type must be string or null`,
+        );
+      }
+
+      if (description !== null && typeof description !== 'string') {
+        throw new Error(
+          `${this.providerName} analysis lot awardCriteria.description must be string or null`,
+        );
+      }
+
+      if (weight !== null && typeof weight !== 'string') {
+        throw new Error(
+          `${this.providerName} analysis lot awardCriteria.weight must be string or null`,
+        );
+      }
+
+      return { type, description, weight };
     });
   }
 

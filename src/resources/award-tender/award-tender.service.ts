@@ -3,7 +3,7 @@ import { TedSearchService } from '@/resources/ted-search/ted-search.service';
 import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
 import { TedContractNature } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
 import { TenderDocument, TenderModel } from '@/resources/tenders/schemas';
-import { TenderNormalizerService } from '@/resources/tenders/tender-normalizer.service';
+import { TenderNormalizerService } from '@/resources/tender-normalizer/tender-normalizer.service';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import {
   AwardTenderModel,
@@ -21,6 +21,7 @@ import {
   getDateArrayValue,
   getDateValue,
   getEngValueOrFirst,
+  getLatestDate,
   getNumberArrayValue,
   getNumberValue,
   getPaginationMeta,
@@ -30,14 +31,14 @@ import {
   parseNoticeDateTime,
 } from '@/utils';
 import { QueryFilter } from 'mongoose';
-import fs from 'node:fs';
+import { NormalizedTenderLot } from '@/resources/tender-normalizer/tender-normalizer.service';
 
-type NormalizedAwardTenderLot = Omit<
+export type NormalizedAwardTenderLot = Omit<
   AwardTenderLot,
   'estimatedValueEur' | 'awardValueEur'
 >;
 
-type NormalizedAwardTenderN = Omit<
+type NormalizedAwardTender = Omit<
   AwardTender,
   '_id' | 'estimatedValueEur' | 'awardValueEur' | 'winners' | 'lots'
 > & {
@@ -58,163 +59,10 @@ export interface SaveAwardTedTendersOptions {
 @Injectable()
 export class AwardTenderService {
   constructor(
-    private readonly tedSearchService: TedSearchService,
     private tenderNormalizer: TenderNormalizerService,
     private readonly tendersService: TendersService,
     private readonly contractorService: ContractorService,
   ) {}
-
-  normalizeAwardTenderLotsNotice(
-    notice: TedNotice,
-  ): NormalizedAwardTenderLot[] {
-    const data = {
-      identifiers: getArrayValue('identifier-lot', notice),
-      resultLotIdentifiers: getArrayValue('result-lot-identifier', notice), // Only award
-      titles: getEngValueOrFirst('title-lot', notice),
-      descriptions: getEngValueOrFirst('description-lot', notice),
-      mainClassifications: getArrayValue('main-classification-lot', notice),
-      additionalClassifications: getArrayValue(
-        'additional-classification-lot',
-        notice,
-      ),
-      contractNatures: getArrayValue('contract-nature-main-lot', notice),
-      estimatedValues: getNumberArrayValue('estimated-value-lot', notice),
-      estimatedValuesCurs: getArrayValue('estimated-value-cur-lot', notice),
-      frameworkMaximumValues: getNumberArrayValue(
-        'framework-maximum-value-lot',
-        notice,
-      ),
-      frameworkMaximumValuesCurs: getArrayValue(
-        'framework-maximum-value-cur-lot',
-        notice,
-      ),
-      areFrameworkAgreements: getArrayValue(
-        'framework-agreement-lot',
-        notice,
-      ).map((s) => !!s && s !== 'none'),
-      plannedEndDates: getDateArrayValue(
-        'contract-duration-end-date-lot',
-        notice,
-      ),
-      dpsUsages: getArrayValue('dps-usage-lot', notice).map(
-        (c) => !!c && c !== 'none',
-      ),
-      durationPeriodValues: getNumberArrayValue(
-        'duration-period-value-lot',
-        notice,
-      ),
-      durationPeriodUnits: getArrayValue('duration-period-unit-lot', notice),
-      deadlineDates: getArrayValue('deadline-receipt-tender-date-lot', notice),
-      deadlineTimes: getArrayValue('deadline-receipt-tender-time-lot', notice),
-      documentUrls: getArrayValue('document-url-lot', notice),
-      submissionUrls: getArrayValue('submission-url-lot', notice),
-      electronicSubmissions: getArrayValue('electronic-submission-lot', notice),
-      awardCriterionTypes: getArrayValue('award-criterion-type-lot', notice),
-      awardCriterionNumberWeights: getArrayValue(
-        'award-criterion-number-weight-lot',
-        notice,
-      ),
-      awardCriterionDescriptions: getEngValueOrFirst(
-        'award-criterion-description-lot',
-        notice,
-      ),
-      selectionCriterionNames: getArrayValue(
-        'selection-criterion-name-lot',
-        notice,
-      ),
-      selectionCriterionDescriptions: getArrayValue(
-        'selection-criterion-description-lot',
-        notice,
-      ),
-      placeOfPerformanceCountries: getArrayValue(
-        'place-of-performance-country-lot',
-        notice,
-      ),
-      placeOfPerformanceCities: getArrayValue(
-        'place-of-performance-city-lot',
-        notice,
-      ),
-      placeOfPerformanceSubdivisions: getArrayValue(
-        'place-of-performance-subdiv-lot',
-        notice,
-      ),
-      resultValues: getNumberArrayValue('result-value-lot', notice),
-      resultValuesCurs: getArrayValue('result-value-cur-lot', notice),
-    };
-
-    const length = Math.max(...Object.values(data).map((v) => v?.length ?? 0));
-
-    if (length === 0) {
-      return [];
-    }
-
-    return Array.from({ length }, (_, i) => {
-      return {
-        identifier: data.identifiers?.[i] ?? data.resultLotIdentifiers?.[i],
-        title: data.titles?.[i],
-        plannedEndDate: data.plannedEndDates?.[i],
-        description: data.descriptions?.[i],
-        mainClassifications: (Array.isArray(data.mainClassifications?.[i])
-          ? data.mainClassifications?.[i]
-          : [data.mainClassifications?.[i]]
-        ).filter(Boolean),
-        additionalClassifications: (Array.isArray(
-          data.additionalClassifications?.[i],
-        )
-          ? data.additionalClassifications?.[i]
-          : [data.additionalClassifications?.[i]]
-        ).filter(Boolean),
-        contractNature: data.contractNatures?.[i],
-        estimatedValue: {
-          amount: data.estimatedValues?.[i] ?? null,
-          currency:
-            data.estimatedValuesCurs?.[i] ?? data.estimatedValuesCurs?.[0],
-        },
-        frameworkMaximumValue: {
-          amount: data.frameworkMaximumValues?.[i] ?? null,
-          currency:
-            data.frameworkMaximumValuesCurs?.[i] ??
-            data.frameworkMaximumValuesCurs?.[0],
-        },
-        isFrameworkAgreement: data.areFrameworkAgreements?.[i],
-        isDps: data.dpsUsages?.[i],
-        duration: {
-          value: data.durationPeriodValues?.[i],
-          unit: data.durationPeriodUnits?.[i] ?? '',
-        },
-
-        documentUrls: Array.isArray(data.documentUrls?.[i])
-          ? data.documentUrls?.[i]
-          : [data.documentUrls?.[i]].filter(Boolean),
-        submissionUrls: Array.isArray(data.submissionUrls?.[i])
-          ? data.submissionUrls?.[i]
-          : [data.submissionUrls?.[i]].filter(Boolean),
-        electronicSubmission: data.electronicSubmissions?.[i],
-        deadlineReceiptTender: parseNoticeDateTime(
-          data.deadlineDates?.[i],
-          data.deadlineTimes?.[i],
-        ),
-        placeOfPerformanceCountry: data.placeOfPerformanceCountries?.[i],
-        placeOfPerformanceSubdivision: data.placeOfPerformanceSubdivisions?.[i],
-        placeOfPerformanceCity: data.placeOfPerformanceCities?.[i],
-
-        awardCriteria: {
-          type: data.awardCriterionTypes?.[i],
-          description: data.awardCriterionDescriptions?.[i],
-          weight: data.awardCriterionNumberWeights?.[i],
-        },
-        selectionCriteria: {
-          name: data.selectionCriterionNames?.[i],
-          description: data.selectionCriterionDescriptions?.[i],
-        },
-
-        awardValue: {
-          amount: data.resultValues?.[i] ?? null,
-          currency: data.resultValuesCurs?.[i] ?? data.resultValuesCurs?.[0],
-        },
-      };
-    }).filter((l) => !!l.identifier);
-  }
 
   normalizeWinnersNotice(notice: TedNotice): WinnerNormalized[] {
     const data: Record<keyof WinnerNormalized, string[] | boolean[]> = {
@@ -261,8 +109,29 @@ export class AwardTenderService {
     return winners;
   }
 
-  normalizeAwardTenderNotice(notice: TedNotice): NormalizedAwardTenderN {
-    const awardLots = this.normalizeAwardTenderLotsNotice(notice);
+  normalizeAwardLotsNotice(notice: TedNotice): NormalizedAwardTenderLot[] {
+    const data = {
+      resultValues: getNumberArrayValue('result-value-lot', notice),
+      resultValuesCurs: getArrayValue('result-value-cur-lot', notice),
+      resultLotIdentifiers: getArrayValue('result-lot-identifier', notice),
+    };
+
+    const tenderLots = this.tenderNormalizer.normalizeTenderLotsNotice(notice);
+
+    return tenderLots.map((l, i) => {
+      return {
+        ...l,
+        resultLotIdentifier: data.resultLotIdentifiers?.[i],
+        awardValue: {
+          amount: data.resultValues?.[i] ?? null,
+          currency: data.resultValuesCurs?.[i] ?? data.resultValuesCurs?.[0],
+        },
+      };
+    });
+  }
+
+  normalizeAwardTenderNotice(notice: TedNotice): NormalizedAwardTender {
+    const awardLots = this.normalizeAwardLotsNotice(notice);
 
     const frameworkData =
       this.tenderNormalizer.normalizeFrameworkFromTEDNotice(notice);
@@ -315,19 +184,14 @@ export class AwardTenderService {
     };
 
     const lotsCodes: string[] = awardLots.flatMap(
-      ({ mainClassifications, additionalClassifications }) => {
+      ({ mainClassification, additionalClassifications }) => {
         return [
-          ...(mainClassifications ?? []),
+          ...(mainClassification ?? []),
           ...(additionalClassifications ?? []),
         ];
       },
     );
-    const maxEndDate = Math.max(
-      ...awardLots
-        .filter((d) => !!d.plannedEndDate)
-        .map((d) => new Date(d.plannedEndDate as unknown as string).getTime()),
-      0,
-    );
+    const maxEndDate = getLatestDate(awardLots.map((l) => l.plannedEndDate));
 
     return {
       ...data,
@@ -341,10 +205,11 @@ export class AwardTenderService {
         ['result-value-cur-notice', 'total-value-cur'],
         notice,
       ),
-      estimatedValue: {
-        amount: data.estimatedValue ?? null,
-        currency: data.estimatedValueCur ?? null,
-      },
+      estimatedValue: this.tenderNormalizer.getMoneyValueFromNotice(
+        ['estimated-value-proc', 'total-value'],
+        ['estimated-value-cur-proc', 'total-value-cur'],
+        notice,
+      ),
       cpvCodes: Array.from(
         new Set([
           ...lotsCodes,
@@ -368,7 +233,7 @@ export class AwardTenderService {
         awardLots.map((l) => l.placeOfPerformanceSubdivision),
       ),
 
-      plannedEndDate: maxEndDate ? new Date(maxEndDate) : undefined,
+      plannedEndDate: maxEndDate,
     };
   }
 
@@ -480,7 +345,6 @@ export class AwardTenderService {
           $set: insertPayload,
           $unset: {
             additionalClassificationLot: '',
-            classificationCpv: '',
             descriptionLot: '',
             internalLotIdentifiers: '',
             mainClassificationLot: '',

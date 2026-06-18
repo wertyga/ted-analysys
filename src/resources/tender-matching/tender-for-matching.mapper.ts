@@ -37,8 +37,10 @@ export function mapTenderForMatching(
         : []),
     ],
     buyerName: readString(tender.buyerName),
-    titleLot: readStringArray(tender.titleLot),
-    descriptionLot: readStringArray(tender.descriptionLot),
+    lotTitles: readStringArray(tender.lots?.map((lot) => lot.title)),
+    lotDescriptions: readStringArray(
+      tender.lots?.map((lot) => lot.description),
+    ),
   };
 }
 

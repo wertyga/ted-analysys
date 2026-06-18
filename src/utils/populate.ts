@@ -7,15 +7,11 @@ export const companyCpvPopulateFields: PopulateOptions[] = [
 ];
 
 export const tenderCpvPopulateFields: PopulateOptions[] = [
-  { path: 'classificationCpv', select: CPV_CODES_LIST_FIELDS },
-  { path: 'mainClassificationProc', select: CPV_CODES_LIST_FIELDS },
-  { path: 'mainClassificationLot', select: CPV_CODES_LIST_FIELDS },
-  { path: 'additionalClassificationLot', select: CPV_CODES_LIST_FIELDS },
 ];
 
 export const deepAnalysisPopulateFields: PopulateOptions[] = [
   { path: 'generalAnalysis' },
-  { path: 'tender', populate: tenderCpvPopulateFields },
+  { path: 'tender' },
   { path: 'company', populate: companyCpvPopulateFields },
 ];
 

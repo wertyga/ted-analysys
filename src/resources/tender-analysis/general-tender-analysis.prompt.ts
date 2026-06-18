@@ -1,5 +1,5 @@
 export const GENERAL_TENDER_ANALYSIS_PROMPT_VERSION =
-  'general-tender-analysis-v2';
+  'general-tender-analysis-v5';
 
 export function buildGeneralTenderAnalysisPrompt(
   outputLanguage: string,
@@ -28,7 +28,10 @@ export function buildGeneralTenderAnalysisPrompt(
     'Use tender.lots together with the general description to understand lot-specific scope, CPVs, values, deadlines, submission channels, selection criteria, and award criteria.',
     'When tender.lots is present, return one lots item for every tender.lots item, preserving the same order and count. Do not omit later lots even when their descriptions or CPV codes repeat earlier lots.',
     'If tender.lots is missing, empty, or incomplete, inspect DOCUMENTS for explicit lot sections, lot numbers, lot titles, lot descriptions, lot values, lot CPVs, lot deadlines, and lot-specific criteria, and include those document-derived lots in the analysis.',
-    'For each returned lot, preserve explicit lot identifier and title when available, summarize the lot-specific scope, include CPV codes, value, and deadline only when explicitly present, and set source to STRUCTURED_DATA, XML_NOTICE, or DOCUMENT_TEXT.',
+    'For each returned lot, preserve the explicit lot identifier when available, summarize the lot-specific scope, include CPV codes, value, and deadline only when explicitly present, and set source to STRUCTURED_DATA, XML_NOTICE, or DOCUMENT_TEXT.',
+    'Return lots[*].title in English only. Do not copy a non-English source lot title into lots[*].title. Translate source lot titles to concise English titles. Preserve the original lot identifier separately in lots[*].identifier.',
+    'If a source lot title is not in English and cannot be translated confidently, create a short English descriptive title from the lot description, CPV codes, or scope, for example "System Development and Maintenance".',
+    'For each returned lot, include lots[*].awardCriteria as an array. Use the lot-specific tender.lots[*].awardCriteria when available. Translate awardCriteria[*].description to English. Keep awardCriteria[*].type and awardCriteria[*].weight as explicit source values when available. Use [] when no lot-specific award criteria are provided.',
     'When lots are extracted only from DOCUMENTS, clearly indicate in the relevant summary, scope, value, criteria, or risk text that the lot information comes from document text.',
     'If lots differ, mention lot-specific scope instead of flattening everything into one generic summary.',
     'If multiple lots are present, analyze all provided lots at a useful summary level.',
@@ -74,8 +77,8 @@ export function buildGeneralTenderAnalysisPrompt(
     'If place of performance differs by lot, mention the lot-level performance locations.',
 
     'TRACEABILITY',
-    'Pay attention to noticeVersion and publicationNumber for traceability.',
-    'Do not include noticeVersion or publicationNumber unless relevant to the analysis, inconsistency, or traceability issue.',
+    'Pay attention to noticeVersion and tender id for traceability.',
+    'Do not include noticeVersion or tender id unless relevant to the analysis, inconsistency, or traceability issue.',
 
     'SCORING',
     'complexityScore, opportunityScore, and confidenceScore must be numbers from 0 to 100.',

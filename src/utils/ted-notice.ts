@@ -1,6 +1,48 @@
 import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
 import { readNumber, readDate } from './checking';
 
+function booleanFromValue(value: unknown): boolean | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  const text = String(value)?.trim().toLowerCase();
+
+  if (text === undefined || text.length === 0) {
+    return undefined;
+  }
+
+  if (['true', '1', 'yes', 'y'].includes(text)) {
+    return true;
+  }
+
+  if (['false', '0', 'no', 'n', 'none', 'not-allowed'].includes(text)) {
+    return false;
+  }
+
+  return undefined;
+}
+
+function systemCodeFlagFromValue(value: unknown): boolean | undefined {
+  const parsedBoolean = booleanFromValue(value);
+
+  if (parsedBoolean !== undefined) {
+    return parsedBoolean;
+  }
+
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  const text = String(value)?.trim().toLowerCase();
+
+  if (text === undefined || text.length === 0) {
+    return undefined;
+  }
+
+  return text !== 'none';
+}
+
 export const getArrayValue = (field: string, notice: TedNotice) => {
   return Array.isArray(notice[field]) ? notice[field] : [notice[field]];
 };
@@ -12,9 +54,9 @@ export const getStringArrayValue = (field: string, notice: TedNotice) => {
 };
 
 export const getBooleanArrayValue = (field: string, notice: TedNotice) => {
-  return getArrayValue(field, notice).map((f) =>
-    Boolean(typeof f === 'string' ? f.trim() : f),
-  );
+  return getArrayValue(field, notice)
+    .map(systemCodeFlagFromValue)
+    .filter((value): value is boolean => value !== undefined);
 };
 
 export const getStringValue = (field: string, notice: TedNotice) => {
@@ -140,6 +182,40 @@ export function getUniqArray<T>(...params: T[][] | T[]): any[] {
   return Array.from(set).filter(Boolean);
 }
 
+function getComparableValue(value: unknown): string {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (value !== null && typeof value === 'object') {
+    return JSON.stringify(value);
+  }
+
+  return String(value);
+}
+
+export function getCommonArrayValue<T>(
+  values: Array<T | null | undefined | ''>,
+): T | undefined {
+  const nonEmptyValues = values.filter(
+    (value): value is T =>
+      value !== undefined && value !== null && value !== '',
+  );
+
+  if (nonEmptyValues.length === 0) {
+    return undefined;
+  }
+
+  const firstValue = nonEmptyValues[0];
+  const firstComparableValue = getComparableValue(firstValue);
+
+  return nonEmptyValues.every(
+    (value) => getComparableValue(value) === firstComparableValue,
+  )
+    ? firstValue
+    : undefined;
+}
+
 export function normalizeEmail(email?: string) {
   return email?.trim().toLowerCase() ?? '';
 }
@@ -153,4 +229,31 @@ export function parseNoticeDateTime(
   }
 
   return readDate(time ? `${date}T${time}` : date) ?? undefined;
+}
+
+function getDatesSorted<
+  T extends Date | string | undefined | Record<string, unknown>,
+>(dates: T[], direction: 'DESC' | 'ASC', key?: string): T {
+  return dates.filter(Boolean).sort((a, b) => {
+    const aDate = new Date(key ? a?.[key] : a).getTime();
+    const bDate = new Date(key ? b?.[key] : b).getTime();
+
+    if (direction === 'DESC') {
+      return aDate - bDate;
+    }
+
+    return bDate - aDate;
+  })?.[0];
+}
+
+export function getEarliestDate<
+  T extends Date | string | undefined | Record<string, unknown>,
+>(dates: T[], key?: string) {
+  return getDatesSorted(dates, 'DESC', key);
+}
+
+export function getLatestDate<
+  T extends Date | string | undefined | Record<string, unknown>,
+>(dates: T[], key?: string) {
+  return getDatesSorted(dates, 'ASC', key);
 }

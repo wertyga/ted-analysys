@@ -12,9 +12,9 @@ export class AwardTendersTechService {
     private readonly tendersService: TendersService,
     private readonly awardTenderService: AwardTenderService,
   ) {
-    // setTimeout(() => {
-    //   this.refreshAwardTendersHistory();
-    // }, 3000);
+    setTimeout(() => {
+      // this.refreshAwardTendersHistory();
+    }, 3000);
   }
 
   refreshAwardTendersHistory() {

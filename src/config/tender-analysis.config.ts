@@ -5,6 +5,7 @@ export const TENDER_ANALYSIS_CONFIG = {
   },
   baseAnalysis: {
     concurrency: 20,
+    processingTimeoutMs: 3 * 60 * 1000,
   },
   freeBasicAnalysisFields: [
     'summary',

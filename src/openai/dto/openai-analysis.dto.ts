@@ -1,4 +1,4 @@
-import { TenderLotAnalysisInput } from '@/types';
+import { TenderLot } from '@/resources/tenders/schemas';
 
 export type AnalysisOutputLanguage = 'en' | 'ru' | 'pl' | 'de' | 'fr';
 export type RiskSeverity = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -36,11 +36,10 @@ export interface GeneralTenderAnalysisInput {
   outputLanguage?: AnalysisOutputLanguage;
   tender: {
     id: string;
-    publicationNumber?: string | null;
     title?: string | null;
     procedureTitle?: string | null;
     description?: string | null;
-    lots?: TenderLotAnalysisInput[];
+    lots: TenderLot[];
     buyerName?: string | null;
     buyerIdentifier?: string | null;
     country?: string | null;
@@ -60,15 +59,13 @@ export interface GeneralTenderAnalysisInput {
     plannedStartDate?: string | null;
     plannedEndDate?: string | null;
     duration?: {
-      value?: string | null;
+      value?: number | null;
       unit?: string | null;
     };
     contractNature?: string | null;
     legalBasis?: string | null;
     cpvCodes?: string[];
     mainCpv?: string[];
-    lotMainCpvs?: string[];
-    lotAdditionalCpvs?: string[];
     estimatedValue?: {
       amount: number | null;
       currency: string | null;
@@ -77,7 +74,6 @@ export interface GeneralTenderAnalysisInput {
       countries?: string[];
       cities?: string[];
     };
-    internalLotIdentifiers?: string[];
     documentUrls?: string[];
     submissionUrls?: string[];
     flags?: {
@@ -107,6 +103,11 @@ export interface GeneralTenderAnalysisResult {
       currency: string | null;
       description: string | null;
     } | null;
+    awardCriteria: Array<{
+      type: string | null;
+      description: string | null;
+      weight: string | null;
+    }>;
     deadline: string | null;
     source: TenderAnalysisLotSource;
   }>;

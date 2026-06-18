@@ -11,37 +11,56 @@ export type TenderDocumentsLinks = Record<
   Record<string, string>
 >;
 
+export type MoneyValue = number | null | undefined;
+
+export interface TenderDuration {
+  value: number | null | undefined;
+  unit: string | null;
+}
+
 export interface TenderLot {
   identifier?: string;
-  internalIdentifier?: string;
   title?: string;
   description?: string;
   mainClassification?: string[];
   additionalClassifications?: string[];
   contractNature?: string;
+  plannedStartDate?: Date;
+  plannedEndDate?: Date;
   estimatedValue?: {
-    amount: number | null;
+    amount: MoneyValue;
     currency: string | null;
   };
   frameworkMaximumValue?: {
-    amount: number | null;
+    amount: MoneyValue;
     currency: string | null;
   };
   isFrameworkAgreement?: boolean;
   isDps?: boolean;
-  durationPeriodValue?: string;
-  durationPeriodUnit?: string;
-  deadlineReceiptTender?: Date;
-  documentUrls?: string[];
-  submissionUrls?: string[];
+  isSME?: boolean;
+  isEuFunded?: boolean;
+
+  duration?: TenderDuration;
+
+  deadlineReceiptTender: Date | undefined;
+  questionsDeadline: Date | undefined;
+  documentUrls: string[];
+  submissionUrls: string[];
   electronicSubmission?: string;
-  submissionLanguages?: string[];
-  placeOfPerformanceCountries?: string[];
-  placeOfPerformanceSubdivisions?: string[];
-  placeOfPerformanceCities?: string[];
-  awardCriteria?: unknown[];
-  selectionCriteria?: unknown[];
+  placeOfPerformanceCountry?: string;
+  placeOfPerformanceSubdivision?: string;
+  placeOfPerformanceCity?: string;
+  awardCriteria?: {
+    type: string | null | undefined;
+    description: string | null | undefined;
+    weight: string | null | undefined;
+  };
+  selectionCriteria?: {
+    name: string | null | undefined;
+    description: string | null | undefined;
+  };
   selectionCriteriaSource?: string;
+  estimatedValueEur?: MoneyValue;
 }
 
 export interface TenderShortTitle {
@@ -56,8 +75,6 @@ export interface Tender {
   _id: string;
   /** Local canonical id. For TED tenders this is the publication number. */
   id: string;
-  /** TED/OJ publication number, e.g. 756265-2023. Useful for display and manual search. */
-  publicationNumber?: string;
   /** TED notice-type: notice kind such as contract notice, award notice, or planning notice. */
   noticeType?: string;
   /** TED notice-subtype: more specific eForms subtype inside the notice type. */
@@ -72,12 +89,8 @@ export interface Tender {
   shortTitle?: TenderShortTitle;
   /** TED title-proc: title at procedure level. */
   titleProc?: string;
-  /** TED title-lot: titles of individual lots. */
-  titleLot?: string[];
   /** TED description-proc, with lot description fallback when procedure description is absent. */
   description?: string;
-  /** TED description-lot: descriptions of individual lots, useful for matching and AI analysis. */
-  descriptionLot?: string[];
   /** Estimated value selected from procedure value first, then lot value fallback. */
   estimatedValue?: {
     amount: number | null;
@@ -119,10 +132,8 @@ export interface Tender {
   plannedStartDate?: Date;
   /** TED contract-duration-end-date-lot: latest planned lot contract end date. */
   plannedEndDate?: Date;
-  /** TED duration-period-value-lot: numeric contract duration value when dates are not enough. */
-  durationPeriodValue?: string;
-  /** TED duration-period-unit-lot: duration unit such as day, month, or year. */
-  durationPeriodUnit?: string;
+  /** TED duration-period-*-lot lifted to tender level when all lots share the same duration. */
+  duration?: TenderDuration;
   /** TED contract-nature: works, supplies, or services. */
   contractNature?: string;
   /** TED legal-basis: legal act or directive/regulation basis for the procedure. */
@@ -135,20 +146,16 @@ export interface Tender {
   isSmeSuitable?: boolean;
   /** TED electronic-submission-lot: electronic submission requirement/availability value. */
   electronicSubmission?: string;
-  /** Mongo ObjectId references to CpvCategory documents from TED main-classification-proc. */
-  mainClassificationProc?: unknown[];
-  /** Mongo ObjectId references to CpvCategory documents from TED main-classification-lot. */
-  mainClassificationLot?: unknown[];
-  /** Mongo ObjectId references to CpvCategory documents from TED additional-classification-lot. */
-  additionalClassificationLot?: unknown[];
+  /** TED main-classification-proc CPV codes. */
+  mainClassificationProc?: string[];
   /** TED place-of-performance-country-* fields: countries where the contract is performed. */
   placeOfPerformanceCountries?: string[];
   /** TED place-of-performance-city-* fields: cities where the contract is performed. */
   placeOfPerformanceCities?: string[];
+  /** TED place-of-performance-subdiv-* fields: subdivisions where the contract is performed. */
+  placeOfPerformanceSubdivisions?: string[];
   /** TED lot-level fields grouped by lot index. */
   lots?: TenderLot[];
-  /** TED internal-identifier-lot: stable lot references across notices/stages. */
-  internalLotIdentifiers?: string[];
   /** TED document-url-lot: procurement document URLs. */
   documentUrls?: string[];
   /** TED submission-url-lot: URLs where tenders/submissions are filed. */
@@ -159,10 +166,8 @@ export interface Tender {
   selectionCriteria?: unknown[];
   /** TED award-criterion-*-lot: lot-level award criteria names/descriptions/types/weights. */
   awardCriteria?: unknown[];
-  /** Mongo ObjectId references to CpvCategory documents resolved from cpvCodes. */
-  classificationCpv?: unknown[];
   /** Aggregated raw CPV code strings from classification/main/additional CPV fields. */
-  cpvCodes?: unknown[];
+  cpvCodes?: string[];
   /** Raw TED links object, including notice/XML/HTML/document links when returned. */
   links?: TenderDocumentsLinks;
   /** Hash of the normalized tender source fields used to detect tender changes. */
@@ -183,7 +188,6 @@ export interface TenderModelType extends Model<TenderDocument> {
 const TenderSchema = new Schema<TenderDocument, TenderModelType>(
   {
     id: { type: String, required: true, unique: true, index: true },
-    publicationNumber: { type: String, index: true },
     noticeType: String,
     noticeSubtype: String,
     noticeVersion: String,
@@ -197,9 +201,7 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
       ru: String,
     },
     titleProc: String,
-    titleLot: { type: [String], default: undefined },
     description: String,
-    descriptionLot: { type: [String], default: undefined },
     estimatedValue: {
       amount: { type: Number, default: null },
       currency: { type: String, default: null },
@@ -228,8 +230,10 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
     questionsDeadline: Date,
     plannedStartDate: Date,
     plannedEndDate: Date,
-    durationPeriodValue: String,
-    durationPeriodUnit: String,
+    duration: {
+      value: { type: Number, default: null },
+      unit: { type: String, default: null },
+    },
     contractNature: String,
     legalBasis: String,
     isDps: {
@@ -248,41 +252,20 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
       index: true,
     },
     electronicSubmission: String,
-    mainClassificationProc: {
-      type: [Schema.Types.ObjectId],
-      ref: 'CpvCategory',
-      default: [],
-    },
-    mainClassificationLot: {
-      type: [Schema.Types.ObjectId],
-      ref: 'CpvCategory',
-      default: [],
-    },
-    additionalClassificationLot: {
-      type: [Schema.Types.ObjectId],
-      ref: 'CpvCategory',
-      default: [],
-    },
-    placeOfPerformanceCountries: { type: [String], default: undefined },
-    placeOfPerformanceCities: { type: [String], default: undefined },
-    lots: { type: [Schema.Types.Mixed], default: undefined },
-    internalLotIdentifiers: { type: [String], default: undefined },
-    documentUrls: { type: [String], default: undefined },
-    submissionUrls: { type: [String], default: undefined },
+    mainClassificationProc: { type: [String], default: [] },
+    placeOfPerformanceCountries: { type: [String], default: [] },
+    placeOfPerformanceCities: { type: [String], default: [] },
+    placeOfPerformanceSubdivisions: { type: [String], default: [] },
+    lots: { type: [Schema.Types.Mixed], default: [] },
+    documentUrls: { type: [String], default: [] },
+    submissionUrls: { type: [String], default: [] },
     euFundLot: {
       type: Boolean,
-      default: undefined,
       index: true,
     },
-    selectionCriteria: { type: [Schema.Types.Mixed], default: undefined },
-    awardCriteria: { type: [Schema.Types.Mixed], default: undefined },
-    classificationCpv: {
-      type: [Schema.Types.ObjectId],
-      ref: 'CpvCategory',
-      required: true,
-      default: [],
-    },
-    cpvCodes: { type: [Schema.Types.Mixed], default: undefined },
+    selectionCriteria: { type: [Schema.Types.Mixed], default: [] },
+    awardCriteria: { type: [Schema.Types.Mixed], default: [] },
+    cpvCodes: { type: [String], default: [] },
     links: Schema.Types.Mixed,
     sourceHash: { type: String, required: true, index: true },
   },
@@ -325,7 +308,7 @@ TenderSchema.index(
 
 function serializeTender(tender: TenderSerializable): TenderDto {
   return filterModel(tender as TenderDocument, {
-    excludeFields: ['cpvCodes', 'links', 'sourceHash'],
+    excludeFields: ['sourceHash'],
   }) as TenderDto;
 }
 
@@ -342,8 +325,6 @@ TenderSchema.statics.serializeList = function (
     links,
     noticeVersion,
     titleProc,
-    titleLot,
-    descriptionLot,
     buyerIdentifier,
     buyerCity,
     buyerEmail,
@@ -351,16 +332,12 @@ TenderSchema.statics.serializeList = function (
     buyerProfile,
     dispatchDate,
     deadlineReceiptTender,
-    durationPeriodValue,
-    durationPeriodUnit,
+    duration,
     legalBasis,
-    additionalClassificationLot,
     lots,
-    internalLotIdentifiers,
     submissionUrls,
     selectionCriteria,
     awardCriteria,
-    cpvCodes,
     ...rest
   } = serializeTender(tender);
 

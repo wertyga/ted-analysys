@@ -23,19 +23,19 @@ export class TendersCronTechService {
     private readonly currencyExchangeRatesService: CurrencyExchangeRatesService,
     private tendersCronService: TendersCronService,
   ) {
-    // setTimeout(async () => {
-    //   if (process.env.NEED_TO_SYNC_CURRENCY_EXCHANGE_RATES_INITIALY) {
-    //     await this.currencyExchangeRatesService.syncLatestRates();
-    //   }
-    //
-    //   if (process.env.NEED_TOGATHER_TED_BASE_INITIALY) {
-    //     await this.tendersCronService.gatherAllCompetitionTenders();
-    //   }
-    //
-    //   if (process.env.NEED_TO_UPDATE_TENDER_ESTIMATED_VALUE_EUR_INITIALY) {
-    //     await this.updateExistingTenderEstimatedValuesEur();
-    //   }
-    // }, CRON_CONFIG.tech.initialRunDelayMs);
+    setTimeout(async () => {
+      if (process.env.NEED_TO_SYNC_CURRENCY_EXCHANGE_RATES_INITIALY) {
+        await this.currencyExchangeRatesService.syncLatestRates();
+      }
+
+      if (process.env.NEED_TOGATHER_TED_BASE_INITIALY) {
+        await this.tendersCronService.gatherAllCompetitionTenders();
+      }
+
+      if (process.env.NEED_TO_UPDATE_TENDER_ESTIMATED_VALUE_EUR_INITIALY) {
+        await this.updateExistingTenderEstimatedValuesEur();
+      }
+    }, CRON_CONFIG.tech.initialRunDelayMs);
   }
 
   async updateExistingTenderEstimatedValuesEur(): Promise<void> {

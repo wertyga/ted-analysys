@@ -20,15 +20,7 @@
 
 [//]: # (- FE - tender-match - показывать isOutDated есть дедлайн кончился)
 
-- FE - generalanalysis.resultJson.lots (и в других местах) - резолвить cpvCodes
-- FE - Expired Deadline - если нет, показывать что нет
-- FE - generalanalysis.status:"PROCESSING" - loading
-
-- BE - Tidy up tender-matching.service ??
-- BE - optimize documents text ??
-- BE - подумать про base analysis winners
-- BE - cron fetch result notices
-- BE - Email send - DEU/POL
+- BE - total-value - для tender price
 
 buyerProfile: https://ch-giorgi.sudest-marchespublics.com
 пробовать доставать portalUrl для deep analysis

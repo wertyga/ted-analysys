@@ -37,28 +37,26 @@ export class TedSearchAdminController {
   ): Promise<TedSearchResponse> {
     const noticeData = await this.tedSearchService.searchTenders({
       ...body,
-      noticeTypes: body.noticeTypes ?? TENDER_COMPETITION_NOTICE_TYPES,
+      noticeTypes:
+        body.noticeTypes !== null ? TENDER_COMPETITION_NOTICE_TYPES : undefined,
     });
 
-    const tendersWithBaseAnalysis =
-      await this.tendersService.upsertIfNeededMultipleTendersWithGeneralAnalysis(
-        noticeData.notices ?? [],
-      );
+    // const tendersWithBaseAnalysis =
+    //   await this.tendersService.upsertIfNeededMultipleTendersWithGeneralAnalysis(
+    //     noticeData.notices ?? [],
+    //   );
 
-    const listTenders = tendersWithBaseAnalysis.map((tba) => {
-      return this.tendersService.toWholeTenderListDto(tba);
-    });
+    // const listTenders = tendersWithBaseAnalysis.map((tba) => {
+    //   return this.tendersService.toWholeTenderListDto(tba);
+    // });
 
-    if (req.user) {
-      await this.tendersService.fillUpTenderListByDeepAnalysisAndWishListStatus(
-        listTenders,
-        req.user._id.toString(),
-      );
-    }
+    // if (req.user) {
+    //   await this.tendersService.fillUpTenderListByDeepAnalysisAndWishListStatus(
+    //     listTenders,
+    //     req.user._id.toString(),
+    //   );
+    // }
 
-    return {
-      ...noticeData,
-      notices: listTenders,
-    };
+    return noticeData;
   }
 }

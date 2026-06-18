@@ -19,11 +19,10 @@ export class TenderGeneralAnalysisBuilder {
     return {
       tender: {
         id: tender.id,
-        publicationNumber: tender.publicationNumber ?? null,
         title: tender.title ?? null,
         procedureTitle: tender.titleProc ?? null,
         description: tender.description ?? null,
-        lots: tender.lots?.map((lot) => this.buildLotInput(lot)) ?? [],
+        lots: tender.lots ?? [],
         buyerName: tender.buyerName ?? null,
         buyerIdentifier: tender.buyerIdentifier ?? null,
         country: tender.buyerCountry ?? null,
@@ -42,18 +41,16 @@ export class TenderGeneralAnalysisBuilder {
         questionsDeadline: this.formatDate(tender.questionsDeadline),
         plannedStartDate: this.formatDate(tender.plannedStartDate),
         plannedEndDate: this.formatDate(tender.plannedEndDate),
-        duration: {
-          value: tender.durationPeriodValue ?? null,
-          unit: tender.durationPeriodUnit ?? null,
-        },
+        duration: tender.duration
+          ? {
+              value: tender.duration.value ?? null,
+              unit: tender.duration.unit ?? null,
+            }
+          : undefined,
         contractNature: tender.contractNature ?? null,
         legalBasis: tender.legalBasis ?? null,
         cpvCodes: this.extractCpvCodes(tender),
         mainCpv: this.extractCpvCodeList(tender.mainClassificationProc),
-        lotMainCpvs: this.extractCpvCodeList(tender.mainClassificationLot),
-        lotAdditionalCpvs: this.extractCpvCodeList(
-          tender.additionalClassificationLot,
-        ),
         estimatedValue: tender.estimatedValue
           ? {
               amount: tender.estimatedValue.amount,
@@ -64,7 +61,6 @@ export class TenderGeneralAnalysisBuilder {
           countries: tender.placeOfPerformanceCountries ?? [],
           cities: tender.placeOfPerformanceCities ?? [],
         },
-        internalLotIdentifiers: tender.internalLotIdentifiers ?? [],
         documentUrls: tender.documentUrls ?? [],
         submissionUrls: tender.submissionUrls ?? [],
         flags: {
@@ -94,10 +90,7 @@ export class TenderGeneralAnalysisBuilder {
   }
 
   private extractCpvCodes(tender: TenderDocument): string[] {
-    const codes = [
-      ...(tender.cpvCodes ?? []),
-      ...(tender.classificationCpv ?? []),
-    ]
+    const codes = [...(tender.cpvCodes ?? [])]
       .map((cpv) => this.extractCpvCode(cpv))
       .filter((code): code is string => code !== null);
 

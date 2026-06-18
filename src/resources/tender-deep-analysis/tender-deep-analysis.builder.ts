@@ -90,7 +90,6 @@ export class TenderDeepAnalysisBuilder {
   buildTenderDto(tender: TenderDocument): TenderAnalysisTenderDto {
     return {
       id: tender.id,
-      publicationNumber: tender.publicationNumber,
       noticeType: tender.noticeType,
       noticeSubtype: tender.noticeSubtype,
       noticeVersion: tender.noticeVersion,
@@ -98,7 +97,7 @@ export class TenderDeepAnalysisBuilder {
       title: tender.title,
       titleProc: tender.titleProc,
       description: tender.description,
-      lots: tender.lots?.map((lot) => buildLotDto(lot)) ?? [],
+      lots: tender.lots ?? [],
       estimatedValue: tender.estimatedValue,
       noticeLanguage: tender.noticeLanguage,
       submissionLanguages: tender.submissionLanguages ?? [],
@@ -116,8 +115,7 @@ export class TenderDeepAnalysisBuilder {
       questionsDeadline: formatDate(tender.questionsDeadline),
       plannedStartDate: formatDate(tender.plannedStartDate),
       plannedEndDate: formatDate(tender.plannedEndDate),
-      durationPeriodValue: tender.durationPeriodValue,
-      durationPeriodUnit: tender.durationPeriodUnit,
+      duration: tender.duration,
       contractNature: tender.contractNature,
       legalBasis: tender.legalBasis,
       isDps: tender.isDps,
@@ -127,7 +125,6 @@ export class TenderDeepAnalysisBuilder {
       cpvCodes: extractCpvCodes(tender),
       placeOfPerformanceCountries: tender.placeOfPerformanceCountries ?? [],
       placeOfPerformanceCities: tender.placeOfPerformanceCities ?? [],
-      internalLotIdentifiers: tender.internalLotIdentifiers ?? [],
       documentUrls: tender.documentUrls ?? [],
       submissionUrls: tender.submissionUrls ?? [],
       documentAccess: (tender as unknown as { documentAccess?: unknown })
@@ -697,7 +694,8 @@ function validateScoreBreakdownShape(result: TenderDeepAnalysisResult): void {
     }
 
     const hasExplanation =
-      typeof item.explanation === 'string' && item.explanation.trim().length > 0;
+      typeof item.explanation === 'string' &&
+      item.explanation.trim().length > 0;
 
     if (!hasExplanation) {
       throw new Error(
@@ -2159,22 +2157,12 @@ function extractCpvCodes(tender: Tender): string[] {
     new Set(
       [
         ...(tender.cpvCodes ?? []),
-        ...(tender.classificationCpv ?? []),
         ...(tender.mainClassificationProc ?? []),
-        ...(tender.mainClassificationLot ?? []),
-        ...(tender.additionalClassificationLot ?? []),
       ]
         .map((item) => extractCpvCode(item))
         .filter((code): code is string => Boolean(code)),
     ),
   );
-}
-
-function buildLotDto(lot: TenderLot) {
-  return {
-    ...lot,
-    deadlineReceiptTender: formatDate(lot.deadlineReceiptTender),
-  };
 }
 
 function countTenderDocumentUrls(tender: Tender): number {

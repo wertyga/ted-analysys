@@ -25,11 +25,11 @@ export class TedSearchFilters {
         $or: [
           { title: this.buildTextRegex(resolvedFilters.text) },
           { titleProc: this.buildTextRegex(resolvedFilters.text) },
-          { titleLot: this.buildTextRegex(resolvedFilters.text) },
+          { 'lots.title': this.buildTextRegex(resolvedFilters.text) },
           { description: this.buildTextRegex(resolvedFilters.text) },
-          { descriptionLot: this.buildTextRegex(resolvedFilters.text) },
+          { 'lots.description': this.buildTextRegex(resolvedFilters.text) },
           { buyerName: this.buildTextRegex(resolvedFilters.text) },
-          { publicationNumber: this.buildTextRegex(resolvedFilters.text) },
+          { id: this.buildTextRegex(resolvedFilters.text) },
         ],
       });
     }

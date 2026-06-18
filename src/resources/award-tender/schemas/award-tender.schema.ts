@@ -9,15 +9,11 @@ import { filterModel } from '@/utils';
 import { ContractorDocument } from '@/resources/contractor/schemas';
 
 export type AwardTenderLot = TenderLot & {
+  resultLotIdentifier: string;
   awardValue?: {
     amount: MoneyValue;
     currency: string | null;
   };
-  resultValue?: {
-    amount: MoneyValue;
-    currency: string | null;
-  };
-  estimatedValueEur?: MoneyValue;
   awardValueEur?: MoneyValue;
 };
 
@@ -93,9 +89,10 @@ const AwardTenderLotValueSchema = new Schema(
 const AwardTenderLotSchema = new Schema<AwardTenderLot>(
   {
     identifier: String,
+    resultLotIdentifier: String,
     title: String,
     description: String,
-    mainClassifications: { type: [String], default: [] },
+    mainClassification: { type: [String], default: [] },
     additionalClassifications: { type: [String], default: [] },
     contractNature: String,
 

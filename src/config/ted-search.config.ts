@@ -28,8 +28,12 @@ export const TED_SEARCH_CONFIG = {
     'buyer-email',
     'buyer-internet-address',
     'buyer-profile',
+
     'estimated-value-proc',
     'estimated-value-cur-proc',
+    'total-value',
+    'total-value-cur',
+
     'place-of-performance-country-proc',
     'place-of-performance-city-proc',
     'links',
@@ -71,6 +75,7 @@ export const TED_SEARCH_CONFIG = {
     'selection-criterion-name-lot',
     'selection-criterion-description-lot',
     'selection-criteria-source',
+    'deadline-receipt-request',
   ] as const,
   localSortFields: {
     [TedTenderSortColumn.PUBLICATION_DATE]: 'publicationDate',

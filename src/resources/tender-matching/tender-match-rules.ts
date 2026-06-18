@@ -21,8 +21,8 @@ export function buildTenderText(tender: TenderForMatching): string {
     tender.description,
     tender.buyerName,
     ...(tender.cpvCodes ?? []),
-    ...(tender.titleLot ?? []),
-    ...(tender.descriptionLot ?? []),
+    ...(tender.lotTitles ?? []),
+    ...(tender.lotDescriptions ?? []),
   ]
     .filter((value): value is string => Boolean(value))
     .join(' ')

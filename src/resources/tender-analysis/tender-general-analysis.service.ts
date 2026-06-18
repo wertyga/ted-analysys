@@ -118,9 +118,14 @@ export class TenderGeneralAnalysisService {
       existingBaseAnalysis.status === TenderGeneralAnalysisStatus.DONE &&
       isHashEqual;
 
+    const isStaleProcessing =
+      existingBaseAnalysis?.status === TenderGeneralAnalysisStatus.PROCESSING &&
+      this.isStaleProcessingAnalysis(existingBaseAnalysis);
+
     const isInProces =
       existingBaseAnalysis?.status === TenderGeneralAnalysisStatus.PROCESSING &&
-      isHashEqual;
+      isHashEqual &&
+      !isStaleProcessing;
 
     if ((hasDoneAnalysis || isInProces) && !isForceBaseAnalysis) {
       return existingBaseAnalysis;
@@ -228,7 +233,7 @@ export class TenderGeneralAnalysisService {
     analysis: T | null,
   ): Partial<T> | null {
     if (!analysis?.resultJson) {
-      return null;
+      return analysis;
     }
 
     const resultJson: Partial<T> = {};
@@ -263,6 +268,19 @@ export class TenderGeneralAnalysisService {
         }),
       )
       .digest('hex');
+  }
+
+  private isStaleProcessingAnalysis(
+    analysis: Pick<TenderGeneralAnalysisDocument, 'updatedAt'>,
+  ): boolean {
+    if (!(analysis.updatedAt instanceof Date)) {
+      return true;
+    }
+
+    return (
+      Date.now() - analysis.updatedAt.getTime() >
+      TENDER_ANALYSIS_CONFIG.baseAnalysis.processingTimeoutMs
+    );
   }
 
   private async analyzeTenderGeneral(
