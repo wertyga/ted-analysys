@@ -128,8 +128,8 @@ export class TendersService {
     const tenderDoc = await TenderModel.findOneAndUpdate(
       { id: normalizedTender.id },
       {
-        $set: tenderSet,
-        $setOnInsert: {
+        $set: {
+          ...tenderSet,
           sourceHash,
         },
         $unset: tenderUnset,
