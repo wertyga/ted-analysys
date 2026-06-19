@@ -256,10 +256,10 @@ export class UpdateUserDto {
   @IsBoolean()
   publicProcurementExperience?: boolean;
 
-  @ApiPropertyOptional({ type: TypicalContractSizeDto })
+  @ApiPropertyOptional({ type: TypicalContractSizeDto, nullable: true })
   @IsOptional()
   @IsObject()
-  typicalContractSize?: TypicalContractSizeDto;
+  typicalContractSize?: TypicalContractSizeDto | null;
 }
 
 export class UserAuthDto extends UserDto {

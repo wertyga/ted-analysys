@@ -40,15 +40,22 @@ export class UsersService {
   }
 
   async updateUser(data: UpdateUserDto, user: UserDocument) {
-    const userData: Partial<TUser> = {
+    const userData = {
       ...data,
       industries: await this.cpvService.resolveCpvCodeIds(data.industries),
       mainServices: await this.cpvService.resolveCpvCodeIds(data.mainServices),
     };
 
     for (const key in data) {
-      if (userData[key]) {
-        user[key] = userData[key];
+      const value = userData[key];
+
+      if (key === 'typicalContractSize' && value === null) {
+        user.set(key, undefined);
+        continue;
+      }
+
+      if (value !== undefined) {
+        user.set(key, value);
       }
     }
 
