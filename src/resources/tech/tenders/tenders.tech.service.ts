@@ -18,7 +18,7 @@ export class TendersTechService {
     };
 
     const tendersQuery = TenderModel.find(query)
-      .select('_id id publicationNumber title')
+      .select('_id id title')
       .sort({ createdAt: 1 })
       .lean();
 

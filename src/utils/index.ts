@@ -11,3 +11,4 @@ export * from './populate';
 export * from './queue-async-concurrency';
 export * from './debounced-async-latest-by-key';
 export * from './debounced-async-latest-queue-by-key';
+export * from './ted-notice';

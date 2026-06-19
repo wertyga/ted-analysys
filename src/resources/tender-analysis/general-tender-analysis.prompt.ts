@@ -1,5 +1,5 @@
 export const GENERAL_TENDER_ANALYSIS_PROMPT_VERSION =
-  'general-tender-analysis-v2';
+  'general-tender-analysis-v9';
 
 export function buildGeneralTenderAnalysisPrompt(
   outputLanguage: string,
@@ -28,7 +28,10 @@ export function buildGeneralTenderAnalysisPrompt(
     'Use tender.lots together with the general description to understand lot-specific scope, CPVs, values, deadlines, submission channels, selection criteria, and award criteria.',
     'When tender.lots is present, return one lots item for every tender.lots item, preserving the same order and count. Do not omit later lots even when their descriptions or CPV codes repeat earlier lots.',
     'If tender.lots is missing, empty, or incomplete, inspect DOCUMENTS for explicit lot sections, lot numbers, lot titles, lot descriptions, lot values, lot CPVs, lot deadlines, and lot-specific criteria, and include those document-derived lots in the analysis.',
-    'For each returned lot, preserve explicit lot identifier and title when available, summarize the lot-specific scope, include CPV codes, value, and deadline only when explicitly present, and set source to STRUCTURED_DATA, XML_NOTICE, or DOCUMENT_TEXT.',
+    'For each returned lot, preserve the explicit lot identifier when available, summarize the lot-specific scope, include CPV codes, value, and deadline only when explicitly present, and set source to STRUCTURED_DATA, XML_NOTICE, or DOCUMENT_TEXT.',
+    'Return lots[*].title in English only. Do not copy a non-English source lot title into lots[*].title. Translate source lot titles to concise English titles. Preserve the original lot identifier separately in lots[*].identifier.',
+    'If a source lot title is not in English and cannot be translated confidently, create a short English descriptive title from the lot description, CPV codes, or scope, for example "System Development and Maintenance".',
+    'For each returned lot, include lots[*].awardCriteria as an array. Use the lot-specific tender.lots[*].awardCriteria when available. Translate awardCriteria[*].description to English. Keep awardCriteria[*].type as an explicit source value when available. Set awardCriteria[*].weight to the explicit numeric criterion value from structured data; do not invent it from weight codes such as per-exa, poi-exa, or ord-imp. Preserve those source weight codes in awardCriteria[*].weightCode. Set awardCriteria[*].summary to a short English human-readable criterion summary combining description/type/weight/weightCode. Use [] when no lot-specific award criteria are provided.',
     'When lots are extracted only from DOCUMENTS, clearly indicate in the relevant summary, scope, value, criteria, or risk text that the lot information comes from document text.',
     'If lots differ, mention lot-specific scope instead of flattening everything into one generic summary.',
     'If multiple lots are present, analyze all provided lots at a useful summary level.',
@@ -57,6 +60,7 @@ export function buildGeneralTenderAnalysisPrompt(
     'ELIGIBILITY AND AWARD CRITERIA',
     'Use selectionCriteria as eligibility criteria.',
     'Use awardCriteria as award criteria.',
+    'Return top-level awardCriteria as an aggregated human-readable English list across all lots and procedure-level criteria. Include lot identifiers in the text when criteria differ by lot.',
     'Preserve explicit weights, types, and descriptions when present.',
     'If criteria are only available per lot, mention that criteria may differ by lot.',
     'Do not infer certifications, financial turnover, references, or required documents unless explicitly stated.',
@@ -74,8 +78,8 @@ export function buildGeneralTenderAnalysisPrompt(
     'If place of performance differs by lot, mention the lot-level performance locations.',
 
     'TRACEABILITY',
-    'Pay attention to noticeVersion and publicationNumber for traceability.',
-    'Do not include noticeVersion or publicationNumber unless relevant to the analysis, inconsistency, or traceability issue.',
+    'Pay attention to noticeVersion and tender id for traceability.',
+    'Do not include noticeVersion or tender id unless relevant to the analysis, inconsistency, or traceability issue.',
 
     'SCORING',
     'complexityScore, opportunityScore, and confidenceScore must be numbers from 0 to 100.',
@@ -99,6 +103,11 @@ export function buildGeneralTenderAnalysisPrompt(
     'Put explicit negative conditions in disadvantages.',
     'Put inferred concerns in risks or hiddenPitfalls.',
     'Use mitigation only when a practical mitigation follows from the provided data. Otherwise set mitigation to null.',
+
+    'QUESTIONS TO ASK',
+    'Return questionsToAsk as structured clarification questions for the buyer or procurement authority.',
+    'For each question, set priority to LOW, MEDIUM, or HIGH; question to the exact question to ask; reason to why the answer matters; and category to a concise topic such as Eligibility, Procedure, Documents, Scope, Commercial, Technical, or Submission.',
+    'Use HIGH priority when an unanswered question can affect eligibility, submission validity, material scope, pricing, or the decision to bid.',
 
     'OUTPUT',
     'Return strict JSON matching the supplied schema.',

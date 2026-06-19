@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TenderGeneralAnalysisDetailDto } from '../../tender-analysis/dto/tender-general-analysis.dto';
+import { TenderLot } from '@/resources/tenders/schemas';
 
 export class TenderCpvDto {
   @ApiProperty({ example: '72000000' })
@@ -20,10 +21,40 @@ export class TenderCpvDto {
 
 export class TenderEstimatedValueDto {
   @ApiPropertyOptional({ example: 1250000 })
-  amount!: number | null;
+  amount!: number | null | undefined;
 
   @ApiPropertyOptional({ example: 'EUR' })
   currency!: string | null;
+}
+
+export class TenderDurationDto {
+  @ApiPropertyOptional({ example: 12 })
+  value!: number | null | undefined;
+
+  @ApiPropertyOptional({ example: 'month' })
+  unit!: string | null;
+}
+
+export class TenderAwardCriteriaDto {
+  @ApiPropertyOptional({ example: 'price' })
+  type?: string | null;
+
+  @ApiPropertyOptional({ example: 'Lowest price' })
+  description?: string | null;
+
+  @ApiPropertyOptional({ example: 70 })
+  weight?: number | null;
+
+  @ApiPropertyOptional({ example: 'per-exa' })
+  weightCode?: string | null;
+}
+
+export class TenderSelectionCriteriaDto {
+  @ApiPropertyOptional({ example: 'Professional ability' })
+  name?: string | null;
+
+  @ApiPropertyOptional({ example: 'Required experience in similar contracts' })
+  description?: string | null;
 }
 
 export class TenderLotDto {
@@ -60,11 +91,11 @@ export class TenderLotDto {
   @ApiPropertyOptional({ example: false })
   isDps?: boolean;
 
-  @ApiPropertyOptional({ example: '12' })
-  durationPeriodValue?: string;
+  @ApiPropertyOptional({ example: true })
+  isEuFunded?: boolean;
 
-  @ApiPropertyOptional({ example: 'month' })
-  durationPeriodUnit?: string;
+  @ApiPropertyOptional({ type: TenderDurationDto })
+  duration?: TenderDurationDto;
 
   @ApiPropertyOptional({ example: '2029-12-17T12:00:00+02:00' })
   deadlineReceiptTender?: Date;
@@ -90,11 +121,11 @@ export class TenderLotDto {
   @ApiPropertyOptional({ type: [String] })
   placeOfPerformanceCities?: string[];
 
-  @ApiPropertyOptional({ type: [Object] })
-  awardCriteria?: unknown[];
+  @ApiPropertyOptional({ type: TenderAwardCriteriaDto })
+  awardCriteria?: TenderAwardCriteriaDto;
 
-  @ApiPropertyOptional({ type: [Object] })
-  selectionCriteria?: unknown[];
+  @ApiPropertyOptional({ type: TenderSelectionCriteriaDto })
+  selectionCriteria?: TenderSelectionCriteriaDto;
 
   @ApiPropertyOptional({ example: 'notice' })
   selectionCriteriaSource?: string;
@@ -126,13 +157,6 @@ export class TenderDto {
       'Local canonical tender id. For TED tenders this is the publication number.',
   })
   id!: string;
-
-  @ApiPropertyOptional({
-    example: '756265-2023',
-    description:
-      'TED/OJ publication number. Useful for display and manual TED search.',
-  })
-  publicationNumber?: string;
 
   @ApiPropertyOptional({
     example: 'cn-standard',
@@ -182,24 +206,11 @@ export class TenderDto {
   titleProc?: string;
 
   @ApiPropertyOptional({
-    type: [String],
-    description: 'TED title-lot: titles of individual lots.',
-  })
-  titleLot?: string[];
-
-  @ApiPropertyOptional({
     example: 'Software development and maintenance.',
     description:
       'TED description-proc, with lot description fallback when procedure description is absent.',
   })
   description?: string;
-
-  @ApiPropertyOptional({
-    type: [String],
-    description:
-      'TED description-lot: descriptions of individual lots, useful for matching and AI analysis.',
-  })
-  descriptionLot?: string[];
 
   @ApiPropertyOptional({
     type: TenderEstimatedValueDto,
@@ -330,18 +341,11 @@ export class TenderDto {
   plannedEndDate?: Date;
 
   @ApiPropertyOptional({
-    example: '12',
+    type: TenderDurationDto,
     description:
-      'TED duration-period-value-lot: numeric contract duration value when provided.',
+      'TED duration-period-*-lot lifted to tender level when all lots share the same duration.',
   })
-  durationPeriodValue?: string;
-
-  @ApiPropertyOptional({
-    example: 'month',
-    description:
-      'TED duration-period-unit-lot: duration unit such as day, month, or year.',
-  })
-  durationPeriodUnit?: string;
+  duration?: TenderDurationDto;
 
   @ApiPropertyOptional({
     example: 'services',
@@ -385,25 +389,10 @@ export class TenderDto {
   electronicSubmission?: string;
 
   @ApiPropertyOptional({
-    type: [TenderCpvDto],
-    description:
-      'CpvCategory documents resolved from TED main-classification-proc.',
+    type: [String],
+    description: 'TED main-classification-proc CPV codes.',
   })
-  mainClassificationProc?: TenderCpvDto[];
-
-  @ApiPropertyOptional({
-    type: [TenderCpvDto],
-    description:
-      'CpvCategory documents resolved from TED main-classification-lot.',
-  })
-  mainClassificationLot?: TenderCpvDto[];
-
-  @ApiPropertyOptional({
-    type: [TenderCpvDto],
-    description:
-      'CpvCategory documents resolved from TED additional-classification-lot.',
-  })
-  additionalClassificationLot?: TenderCpvDto[];
+  mainClassificationProc?: string[];
 
   @ApiPropertyOptional({
     type: [String],
@@ -420,17 +409,17 @@ export class TenderDto {
   placeOfPerformanceCities?: string[];
 
   @ApiPropertyOptional({
+    type: [String],
+    description:
+      'TED place-of-performance-subdiv-* fields: subdivisions where the contract is performed.',
+  })
+  placeOfPerformanceSubdivisions?: string[];
+
+  @ApiPropertyOptional({
     type: [TenderLotDto],
     description: 'TED lot-level fields grouped by lot index.',
   })
-  lots?: TenderLotDto[];
-
-  @ApiPropertyOptional({
-    type: [String],
-    description:
-      'TED internal-identifier-lot: stable lot references across notices/stages.',
-  })
-  internalLotIdentifiers?: string[];
+  lots: TenderLot[] = [];
 
   @ApiPropertyOptional({
     type: [String],
@@ -467,13 +456,6 @@ export class TenderDto {
   awardCriteria?: unknown[];
 
   @ApiPropertyOptional({
-    type: [TenderCpvDto],
-    description:
-      'Mongo ObjectId references populated from CpvCategory documents resolved from cpvCodes.',
-  })
-  classificationCpv?: TenderCpvDto[];
-
-  @ApiPropertyOptional({
     type: [String],
     description:
       'Aggregated raw CPV code strings from classification/main/additional CPV fields.',
@@ -507,8 +489,6 @@ export type TenderListDto = Omit<
   | 'links'
   | 'noticeVersion'
   | 'titleProc'
-  | 'titleLot'
-  | 'descriptionLot'
   | 'buyerIdentifier'
   | 'buyerCity'
   | 'buyerEmail'
@@ -516,12 +496,9 @@ export type TenderListDto = Omit<
   | 'buyerProfile'
   | 'dispatchDate'
   | 'deadlineReceiptTender'
-  | 'durationPeriodValue'
-  | 'durationPeriodUnit'
+  | 'duration'
   | 'legalBasis'
-  | 'additionalClassificationLot'
   | 'lots'
-  | 'internalLotIdentifiers'
   | 'submissionUrls'
   | 'selectionCriteria'
   | 'awardCriteria'

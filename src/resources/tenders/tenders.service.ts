@@ -21,11 +21,12 @@ import {
   TenderGeneralAnalysisModel,
 } from '../tender-analysis/schemas';
 import { TenderListDto } from './dto/tender.dto';
-import { TenderDocument, TenderModel } from './schemas';
+import { TenderDocument, TenderLot, TenderModel } from './schemas';
 import {
   NormalizedTenderDto,
+  NormalizedTenderLot,
   TenderNormalizerService,
-} from './tender-normalizer.service';
+} from '@/resources/tender-normalizer/tender-normalizer.service';
 import {
   extractPublicationNumberFromNotice,
   isRecord,
@@ -43,8 +44,8 @@ import {
 } from '@/resources/tender-wishlist/schemas';
 import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rates/currency-exchange-rates.service';
 import { CurrencySign } from '@/resources/codelist';
-import { searchTendersDefaultFields } from '@/resources/ted-search/utils';
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
+import { TENDER_COMPETITION_SEARCH_FIELDS } from '@/config/ted-search.config';
 
 export interface GatherActiveTendersResult {
   completed?: boolean;
@@ -75,6 +76,21 @@ export type TenderDocumentWithGeneralAnalysis = TenderDocument & {
 };
 
 const SHORT_TITLE_GENERATION_BATCH_SIZE = 20;
+const OPTIONAL_TENDER_UNSET_FIELDS = [
+  'noticeSubtype',
+  'noticeVersion',
+  'description',
+  'buyerInternetAddress',
+  'buyerProfile',
+  'deadlineReceiptTender',
+  'questionsDeadline',
+  'plannedStartDate',
+  'plannedEndDate',
+  'duration',
+  'electronicSubmission',
+  'isSmeSuitable',
+  'euFundLot',
+] as const;
 
 @Injectable()
 export class TendersService {
@@ -91,41 +107,61 @@ export class TendersService {
   ) {}
 
   async upsertTender(notice: TedNotice): Promise<TenderDocument | undefined> {
-    const publicationNumber = extractPublicationNumberFromNotice(notice);
-
-    if (!publicationNumber) {
-      return undefined;
+    const normalizedTender = this.tenderNormalizer.normalizeTedNotice(notice);
+    if (!normalizedTender.id) {
+      return;
     }
 
-    const normalizedTender = this.tenderNormalizer.normalizeTedNotice(notice);
-
-    const normalizedTenderDto =
-      await this.tenderNormalizer.normalizeTedNoticeWithCpvCodes(
-        notice,
-        true,
-        normalizedTender,
-      );
-
-    const estimatedValueEur =
-      await this.calculateEstimatedValueEur(normalizedTender);
+    const [estimatedValueEur, lotsWithEur] = await Promise.all([
+      this.calculateEstimatedValueEur(normalizedTender),
+      this.getLotsWithEurValues(normalizedTender.lots),
+    ]);
 
     const sourceHash = this.buildTenderSourceHash(normalizedTender);
+    const tenderSet = this.omitUndefinedFields({
+      ...normalizedTender,
+      lots: lotsWithEur,
+      estimatedValueEur,
+    });
+    const tenderUnset = this.buildTenderUnset(normalizedTender);
 
     const tenderDoc = await TenderModel.findOneAndUpdate(
-      { id: publicationNumber },
+      { id: normalizedTender.id },
       {
-        $set: {
-          ...normalizedTenderDto,
-          id: publicationNumber,
-          publicationNumber,
-          estimatedValueEur,
+        $set: tenderSet,
+        $setOnInsert: {
           sourceHash,
         },
+        $unset: tenderUnset,
       },
       { returnDocument: 'after', upsert: true, strict: false },
-    ).exec();
+    );
 
-    return tenderDoc.populate(tenderCpvPopulateFields);
+    return tenderDoc;
+  }
+
+  private async getLotsWithEurValues(
+    lots: NormalizedTenderLot[],
+    publicationDate?: Date,
+  ): Promise<TenderLot[]> {
+    const lotsEur: (number | null)[] = await Promise.all(
+      lots.map((lot) => {
+        const { estimatedValue } = lot;
+
+        return this._calculateEstimatedValueEur(
+          estimatedValue?.amount,
+          estimatedValue?.currency,
+          publicationDate,
+        );
+      }),
+    );
+
+    return lots.map((lot, i) => {
+      return {
+        ...lot,
+        estimatedValueEur: lotsEur[i],
+      };
+    });
   }
 
   async calculateEstimatedValueEur(
@@ -148,16 +184,24 @@ export class TendersService {
 
     const normalizedCurrency = currency.trim().toUpperCase() as CurrencySign;
 
-    if (!Object.values(CurrencySign).includes(normalizedCurrency)) {
+    return this._calculateEstimatedValueEur(
+      amount,
+      normalizedCurrency,
+      tender.publicationDate,
+    );
+  }
+
+  async _calculateEstimatedValueEur(
+    amount: number | null | undefined,
+    cur: string | null | undefined,
+    date?: Date,
+  ) {
+    if (!amount || !cur || !Object.values(CurrencySign).includes(cur as any)) {
       return null;
     }
 
     const estimatedValueEur =
-      await this.currencyExchangeRatesService.convertToEur(
-        amount,
-        normalizedCurrency,
-        tender.publicationDate,
-      );
+      await this.currencyExchangeRatesService.convertToEur(amount, cur, date);
 
     return estimatedValueEur === null ? null : Math.round(estimatedValueEur);
   }
@@ -198,15 +242,11 @@ export class TendersService {
     const existingTenders = await TenderModel.find({
       id: { $in: publicationNumbers },
     })
-      .select('id publicationNumber noticeVersion sourceHash title shortTitle')
+      .select('id noticeVersion sourceHash title shortTitle')
       .exec();
 
     const existingTendersByPublicationNumber = new Map(
-      existingTenders.flatMap((tender) =>
-        [tender.id, tender.publicationNumber]
-          .filter((value): value is string => typeof value === 'string')
-          .map((publicationNumber) => [publicationNumber, tender] as const),
-      ),
+      existingTenders.map((tender) => [tender.id, tender] as const),
     );
     let saved = 0;
     let updated = 0;
@@ -224,7 +264,7 @@ export class TendersService {
       );
 
       if (existingTender && !shouldUpdateExistingTender) {
-        if (!existingTender.shortTitle) {
+        if (!this.hasCompleteShortTitle(existingTender.shortTitle)) {
           tendersForShortTitle.push(existingTender);
         }
 
@@ -235,7 +275,7 @@ export class TendersService {
       const savedTender = await this.upsertTender(notice);
 
       if (savedTender) {
-        if (!savedTender.shortTitle) {
+        if (!this.hasCompleteShortTitle(savedTender.shortTitle)) {
           tendersForShortTitle.push(savedTender);
         }
 
@@ -260,7 +300,7 @@ export class TendersService {
     tenders: Array<Pick<TenderDocument, 'id' | 'title' | 'shortTitle'>>,
   ) {
     const tendersWithoutShortTitle = tenders.filter((tender) => {
-      return tender.title && !tender.shortTitle;
+      return tender.title && !this.hasCompleteShortTitle(tender.shortTitle);
     });
 
     if (!tendersWithoutShortTitle.length) {
@@ -292,18 +332,23 @@ export class TendersService {
             const item = byId.get(tender.id);
 
             if (!item) {
+              this.logger.warn(
+                `DeepSeek short title response did not include tender ${tender.id}`,
+              );
+
               return;
             }
 
-            await TenderModel.updateOne(
+            const updatedTender = await TenderModel.findOneAndUpdate(
               {
                 id: tender.id,
-                $or: [{ shortTitle: { $exists: false } }, { shortTitle: null }],
+                ...this.buildMissingShortTitleQuery(),
               },
               { $set: { shortTitle: item.shortTitle } },
+              { returnDocument: 'after' },
             ).exec();
 
-            tender.shortTitle = item.shortTitle;
+            tender.shortTitle = updatedTender?.shortTitle ?? item.shortTitle;
           }),
         );
       } catch (error: unknown) {
@@ -314,6 +359,31 @@ export class TendersService {
         );
       }
     }
+  }
+
+  private hasCompleteShortTitle(
+    value: TenderDocument['shortTitle'] | undefined,
+  ): boolean {
+    return Boolean(value?.en && value.de && value.fr && value.pl && value.ru);
+  }
+
+  private buildMissingShortTitleQuery() {
+    return {
+      $or: [
+        { shortTitle: { $exists: false } },
+        { shortTitle: null },
+        { 'shortTitle.en': { $exists: false } },
+        { 'shortTitle.de': { $exists: false } },
+        { 'shortTitle.fr': { $exists: false } },
+        { 'shortTitle.pl': { $exists: false } },
+        { 'shortTitle.ru': { $exists: false } },
+        { 'shortTitle.en': '' },
+        { 'shortTitle.de': '' },
+        { 'shortTitle.fr': '' },
+        { 'shortTitle.pl': '' },
+        { 'shortTitle.ru': '' },
+      ],
+    };
   }
 
   private shouldUpdateTenderFromTedNotice(
@@ -456,7 +526,7 @@ export class TendersService {
       paginationMode: TedPaginationMode.PAGE_NUMBER,
       onlyLatestVersions: true,
       checkQuerySyntax: false,
-      fields: searchTendersDefaultFields,
+      fields: TENDER_COMPETITION_SEARCH_FIELDS,
     });
 
     return this.extractNotices(response)[0];
@@ -634,5 +704,37 @@ export class TendersService {
     return createHash('sha256')
       .update(JSON.stringify(normalizedTender))
       .digest('hex');
+  }
+
+  private omitUndefinedFields<T extends Record<string, unknown>>(value: T): T {
+    return Object.fromEntries(
+      Object.entries(value).filter(
+        ([, fieldValue]) => fieldValue !== undefined,
+      ),
+    ) as T;
+  }
+
+  private buildTenderUnset(
+    normalizedTender: NormalizedTenderDto,
+  ): Record<string, ''> {
+    const unset: Record<string, ''> = {
+      classificationCpv: '',
+      publicationNumber: '',
+      titleLot: '',
+      descriptionLot: '',
+      mainClassificationLot: '',
+      additionalClassificationLot: '',
+      buyerAuthorityMainActivities: '',
+      buyerEntityMainActivities: '',
+      buyerLegalTypes: '',
+    };
+
+    for (const field of OPTIONAL_TENDER_UNSET_FIELDS) {
+      if (normalizedTender[field] === undefined) {
+        unset[field] = '';
+      }
+    }
+
+    return unset;
   }
 }

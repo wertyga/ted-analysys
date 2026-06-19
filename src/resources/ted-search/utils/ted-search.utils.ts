@@ -32,14 +32,17 @@ export function resolveDeadlineRange(
         submissionDeadlineFrom: todayTedDate,
         submissionDeadlineTo: undefined,
       };
+
     case TedDeadlineRange.NEXT_7_DAYS:
       return withNextDaysDeadline(filters, today, 7);
+
     case TedDeadlineRange.NEXT_14_DAYS:
       return withNextDaysDeadline(filters, today, 14);
+
     case TedDeadlineRange.NEXT_30_DAYS:
       return withNextDaysDeadline(filters, today, 30);
-    case TedDeadlineRange.CUSTOM:
-    case undefined:
+
+    default:
       return filters;
   }
 }

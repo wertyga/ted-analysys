@@ -20,7 +20,6 @@ import { TenderModel } from '@/resources/tenders/schemas';
 
 type SitemapTender = {
   id?: string;
-  publicationNumber?: string;
   updatedAt?: Date;
 };
 
@@ -38,7 +37,7 @@ export class SitemapTechService {
     const maxUrlsPerFile = this.normalizeMaxUrlsPerFile(options.maxUrlsPerFile);
     const outputPath = this.getSitemapOutputPath();
     const tenders = await TenderModel.find({})
-      .select('id publicationNumber updatedAt')
+      .select('id updatedAt')
       .lean<SitemapTender[]>()
       .exec();
     const tenderUrls = tenders.flatMap((tender) =>
@@ -132,7 +131,7 @@ export class SitemapTechService {
     locales: string[],
     tender: SitemapTender,
   ) {
-    const tenderId = tender.publicationNumber || tender.id;
+    const tenderId = tender.id;
 
     if (!tenderId) {
       return [];

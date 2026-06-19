@@ -13,10 +13,7 @@ type NormalizedCpvCategory = {
 };
 
 const cpvClassificationFields = [
-  'classificationCpv',
   'mainClassificationProc',
-  'mainClassificationLot',
-  'additionalClassificationLot',
 ] as const;
 
 export function tenderNormilizer(tender: TedNotice): TedNotice {

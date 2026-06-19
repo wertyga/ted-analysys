@@ -7,7 +7,7 @@ import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 import {
   TenderDocumentTextExtractorService,
   TenderSourceDocumentType,
-} from '@/resources/tenders/tender-document-text-extractor.service';
+} from '@/resources/tender-normalizer/tender-document-text-extractor.service';
 import {
   getNormalizedStringArray,
   getOptionalNonNegativeNumber,

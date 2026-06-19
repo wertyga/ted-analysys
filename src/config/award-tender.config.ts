@@ -1,11 +1,12 @@
+import { BUYER_FIELDS } from '@/config/buyer.config';
+
 export const AWARD_TENDER_CONFIG = {
   historyYearsBack: 3,
   awardTenderSearchLimit: 1,
   awardSearchCacheTtlMs: 7 * 24 * 60 * 60 * 1000,
 };
 
-export const AWARD_HISTORY_FIELDS = [
-  'notice-identifier',
+export const AWARD_TENDER_FIELDS = [
   'publication-number',
   'notice-type',
   'notice-subtype',
@@ -23,15 +24,10 @@ export const AWARD_HISTORY_FIELDS = [
 
   'classification-cpv',
   'main-classification-proc',
-  'main-classification-lot',
-  'additional-classification-lot',
 
-  'buyer-name',
-  'buyer-identifier',
-  'buyer-country',
-  'buyer-city',
-  'buyer-legal-type',
-  'buyer-contracting-entity',
+  'place-of-performance-country-proc',
+  'place-of-performance-city-proc',
+
   'main-activity',
   'authority-main-activity',
   'entity-main-activity',
@@ -52,22 +48,19 @@ export const AWARD_HISTORY_FIELDS = [
   'received-submissions-type-code',
   'received-submissions-type-val',
 
-  'identifier-lot',
-  'internal-identifier-lot',
-  'result-lot-identifier',
-  'tender-lot-identifier',
-  'title-lot',
-  'description-lot',
-  'contract-nature-main-lot',
-  'estimated-value-lot',
-  'estimated-value-cur-lot',
-  'contract-duration-end-date-lot',
-  'deadline-receipt-tender-date-lot',
-  'deadline-receipt-tender-time-lot',
-  'place-of-performance-country-lot',
-  'place-of-performance-subdiv-lot',
-  'place-of-performance-city-lot',
+  'links',
+  'contract-url',
+  'announcement-url',
 
+  'result-framework-maximum-value-cur-notice',
+  'result-framework-maximum-value-notice',
+
+  'submission-language',
+
+  'selection-criteria-source',
+] as any;
+
+export const WINNER_FIELDS = [
   'winner-name',
   'winner-identifier',
   'winner-country',
@@ -80,8 +73,75 @@ export const AWARD_HISTORY_FIELDS = [
   'winner-decision-date',
   'winner-internet-address',
   'winner-email',
+  'winner-owner-nationality',
+  'eu-registration-number',
+];
 
-  'links',
-  'contract-url',
-  'announcement-url',
-] as any;
+export const FRAMEWORK_FIELDS = [
+  'framework-estimated-value',
+  'framework-estimated-value-cur',
+
+  'framework-value-notice',
+  'framework-value-cur-notice',
+
+  'framework-approximate-value-notice',
+  'framework-approximate-value-cur-notice',
+
+  'result-framework-maximum-value-notice',
+  'result-framework-maximum-value-cur-notice',
+];
+
+export const AWARD_TENDER_LOT_FIELDS = [
+  'identifier-lot',
+  'internal-identifier-lot',
+  'result-lot-identifier',
+  'tender-lot-identifier',
+  'title-lot',
+  'description-lot',
+
+  'contract-nature-main-lot',
+
+  'estimated-value-lot',
+  'estimated-value-cur-lot',
+
+  'contract-duration-end-date-lot',
+  'deadline-receipt-tender-date-lot',
+  'deadline-receipt-tender-time-lot',
+
+  'place-of-performance-country-lot',
+  'place-of-performance-subdiv-lot',
+  'place-of-performance-city-lot',
+
+  'main-classification-lot',
+  'additional-classification-lot',
+
+  'duration-period-value-lot',
+  'duration-period-unit-lot',
+
+  'framework-agreement-lot',
+
+  'dps-usage-lot',
+
+  'document-url-lot',
+
+  'submission-url-lot',
+  'electronic-submission-lot',
+
+  'award-criterion-type-lot',
+  'award-criterion-description-lot',
+  'award-criterion-number-lot',
+  'award-criterion-number-weight-lot',
+
+  'selection-criterion-name-lot',
+  'selection-criterion-description-lot',
+];
+
+export const AWARD_HISTORY_FIELDS = Array.from(
+  new Set([
+    ...AWARD_TENDER_FIELDS,
+    ...WINNER_FIELDS,
+    ...BUYER_FIELDS,
+    ...AWARD_TENDER_LOT_FIELDS,
+    ...FRAMEWORK_FIELDS,
+  ]),
+);

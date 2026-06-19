@@ -16,8 +16,10 @@ export interface TenderLotAnalysisInput {
   };
   isFrameworkAgreement?: boolean;
   isDps?: boolean;
-  durationPeriodValue?: string;
-  durationPeriodUnit?: string;
+  duration?: {
+    value: number | null | undefined;
+    unit: string | null;
+  };
   deadlineReceiptTender?: string | null;
   documentUrls?: string[];
   submissionUrls?: string[];
@@ -26,7 +28,7 @@ export interface TenderLotAnalysisInput {
   placeOfPerformanceCountries?: string[];
   placeOfPerformanceSubdivisions?: string[];
   placeOfPerformanceCities?: string[];
-  awardCriteria?: unknown[];
-  selectionCriteria?: unknown[];
+  awardCriteria?: unknown;
+  selectionCriteria?: unknown;
   selectionCriteriaSource?: string;
 }

@@ -12,7 +12,7 @@ import {
   TedDeadlineRange,
   TedProcedureType,
 } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
-import { resolveDeadlineRange } from '@/resources/ted-search/utils';
+import { getTedDate, resolveDeadlineRange } from '@/resources/ted-search/utils';
 
 export interface TedTenderSearchFilters {
   text?: string;

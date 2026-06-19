@@ -211,7 +211,7 @@ export abstract class BaseLlmAnalysisService {
       disadvantages: this.requireStringArray(value, 'disadvantages'),
       risks: this.requireRisks(value.risks),
       hiddenPitfalls: this.requireStringArray(value, 'hiddenPitfalls'),
-      questionsToAsk: this.requireStringArray(value, 'questionsToAsk'),
+      questionsToAsk: this.requireQuestionsToAsk(value.questionsToAsk),
       complexityScore: this.requireScore(value, 'complexityScore'),
       opportunityScore: this.requireScore(value, 'opportunityScore'),
       generalRecommendation: this.requireGeneralRecommendation(
@@ -377,8 +377,64 @@ export abstract class BaseLlmAnalysisService {
         summary: this.requireString(item, 'summary'),
         cpvCodes: this.requireStringArray(item, 'cpvCodes'),
         estimatedValue: this.requireLotEstimatedValue(estimatedValue),
+        awardCriteria: this.requireLotAwardCriteria(item.awardCriteria),
         deadline,
         source,
+      };
+    });
+  }
+
+  protected requireLotAwardCriteria(
+    value: unknown,
+  ): GeneralTenderAnalysisResult['lots'][number]['awardCriteria'] {
+    if (!Array.isArray(value)) {
+      throw new Error(
+        `${this.providerName} analysis lot awardCriteria must be an array`,
+      );
+    }
+
+    return value.map((item) => {
+      if (!isRecord(item)) {
+        throw new Error(
+          `${this.providerName} analysis lot awardCriteria item must be an object`,
+        );
+      }
+
+      const type = item.type;
+      const description = item.description;
+      const weight = item.weight;
+      const weightCode = item.weightCode;
+
+      if (type !== null && typeof type !== 'string') {
+        throw new Error(
+          `${this.providerName} analysis lot awardCriteria.type must be string or null`,
+        );
+      }
+
+      if (description !== null && typeof description !== 'string') {
+        throw new Error(
+          `${this.providerName} analysis lot awardCriteria.description must be string or null`,
+        );
+      }
+
+      if (weight !== null && typeof weight !== 'number') {
+        throw new Error(
+          `${this.providerName} analysis lot awardCriteria.weight must be number or null`,
+        );
+      }
+
+      if (weightCode !== null && typeof weightCode !== 'string') {
+        throw new Error(
+          `${this.providerName} analysis lot awardCriteria.weightCode must be string or null`,
+        );
+      }
+
+      return {
+        type,
+        description,
+        weight,
+        weightCode,
+        summary: this.requireString(item, 'summary'),
       };
     });
   }
@@ -501,6 +557,39 @@ export abstract class BaseLlmAnalysisService {
         severity,
         description: this.requireString(item, 'description'),
         mitigation,
+      };
+    });
+  }
+
+  protected requireQuestionsToAsk(
+    value: unknown,
+  ): GeneralTenderAnalysisResult['questionsToAsk'] {
+    if (!Array.isArray(value)) {
+      throw new Error(
+        `${this.providerName} analysis field questionsToAsk must be an array`,
+      );
+    }
+
+    return value.map((item) => {
+      if (!isRecord(item)) {
+        throw new Error(
+          `${this.providerName} analysis questionsToAsk item must be an object`,
+        );
+      }
+
+      const priority = item.priority;
+
+      if (priority !== 'LOW' && priority !== 'MEDIUM' && priority !== 'HIGH') {
+        throw new Error(
+          `${this.providerName} analysis questionsToAsk priority is invalid`,
+        );
+      }
+
+      return {
+        priority,
+        question: this.requireString(item, 'question'),
+        reason: this.requireString(item, 'reason'),
+        category: this.requireString(item, 'category'),
       };
     });
   }

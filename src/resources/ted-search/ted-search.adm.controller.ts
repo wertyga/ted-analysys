@@ -37,13 +37,9 @@ export class TedSearchAdminController {
   ): Promise<TedSearchResponse> {
     const noticeData = await this.tedSearchService.searchTenders({
       ...body,
-      noticeTypes: body.noticeTypes ?? TENDER_COMPETITION_NOTICE_TYPES,
+      noticeTypes:
+        body.noticeTypes !== null ? TENDER_COMPETITION_NOTICE_TYPES : undefined,
     });
-
-    fs.writeFileSync(
-      'ted.json',
-      JSON.stringify(noticeData.notices[0], null, 2),
-    );
 
     const tendersWithBaseAnalysis =
       await this.tendersService.upsertIfNeededMultipleTendersWithGeneralAnalysis(
@@ -61,9 +57,6 @@ export class TedSearchAdminController {
       );
     }
 
-    return {
-      ...noticeData,
-      notices: listTenders,
-    };
+    return noticeData;
   }
 }

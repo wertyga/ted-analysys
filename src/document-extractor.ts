@@ -10,11 +10,11 @@ import {
 import {
   TenderDocumentTextExtractorService,
   TenderSourceDocumentType,
-} from '@/resources/tenders/tender-document-text-extractor.service';
+} from '@/resources/tender-normalizer/tender-document-text-extractor.service';
 import {
   fetchXmlContentFromNotice,
   findXmlUrl,
-} from '@/resources/tenders/tender-normalizer-xml';
+} from '@/resources/tender-normalizer/tender-normalizer-xml';
 import { DOCUMENT_EXTRACTOR_CONFIG } from '@/config/document-extractor.config';
 
 export type TenderAnalysisDocumentSource =

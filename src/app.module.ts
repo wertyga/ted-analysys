@@ -25,6 +25,7 @@ import { TariffModule } from './resources/tariff';
 import { AwardTenderModule } from './resources/award-tender/award-tender.module';
 import { TechModule } from './resources/tech/tech.module';
 import { CronModule } from './resources/cron/cron.module';
+import { TenderNormalizerModule } from '@/resources/tender-normalizer/tender-normalizer.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { CronModule } from './resources/cron/cron.module';
     TariffModule,
     AwardTenderModule,
     TechModule,
+    TenderNormalizerModule,
   ],
   controllers: [AppController],
   providers: [AppService],

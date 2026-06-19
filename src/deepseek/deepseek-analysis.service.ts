@@ -75,7 +75,7 @@ export class DeepSeekAnalysisService extends BaseLlmAnalysisService {
             'Create shortTitle translations in English, German, French, Polish, and Russian.',
             'Keep each title concise, ideally 5-10 words.',
             'Preserve the procurement subject and avoid adding facts not present in the source title.',
-            'Return JSON only in this exact shape: {"items":[{"id":"...","shortTitle":{"en":"...","de":"...","fr":"...","pl":"...","ru":"..."}}]}.',
+            'Return JSON only in this exact shape: {"items":[{"id":"...","en":"...","de":"...","fr":"...","pl":"...","ru":"..."}]}.',
           ].join('\n'),
         },
         {
@@ -133,16 +133,12 @@ export class DeepSeekAnalysisService extends BaseLlmAnalysisService {
         throw new Error('DeepSeek short title item must contain string id');
       }
 
-      if (!isRecord(item.shortTitle)) {
-        throw new Error('DeepSeek short title item must contain shortTitle');
-      }
-
       const shortTitle = {
-        en: this.requireShortTitleString(item.shortTitle.en, 'en'),
-        de: this.requireShortTitleString(item.shortTitle.de, 'de'),
-        fr: this.requireShortTitleString(item.shortTitle.fr, 'fr'),
-        pl: this.requireShortTitleString(item.shortTitle.pl, 'pl'),
-        ru: this.requireShortTitleString(item.shortTitle.ru, 'ru'),
+        en: this.requireShortTitleString(item.en, 'en'),
+        de: this.requireShortTitleString(item.de, 'de'),
+        fr: this.requireShortTitleString(item.fr, 'fr'),
+        pl: this.requireShortTitleString(item.pl, 'pl'),
+        ru: this.requireShortTitleString(item.ru, 'ru'),
       };
 
       return {

@@ -1,24 +1,32 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
 import { TedContractNature } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
-import { TenderDocumentsLinks, TenderLot } from '@/resources/tenders/schemas';
+import {
+  MoneyValue,
+  TenderDocumentsLinks,
+  TenderLot,
+} from '@/resources/tenders/schemas';
 import { filterModel } from '@/utils';
-import { Contractor, ContractorDocument } from '@/resources/contractor/schemas';
+import { ContractorDocument } from '@/resources/contractor/schemas';
 
-export type AwardTenderWinner = Contractor;
+export type AwardTenderLot = TenderLot & {
+  resultLotIdentifier: string;
+  awardValue?: {
+    amount: MoneyValue;
+    currency: string | null;
+  };
+  awardValueEur?: MoneyValue;
+};
 
 export interface AwardTender {
   _id: string;
   id: string;
-  publicationNumber?: string;
   noticeType?: string;
   noticeSubtype?: string;
   noticeVersion?: string;
   procedureType?: string;
   title?: string;
   titleProc?: string;
-  titleLot?: string[];
   description?: string;
-  descriptionLot?: string[];
   buyerName?: string;
   buyerIdentifier?: string;
   buyerCountry?: string;
@@ -27,29 +35,37 @@ export interface AwardTender {
   publicationDate?: Date;
   dispatchDate?: Date;
   submissionDeadline?: Date;
-  deadlineReceiptTender?: Date;
-  plannedEndDate?: Date;
+  plannedEndDate: Date | undefined;
   contractNature?: TedContractNature | string;
-  cpvCodes?: string[];
-  classificationCpv?: unknown[];
+  cpvCodes: string[];
   mainClassificationProc?: unknown[];
-  mainClassificationLot?: unknown[];
-  additionalClassificationLot?: unknown[];
-  estimatedValue?: {
-    amount: number | null;
+
+  estimatedValue: {
+    amount: MoneyValue;
     currency: string | null;
   };
-  estimatedValueEur?: number | null;
-  awardDecisionDate?: Date;
-  selectionStatus?: string[];
-  decisionDate?: string[];
-  placeOfPerformanceCountries?: string[];
-  placeOfPerformanceCities?: string[];
-  lots?: TenderLot[];
-  internalLotIdentifiers?: string[];
+  awardValue: {
+    amount: MoneyValue;
+    currency: string | null;
+  };
+  estimatedValueEur: MoneyValue;
+  awardValueEur: MoneyValue;
+
+  awardDecisionDates: string[];
+  selectionStatuses: string[];
+  isFrameworkAgreement?: boolean;
+  placeOfPerformanceCountriesProc: string[];
+  placeOfPerformanceCitiesProc: string[];
+  placeOfPerformanceCountries: string[];
+  placeOfPerformanceCities: string[];
+  placeOfPerformanceSubdivisions: string[];
+
+  lots: AwardTenderLot[];
+
+  selectionCriteriaSources: string[];
+
   winners: Array<mongoose.Types.ObjectId | ContractorDocument>;
-  links?: TenderDocumentsLinks;
-  sourceHash: string;
+  links: TenderDocumentsLinks;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -62,71 +78,112 @@ export interface AwardTenderModelType extends Model<AwardTenderDocument> {
   toDetailDto(tender: AwardTenderSerializable): Partial<AwardTender>;
 }
 
+const AwardTenderLotValueSchema = new Schema(
+  {
+    amount: { type: Number, default: null },
+    currency: { type: String, default: null },
+  },
+  { _id: false },
+);
+
+const AwardTenderLotSchema = new Schema<AwardTenderLot>(
+  {
+    identifier: String,
+    resultLotIdentifier: String,
+    title: String,
+    description: String,
+    mainClassification: { type: [String], default: [] },
+    additionalClassifications: { type: [String], default: [] },
+    contractNature: String,
+
+    estimatedValue: { type: AwardTenderLotValueSchema },
+    awardValue: { type: AwardTenderLotValueSchema },
+    estimatedValueEur: { type: Number, default: null, index: true },
+    awardValueEur: { type: Number, default: null, index: true },
+    isFrameworkAgreement: Boolean,
+    isDps: Boolean,
+
+    frameworkMaximumValue: {
+      type: AwardTenderLotValueSchema,
+    },
+    duration: {
+      value: { type: Number, default: null },
+      unit: String,
+    },
+    deadlineReceiptTender: Date,
+    documentUrls: { type: [String], default: [] },
+    submissionUrls: { type: [String], default: [] },
+    electronicSubmission: String,
+    plannedEndDate: { type: Date },
+    placeOfPerformanceCountry: String,
+    placeOfPerformanceSubdivision: String,
+    placeOfPerformanceCity: String,
+    awardCriteria: { type: Schema.Types.Mixed },
+    selectionCriteria: { type: Schema.Types.Mixed },
+    selectionCriteriaSource: String,
+  },
+  { _id: false, strict: false },
+);
+
 const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
   {
-    id: { type: String, required: true, index: true },
-    publicationNumber: { type: String, index: true },
-    noticeType: { type: String, index: true },
+    id: { type: String, required: true, unique: true },
+    noticeType: { type: String },
     noticeSubtype: String,
     noticeVersion: String,
     procedureType: String,
     title: String,
     titleProc: String,
-    titleLot: { type: [String] },
     description: String,
-    descriptionLot: { type: [String] },
     buyerName: String,
     buyerIdentifier: String,
-    buyerCountry: { type: String, index: true },
+    buyerCountry: { type: String },
     buyerCity: String,
     buyerMainActivities: {
       type: [String],
     },
-    publicationDate: { type: Date, index: true },
+    selectionStatuses: { type: [String], default: [] },
+    publicationDate: { type: Date },
     dispatchDate: Date,
-    submissionDeadline: { type: Date, index: true },
-    deadlineReceiptTender: Date,
-    plannedEndDate: { type: Date, index: true },
+    submissionDeadline: { type: Date },
+    plannedEndDate: { type: Date },
     contractNature: {
       type: String,
       enum: TedContractNature,
     },
-    cpvCodes: { type: [String], index: true },
-    classificationCpv: {
-      type: [String],
-      default: [],
-    },
+    cpvCodes: { type: [String] },
     mainClassificationProc: {
       type: [String],
       default: [],
     },
-    mainClassificationLot: {
-      type: [String],
-      default: [],
-    },
-    additionalClassificationLot: {
-      type: [String],
-      default: [],
-    },
+    isFrameworkAgreement: Boolean,
     estimatedValue: {
       amount: { type: Number, default: null },
       currency: { type: String, default: null },
     },
-    estimatedValueEur: { type: Number, default: null, index: true },
-    awardDecisionDate: { type: Date, index: true },
-    selectionStatus: { type: [String] },
-    decisionDate: { type: [String] },
-    placeOfPerformanceCountries: { type: [String] },
-    placeOfPerformanceCities: { type: [String] },
-    lots: { type: [Schema.Types.Mixed] },
-    internalLotIdentifiers: { type: [String] },
+    awardValue: {
+      amount: { type: Number, default: null },
+      currency: { type: String, default: null },
+    },
+    estimatedValueEur: { type: Number, default: null },
+    awardValueEur: { type: Number, default: null },
+    awardDecisionDates: { type: [String], default: [] },
+    placeOfPerformanceCitiesProc: { type: [String], default: [] },
+    placeOfPerformanceCountriesProc: { type: [String], default: [] },
+    placeOfPerformanceCountries: { type: [String], default: [] },
+    placeOfPerformanceCities: { type: [String], default: [] },
+    placeOfPerformanceSubdivisions: { type: [String], default: [] },
+
+    lots: { type: [AwardTenderLotSchema], default: [] },
+
+    selectionCriteriaSources: { type: [String], default: [] },
+
     winners: {
       type: [Schema.Types.ObjectId],
       ref: 'Contractor',
       default: [],
     },
     links: Schema.Types.Mixed,
-    sourceHash: { type: String, required: true, index: true },
   },
   {
     collection: 'award_tenders',
@@ -140,13 +197,6 @@ AwardTenderSchema.index({
   contractNature: 1,
   publicationDate: -1,
 });
-AwardTenderSchema.index(
-  { id: 1, searchHash: 1 },
-  {
-    unique: true,
-    partialFilterExpression: { searchHash: { $exists: true } },
-  },
-);
 AwardTenderSchema.index({ 'winners.identifier': 1 });
 AwardTenderSchema.index({ 'winners.name': 1 });
 

@@ -38,6 +38,7 @@ export const GENERAL_TENDER_ANALYSIS_JSON_SCHEMA = {
           'summary',
           'cpvCodes',
           'estimatedValue',
+          'awardCriteria',
           'deadline',
           'source',
         ],
@@ -57,6 +58,27 @@ export const GENERAL_TENDER_ANALYSIS_JSON_SCHEMA = {
               amount: { type: ['number', 'null'] },
               currency: { type: ['string', 'null'] },
               description: { type: ['string', 'null'] },
+            },
+          },
+          awardCriteria: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: [
+                'type',
+                'description',
+                'weight',
+                'weightCode',
+                'summary',
+              ],
+              properties: {
+                type: { type: ['string', 'null'] },
+                description: { type: ['string', 'null'] },
+                weight: { type: ['number', 'null'] },
+                weightCode: { type: ['string', 'null'] },
+                summary: { type: 'string' },
+              },
             },
           },
           deadline: { type: ['string', 'null'] },
@@ -163,7 +185,20 @@ export const GENERAL_TENDER_ANALYSIS_JSON_SCHEMA = {
 
     questionsToAsk: {
       type: 'array',
-      items: { type: 'string' },
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['priority', 'question', 'reason', 'category'],
+        properties: {
+          priority: {
+            type: 'string',
+            enum: ['LOW', 'MEDIUM', 'HIGH'],
+          },
+          question: { type: 'string' },
+          reason: { type: 'string' },
+          category: { type: 'string' },
+        },
+      },
     },
 
     complexityScore: {

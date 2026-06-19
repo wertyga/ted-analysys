@@ -428,11 +428,6 @@ export class TenderMatchingService {
     match: TenderCompanyMatchDocument,
   ): Promise<CompanyTenderFitAiPayload> {
     const companyName = await this.getCompanyName(filter.user);
-    const populatedTender = await tender.populate({
-      path: 'classificationCpv',
-      select: 'code name',
-    });
-
     return {
       company: {
         name: companyName,
@@ -458,7 +453,7 @@ export class TenderMatchingService {
         id: tender.id,
         title: tender.title ?? '',
         description: tender.description,
-        cpvCodes: readStringArray(populatedTender.classificationCpv),
+        cpvCodes: tender.cpvCodes ?? [],
         buyerName: tender.buyerName,
         buyerCountry: tender.buyerCountry,
         placeOfPerformanceCountries: tender.placeOfPerformanceCountries ?? [],

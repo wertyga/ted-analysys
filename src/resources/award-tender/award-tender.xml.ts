@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 import { isTag, type AnyNode, type Element } from 'domhandler';
-import { EstimatedValueCandidate } from '@/resources/tenders/tender-normalizer-xml';
+import { EstimatedValueCandidate } from '@/resources/tender-normalizer/tender-normalizer-xml';
 
 export interface XmlAwardWinner {
   name?: string;
@@ -169,10 +169,7 @@ function extractXmlAwardDecisionDate(
 function extractXmlOrganizations(
   $: cheerio.CheerioAPI,
 ): Map<string, Omit<XmlAwardWinner, 'decisionDate'>> {
-  const organizations = new Map<
-    string,
-    Omit<XmlAwardWinner, 'decisionDate'>
-  >();
+  const organizations = new Map<string, Omit<XmlAwardWinner, 'decisionDate'>>();
 
   $('*').each((_, element) => {
     if (getElementLocalName(element).toLowerCase() !== 'company') {

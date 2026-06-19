@@ -1,7 +1,8 @@
-import { TenderLotAnalysisInput } from '@/types';
+import { TenderLot } from '@/resources/tenders/schemas';
 
 export type AnalysisOutputLanguage = 'en' | 'ru' | 'pl' | 'de' | 'fr';
 export type RiskSeverity = 'LOW' | 'MEDIUM' | 'HIGH';
+export type QuestionPriority = 'LOW' | 'MEDIUM' | 'HIGH';
 export type GeneralGoNoGo = 'GO' | 'NO_GO' | 'REVIEW';
 export type GeneralRecommendation =
   | 'PROMISING'
@@ -36,11 +37,10 @@ export interface GeneralTenderAnalysisInput {
   outputLanguage?: AnalysisOutputLanguage;
   tender: {
     id: string;
-    publicationNumber?: string | null;
     title?: string | null;
     procedureTitle?: string | null;
     description?: string | null;
-    lots?: TenderLotAnalysisInput[];
+    lots: TenderLot[];
     buyerName?: string | null;
     buyerIdentifier?: string | null;
     country?: string | null;
@@ -60,15 +60,13 @@ export interface GeneralTenderAnalysisInput {
     plannedStartDate?: string | null;
     plannedEndDate?: string | null;
     duration?: {
-      value?: string | null;
+      value?: number | null;
       unit?: string | null;
     };
     contractNature?: string | null;
     legalBasis?: string | null;
     cpvCodes?: string[];
     mainCpv?: string[];
-    lotMainCpvs?: string[];
-    lotAdditionalCpvs?: string[];
     estimatedValue?: {
       amount: number | null;
       currency: string | null;
@@ -77,7 +75,6 @@ export interface GeneralTenderAnalysisInput {
       countries?: string[];
       cities?: string[];
     };
-    internalLotIdentifiers?: string[];
     documentUrls?: string[];
     submissionUrls?: string[];
     flags?: {
@@ -107,6 +104,13 @@ export interface GeneralTenderAnalysisResult {
       currency: string | null;
       description: string | null;
     } | null;
+    awardCriteria: Array<{
+      type: string | null;
+      description: string | null;
+      weight: number | null;
+      weightCode: string | null;
+      summary: string;
+    }>;
     deadline: string | null;
     source: TenderAnalysisLotSource;
   }>;
@@ -141,7 +145,12 @@ export interface GeneralTenderAnalysisResult {
   }>;
 
   hiddenPitfalls: string[];
-  questionsToAsk: string[];
+  questionsToAsk: Array<{
+    priority: QuestionPriority;
+    question: string;
+    reason: string;
+    category: string;
+  }>;
 
   /**
    * 0–100 score.

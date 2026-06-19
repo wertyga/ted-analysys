@@ -62,8 +62,8 @@ export interface TenderForMatching {
   procedureType?: string | null;
   languages?: string[];
   buyerName?: string | null;
-  titleLot?: string[];
-  descriptionLot?: string[];
+  lotTitles?: string[];
+  lotDescriptions?: string[];
 }
 
 export interface CompanyTenderFilterForMatching {
