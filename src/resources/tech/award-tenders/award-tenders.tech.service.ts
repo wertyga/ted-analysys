@@ -25,8 +25,6 @@ export class AwardTendersTechService {
     ).collectResultTendersFromTed(
       { lookbackYears: AWARD_TENDER_CONFIG.historyYearsBack },
       {
-        pageLimit: 100,
-        maxPages: 100_000,
         updateExisting: true,
       },
     );

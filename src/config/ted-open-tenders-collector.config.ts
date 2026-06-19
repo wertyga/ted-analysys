@@ -1,5 +1,5 @@
 export const TED_OPEN_TENDERS_COLLECTOR_CONFIG = {
-  defaultPageLimit: 100,
+  defaultPageLimit: 80,
   defaultMaxPages: 10_000,
   historyResult: {
     yearsBack: 3,

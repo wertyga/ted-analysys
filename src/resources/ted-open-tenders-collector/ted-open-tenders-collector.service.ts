@@ -22,6 +22,7 @@ import { TED_OPEN_TENDERS_COLLECTOR_CONFIG } from '@/config/ted-open-tenders-col
 import { AWARD_HISTORY_FIELDS } from '@/config/award-tender.config';
 import { AwardTenderDocument } from '@/resources/award-tender/schemas';
 import { TENDER_COMPETITION_SEARCH_FIELDS } from '@/config/ted-search.config';
+import fs from 'node:fs';
 
 export interface TedOpenTendersCollectorOptions<
   TChangedTender = TenderDocument,

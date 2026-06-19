@@ -160,9 +160,7 @@ export class TendersCronService {
           lookbackDays:
             TED_OPEN_TENDERS_COLLECTOR_CONFIG.recentResult.lookbackDays,
         },
-        {
-          pageLimit: 1000,
-        },
+        {},
       );
 
       devLog(
