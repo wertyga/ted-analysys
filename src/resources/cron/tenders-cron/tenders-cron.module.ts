@@ -18,5 +18,6 @@ import { AwardTenderModule } from '@/resources/award-tender/award-tender.module'
     AwardTenderModule,
   ],
   providers: [TendersCronService, TendersCronTechService],
+  exports: [TendersCronService],
 })
 export class TendersCronModule {}

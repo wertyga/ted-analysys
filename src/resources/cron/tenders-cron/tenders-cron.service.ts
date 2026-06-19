@@ -31,6 +31,10 @@ export class TendersCronService {
     private readonly cronTaskQueueService: CronTaskQueueService,
   ) {}
 
+  getAllCompetitionTendersStatus(): { isRunning: boolean } {
+    return { isRunning: this.isGatheringAllCompetitionTenders };
+  }
+
   // @Cron(CRON_CONFIG.tenders.allCompetitionTenders, {
   //   timeZone: CRON_CONFIG.timeZone,
   // })

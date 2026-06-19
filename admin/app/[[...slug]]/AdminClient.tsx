@@ -75,6 +75,10 @@ type DbCopyResult = {
   deletedCount: number;
 };
 
+type GatherAllCompetitionTendersStatus = {
+  isRunning: boolean;
+};
+
 const tokenStorageKey = 'ted-admin-token';
 
 class ApiRequestError extends Error {
@@ -163,6 +167,8 @@ export default function AdminApp() {
   const [shortTitlesLoading, setShortTitlesLoading] = useState(false);
   const [dbCopyResult, setDbCopyResult] = useState<DbCopyResult | null>(null);
   const [dbCopyLoading, setDbCopyLoading] = useState(false);
+  const [gatherAllStatus, setGatherAllStatus] =
+    useState<GatherAllCompetitionTendersStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -208,6 +214,20 @@ export default function AdminApp() {
     }
 
     void loadAdminData(token, activeSection);
+  }, [activeSection, token]);
+
+  useEffect(() => {
+    if (!token || activeSection !== 'tech') {
+      return;
+    }
+
+    void loadGatherAllStatus(token);
+    const interval = window.setInterval(
+      () => void loadGatherAllStatus(token),
+      5000,
+    );
+
+    return () => window.clearInterval(interval);
   }, [activeSection, token]);
 
   const userColumns: ColumnsType<AdminUser> = [
@@ -324,12 +344,29 @@ export default function AdminApp() {
       if (section === 'tenders') {
         await loadTenders(authToken, tendersPage, tendersPageSize);
       }
+
+      if (section === 'tech') {
+        await loadGatherAllStatus(authToken);
+      }
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : 'Failed to load data',
       );
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function loadGatherAllStatus(authToken: string) {
+    try {
+      const status = await request<GatherAllCompetitionTendersStatus>(
+        '/adm/tech/tenders/gather-all-competition/status',
+        { token: authToken },
+      );
+
+      setGatherAllStatus(status);
+    } catch {
+      setGatherAllStatus(null);
     }
   }
 
@@ -456,6 +493,7 @@ export default function AdminApp() {
     setSitemapResult(null);
     setShortTitlesResult(null);
     setDbCopyResult(null);
+    setGatherAllStatus(null);
   }
 
   async function generateSitemap(event: FormEvent<HTMLFormElement>) {
@@ -713,6 +751,22 @@ export default function AdminApp() {
 
             {activeSection === 'tech' ? (
               <>
+                <section className="panel panelWide">
+                  <div className="panelHeader">
+                    <div>
+                      <h2>Full tender gathering</h2>
+                      <p>Current gatherAllCompetitionTenders status.</p>
+                    </div>
+                    {gatherAllStatus ? (
+                      <Tag color={gatherAllStatus.isRunning ? 'processing' : 'default'}>
+                        {gatherAllStatus.isRunning ? 'RUNNING' : 'IDLE'}
+                      </Tag>
+                    ) : (
+                      <Tag>UNKNOWN</Tag>
+                    )}
+                  </div>
+                </section>
+
                 <section className="panel panelWide">
                   <div className="panelHeader">
                     <div>

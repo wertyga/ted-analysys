@@ -15,6 +15,7 @@ import { AwardTendersTechService } from './award-tenders/award-tenders.tech.serv
 import { AwardTenderModule } from '@/resources/award-tender/award-tender.module';
 import { TedSearchModule } from '@/resources/ted-search/ted-search.module';
 import { TendersModule } from '@/resources/tenders/tenders.module';
+import { TendersCronModule } from '@/resources/cron/tenders-cron/tenders-cron.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { TendersModule } from '@/resources/tenders/tenders.module';
     AwardTenderModule,
     TedSearchModule,
     TendersModule,
+    TendersCronModule,
   ],
   controllers: [
     AwardTendersTechController,
