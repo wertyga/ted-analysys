@@ -211,7 +211,7 @@ export abstract class BaseLlmAnalysisService {
       disadvantages: this.requireStringArray(value, 'disadvantages'),
       risks: this.requireRisks(value.risks),
       hiddenPitfalls: this.requireStringArray(value, 'hiddenPitfalls'),
-      questionsToAsk: this.requireStringArray(value, 'questionsToAsk'),
+      questionsToAsk: this.requireQuestionsToAsk(value.questionsToAsk),
       complexityScore: this.requireScore(value, 'complexityScore'),
       opportunityScore: this.requireScore(value, 'opportunityScore'),
       generalRecommendation: this.requireGeneralRecommendation(
@@ -557,6 +557,39 @@ export abstract class BaseLlmAnalysisService {
         severity,
         description: this.requireString(item, 'description'),
         mitigation,
+      };
+    });
+  }
+
+  protected requireQuestionsToAsk(
+    value: unknown,
+  ): GeneralTenderAnalysisResult['questionsToAsk'] {
+    if (!Array.isArray(value)) {
+      throw new Error(
+        `${this.providerName} analysis field questionsToAsk must be an array`,
+      );
+    }
+
+    return value.map((item) => {
+      if (!isRecord(item)) {
+        throw new Error(
+          `${this.providerName} analysis questionsToAsk item must be an object`,
+        );
+      }
+
+      const priority = item.priority;
+
+      if (priority !== 'LOW' && priority !== 'MEDIUM' && priority !== 'HIGH') {
+        throw new Error(
+          `${this.providerName} analysis questionsToAsk priority is invalid`,
+        );
+      }
+
+      return {
+        priority,
+        question: this.requireString(item, 'question'),
+        reason: this.requireString(item, 'reason'),
+        category: this.requireString(item, 'category'),
       };
     });
   }

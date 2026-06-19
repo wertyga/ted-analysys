@@ -2,6 +2,7 @@ import { TenderLot } from '@/resources/tenders/schemas';
 
 export type AnalysisOutputLanguage = 'en' | 'ru' | 'pl' | 'de' | 'fr';
 export type RiskSeverity = 'LOW' | 'MEDIUM' | 'HIGH';
+export type QuestionPriority = 'LOW' | 'MEDIUM' | 'HIGH';
 export type GeneralGoNoGo = 'GO' | 'NO_GO' | 'REVIEW';
 export type GeneralRecommendation =
   | 'PROMISING'
@@ -144,7 +145,12 @@ export interface GeneralTenderAnalysisResult {
   }>;
 
   hiddenPitfalls: string[];
-  questionsToAsk: string[];
+  questionsToAsk: Array<{
+    priority: QuestionPriority;
+    question: string;
+    reason: string;
+    category: string;
+  }>;
 
   /**
    * 0–100 score.

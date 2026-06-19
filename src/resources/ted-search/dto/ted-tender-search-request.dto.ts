@@ -13,6 +13,7 @@ import {
   Matches,
   Max,
   Min,
+  IsBoolean,
 } from 'class-validator';
 import { TedNoticeType } from '../../tenders/types';
 import {
@@ -63,6 +64,11 @@ export enum TedDeadlineRange {
 }
 
 export class TedTenderSearchRequestDto implements TedTenderSearchFilters {
+  @IsOptional()
+  @IsBoolean()
+  @IsNotEmpty()
+  withoutBaseAnalysis?: boolean;
+
   @ApiPropertyOptional({ example: 'software development' })
   @IsOptional()
   @IsString()

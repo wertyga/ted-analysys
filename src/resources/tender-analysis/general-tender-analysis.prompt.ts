@@ -1,5 +1,5 @@
 export const GENERAL_TENDER_ANALYSIS_PROMPT_VERSION =
-  'general-tender-analysis-v8';
+  'general-tender-analysis-v9';
 
 export function buildGeneralTenderAnalysisPrompt(
   outputLanguage: string,
@@ -103,6 +103,11 @@ export function buildGeneralTenderAnalysisPrompt(
     'Put explicit negative conditions in disadvantages.',
     'Put inferred concerns in risks or hiddenPitfalls.',
     'Use mitigation only when a practical mitigation follows from the provided data. Otherwise set mitigation to null.',
+
+    'QUESTIONS TO ASK',
+    'Return questionsToAsk as structured clarification questions for the buyer or procurement authority.',
+    'For each question, set priority to LOW, MEDIUM, or HIGH; question to the exact question to ask; reason to why the answer matters; and category to a concise topic such as Eligibility, Procedure, Documents, Scope, Commercial, Technical, or Submission.',
+    'Use HIGH priority when an unanswered question can affect eligibility, submission validity, material scope, pricing, or the decision to bid.',
 
     'OUTPUT',
     'Return strict JSON matching the supplied schema.',

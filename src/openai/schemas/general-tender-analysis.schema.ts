@@ -185,7 +185,20 @@ export const GENERAL_TENDER_ANALYSIS_JSON_SCHEMA = {
 
     questionsToAsk: {
       type: 'array',
-      items: { type: 'string' },
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['priority', 'question', 'reason', 'category'],
+        properties: {
+          priority: {
+            type: 'string',
+            enum: ['LOW', 'MEDIUM', 'HIGH'],
+          },
+          question: { type: 'string' },
+          reason: { type: 'string' },
+          category: { type: 'string' },
+        },
+      },
     },
 
     complexityScore: {
