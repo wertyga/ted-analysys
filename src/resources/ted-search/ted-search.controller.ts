@@ -30,7 +30,8 @@ export class TedSearchController {
 
     const noticeData = await this.tedSearchService.searchLocalTenders({
       ...searchBody,
-      withoutBaseAnalysisGenerating: !!req.isBot,
+      withoutBaseAnalysisGenerating:
+        !!req.isBot || body.withoutBaseAnalysisGenerating,
       noticeTypes: searchBody.noticeTypes ?? TENDER_COMPETITION_NOTICE_TYPES,
     });
 
