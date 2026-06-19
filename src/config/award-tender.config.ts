@@ -1,3 +1,5 @@
+import { BUYER_FIELDS } from '@/config/buyer.config';
+
 export const AWARD_TENDER_CONFIG = {
   historyYearsBack: 3,
   awardTenderSearchLimit: 1,
@@ -75,17 +77,6 @@ export const WINNER_FIELDS = [
   'eu-registration-number',
 ];
 
-export const BUYER_FIELDS = [
-  'organisation-identifier-buyer',
-  'organisation-identifier-tenderer',
-  'buyer-name',
-  'buyer-identifier',
-  'buyer-country',
-  'buyer-city',
-  'buyer-legal-type',
-  'buyer-contracting-entity',
-];
-
 export const FRAMEWORK_FIELDS = [
   'framework-estimated-value',
   'framework-estimated-value-cur',
@@ -138,16 +129,19 @@ export const AWARD_TENDER_LOT_FIELDS = [
 
   'award-criterion-type-lot',
   'award-criterion-description-lot',
+  'award-criterion-number-lot',
   'award-criterion-number-weight-lot',
 
   'selection-criterion-name-lot',
   'selection-criterion-description-lot',
 ];
 
-export const AWARD_HISTORY_FIELDS = [
-  ...AWARD_TENDER_FIELDS,
-  ...WINNER_FIELDS,
-  ...BUYER_FIELDS,
-  ...AWARD_TENDER_LOT_FIELDS,
-  ...FRAMEWORK_FIELDS,
-];
+export const AWARD_HISTORY_FIELDS = Array.from(
+  new Set([
+    ...AWARD_TENDER_FIELDS,
+    ...WINNER_FIELDS,
+    ...BUYER_FIELDS,
+    ...AWARD_TENDER_LOT_FIELDS,
+    ...FRAMEWORK_FIELDS,
+  ]),
+);

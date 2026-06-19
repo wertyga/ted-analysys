@@ -43,10 +43,8 @@ import {
 } from '@/resources/tender-wishlist/schemas';
 import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rates/currency-exchange-rates.service';
 import { CurrencySign } from '@/resources/codelist';
-import { searchTendersDefaultFields } from '@/resources/ted-search/utils';
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
-import { AwardTenderLot } from '@/resources/award-tender/schemas';
-import { NormalizedAwardTenderLot } from '@/resources/award-tender/award-tender.service';
+import { TENDER_COMPETITION_SEARCH_FIELDS } from '@/config/ted-search.config';
 
 export interface GatherActiveTendersResult {
   completed?: boolean;
@@ -265,7 +263,7 @@ export class TendersService {
       );
 
       if (existingTender && !shouldUpdateExistingTender) {
-        if (!existingTender.shortTitle) {
+        if (!this.hasCompleteShortTitle(existingTender.shortTitle)) {
           tendersForShortTitle.push(existingTender);
         }
 
@@ -276,7 +274,7 @@ export class TendersService {
       const savedTender = await this.upsertTender(notice);
 
       if (savedTender) {
-        if (!savedTender.shortTitle) {
+        if (!this.hasCompleteShortTitle(savedTender.shortTitle)) {
           tendersForShortTitle.push(savedTender);
         }
 
@@ -301,7 +299,7 @@ export class TendersService {
     tenders: Array<Pick<TenderDocument, 'id' | 'title' | 'shortTitle'>>,
   ) {
     const tendersWithoutShortTitle = tenders.filter((tender) => {
-      return tender.title && !tender.shortTitle;
+      return tender.title && !this.hasCompleteShortTitle(tender.shortTitle);
     });
 
     if (!tendersWithoutShortTitle.length) {
@@ -333,18 +331,23 @@ export class TendersService {
             const item = byId.get(tender.id);
 
             if (!item) {
+              this.logger.warn(
+                `DeepSeek short title response did not include tender ${tender.id}`,
+              );
+
               return;
             }
 
-            await TenderModel.updateOne(
+            const updatedTender = await TenderModel.findOneAndUpdate(
               {
                 id: tender.id,
-                $or: [{ shortTitle: { $exists: false } }, { shortTitle: null }],
+                ...this.buildMissingShortTitleQuery(),
               },
               { $set: { shortTitle: item.shortTitle } },
+              { returnDocument: 'after' },
             ).exec();
 
-            tender.shortTitle = item.shortTitle;
+            tender.shortTitle = updatedTender?.shortTitle ?? item.shortTitle;
           }),
         );
       } catch (error: unknown) {
@@ -355,6 +358,31 @@ export class TendersService {
         );
       }
     }
+  }
+
+  private hasCompleteShortTitle(
+    value: TenderDocument['shortTitle'] | undefined,
+  ): boolean {
+    return Boolean(value?.en && value.de && value.fr && value.pl && value.ru);
+  }
+
+  private buildMissingShortTitleQuery() {
+    return {
+      $or: [
+        { shortTitle: { $exists: false } },
+        { shortTitle: null },
+        { 'shortTitle.en': { $exists: false } },
+        { 'shortTitle.de': { $exists: false } },
+        { 'shortTitle.fr': { $exists: false } },
+        { 'shortTitle.pl': { $exists: false } },
+        { 'shortTitle.ru': { $exists: false } },
+        { 'shortTitle.en': '' },
+        { 'shortTitle.de': '' },
+        { 'shortTitle.fr': '' },
+        { 'shortTitle.pl': '' },
+        { 'shortTitle.ru': '' },
+      ],
+    };
   }
 
   private shouldUpdateTenderFromTedNotice(
@@ -461,7 +489,7 @@ export class TendersService {
       paginationMode: TedPaginationMode.PAGE_NUMBER,
       onlyLatestVersions: true,
       checkQuerySyntax: false,
-      fields: searchTendersDefaultFields,
+      fields: TENDER_COMPETITION_SEARCH_FIELDS,
     });
 
     return this.extractNotices(response)[0];

@@ -181,6 +181,10 @@ export class TenderNormalizerService {
         'award-criterion-number-weight-lot',
         notice,
       ),
+      awardCriterionNumbers: getNumberArrayValue(
+        'award-criterion-number-lot',
+        notice,
+      ),
       awardCriterionDescriptions: getEngValueOrFirst(
         'award-criterion-description-lot',
         notice,
@@ -287,7 +291,8 @@ export class TenderNormalizerService {
         awardCriteria: {
           type: data.awardCriterionTypes?.[i],
           description: data.awardCriterionDescriptions?.[i],
-          weight: data.awardCriterionNumberWeights?.[i],
+          weight: data.awardCriterionNumbers?.[i] ?? null,
+          weightCode: data.awardCriterionNumberWeights?.[i],
         },
         selectionCriteria: {
           name: data.selectionCriterionNames?.[i],

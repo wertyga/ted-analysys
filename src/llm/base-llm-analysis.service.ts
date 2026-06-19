@@ -403,6 +403,7 @@ export abstract class BaseLlmAnalysisService {
       const type = item.type;
       const description = item.description;
       const weight = item.weight;
+      const weightCode = item.weightCode;
 
       if (type !== null && typeof type !== 'string') {
         throw new Error(
@@ -416,13 +417,25 @@ export abstract class BaseLlmAnalysisService {
         );
       }
 
-      if (weight !== null && typeof weight !== 'string') {
+      if (weight !== null && typeof weight !== 'number') {
         throw new Error(
-          `${this.providerName} analysis lot awardCriteria.weight must be string or null`,
+          `${this.providerName} analysis lot awardCriteria.weight must be number or null`,
         );
       }
 
-      return { type, description, weight };
+      if (weightCode !== null && typeof weightCode !== 'string') {
+        throw new Error(
+          `${this.providerName} analysis lot awardCriteria.weightCode must be string or null`,
+        );
+      }
+
+      return {
+        type,
+        description,
+        weight,
+        weightCode,
+        summary: this.requireString(item, 'summary'),
+      };
     });
   }
 

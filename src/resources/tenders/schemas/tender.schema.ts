@@ -53,7 +53,8 @@ export interface TenderLot {
   awardCriteria?: {
     type: string | null | undefined;
     description: string | null | undefined;
-    weight: string | null | undefined;
+    weight: number | null | undefined;
+    weightCode?: string | null | undefined;
   };
   selectionCriteria?: {
     name: string | null | undefined;

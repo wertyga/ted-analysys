@@ -106,7 +106,9 @@ export interface GeneralTenderAnalysisResult {
     awardCriteria: Array<{
       type: string | null;
       description: string | null;
-      weight: string | null;
+      weight: number | null;
+      weightCode: string | null;
+      summary: string;
     }>;
     deadline: string | null;
     source: TenderAnalysisLotSource;

@@ -42,8 +42,11 @@ export class TenderAwardCriteriaDto {
   @ApiPropertyOptional({ example: 'Lowest price' })
   description?: string | null;
 
-  @ApiPropertyOptional({ example: '70' })
-  weight?: string | null;
+  @ApiPropertyOptional({ example: 70 })
+  weight?: number | null;
+
+  @ApiPropertyOptional({ example: 'per-exa' })
+  weightCode?: string | null;
 }
 
 export class TenderSelectionCriteriaDto {

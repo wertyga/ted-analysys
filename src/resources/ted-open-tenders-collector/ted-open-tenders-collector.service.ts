@@ -9,10 +9,7 @@ import {
   TedSortOrder,
   TedTenderSortColumn,
 } from '@/resources/ted-search/types/ted-search.types';
-import {
-  getTedDate,
-  searchTendersDefaultFields,
-} from '@/resources/ted-search/utils';
+import { getTedDate } from '@/resources/ted-search/utils';
 import {
   TENDER_COMPETITION_NOTICE_TYPES,
   TENDER_RESULT_NOTICE_TYPES,
@@ -24,6 +21,7 @@ import { AwardTenderService } from '@/resources/award-tender/award-tender.servic
 import { TED_OPEN_TENDERS_COLLECTOR_CONFIG } from '@/config/ted-open-tenders-collector.config';
 import { AWARD_HISTORY_FIELDS } from '@/config/award-tender.config';
 import { AwardTenderDocument } from '@/resources/award-tender/schemas';
+import { TENDER_COMPETITION_SEARCH_FIELDS } from '@/config/ted-search.config';
 
 export interface TedOpenTendersCollectorOptions<
   TChangedTender = TenderDocument,
@@ -168,7 +166,7 @@ export class TedOpenTendersCollectorService {
     return this.collectTedNoticesByIteration({
       query,
       scope: TedScope.ACTIVE,
-      fields: searchTendersDefaultFields,
+      fields: TENDER_COMPETITION_SEARCH_FIELDS,
       options,
       saveNotices: async (notices) => {
         const saveResult = await this.tendersService.saveNewTedTenders(notices);

@@ -1,5 +1,5 @@
 export const GENERAL_TENDER_ANALYSIS_PROMPT_VERSION =
-  'general-tender-analysis-v5';
+  'general-tender-analysis-v8';
 
 export function buildGeneralTenderAnalysisPrompt(
   outputLanguage: string,
@@ -31,7 +31,7 @@ export function buildGeneralTenderAnalysisPrompt(
     'For each returned lot, preserve the explicit lot identifier when available, summarize the lot-specific scope, include CPV codes, value, and deadline only when explicitly present, and set source to STRUCTURED_DATA, XML_NOTICE, or DOCUMENT_TEXT.',
     'Return lots[*].title in English only. Do not copy a non-English source lot title into lots[*].title. Translate source lot titles to concise English titles. Preserve the original lot identifier separately in lots[*].identifier.',
     'If a source lot title is not in English and cannot be translated confidently, create a short English descriptive title from the lot description, CPV codes, or scope, for example "System Development and Maintenance".',
-    'For each returned lot, include lots[*].awardCriteria as an array. Use the lot-specific tender.lots[*].awardCriteria when available. Translate awardCriteria[*].description to English. Keep awardCriteria[*].type and awardCriteria[*].weight as explicit source values when available. Use [] when no lot-specific award criteria are provided.',
+    'For each returned lot, include lots[*].awardCriteria as an array. Use the lot-specific tender.lots[*].awardCriteria when available. Translate awardCriteria[*].description to English. Keep awardCriteria[*].type as an explicit source value when available. Set awardCriteria[*].weight to the explicit numeric criterion value from structured data; do not invent it from weight codes such as per-exa, poi-exa, or ord-imp. Preserve those source weight codes in awardCriteria[*].weightCode. Set awardCriteria[*].summary to a short English human-readable criterion summary combining description/type/weight/weightCode. Use [] when no lot-specific award criteria are provided.',
     'When lots are extracted only from DOCUMENTS, clearly indicate in the relevant summary, scope, value, criteria, or risk text that the lot information comes from document text.',
     'If lots differ, mention lot-specific scope instead of flattening everything into one generic summary.',
     'If multiple lots are present, analyze all provided lots at a useful summary level.',
@@ -60,6 +60,7 @@ export function buildGeneralTenderAnalysisPrompt(
     'ELIGIBILITY AND AWARD CRITERIA',
     'Use selectionCriteria as eligibility criteria.',
     'Use awardCriteria as award criteria.',
+    'Return top-level awardCriteria as an aggregated human-readable English list across all lots and procedure-level criteria. Include lot identifiers in the text when criteria differ by lot.',
     'Preserve explicit weights, types, and descriptions when present.',
     'If criteria are only available per lot, mention that criteria may differ by lot.',
     'Do not infer certifications, financial turnover, references, or required documents unless explicitly stated.',
