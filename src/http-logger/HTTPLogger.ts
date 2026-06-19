@@ -34,6 +34,7 @@ export class HttpErrorLoggingFilter implements ExceptionFilter {
         {
           body,
           stack,
+          ua: req.headers['user-agent'],
           user: req.user ?? null,
         },
         this.getClientIp(req),

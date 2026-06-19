@@ -66,8 +66,7 @@ export enum TedDeadlineRange {
 export class TedTenderSearchRequestDto implements TedTenderSearchFilters {
   @IsOptional()
   @IsBoolean()
-  @IsNotEmpty()
-  withoutBaseAnalysis?: boolean;
+  withoutBaseAnalysisGenerating?: boolean;
 
   @ApiPropertyOptional({ example: 'software development' })
   @IsOptional()

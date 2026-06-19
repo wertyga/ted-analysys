@@ -7,6 +7,8 @@ import { dirname, isAbsolute, join, normalize } from 'path';
 import { AppModule } from './app.module';
 import mongooseConnect from './mongoose/mongoose';
 import { HttpErrorLoggingFilter } from '@/http-logger/HTTPLogger';
+import { isSearchBot } from '@/utils/bots';
+import { logger } from '@/utils';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
@@ -27,6 +29,14 @@ async function bootstrap() {
     }),
   );
   app.useGlobalFilters(new HttpErrorLoggingFilter());
+
+  app.use((req, res, next) => {
+    const ua = req.headers['user-agent'];
+
+    req.isBot = isSearchBot(Array.isArray(ua) ? ua.join(' ') : ua);
+
+    next();
+  });
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('TED Tender Search API')

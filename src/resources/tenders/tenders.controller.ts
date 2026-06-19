@@ -4,6 +4,7 @@ import {
   Get,
   Inject,
   Param,
+  Query,
   Req,
 } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -34,7 +35,7 @@ export class TendersController {
     @Param('id') id: string,
     @Req() req,
   ): Promise<TenderDetailDto> {
-    const tba = await this.tendersService.findById(id);
+    const tba = await this.tendersService.findById(id, !!req.isBot);
     const tender = tba.toObject();
 
     const tenderSerialized = TenderModel.serializeDetail(tender);

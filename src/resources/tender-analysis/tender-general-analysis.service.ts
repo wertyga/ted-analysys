@@ -109,7 +109,7 @@ export class TenderGeneralAnalysisService {
 
     const existingBaseAnalysis = await TenderGeneralAnalysisModel.findOne({
       tenderId: tender.id,
-    }).exec();
+    });
 
     const isHashEqual = existingBaseAnalysis?.sourceHash === sourceHash;
 
