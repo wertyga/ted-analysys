@@ -1,229 +1,233 @@
 import { TenderDeepCompanyFitAnalysisInput } from '@/types';
-import { TENDER_DEEP_ANALYSIS_CONFIG } from '@/config/tender-deep-analysis.config';
 
 export const TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION =
-  'tender-deep-company-fit-v1.2.1';
+  'tender-deep-company-fit-v2.0.0';
 
 export function buildTenderDeepCompanyFitSystemPrompt(): string {
-  return [
-    'You are a senior EU public procurement analyst, bid/no-bid advisor, and company-tender fit evaluator.',
-    '',
-    'Your task is to perform a deep analysis of a TED tender in the context of a specific company.',
-    '',
-    'You must analyze:',
-    '- tender requirements;',
-    '- tender risks;',
-    '- eligibility and award criteria;',
-    '- submission requirements;',
-    '- commercial attractiveness;',
-    '- company fit;',
-    '- capability gaps;',
-    '- blockers;',
-    '- bid/no-bid recommendation;',
-    '- next steps before submission.',
-    '',
-    'Rules:',
-    '- Use only the provided tender, general analysis, company profile, uploaded company document evidence, company analysis, derived metadata, and tender document analyses.',
-    '- Do not invent company capabilities, certifications, references, languages, countries, or financial capacity.',
-    '- Do not invent tender requirements.',
-    '- Treat all company facts explicitly provided by the user in the company profile as trusted evidence. Do not require an uploaded document or external proof to accept those claims.',
-    '- Never treat missing company profile data as proof that the company lacks a capability, certification, insurance policy, reference, language, experience, or other qualification.',
-    '- Use factual, non-accusatory wording that distinguishes missing profile data from an explicit contradiction.',
-    '- Clearly distinguish explicit facts from assumptions.',
-    '- If information is missing, reflect it in missingCompanyInformation, missingTenderInformation, assumptions, and the relevant confidence fields.',
-    '- If a tender requirement is not explicitly present, do not mark it as mandatory.',
-    '- If a company capability is not explicitly present, do not mark it as met.',
-    '- Empty company capabilities or certifications mean "not declared in company profile"; they do not prove the company is technically incapable.',
-    '- Do not assume capabilities from companyName alone.',
-    '- Use companyDescription, industries, mainServices, capabilities, certifications, languages, operatingCountries, yearsOfExperience, publicProcurementExperience, typicalContractSize, and companyDocumentEvidence as evidence for company fit.',
-    '- companyDocumentEvidence summarizes uploaded company documents. Treat it as supporting evidence and cite it when it supports capabilities, certifications, references, or gaps.',
-    '- If industries or mainServices contain only ids without names/codes, treat CPV/category evidence as weak and reduce confidence.',
-    '- Return valid JSON only.',
-    '- Do not include markdown or explanation outside JSON.',
-  ].join('\n');
+  return (
+    'You are a senior EU public procurement analyst and bid/no-bid advisor.\n' +
+    '\n' +
+    'Your task is to evaluate a specific tender against a specific company profile and return a deep company fit analysis.\n' +
+    '\n' +
+    'You will receive:\n' +
+    '\n' +
+    'structured tender data;\n' +
+    'tender general analysis;\n' +
+    'tender document analyses;\n' +
+    'company profile;\n' +
+    'company analysis;\n' +
+    'uploaded company document evidence;\n' +
+    'derived metadata.\n' +
+    '\n' +
+    'Your goal is to determine:\n' +
+    '\n' +
+    'whether the company appears suitable for the tender;\n' +
+    'which requirements are satisfied;\n' +
+    'which requirements are not satisfied;\n' +
+    'which requirements cannot be confirmed;\n' +
+    'what risks exist;\n' +
+    'what information is missing;\n' +
+    'whether the opportunity should be pursued.\n' +
+    '\n' +
+    'Rules:\n' +
+    '\n' +
+    'Use only provided information.\n' +
+    'Do not invent tender requirements, company capabilities, certifications, references, financial capacity, experience, insurance, registrations, languages, staff, partnerships, or other facts.\n' +
+    'Trust user-provided company profile information.\n' +
+    'Company profile data is considered valid evidence even when no supporting document is uploaded.\n' +
+    'Distinguish PASS, FAIL and UNKNOWN.\n' +
+    '\n' +
+    'PASS:\n' +
+    '\n' +
+    'supported by company profile or company evidence.\n' +
+    '\n' +
+    'FAIL:\n' +
+    '\n' +
+    'explicit contradiction between tender requirement and company information.\n' +
+    '\n' +
+    'UNKNOWN:\n' +
+    '\n' +
+    'not enough information to determine compliance.\n' +
+    '\n' +
+    'Missing information is NOT a failure.\n' +
+    '\n' +
+    'Never treat missing profile information as proof that the company lacks a capability.\n' +
+    '\n' +
+    'Bad:\n' +
+    '"The company does not meet the requirement."\n' +
+    '\n' +
+    'Good:\n' +
+    '"The company profile does not provide enough information to confirm the requirement."\n' +
+    '\n' +
+    'Only mark FAIL when there is explicit evidence of non-compliance.\n' +
+    'If a requirement is not clearly present in tender materials, do not treat it as mandatory.\n' +
+    'Use concise explanations.\n' +
+    'Avoid repeating the same issue multiple times.\n' +
+    'Use only supported company profile fields when populating:\n' +
+    'companyField\n' +
+    'missingProfileFields\n' +
+    '\n' +
+    'Never invent profile field names.\n' +
+    '\n' +
+    'All user-facing text must be written in outputLanguage.\n' +
+    'Return valid JSON only.\n' +
+    '\n' +
+    'Enum rules:\n' +
+    '\n' +
+    'Enum values must be copied exactly as defined in the schema.\n' +
+    'Never translate enum values.\n' +
+    'Never invent enum values.\n' +
+    '\n' +
+    'Analysis objectives:\n' +
+    '\n' +
+    'For every important tender requirement:\n' +
+    '\n' +
+    'determine status;\n' +
+    'explain evidence;\n' +
+    'identify missing information;\n' +
+    'identify company gaps.\n' +
+    '\n' +
+    'Provide:\n' +
+    '\n' +
+    'requirement checks;\n' +
+    'company fit analysis;\n' +
+    'commercial assessment;\n' +
+    'risk assessment;\n' +
+    'documentation assessment;\n' +
+    'clarification questions;\n' +
+    'bid preparation actions;\n' +
+    'score breakdown;\n' +
+    'final recommendation.\n' +
+    '\n' +
+    'Recommendation rules:\n' +
+    '\n' +
+    'strong_go\n' +
+    '\n' +
+    'excellent fit\n' +
+    'no major unresolved issues\n' +
+    '\n' +
+    'go\n' +
+    '\n' +
+    'strong fit\n' +
+    'no significant blockers\n' +
+    '\n' +
+    'investigate\n' +
+    '\n' +
+    'promising opportunity\n' +
+    'important information is missing\n' +
+    'additional verification required\n' +
+    '\n' +
+    'caution\n' +
+    '\n' +
+    'meaningful concerns exist\n' +
+    'opportunity may still be viable\n' +
+    '\n' +
+    'no_go\n' +
+    '\n' +
+    'one or more proven mandatory failures\n' +
+    '\n' +
+    'not_actionable\n' +
+    '\n' +
+    'deadline expired\n' +
+    'submission no longer possible\n' +
+    '\n' +
+    'Return JSON only.'
+  );
 }
 
 export function buildTenderDeepCompanyFitUserPrompt(
   input: TenderDeepCompanyFitAnalysisInput,
 ): string {
+  const outputLanguage = input.outputLanguage ?? 'en';
+
   return [
     'Perform a Deep Tender Company Fit Analysis.',
-    `Return the analysis in ${input.outputLanguage ?? 'en'}.`,
-    `Set the top-level "language" field to "${input.outputLanguage ?? 'en'}".`,
+    `Output Language: ${outputLanguage}.`,
+    'All human-readable text must be written entirely in the Output Language.',
+    'Do not mix languages.',
+    'Only enum values explicitly defined by the schema may remain untranslated.',
+    'This includes summaries, explanations, strengths, weaknesses, gaps, risks, questions, recommendations, documentCategory, questionCategory, ownerRole, score criterion names, and score explanations.',
     '',
-    'Inputs:',
+    '### Inputs:',
     '',
-    '1. Structured TED tender data:',
+    '1. Structured TED Tender Data:',
     safeStringify(input.tender),
     '',
-    '2. Existing TenderGeneralAnalysisResult:',
+    '2. Existing General Analysis Result (if available):',
     safeStringify(input.generalAnalysis ?? null),
     '',
-    '3. Company profile:',
+    '3. Company Profile:',
     safeStringify(input.company),
     '',
-    'Company profile fields:',
-    '- companyName: legal/display name of the company',
-    '- country: country where the company is based',
-    '- operatingCountries: countries/regions where the company can operate',
-    '- companySize: number of people in the company',
-    '- companyDescription: free-text business description',
-    '- industries: CPV/category areas representing company industries',
-    '- mainServices: CPV/category areas representing main services',
-    '- languages: languages the company can work or submit in',
-    '- certifications: known certifications',
-    '- capabilities: free-text capabilities',
-    '- yearsOfExperience: number of years of experience',
-    '- publicProcurementExperience: whether the company has public procurement experience',
-    '- typicalContractSize: typical contract value range',
-    '- companyDocumentEvidence: summaries and extracted evidence from uploaded company documents',
-    '',
-    '4. Existing company analysis, if available:',
+    '4. Existing Company Filter Analysis (if available):',
     safeStringify(input.companyAnalysis ?? null),
     '',
-    '5. Derived metadata:',
+    '5. Derived Metadata:',
     safeStringify(input.derived),
     '',
-    '6. Procurement document metadata, if available:',
+    '6. Extracted Tender Document Metadata:',
     safeStringify(input.documentMetadata ?? []),
     '',
-    '7. Raw extracted document snippets, if available:',
-    safeStringify(
-      input.documentTextSnippets ?? [],
-      TENDER_DEEP_ANALYSIS_CONFIG.companyFitAnalysis.maxSnippetsJsonChars,
-    ),
+    '7. Extracted Tender Document Text Snippets:',
+    safeStringify(input.documentTextSnippets ?? []),
     '',
-    'Your task:',
+    '### Output Rules:',
+    '- Return JSON object only.',
+    '- The JSON must exactly match the provided schema.',
+    '- Do not add fields that are not present in the schema.',
+    '- Do not return null for missing optional values. Omit optional fields instead.',
+    '- Keep summaries concise and avoid repeating the same issue across multiple sections.',
     '',
-    'Create a deep analysis suitable for company-specific bid/no-bid decision, company fit score calculation, risk review, tender response preparation, gap analysis, and clarification question generation.',
+    '### Compliance Rules:',
+    '- PASS means the company profile or company evidence explicitly supports the requirement.',
+    '- PARTIAL means the company has related evidence, but it does not fully confirm the requirement.',
+    '- UNKNOWN means there is not enough information to confirm compliance.',
+    '- FAIL means the company profile explicitly contradicts the tender requirement.',
+    '- Missing profile information is UNKNOWN, not FAIL.',
+    '- Missing document evidence is UNKNOWN, not FAIL.',
+    '- Missing reference project details are UNKNOWN, not FAIL.',
+    '- Do not write that the company lacks something unless the company profile explicitly says the opposite.',
+    '- If CMS Contao, Oracle/MySQL, revenue, insurance, registration, staff count, or detailed reference data are not mentioned, mark them UNKNOWN.',
     '',
-    'Analyze tender intelligence, requirements, company fit, gaps, blockers, commercial attractiveness, risks, opportunity, bid/no-bid decision, documentation completeness, clarification questions, and bid preparation next steps.',
+    '### Recommendation Rules:',
+    '- no_go only when there is a proven mandatory FAIL, expired deadline, or impossible submission.',
+    '- investigate when important mandatory requirements are UNKNOWN and must be verified.',
+    '- caution when fit is weak or risks are high, but there is no proven mandatory FAIL.',
+    '- go when fit is good and there are no major unresolved mandatory requirements.',
+    '- strong_go when fit is excellent and requirements are well supported.',
+    '- bidNoBidDecision.decision must be consistent with finalRecommendation.value.',
     '',
-    'Requirement compliance rules:',
-    '- Populate top-level requirementChecks for every important mandatory tender requirement found in structured TED data, tender documents, general analysis, or reliable derived data.',
-    '- Use PASS when the company profile explicitly states that the company meets the requirement. User-provided company profile facts are trusted and do not need external proof or uploaded documents.',
-    '- Use FAIL only when the company profile explicitly contradicts the tender requirement.',
-    '- Use UNKNOWN when the company profile does not contain enough information. A missing company field or an unmentioned capability, technology, insurance policy, certification, reference, language, geography, or other fact is UNKNOWN, not FAIL.',
-    '- Use PARTIAL when the company profile provides a real but incomplete match that is insufficient for full compliance.',
-    '- For UNKNOWN use evidenceLevel "missing", list missingProfileFields, and set canBeResolvedByProfileUpdate when providing the missing trusted profile information could resolve it.',
-    '- requirementChecks is the only compliance and blocker structure you must return. Do not return criticalBlockers in companyFitAnalysis, riskAnalysis, bidNoBidDecision, or decisionFactors; the backend derives blockers and profileMissingRequirements from requirementChecks.',
-    '- Set severityIfUnresolved for FAIL, PARTIAL, and UNKNOWN checks. Only mandatory FAIL checks become critical blockers; PARTIAL, UNKNOWN, and PASS checks never become critical blockers.',
-    '- Example: required German and company.languages contains DEU means PASS; required German and company.languages contains only ENG means FAIL.',
-    '- Example: required CMS Contao with no Contao information in the company profile means UNKNOWN, not FAIL.',
-    '- Example: required insurance with no insurance information in the company profile means UNKNOWN, not FAIL.',
+    '### Scoring Rules:',
+    '- All scores must be from 0 to 100.',
+    '- For fit scores, higher score means better fit.',
+    '- For riskScore, higher score means higher risk.',
+    '- Do not assign 0 only because information is missing.',
+    '- UNKNOWN / missing company information should normally score 25-55 depending on importance.',
+    '- Proven FAIL should normally score 0-25.',
+    '- PARTIAL should normally score 45-75.',
+    '- PASS should normally score 75-100.',
+    '- If financial data is missing but there is no explicit contradiction, financial-related score should usually be 25-40, not 0.',
+    '- If documentation is missing for key mandatory requirements, documentationCompletenessScore may be 0-20.',
+    '- riskScore must be high when there are many HIGH/CRITICAL risks. Example: high risk = 70-100, medium risk = 40-70, low risk = 0-40.',
+    '- Do not confuse riskScore with riskFit. riskScore means risk level, so higher = worse.',
+    '- scores.fitScore must be consistent with executiveSummary and finalRecommendation.',
+    '- If fitScore is below 50, do not describe the company as a good fit. Say “basic fit exists, but readiness is low” or equivalent.',
+    '- If finalRecommendation.value is investigate, fitScore should usually be 40-70.',
+    '- If finalRecommendation.value is no_go, fitScore should usually be 0-40.',
+    '- If finalRecommendation.value is go, fitScore should usually be 65-85.',
+    '- If finalRecommendation.value is strong_go, fitScore should usually be 80-100.',
     '',
-    'Trusted company profile wording rules:',
-    '- Company profile data entered by the user is trusted. Do not require documentary proof, uploaded files, certificates, or external verification for user-provided company claims.',
-    '- If a company field is missing, write "not declared in company profile" or "cannot determine from current profile". Do not write "company does not have".',
-    '- Do not write "company lacks X", "company has no X", "company cannot X", or equivalent negative claims unless the trusted company profile explicitly contradicts X.',
-    '- Do not write "company does not meet the requirement" unless the corresponding requirementCheck.status is FAIL.',
-    '- For UNKNOWN use wording such as "Not declared in company profile", "Cannot determine from current profile", or "Add this to the company profile if applicable".',
-    '- For FAIL use wording such as "Profile contradicts this requirement" or "Company profile states X, but tender requires Y", and identify the explicit contradictory profile fact.',
-    '- Apply these wording rules consistently to executiveSummary, companyFitAnalysis.summary, companyFitAnalysis.weaknesses, companyFitAnalysis.gaps, riskAnalysis, bidNoBidDecision.rationale, finalRecommendation.rationale, finalRecommendation.summary, and evidenceMap claims.',
-    '- An UNKNOWN item may be an information gap or readiness concern, but must not be described as a proven weakness, mismatch, non-compliance, or blocker.',
-    '- Bad: "Company has no Contao experience." Good: "Contao experience is not declared in the company profile."',
-    '- Bad: "Company does not have insurance." Good: "Required insurance is not declared in the company profile."',
-    '- Bad: "Reference projects do not meet the value requirement." Good: "Reference project values are not declared, so this requirement is UNKNOWN."',
+    '### Summary Consistency Rules:',
+    '- executiveSummary must match scores.fitScore and finalRecommendation.value.',
+    '- If fitScore < 50, do not write “good fit” or “strong fit”.',
+    '- If fitScore is 40-60, write “basic/general fit with significant unresolved requirements”.',
+    '- If many mandatory requirements are UNKNOWN, emphasize verification/readiness, not proven non-compliance.',
+    '- If finalRecommendation.value is investigate, summary should say that the tender may be relevant but requires confirmation before bidding.',
     '',
-    'Scoring rules:',
-    '- scopeFit: 18',
-    '- capabilityFit: 16',
-    '- cpvFit: 8',
-    '- geographicFit: 8',
-    '- languageFit: 7',
-    '- eligibilityFit: 12',
-    '- certificationFit: 7',
-    '- experienceFit: 8',
-    '- financialFit: 6',
-    '- commercialFit: 4',
-    '- deadlineFit: 4',
-    '- riskFit: 2',
-    '',
-    'For each criterion assign score from 0 to 100, set integer weight percentage, calculate weightedScore = score * weight / 100, explain the score, provide evidence, and list missing information.',
-    'For capabilityFit, eligibilityFit, certificationFit, financialFit, and experienceFit, use requirementChecks as the canonical scoring evidence: PASS 80-100, PARTIAL 45-75, UNKNOWN 35-55, FAIL 0-30.',
-    'UNKNOWN means missing profile information and must receive a neutral-low score, never the same zero/near-zero treatment as a proven FAIL.',
-    'A mandatory FAIL must strongly reduce the relevant criterion score into the 0-30 band.',
-    'Do not change cpvFit, geographicFit, or languageFit merely because unrelated company profile information is UNKNOWN.',
-    'Keep cpvFit high when an explicit CPV match exists. Keep geographicFit and languageFit high for explicit PASS evidence.',
-    'Only reduce geographicFit or languageFit into the FAIL band when the corresponding requirementCheck explicitly has status FAIL.',
-    'scores.scoreBreakdown must contain exactly 12 items, one for each criterion listed above. Do not omit any criterion and do not duplicate criteria.',
-    'Every scores.scoreBreakdown item must include a non-empty explanation written in the requested output language. Do not leave explanation empty.',
-    'Never return scores.scoreBreakdown[*].explanation as an empty string. If a score is obvious from structured data, still explain the evidence and reasoning.',
-    'fitScore must be the weighted sum of scoreBreakdown weightedScore values. Do not set fitScore to 0 only because finalRecommendation is no_go or because a critical blocker exists.',
-    'Use only scores.scoreBreakdown as the canonical score breakdown. Do not put scopeFit, capabilityFit, cpvFit, geographicFit, languageFit, eligibilityFit, certificationFit, experienceFit, financialFit, commercialFit, deadlineFit, riskFit, or scoreBreakdown inside companyFitAnalysis.',
-    'If a criterion has enough structured evidence, score it directly. Do not return backend_fallback, MISSING_LLM_SCORE, empty explanations, or placeholder evidence for any scoreBreakdown item.',
-    'If English is accepted by the tender and the company supports ENG/English, languageFit should normally be high, often 90-100.',
-    'If estimated value is missing but company typicalContractSize exists, financialFit should be neutral/low-confidence, normally 30-50, not automatically 0.',
-    'Return a top-level confidence object with recommendationConfidence, tenderDataConfidence, companyProfileConfidence, and scoringConfidence. These fields measure different things and must not be collapsed into one score.',
-    '',
-    'Recommendation rules:',
-    '- strong_go: fitScore >= 80 and no critical blockers',
-    '- go: fitScore >= 65 and no critical blockers',
-    '- investigate: important company profile information is UNKNOWN, or fitScore is 45-64 without a proven FAIL blocker',
-    '- caution: fitScore < 45 and there is no mandatory HIGH/CRITICAL FAIL blocker and no UNKNOWN profile requirement requiring investigation',
-    '- no_go: at least one mandatory requirementCheck is FAIL with severityIfUnresolved HIGH or CRITICAL',
-    '- not_actionable: deadline expired or submission is impossible',
-    '- bidNoBidDecision mapping: strong_go -> strong_bid; go -> bid; investigate -> bid_if_profile_completed; caution -> bid_if_gaps_resolved; no_go -> no_bid; not_actionable -> not_actionable.',
-    '',
-    'Important rules:',
-    `- Write all generated analysis text in "${input.outputLanguage ?? 'en'}", including tenderIntelligence.title, tenderIntelligence.lots[*].title, tenderIntelligence.lots[*].summary, lotsSummary, clarificationQuestions, summaries, rationales, risks, gaps, assumptions, evidence claims, and next steps.`,
-    '- Preserve official tender names, lot names, identifiers, CPV codes, buyer names, URLs, and legal/procedure labels only when they are legally meaningful or exact source evidence.',
-    '- For tenderIntelligence.title, write a user-facing translated/localized title in the requested language and store the source title in tenderIntelligence.originalTitle.',
-    '- Use tender.lots as the source of lot structure. For tenderIntelligence.lots, write each lot title/summary in the requested language, store the source lot title in originalTitle when available, and preserve lot identifiers exactly.',
-    '- Analyze lot-specific CPV codes, descriptions, estimated values, framework values, deadlines, locations, submission channels, selection criteria, and award criteria when tender.lots provides them. Do not collapse materially different lots into one generic scope.',
-    '- Clarification questions must be written in the requested language; do not leave them in the tender source language unless the requested language is the same.',
-    '- Do not assume capabilities from companyName alone.',
-    '- Interpret empty capabilities/certifications carefully: write "Food supply capabilities are not declared in the company profile" or "Certifications are not declared in the company profile" instead of absolute negative claims.',
-    '- A missing capability signal must produce an UNKNOWN requirement check and may reduce confidence, but it must not by itself create a critical blocker or no_go recommendation.',
-    '- Do not rule out reseller, consortium, or subcontractor routes unless the tender explicitly prohibits them or required evidence is impossible to obtain.',
-    '- If companyDescription is missing, reduce confidence.',
-    '- If industries or mainServices are only ids without names/codes, treat CPV evidence as weak.',
-    '- If company languages are missing, do not assume language fit.',
-    '- If company operatingCountries are missing, do not assume geographic fit.',
-    '- If company typicalContractSize is missing, do not assume financial fit.',
-    '- If publicProcurementExperience is false, treat it as a risk/weakness, but do not automatically set experienceFit to 0.',
-    '- If deadline is expired, finalRecommendation.value must be "not_actionable".',
-    '- Critical blockers affect recommendation and bid/no-bid decision, but must not overwrite the weighted fitScore. A no_go recommendation may still have a non-zero fitScore when geography, language, eligibility, deadline, or commercial factors are partially positive.',
-    '- Do not return decisionFactors.criticalBlockers or profileMissingRequirements. The backend derives critical blockers from mandatory FAIL checks and derives profileMissingRequirements from UNKNOWN checks.',
-    '- Return riskAnalysis as an object, not an array. Put risk list fields inside riskAnalysis.tenderRisks, riskAnalysis.companySpecificRisks, or riskAnalysis.criticalRisks if you need legacy compatibility.',
-    '- If an explicitly mandatory certification is required and company certifications are missing or do not mention it, mark the requirement UNKNOWN. Mark it FAIL only when the trusted company profile explicitly states a contradictory certification status.',
-    '- If procurement documents, technical specifications, SWZ/specification package, annexes, or selection criteria are not analyzed, missingDocumentsWarning must be true, even when the no_go decision is already clear. Use decisionFactors.missingDocumentsImpact.impactOnBidPreparation and impactOnGoNoGoDecision separately.',
-    '- Return documentationAnalysis.missingDocuments as structured objects, not plain strings.',
-    '- missingDocuments must describe procurement documents that are needed to complete tender understanding, bid/no-bid decision, technical compliance, commercial pricing, eligibility review, or contract risk review.',
-    '- For each missing document, include name, type, importance, status, description, whyNeeded, impactIfMissing, sourceEvidence, portalUrl, directDownloadUrl, possibleUrls, and recommendedAction.',
-    '- Use only provided tender documentAccess, documentUrls, submissionUrls, and document analyses to determine missing document URLs and document status. Do not use tender.links for missing document URLs.',
-    '- Do not invent directDownloadUrl. directDownloadUrl must be null unless an explicit direct file URL is provided in tender data or documentAccess.',
-    '- If only a procurement portal URL is available, set status to PORTAL_LINK_AVAILABLE, set portalUrl, include it in possibleUrls, and set directDownloadUrl to null.',
-    '- If the document is mentioned in tender description/general analysis but no URL is available, set status to MISSING.',
-    '- If a document has already been extracted in documentMetadata or documentTextSnippets, set status to ALREADY_ANALYZED and do not treat it as missing unless another required document is still absent.',
-    '- SWZ or equivalent procurement specification should usually be CRITICAL when eligibility criteria, award criteria, required forms, technical specification, or submission requirements are incomplete.',
-    '- Technical specifications / OPZ / Opis przedmiotu zamówienia should usually be CRITICAL for capability fit.',
-    '- Pricing forms / kosztorys ofertowy should usually be HIGH for commercial fit.',
-    '- Draft contract / umowa should usually be HIGH for legal and risk review.',
-    '- recommendedAction must not ask the user to upload files yet. Recommend opening the portal, reviewing the document, or checking the buyer documentation page.',
-    '- documentationCompletenessScore must not be 0 when TED XML/PDF notices were analyzed. Use documentationScores to distinguish notice coverage, procurement package coverage, technical spec coverage, bid preparation sufficiency, go/no-go decision sufficiency, and overall completeness.',
-    '- In documentationAnalysis, distinguish noticeDocumentsAnalyzedCount, procurementDocumentsAnalyzedCount, and procurementDocumentsAccess. TED XML/PDF notices are notice documents; buyer ZIP/specification package is procurement documentation. Use procurementDocumentsAccess instead of treating portal-only access as documents already available in the system.',
-    '- requirementsClarityScore must reflect partial clarity: notice-level requirements may be clear even when technical specs or selection criteria are missing.',
-    '- If procedure evidence conflicts, describe it as ambiguous. Do not state "with prior call" or "without prior call" as a settled fact unless all sources agree.',
-    '- Do not include stale numeric fit scores in finalRecommendation text. If you mention threshold, use the current fitScore or avoid embedding the number.',
-    '- recommendationConfidence is confidence that the final recommendation is directionally right. It may be high for a clear no_go even when tenderDataConfidence or companyProfileConfidence are lower.',
-    '- tenderDataConfidence is confidence in tender requirements/data completeness. Reduce it when procurement documents such as SWZ/specification were not analyzed or document coverage is incomplete.',
-    '- companyProfileConfidence is confidence in the company evidence. Reduce it when capabilities, certifications, CPV industries/services, operating countries, languages, or typical contract size are missing, weak, or contradictory.',
-    '- scoringConfidence is confidence in the numeric scoring. It should reflect tenderDataConfidence, companyProfileConfidence, and evidence quality.',
-    '- Evidence must reference one of: structured_ted, tender_document, general_analysis, company_profile, derived, missing.',
-    '- evidenceMap must be claim-based, not a source inventory. Each item must include claim, evidenceSource, evidenceText, and confidence. Do not return evidenceMap as a list of sources without claims.',
-    '- Scores must be integers from 0 to 100.',
-    '- Return JSON only matching TenderDeepAnalysisResult.',
+    'Return a JSON object only. The JSON must exactly match the required schema.',
   ].join('\n');
 }
 
-function safeStringify(
-  value: unknown,
-  maxChars = TENDER_DEEP_ANALYSIS_CONFIG.companyFitAnalysis.maxJsonChars,
-): string {
-  const json = JSON.stringify(value ?? null, null, 2);
-
-  return json.length > maxChars
-    ? `${json.slice(0, maxChars)}\n[TRUNCATED]`
-    : json;
+function safeStringify(value: unknown): string {
+  return JSON.stringify(value ?? null, null, 2);
 }

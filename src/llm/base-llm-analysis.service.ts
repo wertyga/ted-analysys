@@ -15,7 +15,11 @@ import {
   buildTenderDeepCompanyFitSystemPrompt,
   buildTenderDeepCompanyFitUserPrompt,
 } from '@/resources/tender-deep-analysis/tender-deep-company-fit.prompt';
-import { TENDER_DEEP_COMPANY_FIT_JSON_SCHEMA } from '@/openai/schemas/tender-deep-company-fit.schema';
+import {
+  DEEP_COMPANY_FIT_LLM_JSON_SCHEMA,
+  normalizeTenderDeepCompanyFitResult,
+  validateTenderDeepCompanyFitResult,
+} from '@/openai/schemas/tender-deep-company-fit.schema';
 
 type JsonRecord = Record<string, unknown>;
 type LlmAnalysisPurpose = 'general' | 'deep';
@@ -63,24 +67,43 @@ export abstract class BaseLlmAnalysisService {
     const prompt = [
       buildTenderDeepCompanyFitSystemPrompt(),
       'Return JSON only. The JSON must match this schema:',
-      JSON.stringify(TENDER_DEEP_COMPANY_FIT_JSON_SCHEMA),
+      JSON.stringify(DEEP_COMPANY_FIT_LLM_JSON_SCHEMA),
     ].join('\n\n');
 
     const context = buildTenderDeepCompanyFitUserPrompt(input).slice(
       0,
       this.maxContextChars,
     );
-    const responseText = await this.createJsonResponse(prompt, context, 'deep');
 
-    const parsed = this.parseJson(responseText);
+    let validationErrors = '';
+    let lastParsedResponse: unknown = {};
 
-    if (!isRecord(parsed)) {
-      throw new Error(
-        `${this.providerName} deep tender analysis result must be a JSON object`,
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      const repairInstruction = validationErrors
+        ? `\n\nYour previous response failed schema validation. Fix these errors and return the complete JSON object again:\n${validationErrors}`
+        : '';
+      const parsed = await this.createDeepJsonResponse(
+        prompt,
+        `${context}${repairInstruction}`,
+      );
+      lastParsedResponse = parsed;
+
+      const validation = validateTenderDeepCompanyFitResult(parsed);
+
+      if (validation.success) {
+        return validation.data;
+      }
+
+      this.logger.warn(
+        `${this.providerName} deep tender analysis schema validation failed on attempt ${attempt}: ${validationErrors}`,
       );
     }
 
-    return parsed as unknown as TenderDeepAnalysisResult;
+    this.logger.warn(
+      `${this.providerName} returned an invalid deep tender analysis after retries; applying schema defaults: ${validationErrors}`,
+    );
+
+    return normalizeTenderDeepCompanyFitResult(lastParsedResponse);
   }
 
   protected buildGeneralTenderAnalysisPrompt(outputLanguage: string): string {

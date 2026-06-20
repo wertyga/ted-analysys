@@ -49,7 +49,7 @@ export class TenderDeepAnalysisController {
         forceUpdate: !!forceUpdate,
       });
 
-    return TenderDeepAnalysisModel.serializeDetail(analysis);
+    return TenderDeepAnalysisModel.serializeDetail(analysis as any);
   }
 }
 
@@ -85,7 +85,7 @@ export class UserTenderDeepAnalysisController {
     return {
       ...result,
       analyses: result.analyses.map((analysis) => {
-        return TenderDeepAnalysisModel.serializeDetail(analysis);
+        return TenderDeepAnalysisModel.serializeDetail(analysis as any);
       }),
     };
   }

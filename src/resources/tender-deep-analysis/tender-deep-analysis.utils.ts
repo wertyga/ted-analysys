@@ -18,8 +18,7 @@ export async function getTenderSourceHash(
   }
 
   if (isPopulatedRecord(deepAnalysis.tender)) {
-    return (deepAnalysis.tender as Pick<TenderDocument, 'sourceHash'>)
-      .sourceHash;
+    return (deepAnalysis.tender as any).sourceHash;
   }
 
   const tenderRecord = await TenderModel.findById(deepAnalysis.tender)
@@ -36,8 +35,7 @@ export async function getGeneralAnalysisSourceHash(
   const generalAnalysis = deepAnalysis.generalAnalysis;
 
   if (isPopulatedRecord(generalAnalysis)) {
-    return (generalAnalysis as Pick<TenderGeneralAnalysisRecord, 'sourceHash'>)
-      .sourceHash;
+    return (generalAnalysis as any).sourceHash;
   }
 
   if (!generalAnalysis) {
