@@ -70,8 +70,6 @@ export function normalizeResultJsonScoreBreakdown(
   if (riskFit && typeof riskFit.score === 'number') {
     mutable.scores.riskFitScore = clampSerializedScore(riskFit.score);
   }
-  normalizeSerializedRiskCriticalBlockers(normalized);
-  normalizeSerializedDecisionFactors(normalized);
   normalizeSerializedDocumentationAndClarity(normalized);
   normalizeSerializedProcedure(normalized);
   cleanupSerializedCompanyFitAnalysis(normalized);
@@ -302,144 +300,6 @@ function normalizeSerializedDocumentationAndClarity(
   }
 }
 
-function normalizeSerializedDecisionFactors(
-  resultJson: TenderDeepAnalysisResult,
-): void {
-  const mutable = resultJson as unknown as {
-    decisionFactors?: { criticalBlockers?: unknown[] };
-    bidNoBidDecision?: {
-      criticalBlockers?: unknown;
-      decisionFactors?: { criticalBlockers?: unknown };
-    };
-  };
-  mutable.decisionFactors ||= {};
-  const blockers = Array.isArray(mutable.decisionFactors.criticalBlockers)
-    ? mutable.decisionFactors.criticalBlockers
-    : [];
-
-  if (Array.isArray(mutable.bidNoBidDecision?.criticalBlockers)) {
-    appendSerializedDecisionBlockers(
-      blockers,
-      mutable.bidNoBidDecision.criticalBlockers,
-    );
-  }
-
-  if (
-    Array.isArray(mutable.bidNoBidDecision?.decisionFactors?.criticalBlockers)
-  ) {
-    appendSerializedDecisionBlockers(
-      blockers,
-      mutable.bidNoBidDecision.decisionFactors.criticalBlockers,
-    );
-  }
-
-  mutable.decisionFactors.criticalBlockers =
-    compactSerializedBlockers(blockers);
-}
-
-function normalizeSerializedRiskCriticalBlockers(
-  resultJson: TenderDeepAnalysisResult,
-): void {
-  resultJson.riskAnalysis ||= {} as TenderDeepAnalysisResult['riskAnalysis'];
-  const riskAnalysis = resultJson.riskAnalysis as unknown as Record<
-    string,
-    unknown
-  >;
-  const criticalBlockers = Array.isArray(riskAnalysis.criticalBlockers)
-    ? riskAnalysis.criticalBlockers
-    : [];
-  const risks = [
-    ...extractSerializedRiskItems(riskAnalysis.tenderRisks),
-    ...extractSerializedRiskItems(riskAnalysis.companySpecificRisks),
-    ...extractSerializedRiskItems(riskAnalysis.risks),
-    ...extractSerializedRiskItems(riskAnalysis.criticalRisks),
-  ];
-
-  for (const risk of risks) {
-    const severity = normalizeSerializedBlockerSeverity(risk.severity);
-
-    if (severity !== 'CRITICAL' && severity !== 'HIGH') {
-      continue;
-    }
-
-    if (typeof risk.description !== 'string' || !risk.description.trim()) {
-      continue;
-    }
-
-    appendSerializedRiskBlocker(criticalBlockers, {
-      type: mapSerializedRiskBlockerType(
-        String(risk.type ?? risk.category ?? 'other'),
-      ),
-      description: risk.description.trim(),
-      canBeResolved: severity !== 'CRITICAL',
-      resolutionAction:
-        typeof risk.mitigation === 'string' ? risk.mitigation : undefined,
-    });
-  }
-
-  riskAnalysis.criticalBlockers = criticalBlockers;
-}
-
-function extractSerializedRiskItems(
-  value: unknown,
-): Array<Record<string, unknown>> {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.filter(isRecordLike);
-}
-
-function appendSerializedRiskBlocker(
-  blockers: unknown[],
-  blocker: Record<string, unknown>,
-): void {
-  const description = String(blocker.description).trim().toLowerCase();
-
-  if (
-    blockers.some(
-      (existing) =>
-        isRecordLike(existing) &&
-        String(existing.description ?? '')
-          .trim()
-          .toLowerCase() === description,
-    )
-  ) {
-    return;
-  }
-
-  blockers.push(blocker);
-}
-
-function mapSerializedRiskBlockerType(type: string): string {
-  const normalized = type.trim().toLowerCase();
-  const mapping: Record<string, string> = {
-    deadline: 'expired_deadline',
-    expired_deadline: 'expired_deadline',
-    documentation: 'missing_documents',
-    missing_documents: 'missing_documents',
-    scope: 'unclear_scope',
-    unclear_scope: 'unclear_scope',
-    certification: 'mandatory_requirement',
-    eligibility: 'mandatory_requirement',
-    mandatory_requirement: 'mandatory_requirement',
-    requirement: 'mandatory_requirement',
-    language: 'language',
-    legal: 'legal',
-    contractual: 'legal',
-    financial: 'financial',
-    commercial: 'financial',
-    budget: 'financial',
-    capability: 'company_fit',
-    company_fit: 'company_fit',
-    delivery: 'company_fit',
-    experience: 'company_fit',
-    operational: 'company_fit',
-  };
-
-  return mapping[normalized] ?? 'other';
-}
-
 function getSerializedProcurementDocumentsAccess(
   missingDocuments: Array<{ status?: string }>,
 ): 'MISSING' | 'PORTAL_LINK_AVAILABLE' | 'DIRECT_LINK_AVAILABLE' | 'UNKNOWN' {
@@ -458,34 +318,6 @@ function getSerializedProcurementDocumentsAccess(
   return 'UNKNOWN';
 }
 
-function appendSerializedDecisionBlockers(
-  blockers: unknown[],
-  values: unknown[],
-): void {
-  for (const item of values) {
-    if (typeof item === 'string') {
-      blockers.push({
-        type: 'other',
-        severity: 'HIGH',
-        description: item,
-        source: 'bid_decision',
-      });
-      continue;
-    }
-
-    if (!isRecordLike(item) || typeof item.description !== 'string') {
-      continue;
-    }
-
-    blockers.push({
-      type: normalizeSerializedBlockerType(item.type),
-      severity: normalizeSerializedBlockerSeverity(item.severity),
-      description: item.description,
-      source: 'bid_decision',
-    });
-  }
-}
-
 function findScoreItem(
   scoreItems: unknown[],
   criterion: CompanyFitScoreKey,
@@ -494,88 +326,6 @@ function findScoreItem(
     (item): item is Record<string, unknown> =>
       isRecordLike(item) && item.criterion === criterion,
   );
-}
-
-function normalizeSerializedBlockerType(value: unknown): string {
-  const normalized =
-    typeof value === 'string' ? value.trim().toLowerCase() : '';
-
-  return [
-    'capability',
-    'certification',
-    'geography',
-    'eligibility',
-    'deadline',
-    'language',
-    'financial',
-    'legal',
-    'other',
-  ].includes(normalized)
-    ? normalized
-    : 'other';
-}
-
-function normalizeSerializedBlockerSeverity(value: unknown): string {
-  const normalized = typeof value === 'string' ? value.toUpperCase() : 'HIGH';
-
-  return ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(normalized)
-    ? normalized
-    : 'HIGH';
-}
-
-function compactSerializedBlockers(blockers: unknown[]): unknown[] {
-  const byType = new Map<string, Record<string, unknown>>();
-  const otherBlockers: Record<string, unknown>[] = [];
-
-  for (const blocker of blockers) {
-    if (!isRecordLike(blocker) || typeof blocker.description !== 'string') {
-      continue;
-    }
-
-    if (blocker.description.trim() === '') {
-      continue;
-    }
-
-    const type = typeof blocker.type === 'string' ? blocker.type : 'other';
-
-    if (type === 'other') {
-      otherBlockers.push(blocker);
-      continue;
-    }
-
-    const current = byType.get(type);
-
-    if (
-      !current ||
-      severityRank(String(blocker.severity)) >
-        severityRank(String(current.severity))
-    ) {
-      byType.set(type, blocker);
-    }
-  }
-
-  return [
-    'eligibility',
-    'capability',
-    'certification',
-    'geography',
-    'financial',
-    'legal',
-    'deadline',
-    'language',
-  ]
-    .map((type) => byType.get(type))
-    .filter(Boolean)
-    .concat(otherBlockers)
-    .map((blocker) => ({
-      ...blocker,
-      description: String(blocker?.description),
-      severity:
-        blocker?.type === 'capability' || blocker?.type === 'certification'
-          ? 'CRITICAL'
-          : blocker?.severity,
-    }))
-    .slice(0, 5);
 }
 
 function normalizeSerializedProcedure(

@@ -122,7 +122,7 @@ export class TenderDeepAnalysisService {
       const rawResult = await this.deepCompanyFitAnalysisQueue.push(() =>
         this.deepSeekAnalysisService.analyzeTenderDeepCompanyFit(input),
       );
-
+      fs.writeFileSync('deep-an.txt', JSON.stringify(rawResult, null, 2));
       const normalized = this.deepAnalysisBuilder.normalizeResult(
         rawResult,
         input,

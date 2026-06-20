@@ -11,6 +11,7 @@ export type TenderDeepRecommendation =
 export type BidNoBidDecision =
   | 'strong_bid'
   | 'bid'
+  | 'bid_if_profile_completed'
   | 'bid_if_gaps_resolved'
   | 'no_bid'
   | 'not_actionable';
@@ -88,6 +89,8 @@ export interface TenderDeepAnalysisResult {
     awardCriteria: AwardCriterionAnalysis[];
     submissionRequirements: SubmissionRequirementsAnalysis;
   };
+  requirementChecks: TenderRequirementCheck[];
+  profileMissingRequirements: ProfileMissingRequirement[];
   companyFitAnalysis: {
     fitScore: number;
     confidenceScore: number;
@@ -185,6 +188,48 @@ export interface TenderDeepAnalysisResult {
   evidenceMap: EvidenceMapItem[];
 }
 
+export interface TenderRequirementCheck {
+  id: string;
+  category:
+    | 'scope'
+    | 'capability'
+    | 'eligibility'
+    | 'financial'
+    | 'insurance'
+    | 'certification'
+    | 'language'
+    | 'geography'
+    | 'reference'
+    | 'legal'
+    | 'deadline'
+    | 'commercial'
+    | 'other';
+  requirement: string;
+  source:
+    | 'structured_ted'
+    | 'tender_document'
+    | 'general_analysis'
+    | 'derived';
+  isMandatory: boolean;
+  status: 'PASS' | 'PARTIAL' | 'UNKNOWN' | 'FAIL';
+  evidenceLevel: 'direct' | 'indirect' | 'missing' | 'contradiction';
+  companyField?: string;
+  tenderField?: string;
+  explanation: string;
+  missingProfileFields?: string[];
+  severityIfUnresolved?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  canBeResolvedByProfileUpdate?: boolean;
+}
+
+export interface ProfileMissingRequirement {
+  requirementCheckId: string;
+  category: string;
+  requirement: string;
+  missingProfileFields: string[];
+  severityIfUnresolved: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  explanation: string;
+}
+
 export interface TenderIntelligenceLot {
   id?: string;
   title: string;
@@ -248,7 +293,7 @@ export interface TenderDeepDecisionFactors {
       | 'other';
     severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
     description: string;
-    source?: 'company_fit' | 'risk' | 'bid_decision' | 'backend_guardrail';
+    source?: 'requirement_check' | 'backend_guardrail';
   }>;
   missingDocumentsImpact?: {
     impactOnBidPreparation: 'LOW' | 'MEDIUM' | 'HIGH';

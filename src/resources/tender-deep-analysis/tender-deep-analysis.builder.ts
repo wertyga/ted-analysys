@@ -220,15 +220,16 @@ export class TenderDeepAnalysisBuilder {
     applyMissingCompanyInfo(result, input);
     applyScoreBreakdown(result);
     applyGuardrails(result, input);
+    applyRequirementCheckScores(result);
     validateRequiredScoreBreakdown(result);
     applyScoreBreakdown(result);
 
+    applyDecisionFactors(result, input);
     const recommendation = calculateFinalRecommendation(result, input);
     result.finalRecommendation.value = recommendation;
     result.companyFitAnalysis.recommendation = recommendation;
     result.bidNoBidDecision.decision =
       mapRecommendationToBidDecision(recommendation);
-    applyDecisionFactors(result, input);
     applyDocumentationAndClarity(result, input);
     applyProcedureConsistency(result, input);
     applyFinalRecommendationConsistency(result);
@@ -309,21 +310,47 @@ export function calculateFinalRecommendation(
   input: TenderDeepCompanyFitAnalysisInput,
 ): TenderDeepRecommendation {
   const fitScore = result.scores.fitScore;
-  const blockers = result.companyFitAnalysis.criticalBlockers ?? [];
+  const hasAnyFailBlocker =
+    result.decisionFactors?.criticalBlockers.some(
+      (blocker) => blocker.source === 'requirement_check',
+    ) ?? false;
+  const hasProvenFailBlocker =
+    result.decisionFactors?.criticalBlockers.some(
+      (blocker) =>
+        blocker.source === 'requirement_check' &&
+        (blocker.severity === 'HIGH' || blocker.severity === 'CRITICAL'),
+    ) ?? false;
+  const hasImportantUnknownRequirement = result.profileMissingRequirements.some(
+    (requirement) =>
+      requirement.severityIfUnresolved === 'HIGH' ||
+      requirement.severityIfUnresolved === 'CRITICAL',
+  );
+  const hasUnknownRequirement = result.profileMissingRequirements.length > 0;
 
-  if (input.derived.isDeadlineExpired) {
+  if (
+    input.derived.isDeadlineExpired ||
+    findSubmissionImpossibleBlocker(result)
+  ) {
     return 'not_actionable';
   }
 
-  if (blockers.some((blocker) => blocker.canBeResolved === false)) {
+  if (hasProvenFailBlocker) {
     return 'no_go';
   }
 
-  if (fitScore >= 80 && blockers.length === 0) {
+  if (hasImportantUnknownRequirement) {
+    return 'investigate';
+  }
+
+  if (hasAnyFailBlocker) {
+    return 'caution';
+  }
+
+  if (fitScore >= 80) {
     return 'strong_go';
   }
 
-  if (fitScore >= 65 && blockers.length === 0) {
+  if (fitScore >= 65) {
     return 'go';
   }
 
@@ -331,11 +358,11 @@ export function calculateFinalRecommendation(
     return 'investigate';
   }
 
-  if (fitScore >= 30) {
-    return 'caution';
+  if (hasUnknownRequirement) {
+    return 'investigate';
   }
 
-  return 'no_go';
+  return 'caution';
 }
 
 function ensureResultShape(
@@ -788,43 +815,56 @@ function applyDecisionFactors(
   result: TenderDeepAnalysisResult,
   input: TenderDeepCompanyFitAnalysisInput,
 ): void {
-  normalizeRiskCriticalBlockers(result);
+  const blockers: NonNullable<
+    TenderDeepAnalysisResult['decisionFactors']
+  >['criticalBlockers'] = [];
 
-  const blockers = result.decisionFactors?.criticalBlockers ?? [];
+  result.profileMissingRequirements = result.requirementChecks
+    .filter((check) => check.status === 'UNKNOWN')
+    .map((check) => ({
+      requirementCheckId: check.id,
+      category: check.category,
+      requirement: check.requirement,
+      missingProfileFields: check.missingProfileFields ?? [],
+      severityIfUnresolved: check.severityIfUnresolved ?? 'HIGH',
+      explanation: check.explanation,
+    }));
 
-  for (const blocker of result.companyFitAnalysis.criticalBlockers ?? []) {
-    addDecisionBlocker(blockers, {
-      type: mapCompanyBlockerType(blocker.type),
-      severity: blocker.canBeResolved ? 'HIGH' : 'CRITICAL',
-      description: blocker.description,
-      source: 'company_fit',
-    });
-  }
-
-  for (const blocker of result.riskAnalysis.criticalBlockers ?? []) {
-    if (typeof blocker === 'string') {
-      addDecisionBlocker(blockers, {
-        type: 'other',
-        severity: 'CRITICAL',
-        description: blocker,
-        source: 'risk',
-      });
+  for (const check of result.requirementChecks) {
+    if (!check.isMandatory || check.status !== 'FAIL') {
       continue;
     }
 
     addDecisionBlocker(blockers, {
-      type: mapRiskBlockerType(blocker.type),
-      severity: blocker.canBeResolved ? 'HIGH' : 'CRITICAL',
-      description: blocker.description,
-      source: 'risk',
+      type: mapRequirementCheckCategory(check.category),
+      severity: check.severityIfUnresolved ?? 'HIGH',
+      description: check.explanation,
+      source: 'requirement_check',
     });
   }
 
-  addBidDecisionBlockers(blockers, result.bidNoBidDecision);
+  if (input.derived.isDeadlineExpired) {
+    addDecisionBlocker(blockers, {
+      type: 'deadline',
+      severity: 'CRITICAL',
+      description: 'The tender submission deadline has expired.',
+      source: 'backend_guardrail',
+    });
+  }
+
+  const submissionImpossible = findSubmissionImpossibleBlocker(result);
+  if (submissionImpossible) {
+    addDecisionBlocker(blockers, {
+      type: 'other',
+      severity: 'CRITICAL',
+      description: submissionImpossible,
+      source: 'backend_guardrail',
+    });
+  }
 
   result.decisionFactors = {
     ...(result.decisionFactors ?? {}),
-    criticalBlockers: compactDecisionBlockers(blockers),
+    criticalBlockers: blockers,
   };
 }
 
@@ -1018,9 +1058,46 @@ function applyFinalRecommendationConsistency(
     fitScoreThreshold?: unknown;
   };
 
-  if (typeof finalRecommendation.fitScoreThreshold === 'string') {
-    finalRecommendation.fitScoreThreshold =
-      'Fit score is below the no-go threshold of 30, and critical blockers are present.';
+  delete finalRecommendation.fitScoreThreshold;
+
+  const recommendation = result.finalRecommendation.value;
+  let rationaleParts: string[] = [];
+
+  if (recommendation === 'investigate') {
+    rationaleParts = result.profileMissingRequirements.map(
+      (requirement) => requirement.explanation,
+    );
+    result.finalRecommendation.conditions =
+      result.profileMissingRequirements.map(
+        (requirement) => requirement.requirement,
+      );
+  } else if (recommendation === 'no_go') {
+    rationaleParts =
+      result.decisionFactors?.criticalBlockers
+        .filter(
+          (blocker) =>
+            blocker.source === 'requirement_check' &&
+            (blocker.severity === 'HIGH' ||
+              blocker.severity === 'CRITICAL'),
+        )
+        .map((blocker) => blocker.description) ?? [];
+  } else if (recommendation === 'caution') {
+    rationaleParts =
+      result.decisionFactors?.criticalBlockers
+        .filter((blocker) => blocker.source === 'requirement_check')
+        .map((blocker) => blocker.description) ?? [];
+  } else if (recommendation === 'not_actionable') {
+    rationaleParts =
+      result.decisionFactors?.criticalBlockers
+        .filter((blocker) => blocker.source === 'backend_guardrail')
+        .map((blocker) => blocker.description) ?? [];
+  }
+
+  if (rationaleParts.length > 0) {
+    const rationale = Array.from(new Set(rationaleParts)).join(' ');
+    result.finalRecommendation.rationale = rationale;
+    result.companyFitAnalysis.recommendationRationale = rationale;
+    result.bidNoBidDecision.rationale = rationale;
   }
 }
 
@@ -1038,17 +1115,20 @@ function getRecommendationConfidence(
     return clampRound(explicitConfidence);
   }
 
-  const blockers = result.companyFitAnalysis.criticalBlockers ?? [];
-  const hasUnresolvedBlocker = blockers.some(
-    (blocker) => blocker.canBeResolved === false,
-  );
+  const hasProvenBlocker =
+    result.decisionFactors?.criticalBlockers.some(
+      (blocker) =>
+        blocker.source === 'backend_guardrail' ||
+        (blocker.source === 'requirement_check' &&
+          (blocker.severity === 'HIGH' || blocker.severity === 'CRITICAL')),
+    ) ?? false;
 
-  if (input.derived.isDeadlineExpired || hasUnresolvedBlocker) {
+  if (input.derived.isDeadlineExpired || hasProvenBlocker) {
     return 95;
   }
 
   if (result.finalRecommendation.value === 'no_go') {
-    return result.scores.fitScore < 30 ? 90 : 85;
+    return 85;
   }
 
   return clampRound(result.companyFitAnalysis.confidenceScore || 80);
@@ -1126,6 +1206,7 @@ function calculateCompanyProfileConfidence(
     10,
     result.companyFitAnalysis.missingCompanyInformation.length * 2,
   );
+  confidence -= Math.min(20, result.profileMissingRequirements.length * 3);
 
   return clampRound(confidence);
 }
@@ -1158,13 +1239,34 @@ function hasOnlyWeakCpvRefs(company: CompanyAnalysisDto): boolean {
   );
 }
 
-function addBidDecisionBlockers(
-  blockers: NonNullable<
-    TenderDeepAnalysisResult['decisionFactors']
-  >['criticalBlockers'],
-  bidNoBidDecision: TenderDeepAnalysisResult['bidNoBidDecision'],
-): void {
-  const decision = bidNoBidDecision as unknown as {
+function findSubmissionImpossibleBlocker(
+  result: TenderDeepAnalysisResult,
+): string | null {
+  const companyBlocker = result.companyFitAnalysis.criticalBlockers.find(
+    (blocker) =>
+      blocker.type === 'submission_impossible' &&
+      blocker.canBeResolved === false &&
+      typeof blocker.description === 'string' &&
+      blocker.description.trim().length > 0,
+  );
+
+  if (companyBlocker) {
+    return companyBlocker.description;
+  }
+
+  const riskBlocker = result.riskAnalysis.criticalBlockers.find(
+    (blocker) =>
+      blocker.type === 'submission_access' &&
+      blocker.canBeResolved === false &&
+      typeof blocker.description === 'string' &&
+      blocker.description.trim().length > 0,
+  );
+
+  if (riskBlocker) {
+    return riskBlocker.description;
+  }
+
+  const decision = result.bidNoBidDecision as unknown as {
     criticalBlockers?: unknown;
     decisionFactors?: {
       criticalBlockers?: unknown;
@@ -1175,33 +1277,28 @@ function addBidDecisionBlockers(
     decision.criticalBlockers,
     decision.decisionFactors?.criticalBlockers,
   ]) {
-    if (!Array.isArray(value)) {
-      continue;
-    }
+    if (!Array.isArray(value)) continue;
 
     for (const item of value) {
-      if (typeof item === 'string') {
-        addDecisionBlocker(blockers, {
-          type: 'other',
-          severity: 'HIGH',
-          description: item,
-          source: 'bid_decision',
-        });
-        continue;
-      }
-
       if (!isRecord(item) || typeof item.description !== 'string') {
         continue;
       }
 
-      addDecisionBlocker(blockers, {
-        type: normalizeDecisionBlockerType(item.type),
-        severity: normalizeDecisionBlockerSeverity(item.severity),
-        description: item.description,
-        source: 'bid_decision',
-      });
+      const type =
+        typeof item.type === 'string' ? item.type.trim().toLowerCase() : '';
+      const canBeResolved = item.canBeResolved;
+
+      if (
+        (type === 'submission_impossible' || type === 'submission_access') &&
+        canBeResolved === false &&
+        item.description.trim().length > 0
+      ) {
+        return item.description;
+      }
     }
   }
+
+  return null;
 }
 
 function addDecisionBlocker(
@@ -1347,15 +1444,7 @@ function compactDecisionBlockers(
         >['criticalBlockers'][number] => Boolean(blocker),
       ),
     ...otherBlockers,
-  ]
-    .map((blocker) => ({
-      ...blocker,
-      severity:
-        blocker.type === 'capability' || blocker.type === 'certification'
-          ? 'CRITICAL'
-          : blocker.severity,
-    }))
-    .slice(0, 5);
+  ].slice(0, 5);
 }
 
 function normalizeDecisionBlockerType(
@@ -1757,6 +1846,35 @@ function mapCompanyBlockerType(
   return mapping[normalized] ?? 'other';
 }
 
+function mapRequirementCheckCategory(
+  category: TenderDeepAnalysisResult['requirementChecks'][number]['category'],
+): NonNullable<
+  TenderDeepAnalysisResult['decisionFactors']
+>['criticalBlockers'][number]['type'] {
+  const mapping: Record<
+    TenderDeepAnalysisResult['requirementChecks'][number]['category'],
+    NonNullable<
+      TenderDeepAnalysisResult['decisionFactors']
+    >['criticalBlockers'][number]['type']
+  > = {
+    scope: 'capability',
+    capability: 'capability',
+    eligibility: 'eligibility',
+    financial: 'financial',
+    insurance: 'financial',
+    certification: 'certification',
+    language: 'language',
+    geography: 'geography',
+    reference: 'eligibility',
+    legal: 'legal',
+    deadline: 'deadline',
+    commercial: 'financial',
+    other: 'other',
+  };
+
+  return mapping[category];
+}
+
 function mapRiskBlockerType(
   type: string,
 ): NonNullable<
@@ -2036,6 +2154,142 @@ function containsRequiredCertification(
   );
 }
 
+type RequirementCheckStatus = TenderDeepAnalysisResult['requirementChecks'][number]['status'];
+
+const REQUIREMENT_SCORE_BANDS: Record<
+  RequirementCheckStatus,
+  { min: number; max: number }
+> = {
+  PASS: { min: 80, max: 100 },
+  PARTIAL: { min: 45, max: 75 },
+  UNKNOWN: { min: 35, max: 55 },
+  FAIL: { min: 0, max: 30 },
+};
+
+function applyRequirementCheckScores(result: TenderDeepAnalysisResult): void {
+  const criterionCategories: Partial<
+    Record<
+      CompanyFitScoreKey,
+      Array<TenderDeepAnalysisResult['requirementChecks'][number]['category']>
+    >
+  > = {
+    capabilityFit: ['scope', 'capability'],
+    eligibilityFit: ['eligibility', 'insurance', 'legal'],
+    certificationFit: ['certification', 'insurance'],
+    financialFit: ['financial', 'insurance', 'commercial'],
+    experienceFit: ['reference'],
+  };
+  const scoreBreakdown = getScoreBreakdownRecord(result);
+
+  for (const [criterion, categories] of Object.entries(
+    criterionCategories,
+  ) as Array<[
+    CompanyFitScoreKey,
+    Array<TenderDeepAnalysisResult['requirementChecks'][number]['category']>,
+  ]>) {
+    const checks = result.requirementChecks.filter((check) =>
+      categories.includes(check.category),
+    );
+
+    if (checks.length === 0) {
+      continue;
+    }
+
+    const status = aggregateRequirementCheckStatus(checks);
+    applyRequirementScoreBand(scoreBreakdown[criterion], status);
+    appendRequirementScoreContext(scoreBreakdown[criterion], checks);
+  }
+
+  for (const [category, criterion] of [
+    ['language', 'languageFit'],
+    ['geography', 'geographicFit'],
+  ] as const) {
+    const failedChecks = result.requirementChecks.filter(
+      (check) => check.category === category && check.status === 'FAIL',
+    );
+
+    if (failedChecks.length === 0) {
+      continue;
+    }
+
+    applyRequirementScoreBand(scoreBreakdown[criterion], 'FAIL');
+    appendRequirementScoreContext(scoreBreakdown[criterion], failedChecks);
+  }
+
+  const hasMandatoryFail = result.requirementChecks.some(
+    (check) => check.isMandatory && check.status === 'FAIL',
+  );
+  const hasImportantUnknown = result.requirementChecks.some(
+    (check) =>
+      check.status === 'UNKNOWN' &&
+      (check.severityIfUnresolved === 'HIGH' ||
+        check.severityIfUnresolved === 'CRITICAL'),
+  );
+  const hasUnknown = result.requirementChecks.some(
+    (check) => check.status === 'UNKNOWN',
+  );
+
+  if (hasMandatoryFail) {
+    result.scores.participationReadinessScore = Math.min(
+      clampRound(result.scores.participationReadinessScore),
+      30,
+    );
+  } else if (hasImportantUnknown) {
+    result.scores.participationReadinessScore = Math.min(
+      clampRound(result.scores.participationReadinessScore),
+      60,
+    );
+  } else if (hasUnknown) {
+    result.scores.participationReadinessScore = Math.min(
+      clampRound(result.scores.participationReadinessScore),
+      75,
+    );
+  }
+}
+
+function aggregateRequirementCheckStatus(
+  checks: TenderDeepAnalysisResult['requirementChecks'],
+): RequirementCheckStatus {
+  if (checks.some((check) => check.isMandatory && check.status === 'FAIL')) {
+    return 'FAIL';
+  }
+
+  if (checks.some((check) => check.status === 'UNKNOWN')) {
+    return 'UNKNOWN';
+  }
+
+  if (
+    checks.some(
+      (check) => check.status === 'PARTIAL' || check.status === 'FAIL',
+    )
+  ) {
+    return 'PARTIAL';
+  }
+
+  return 'PASS';
+}
+
+function applyRequirementScoreBand(
+  score: CompanyFitScoreBreakdown[CompanyFitScoreKey],
+  status: RequirementCheckStatus,
+): void {
+  const band = REQUIREMENT_SCORE_BANDS[status];
+  score.score = Math.max(band.min, Math.min(band.max, clampRound(score.score)));
+}
+
+function appendRequirementScoreContext(
+  score: CompanyFitScoreBreakdown[CompanyFitScoreKey],
+  checks: TenderDeepAnalysisResult['requirementChecks'],
+): void {
+  for (const check of checks) {
+    if (check.status === 'UNKNOWN') {
+      addUnique(score.missingInformation, check.explanation);
+    } else {
+      addUnique(score.evidence, check.explanation);
+    }
+  }
+}
+
 function mapRecommendationToBidDecision(
   recommendation: TenderDeepRecommendation,
 ): BidNoBidDecision {
@@ -2047,7 +2301,11 @@ function mapRecommendationToBidDecision(
     return 'bid';
   }
 
-  if (recommendation === 'investigate' || recommendation === 'caution') {
+  if (recommendation === 'investigate') {
+    return 'bid_if_profile_completed';
+  }
+
+  if (recommendation === 'caution') {
     return 'bid_if_gaps_resolved';
   }
 

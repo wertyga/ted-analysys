@@ -40,6 +40,8 @@ export class TendersController {
 
     const tenderSerialized = TenderModel.serializeDetail(tender);
 
+    const tariff = await this.tariffService.getUserTariff(req.user);
+
     if (req.user) {
       await this.tendersService.fillUpTenderListByDeepAnalysisAndWishListStatus(
         [tenderSerialized],
@@ -51,7 +53,7 @@ export class TendersController {
       tender.generalAnalysis,
     );
 
-    if (!req.user) {
+    if (tariff.type === TariffType.free) {
       generalAnalysis =
         this.tenderGeneralAnalysisService.filterFreeBasicAnalysisFields(
           generalAnalysis,

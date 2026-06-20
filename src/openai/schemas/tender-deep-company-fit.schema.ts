@@ -8,6 +8,7 @@ export const TENDER_DEEP_COMPANY_FIT_JSON_SCHEMA = {
     'executiveSummary',
     'tenderIntelligence',
     'requirementsAnalysis',
+    'requirementChecks',
     'companyFitAnalysis',
     'commercialAnalysis',
     'riskAnalysis',
@@ -17,7 +18,6 @@ export const TENDER_DEEP_COMPANY_FIT_JSON_SCHEMA = {
     'clarificationQuestions',
     'bidPreparationPlan',
     'scores',
-    'decisionFactors',
     'confidence',
     'finalRecommendation',
     'evidenceMap',
@@ -29,6 +29,75 @@ export const TENDER_DEEP_COMPANY_FIT_JSON_SCHEMA = {
     executiveSummary: { type: 'string' },
     tenderIntelligence: { type: 'object' },
     requirementsAnalysis: { type: 'object' },
+    requirementChecks: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: [
+          'id',
+          'category',
+          'requirement',
+          'source',
+          'isMandatory',
+          'status',
+          'evidenceLevel',
+          'explanation',
+        ],
+        properties: {
+          id: { type: 'string', minLength: 1 },
+          category: {
+            type: 'string',
+            enum: [
+              'scope',
+              'capability',
+              'eligibility',
+              'financial',
+              'insurance',
+              'certification',
+              'language',
+              'geography',
+              'reference',
+              'legal',
+              'deadline',
+              'commercial',
+              'other',
+            ],
+          },
+          requirement: { type: 'string', minLength: 1 },
+          source: {
+            type: 'string',
+            enum: [
+              'structured_ted',
+              'tender_document',
+              'general_analysis',
+              'derived',
+            ],
+          },
+          isMandatory: { type: 'boolean' },
+          status: {
+            type: 'string',
+            enum: ['PASS', 'PARTIAL', 'UNKNOWN', 'FAIL'],
+          },
+          evidenceLevel: {
+            type: 'string',
+            enum: ['direct', 'indirect', 'missing', 'contradiction'],
+          },
+          companyField: { type: 'string', minLength: 1 },
+          tenderField: { type: 'string', minLength: 1 },
+          explanation: { type: 'string', minLength: 1 },
+          missingProfileFields: {
+            type: 'array',
+            items: { type: 'string', minLength: 1 },
+          },
+          severityIfUnresolved: {
+            type: 'string',
+            enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'],
+          },
+          canBeResolvedByProfileUpdate: { type: 'boolean' },
+        },
+      },
+    },
     companyFitAnalysis: { type: 'object' },
     commercialAnalysis: { type: 'object' },
     riskAnalysis: {
@@ -37,7 +106,6 @@ export const TENDER_DEEP_COMPANY_FIT_JSON_SCHEMA = {
       properties: {
         tenderRisks: { type: 'array' },
         companySpecificRisks: { type: 'array' },
-        criticalBlockers: { type: 'array' },
         criticalRisks: { type: 'array' },
       },
     },
@@ -188,41 +256,6 @@ export const TENDER_DEEP_COMPANY_FIT_JSON_SCHEMA = {
       },
     },
     finalRecommendation: { type: 'object' },
-    decisionFactors: {
-      type: 'object',
-      additionalProperties: true,
-      properties: {
-        criticalBlockers: {
-          type: 'array',
-          items: {
-            type: 'object',
-            additionalProperties: true,
-            required: ['type', 'severity', 'description'],
-            properties: {
-              type: {
-                type: 'string',
-                enum: [
-                  'capability',
-                  'certification',
-                  'geography',
-                  'eligibility',
-                  'deadline',
-                  'language',
-                  'financial',
-                  'legal',
-                  'other',
-                ],
-              },
-              severity: {
-                type: 'string',
-                enum: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'],
-              },
-              description: { type: 'string', minLength: 1 },
-            },
-          },
-        },
-      },
-    },
     evidenceMap: {
       type: 'array',
       items: {
