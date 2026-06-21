@@ -41,7 +41,7 @@ export type TenderDeepAnalysisRecord = TenderDeepAnalysis & {
 
 export interface TenderDeepAnalysisModelType extends Model<TenderDeepAnalysisDocument> {
   serializeDetail(
-    doc?: TenderDeepAnalysisDocument | null,
+    doc?: TenderDeepAnalysisDocument | TenderDeepAnalysisRecord | null,
   ): Partial<TenderDeepAnalysisDocument> | null;
 }
 

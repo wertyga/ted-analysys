@@ -166,12 +166,13 @@ export class TenderDeepAnalysisService {
       });
     }
   }
+
   async analyzeTenderDeepCompanyFit(params: {
     tenderId: string;
     companyId: string;
     language?: string;
     forceUpdate?: boolean;
-  }): Promise<TenderDeepAnalysisDocument | TenderDeepAnalysisRecord> {
+  }): Promise<TenderDeepAnalysisDocument> {
     const language = normalizeDeepAnalysisLanguage(params.language);
     const [tender, company] = await Promise.all([
       this.tendersService.findLocalTender(params.tenderId),
@@ -212,6 +213,7 @@ export class TenderDeepAnalysisService {
     }
     return localDeepAnalysis;
   }
+
   async listByCompany(params: {
     companyId: string;
     page?: number;
