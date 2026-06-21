@@ -127,7 +127,6 @@ export interface TenderDeepAnalysisResult {
       explanation: string;
     }>;
     fitScore: number;
-    fitConfidenceScore: number;
     participationReadinessScore: number;
     documentationCompletenessScore: number;
     requirementsClarityScore: number;

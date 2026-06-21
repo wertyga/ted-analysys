@@ -1,5 +1,5 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
-import { validateTenderDeepCompanyFitResult } from '@/openai/schemas/tender-deep-company-fit.schema';
+import { validateTenderDeepCompanyFitResult } from '@/openai/schemas/deep-analysis';
 import { TenderDeepAnalysisResult, TenderDeepRecommendation } from '@/types';
 import { filterModel } from '@/utils';
 
@@ -97,7 +97,6 @@ export const TenderDeepAnalysisSchema: Schema<
   { collection: 'tender_deep_analyses', timestamps: true },
 );
 
-TenderDeepAnalysisSchema.index({ company: 1, tenderId: 1 }, { unique: true });
 TenderDeepAnalysisSchema.index({ status: 1, updatedAt: 1 });
 
 TenderDeepAnalysisSchema.statics.serializeDetail = function serializeDetail(

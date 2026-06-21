@@ -19,7 +19,7 @@ import {
   DEEP_COMPANY_FIT_LLM_JSON_SCHEMA,
   normalizeTenderDeepCompanyFitResult,
   validateTenderDeepCompanyFitResult,
-} from '@/openai/schemas/tender-deep-company-fit.schema';
+} from '@/openai/schemas/deep-analysis';
 
 type JsonRecord = Record<string, unknown>;
 type LlmAnalysisPurpose = 'general' | 'deep';
