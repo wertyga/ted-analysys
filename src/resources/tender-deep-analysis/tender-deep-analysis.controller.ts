@@ -19,6 +19,7 @@ import {
 import { AuthGuard, TariffProGuard } from '@/guards';
 import { TenderDeepAnalysisService } from './tender-deep-analysis.service';
 import { TenderDeepAnalysisModel } from './schemas';
+import { buildDecisionReadinessItems } from '@/openai/schemas/deep-analysis/tender-deep-company-fit.simulation';
 
 @ApiTags('deep-analysis')
 @UseGuards(TariffProGuard)
@@ -49,7 +50,15 @@ export class TenderDeepAnalysisController {
         forceUpdate: !!forceUpdate,
       });
 
-    return TenderDeepAnalysisModel.serializeDetail(analysis);
+    const serialized = TenderDeepAnalysisModel.serializeDetail(analysis);
+
+    if (serialized?.resultJson) {
+      Object.assign(serialized, {
+        decisionReadiness: buildDecisionReadinessItems(serialized.resultJson),
+      });
+    }
+
+    return serialized;
   }
 }
 
@@ -85,7 +94,17 @@ export class UserTenderDeepAnalysisController {
     return {
       ...result,
       analyses: result.analyses.map((analysis) => {
-        return TenderDeepAnalysisModel.serializeDetail(analysis);
+        const serialized = TenderDeepAnalysisModel.serializeDetail(analysis);
+
+        if (serialized?.resultJson) {
+          Object.assign(serialized, {
+            decisionReadiness: buildDecisionReadinessItems(
+              serialized.resultJson,
+            ),
+          });
+        }
+
+        return serialized;
       }),
     };
   }

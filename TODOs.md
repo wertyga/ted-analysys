@@ -1,26 +1,8 @@
-[//]: # (- FE to implement notification user's settings)
+- FE - чекер с доками и отсылать на повторный анализ
+- FE - генерация дип анализа на другом языке
 
-[//]: # (- FE - deep analysis isOutOfDate)
-
-[//]: # (- FE - awardCriteria)
-
-[//]: # (- FE - buyer fields - может отдельно показывать)
-
-[//]: # (- FE - estimatedValue - если нет в тендере, вытягивать из generalAnalysis)
-
-[//]: # (- FE - lots &#40;tender -> generalAnalysis&#41;)
-
-[//]: # (- FE - generalAnalysis -> scopeOfWork)
-
-[//]: # (- FE - generalAnalysis -> eligibilityCriteria)
-
-[//]: # (- FE - generalAnalysis -> awardCriteria)
-
-[//]: # (- FE - tender-match - Tender details are currently unavailable - show a tender info)
-
-[//]: # (- FE - tender-match - показывать isOutDated есть дедлайн кончился)
-
-- BE - total-value - для tender price
+- BE - указывать источник причины
+- BE - vat price from freemium
 
 buyerProfile: https://ch-giorgi.sudest-marchespublics.com
 пробовать доставать portalUrl для deep analysis
