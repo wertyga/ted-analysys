@@ -1,4 +1,5 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
+import { TenderDocument } from '@/resources/tenders/schemas';
 
 export enum BuyerIdentifierType {
   TED_ORG_ID = 'TED_ORG_ID',
@@ -14,30 +15,21 @@ export type BuyerIdentifier = {
 };
 
 export type BuyerContact = {
-  contactPoint?: string;
-  person?: string;
-  email?: string;
-  phone?: string;
-  fax?: string;
-  url?: string;
-  gateway?: string;
+  contactPoint: string;
+  person: string;
+  email: string;
+  phone: string;
+  fax: string;
+  url: string;
+  gateway: string;
 };
 
 export type BuyerAddress = {
-  street?: string;
-  postCode?: string;
-  city?: string;
-  country?: string;
-  countrySub?: string;
-};
-
-export type BuyerStats = {
-  tenderCount: number;
-  totalEstimatedValueEur: number;
-  firstPublicationDate?: Date;
-  lastPublicationDate?: Date;
-  cpvCodes: string[];
-  countries: string[];
+  street: string;
+  postCode: string;
+  city: string;
+  country: string;
+  countrySub: string;
 };
 
 export type Buyer = {
@@ -75,7 +67,7 @@ export type Buyer = {
    * buyer-gateway
    * touchpoint-gateway-buyer
    */
-  contact?: BuyerContact;
+  contact: BuyerContact;
 
   /**
    * organisation-street-buyer
@@ -90,7 +82,7 @@ export type Buyer = {
    * buyer-country-sub
    * buyer-post-code
    */
-  address?: BuyerAddress;
+  address: BuyerAddress;
 
   /**
    * organisation-identifier-buyer
@@ -119,47 +111,14 @@ export type Buyer = {
    */
   profiles: string[];
 
+  gateways: string[];
+
   /**
    * organisation-internet-address-buyer
    * buyer-internet-address
    * touchpoint-internet-address-buyer
    */
   websites: string[];
-
-  /**
-   * organisation-email-buyer
-   * buyer-email
-   * touchpoint-email-buyer
-   */
-  emails: string[];
-
-  /**
-   * organisation-tel-buyer
-   * touchpoint-tel-buyer
-   */
-  phones: string[];
-
-  /**
-   * organisation-gateway-buyer
-   * buyer-gateway
-   * touchpoint-gateway-buyer
-   */
-  gateways: string[];
-
-  /**
-   * acquiring-cpb-buyer
-   */
-  isCentralPurchasingBody: boolean;
-
-  /**
-   * awarding-cpb-org
-   */
-  isAwardingCentralPurchasingBody: boolean;
-
-  /**
-   * buyer-group-lead
-   */
-  isGroupLead: boolean;
 
   /**
    * calculated from imported tenders
@@ -182,12 +141,23 @@ export type Buyer = {
    *   classification-cpv
    *   main-classification-proc
    *   main-classification-lot
-   *
-   * countries:
+   */
+  cpvCodes: string[];
+
+  /** countries:
    *   place-of-performance-country-proc
    *   place-of-performance-country-lot
-   */
-  stats: BuyerStats;
+   *   */
+  countries: string[];
+
+  tenders: TenderDocument[];
+
+  totalEstimatedValueEur: number;
+  firstPublicationDate: Date;
+  lastPublicationDate: Date;
+
+  organisationIdentifierBuyer: string;
+  buyerCountry: string;
 
   createdAt: Date;
   updatedAt: Date;
@@ -210,31 +180,24 @@ const BuyerIdentifierSchema = new Schema<BuyerIdentifier>(
 
 const BuyerContactSchema = new Schema<BuyerContact>(
   {
-    contactPoint: String,
-    person: String,
+    contactPoint: { type: String, default: '' },
+    person: { type: String, default: '' },
+    email: { type: String, default: '' },
+    phone: { type: String, default: '' },
+    fax: { type: String, default: '' },
+    url: { type: String, default: '' },
+    gateway: { type: String, default: '' },
   },
   { _id: false },
 );
 
 const BuyerAddressSchema = new Schema<BuyerAddress>(
   {
-    street: String,
-    postCode: String,
-    city: { type: String, index: true },
-    country: { type: String, index: true },
-    countrySub: { type: String, index: true },
-  },
-  { _id: false },
-);
-
-const BuyerStatsSchema = new Schema<BuyerStats>(
-  {
-    tenderCount: { type: Number, default: 0 },
-    totalEstimatedValueEur: { type: Number, default: 0 },
-    firstPublicationDate: Date,
-    lastPublicationDate: Date,
-    cpvCodes: { type: [String], default: [] },
-    countries: { type: [String], default: [] },
+    street: { type: String, default: '' },
+    postCode: { type: String, default: '' },
+    city: { type: String, default: '', index: true },
+    country: { type: String, default: '', index: true },
+    countrySub: { type: String, default: '', index: true },
   },
   { _id: false },
 );
@@ -251,31 +214,32 @@ export const BuyerSchema = new Schema<Buyer>(
     contact: BuyerContactSchema,
     address: BuyerAddressSchema,
 
+    organisationIdentifierBuyer: {
+      type: String,
+      index: true,
+    },
+    buyerCountry: {
+      type: String,
+      index: true,
+    },
+
     legalTypes: { type: [String], default: [], index: true },
     mainActivities: { type: [String], default: [], index: true },
 
     profiles: { type: [String], default: [] },
     websites: { type: [String], default: [] },
-    emails: { type: [String], default: [] },
-    phones: { type: [String], default: [] },
+
+    totalEstimatedValueEur: { type: Number, default: 0 },
+    firstPublicationDate: Date,
+    lastPublicationDate: Date,
+    cpvCodes: { type: [String], default: [] },
+    countries: { type: [String], default: [] },
     gateways: { type: [String], default: [] },
-
-    isCentralPurchasingBody: { type: Boolean, default: false },
-    isAwardingCentralPurchasingBody: { type: Boolean, default: false },
-    isGroupLead: { type: Boolean, default: false },
-
-    stats: {
-      type: BuyerStatsSchema,
-      default: () => ({
-        tenderCount: 0,
-        totalEstimatedValueEur: 0,
-        cpvCodes: [],
-        countries: [],
-      }),
-    },
   },
   { timestamps: true },
 );
+
+BuyerSchema.index({ buyerCountry: 1, organisationIdentifierBuyer: 1 });
 
 export const BuyerModel: Model<Buyer> =
   mongoose.models.Buyer ?? mongoose.model<Buyer>('Buyer', BuyerSchema);
