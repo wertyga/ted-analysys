@@ -3,8 +3,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import CPV_INDUSTRY_SLUGS from './cpv-slug.json';
-import COUNTRY_SLUGS from './countries-slug.json';
+import CPV_INDUSTRIES from './cpv-obj.json';
+import { STATIC_SITEMAP_PATHS } from './static-pages';
+import { COUNTRY_DATA, EUROPEAN_CODES } from './countries';
 import { existsSync } from 'fs';
 import { mkdir, writeFile } from 'fs/promises';
 import {
@@ -17,6 +18,7 @@ import {
   relative,
 } from 'path';
 import { TenderModel } from '@/resources/tenders/schemas';
+import { CpvCategoryModel } from '@/resources/cpv/schemas';
 
 type SitemapTender = {
   id?: string;
@@ -27,6 +29,29 @@ const SITEMAP_ABSOLUTE_MAX_URLS = 40_000;
 
 @Injectable()
 export class SitemapTechService {
+  private buildSitemapFilesByEntity(options: {
+    outputDir: string;
+    entityName: string;
+    urls: Array<{ loc: string; lastmod?: string }>;
+    maxUrlsPerFile: number;
+  }) {
+    const { outputDir, entityName, urls, maxUrlsPerFile } = options;
+
+    const chunks: Array<{ outputPath: string; xml: string }> = [];
+
+    for (let index = 0; index < urls.length; index += maxUrlsPerFile) {
+      const chunkUrls = urls.slice(index, index + maxUrlsPerFile);
+      const chunkIndex = chunks.length;
+
+      chunks.push({
+        outputPath: join(outputDir, `${entityName}-${chunkIndex}.xml`),
+        xml: this.buildSitemapXml(chunkUrls),
+      });
+    }
+
+    return chunks;
+  }
+
   async generateTenderSitemap(options: {
     domain: string;
     locales?: string | string[];
@@ -36,51 +61,79 @@ export class SitemapTechService {
     const locales = this.getSitemapLocales(options.locales);
     const maxUrlsPerFile = this.normalizeMaxUrlsPerFile(options.maxUrlsPerFile);
     const outputPath = this.getSitemapOutputPath();
-    const tenders = await TenderModel.find({})
-      .select('id updatedAt')
-      .lean<SitemapTender[]>()
-      .exec();
-    const tenderUrls = tenders.flatMap((tender) =>
-      this.buildTenderSitemapUrls(domain, locales, tender),
+    const outputDir = dirname(outputPath);
+
+    const tenderUrls = await this.buildTenderSitemapUrls(domain, locales);
+    const industryUrls = await this.buildCpvIndustrySitemapUrls(domain);
+    const countryUrls = await this.buildCountrySitemapUrls(domain, locales);
+    const countryIndustryUrls = await this.buildCountryIndustrySitemapUrls(
+      domain,
+      locales,
     );
-    const industryUrls = this.buildCpvIndustrySitemapUrls(domain, locales);
-    const countryUrls = this.buildCountrySitemapUrls(domain, locales);
-    const urls = [...tenderUrls, ...industryUrls, ...countryUrls];
-    const sitemapFiles = this.buildSitemapFiles(
+    const staticUrls = this.buildStaticSitemapUrls(domain, locales);
+
+    const sitemapGroups = [
+      {
+        name: 'static',
+        urls: staticUrls,
+      },
+      {
+        name: 'tenders',
+        urls: tenderUrls,
+      },
+      {
+        name: 'industries',
+        urls: industryUrls,
+      },
+      {
+        name: 'countries',
+        urls: countryUrls,
+      },
+      {
+        name: 'country-industries',
+        urls: countryIndustryUrls,
+      },
+    ].filter((group) => group.urls.length > 0);
+
+    const sitemapFiles = sitemapGroups.flatMap((group) =>
+      this.buildSitemapFilesByEntity({
+        outputDir,
+        entityName: group.name,
+        urls: group.urls,
+        maxUrlsPerFile,
+      }),
+    );
+
+    const urlsCount = sitemapGroups.reduce(
+      (sum, group) => sum + group.urls.length,
+      0,
+    );
+
+    await mkdir(outputDir, { recursive: true });
+
+    await Promise.all(
+      sitemapFiles.map((file) => writeFile(file.outputPath, file.xml, 'utf8')),
+    );
+
+    await writeFile(
       outputPath,
-      urls,
-      maxUrlsPerFile,
+      this.buildSitemapIndexXml(
+        sitemapFiles.map((file) => ({
+          loc: this.buildPublicSitemapUrl(domain, file.outputPath),
+          lastmod: new Date().toISOString(),
+        })),
+      ),
+      'utf8',
     );
-
-    await mkdir(dirname(outputPath), { recursive: true });
-
-    if (sitemapFiles.length === 1) {
-      await writeFile(outputPath, this.buildSitemapXml(urls), 'utf8');
-    } else {
-      await Promise.all(
-        sitemapFiles.map((file) =>
-          writeFile(file.outputPath, file.xml, 'utf8'),
-        ),
-      );
-      await writeFile(
-        outputPath,
-        this.buildSitemapIndexXml(
-          sitemapFiles.map((file) => ({
-            loc: this.buildPublicSitemapUrl(domain, file.outputPath),
-            lastmod: new Date().toISOString(),
-          })),
-        ),
-        'utf8',
-      );
-    }
 
     return {
       outputPath,
       downloadUrl: '/adm/tech/sitemap/download',
-      tendersCount: tenders.length,
-      industriesCount: CPV_INDUSTRY_SLUGS.length,
-      countriesCount: COUNTRY_SLUGS.length,
-      urlsCount: urls.length,
+      tendersCount: tenderUrls.length,
+      industriesCount: industryUrls.length,
+      countriesCount: countryUrls.length,
+      countryIndustriesCount: countryIndustryUrls.length,
+      urlsCount,
       sitemapFilesCount: sitemapFiles.length,
       maxUrlsPerFile,
       sitemapFiles: sitemapFiles.map((file) => ({
@@ -90,10 +143,21 @@ export class SitemapTechService {
           basename(file.outputPath),
         )}`,
       })),
-      isSitemapIndex: sitemapFiles.length > 1,
+      isSitemapIndex: true,
       domain,
       locales,
     };
+  }
+
+  private buildStaticSitemapUrls(domain: string, locales: string[]) {
+    return locales.flatMap((locale) =>
+      STATIC_SITEMAP_PATHS.map((page) => ({
+        loc: page.path
+          ? `${domain}/${locale}/${page.path}`
+          : `${domain}/${locale}`,
+        priority: page.priority,
+      })),
+    );
   }
 
   getSitemapOutputPath() {
@@ -126,47 +190,180 @@ export class SitemapTechService {
     return downloadPath;
   }
 
-  private buildTenderSitemapUrls(
+  private async buildTenderSitemapUrls(
     domain: string,
     locales: string[],
-    tender: SitemapTender,
-  ) {
-    const tenderId = tender.id;
+  ): Promise<{ loc: string; lastmod: string }[]> {
+    const tenders = await TenderModel.find({ id: { $exists: true } })
+      .select('id updatedAt')
+      .lean<SitemapTender[]>();
 
-    if (!tenderId) {
+    if (!tenders.length) {
       return [];
     }
 
-    return locales.map((locale) => ({
-      loc: `${domain}/${locale}/tenders/${encodeURIComponent(tenderId)}`,
-      lastmod: tender.updatedAt?.toISOString(),
-    }));
+    return tenders.flatMap((tender) => {
+      return locales
+        .map((locale) => {
+          if (!tender.id) {
+            return null;
+          }
+
+          return {
+            loc: `${domain}/${locale}/tenders/${encodeURIComponent(tender.id)}`,
+            lastmod: tender.updatedAt?.toISOString(),
+          };
+        })
+        .filter(Boolean);
+    }) as { loc: string; lastmod: string }[];
   }
 
-  private buildCpvIndustrySitemapUrls(domain: string, locales: string[]) {
-    return locales.flatMap((locale) =>
-      CPV_INDUSTRY_SLUGS.map((slug) => ({
-        loc: `${domain}/${locale}/industries/${encodeURIComponent(slug)}`,
-      })),
+  private async buildCpvIndustrySitemapUrls(
+    domain: string,
+  ): Promise<{ loc: string }[]> {
+    const tenders = await TenderModel.find({
+      'cpvCodes.0': { $exists: true },
+    })
+      .select('cpvCodes')
+      .lean();
+
+    const industryCodeSet = new Set<string>();
+
+    for (const tender of tenders) {
+      for (const cpvCode of tender.cpvCodes || []) {
+        for (const indexableCpvCode of this.getIndexableCpvIndustryCodes(
+          cpvCode,
+        )) {
+          industryCodeSet.add(indexableCpvCode);
+        }
+      }
+    }
+
+    return Array.from(industryCodeSet)
+      .map((code) => CPV_INDUSTRIES[code])
+      .filter((industry) => industry?.slug)
+      .map((industry) => ({
+        loc: `${domain}/en/industries/${encodeURIComponent(industry.slug)}`,
+      }))
+      .filter(Boolean) as { loc: string }[];
+  }
+
+  private async buildCountrySitemapUrls(domain: string, locales: string[]) {
+    const tendersWithCountries = await TenderModel.find({
+      'placeOfPerformanceCountries.0': { $exists: true },
+    });
+
+    const euCountriesCodes = Array.from(EUROPEAN_CODES);
+    const euUrls: string[] = [];
+
+    const tenderCountriesUrls: string[] = locales.flatMap((locale) => {
+      euCountriesCodes.forEach((countryCode) => {
+        const slug = COUNTRY_DATA[countryCode]?.slug;
+
+        if (slug) {
+          euUrls.push(
+            `${domain}/${locale}/countries/${encodeURIComponent(slug)}`,
+          );
+        }
+      });
+
+      return tendersWithCountries.flatMap((tender) => {
+        const countries = tender.placeOfPerformanceCountries || [];
+
+        return countries
+          .map((countryCode) => {
+            const slug = COUNTRY_DATA[countryCode]?.slug;
+            if (!slug) {
+              return null;
+            }
+
+            return `${domain}/${locale}/countries/${encodeURIComponent(slug)}`;
+          })
+          .filter(Boolean);
+      });
+    }) as string[];
+
+    return Array.from(new Set([...euUrls, ...tenderCountriesUrls])).map(
+      (url) => {
+        return {
+          loc: url,
+        };
+      },
     );
   }
 
-  private buildCountrySitemapUrls(domain: string, locales: string[]) {
-    return locales.flatMap((locale) =>
-      COUNTRY_SLUGS.map((country) => ({
-        loc: `${domain}/${locale}/tenders/${encodeURIComponent(country)}`,
-      })),
-    );
+  private getIndexableCpvIndustryCodes(cpvCode: string) {
+    const candidates = [
+      cpvCode.slice(0, 2) + '000000',
+      cpvCode.slice(0, 3) + '00000',
+      cpvCode.slice(0, 4) + '0000',
+      cpvCode,
+    ];
+
+    return Array.from(new Set(candidates)).filter((code) => {
+      const industry = CPV_INDUSTRIES[code];
+
+      return industry?.slug && industry.level >= 2 && industry.level <= 4;
+    });
+  }
+  private async buildCountryIndustrySitemapUrls(
+    domain: string,
+    locales: string[],
+  ) {
+    const tenders = await TenderModel.find({
+      'placeOfPerformanceCountries.0': { $exists: true },
+      'cpvCodes.0': { $exists: true },
+    })
+      .select('placeOfPerformanceCountries cpvCodes')
+      .lean();
+
+    const urlSet = new Set<string>();
+
+    for (const tender of tenders) {
+      const countries = tender.placeOfPerformanceCountries || [];
+      const cpvCodes = tender.cpvCodes || [];
+
+      for (const countryCode of countries) {
+        const countrySlug = COUNTRY_DATA[countryCode]?.slug;
+
+        if (!countrySlug) continue;
+
+        for (const cpvCode of cpvCodes) {
+          for (const indexableCpvCode of this.getIndexableCpvIndustryCodes(
+            cpvCode,
+          )) {
+            const industry = CPV_INDUSTRIES[indexableCpvCode];
+
+            for (const locale of locales) {
+              urlSet.add(
+                `${domain}/${locale}/${encodeURIComponent(
+                  countrySlug,
+                )}/${encodeURIComponent(industry.slug)}`,
+              );
+            }
+          }
+        }
+      }
+    }
+
+    return Array.from(urlSet).map((loc) => ({ loc }));
   }
 
-  private buildSitemapXml(urls: Array<{ loc: string; lastmod?: string }>) {
+  private buildSitemapXml(
+    urls: Array<{ loc: string; lastmod?: string; priority?: number }>,
+  ) {
     const urlEntries = urls
       .map((url) => {
         const lastmod = url.lastmod
           ? `\n    <lastmod>${this.escapeXml(url.lastmod)}</lastmod>`
           : '';
 
-        return `  <url>\n    <loc>${this.escapeXml(url.loc)}</loc>${lastmod}\n  </url>`;
+        const priority =
+          typeof url.priority === 'number'
+            ? `\n    <priority>${url.priority.toFixed(1)}</priority>`
+            : '';
+
+        return `  <url>\n    <loc>${this.escapeXml(url.loc)}</loc>${lastmod}${priority}\n  </url>`;
       })
       .join('\n');
 

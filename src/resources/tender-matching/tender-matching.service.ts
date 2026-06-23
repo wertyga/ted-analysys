@@ -41,6 +41,7 @@ import { COMPANY_TENDER_FIT_SYSTEM_PROMPT } from './company-tender-fit.prompt';
 import { UserModel } from '@/resources/user/user.schema';
 import { TariffService } from '@/resources/tariff';
 import { TENDER_MATCHING_CONFIG } from '@/config/tender-matching.config';
+import { buildCompanyTenderFitUserPrompt } from './tender-matching.prompt';
 
 @Injectable()
 export class TenderMatchingService {
@@ -175,9 +176,7 @@ export class TenderMatchingService {
     tender: TenderDocument,
     source: TenderMatchSource,
   ): Promise<TenderCompanyMatchDocument[]> {
-    const companyFilters = await CompanyTenderFilterModel.find({
-      confirmedByUser: true,
-    }).exec();
+    const companyFilters = await CompanyTenderFilterModel.find({});
 
     return this.matchTenderWithFilters(tender, companyFilters, source);
   }
@@ -259,11 +258,7 @@ export class TenderMatchingService {
     await this.setTenderMatchPendingStatus(match._id);
 
     try {
-      const payload = await this.buildCompanyTenderFitPayload(
-        tender,
-        filter,
-        match,
-      );
+      const payload = await this.buildCompanyTenderFitPayload(tender, filter);
       const result = await this.analyzeCompanyTenderFit(payload);
 
       const updatedMatch = await TenderCompanyMatchModel.findByIdAndUpdate(
@@ -362,35 +357,10 @@ export class TenderMatchingService {
     const response =
       await this.deepSeekAnalysisService.createGeneralJsonResponse(
         COMPANY_TENDER_FIT_SYSTEM_PROMPT,
-        this.buildCompanyTenderFitUserPrompt(payload),
+        buildCompanyTenderFitUserPrompt(payload),
       );
 
     return this.validateCompanyTenderFitAiResult(response);
-  }
-
-  private buildCompanyTenderFitUserPrompt(
-    payload: CompanyTenderFitAiPayload,
-  ): string {
-    return [
-      'Evaluate whether this hard-matched tender should be sent to the user by email.',
-      '',
-      'Input:',
-      JSON.stringify(payload, null, 2),
-      '',
-      'Return JSON with this exact structure:',
-      JSON.stringify(
-        {
-          score: 75,
-          decision: 'good_fit',
-          summary: 'string',
-          reasons: ['string'],
-          risks: ['string'],
-          recommendedAction: 'review',
-        },
-        null,
-        2,
-      ),
-    ].join('\n');
   }
 
   private validateCompanyTenderFitAiResult(
@@ -425,7 +395,6 @@ export class TenderMatchingService {
   private async buildCompanyTenderFitPayload(
     tender: TenderDocument,
     filter: CompanyTenderFilterForMatching,
-    match: TenderCompanyMatchDocument,
   ): Promise<CompanyTenderFitAiPayload> {
     const companyName = await this.getCompanyName(filter.user);
     return {
@@ -472,13 +441,6 @@ export class TenderMatchingService {
         submissionLanguages: tender.submissionLanguages ?? [],
         selectionCriteria: this.mapSelectionCriteria(tender.selectionCriteria),
         awardCriteria: this.mapAwardCriteria(tender.awardCriteria),
-      },
-      hardMatch: {
-        score: match.hardMatchScore,
-        decision: match.decision,
-        reasons: match.reasons,
-        risks: match.risks,
-        keywordHits: match.keywordHits,
       },
     };
   }

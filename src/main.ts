@@ -9,6 +9,8 @@ import mongooseConnect from './mongoose/mongoose';
 import { HttpErrorLoggingFilter } from '@/http-logger/HTTPLogger';
 import { isSearchBot } from '@/utils/bots';
 import { logger } from '@/utils';
+import fs from 'node:fs';
+import { CpvCategoryModel } from '@/resources/cpv/schemas';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
@@ -87,6 +89,13 @@ async function bootstrap() {
 
     mongooseConnect(async () => {
       console.log(`Connected to ${process.env.DB_NAME} database`);
+
+      function toSlug(name: string): string {
+        return name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+      }
     });
   });
 }

@@ -159,13 +159,6 @@ export type CompanyTenderFitAiPayload = {
       weight?: number | null;
     }[];
   };
-  hardMatch: {
-    score: number;
-    decision: string;
-    reasons: string[];
-    risks: string[];
-    keywordHits: string[];
-  };
 };
 
 export interface CompanyTenderFitAiResult {
