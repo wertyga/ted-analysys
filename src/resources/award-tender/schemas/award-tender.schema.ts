@@ -7,6 +7,7 @@ import {
 } from '@/resources/tenders/schemas';
 import { filterModel } from '@/utils';
 import { ContractorDocument } from '@/resources/contractor/schemas';
+import { BuyerDocument } from '@/resources/buyer/schemas';
 
 export type AwardTenderLot = TenderLot & {
   resultLotIdentifier: string;
@@ -27,11 +28,7 @@ export interface AwardTender {
   title?: string;
   titleProc?: string;
   description?: string;
-  buyerName?: string;
-  buyerIdentifier?: string;
-  buyerCountry?: string;
-  buyerCity?: string;
-  buyerMainActivities?: string[];
+  buyer: BuyerDocument;
   publicationDate?: Date;
   dispatchDate?: Date;
   submissionDeadline?: Date;
@@ -135,12 +132,10 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
     title: String,
     titleProc: String,
     description: String,
-    buyerName: String,
-    buyerIdentifier: String,
-    buyerCountry: { type: String },
-    buyerCity: String,
-    buyerMainActivities: {
-      type: [String],
+    buyer: {
+      type: Schema.Types.ObjectId,
+      ref: 'Buyer',
+      required: true,
     },
     selectionStatuses: { type: [String], default: [] },
     publicationDate: { type: Date },
@@ -193,7 +188,7 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
 
 AwardTenderSchema.index({
   cpvCodes: 1,
-  buyerCountry: 1,
+  buyerCountry: 1, // TODO
   contractNature: 1,
   publicationDate: -1,
 });

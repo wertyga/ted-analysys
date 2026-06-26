@@ -1,48 +1,86 @@
+import mongoose, { Types } from 'mongoose';
 import { Injectable } from '@nestjs/common';
 import { BuyerNormalizer } from './buyer.normalizer';
 import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
-import { BuyerModel } from './schemas';
-import { getUniqArray } from '@/utils';
+import { Buyer, BuyerDocument, BuyerModel } from './schemas';
+import { getEarliestDate, getLatestDate, getUniqArray } from '@/utils';
+
+import { TenderModel } from '@/resources/tenders/schemas';
 
 @Injectable()
 export class BuyerService {
   normalizer = new BuyerNormalizer();
 
-  async upsertBuyerFromTEDNotice(notice: TedNotice) {
+  async getTendersBuyerMeta(
+    tendersInnerIds: (string | mongoose.Types.ObjectId)[],
+  ): Promise<
+    Pick<
+      Buyer,
+      'totalEstimatedValueEur' | 'firstPublicationDate' | 'lastPublicationDate'
+    >
+  > {
+    const tenders = await TenderModel.find({
+      _id: { $in: tendersInnerIds.map((id) => new Types.ObjectId(id)) },
+    });
+
+    const publicationDates = tenders.map((t) => t.publicationDate);
+    const firstPublicationDate = getEarliestDate(publicationDates);
+    const lastPublicationDate = getLatestDate(publicationDates);
+    const totalEstimatedValueEur = tenders.reduce((acc, t) => {
+      return acc + (t.estimatedValueEur ?? 0);
+    }, 0);
+
+    return {
+      totalEstimatedValueEur,
+      lastPublicationDate,
+      firstPublicationDate,
+    };
+  }
+
+  async upsertBuyerFromTEDNotice(
+    notice: TedNotice,
+    tenderInnerIds: string[] = [],
+  ): Promise<BuyerDocument> {
     const normalizedBuyer = this.normalizer.normalizeBuyerFromTEDNotice(notice);
 
     const identityFilter =
       normalizedBuyer.organisationIdentifierBuyer &&
-      normalizedBuyer.buyerCountry
+      normalizedBuyer.address.country
         ? {
             organisationIdentifierBuyer:
               normalizedBuyer.organisationIdentifierBuyer,
-            buyerCountry: normalizedBuyer.buyerCountry,
+            'address.country': normalizedBuyer.address.country,
           }
         : {
             name: normalizedBuyer.name,
-            buyerCountry: normalizedBuyer.buyerCountry,
+            'address.country': normalizedBuyer.address.country,
           };
 
     const existingBuyer = await BuyerModel.findOne(identityFilter);
 
     if (!existingBuyer) {
-      return BuyerModel.create(normalizedBuyer);
+      return BuyerModel.create(normalizedBuyer) as any;
     }
 
     const getLastExisting = (...values: Array<string | null | undefined>) =>
       values.findLast((value) => value?.trim()) ?? '';
 
+    const tenderIds = Array.from(
+      new Set([...existingBuyer.tenders, ...tenderInnerIds]),
+    ) as string[];
+
     existingBuyer.set({
+      ...(await this.getTendersBuyerMeta(tenderIds)),
+      tenders: tenderIds,
       name: getLastExisting(existingBuyer.name, normalizedBuyer.name),
       organisationIdentifierBuyer: getLastExisting(
         existingBuyer.organisationIdentifierBuyer,
         normalizedBuyer.organisationIdentifierBuyer,
       ),
-      buyerCountry: getLastExisting(
-        existingBuyer.buyerCountry,
-        normalizedBuyer.buyerCountry,
-      ),
+      // buyerCountry: getLastExisting(
+      //   existingBuyer.buyerCountry,
+      //   normalizedBuyer.buyerCountry,
+      // ),
       contact: {
         contactPoint: getLastExisting(
           existingBuyer.contact?.contactPoint,
@@ -113,28 +151,16 @@ export class BuyerService {
         existingBuyer.mainActivities,
         normalizedBuyer.mainActivities,
       ),
-      profiles: getUniqArray(
-        existingBuyer.profiles,
-        normalizedBuyer.profiles,
-      ),
-      gateways: getUniqArray(
-        existingBuyer.gateways,
-        normalizedBuyer.gateways,
-      ),
-      websites: getUniqArray(
-        existingBuyer.websites,
-        normalizedBuyer.websites,
-      ),
-      cpvCodes: getUniqArray(
-        existingBuyer.cpvCodes,
-        normalizedBuyer.cpvCodes,
-      ),
+      profiles: getUniqArray(existingBuyer.profiles, normalizedBuyer.profiles),
+      gateways: getUniqArray(existingBuyer.gateways, normalizedBuyer.gateways),
+      websites: getUniqArray(existingBuyer.websites, normalizedBuyer.websites),
+      cpvCodes: getUniqArray(existingBuyer.cpvCodes, normalizedBuyer.cpvCodes),
       countries: getUniqArray(
         existingBuyer.countries,
         normalizedBuyer.countries,
       ),
     });
 
-    return existingBuyer.save();
+    return existingBuyer.save() as any;
   }
 }

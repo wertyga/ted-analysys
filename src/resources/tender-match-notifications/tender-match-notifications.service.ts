@@ -358,8 +358,8 @@ export class TenderMatchNotificationsService {
       .map((match) => {
         const tender = match.tender;
         const title = this.escapeHtml(tender.title || tender.id);
-        const buyer = tender.buyerName
-          ? this.escapeHtml(tender.buyerName)
+        const buyer = tender.buyer.name
+          ? this.escapeHtml(tender.buyer.name)
           : 'Not specified';
         const deadline =
           tender.submissionDeadline ?? tender.deadlineReceiptTender;

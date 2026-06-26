@@ -9,6 +9,7 @@ import { CurrencyExchangeRatesModule } from '@/resources/currency-exchange-rates
 import { TariffModule } from '@/resources/tariff';
 import { DeepSeekModule } from '@/deepseek/deepseek.module';
 import { TenderNormalizerModule } from '@/resources/tender-normalizer/tender-normalizer.module';
+import { BuyerModule } from '@/resources/buyer/buyer.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { TenderNormalizerModule } from '@/resources/tender-normalizer/tender-nor
     DeepSeekModule,
     TariffModule,
     TenderNormalizerModule,
+    BuyerModule,
   ],
   controllers: [TendersAdmController, TendersController],
   providers: [TendersService],

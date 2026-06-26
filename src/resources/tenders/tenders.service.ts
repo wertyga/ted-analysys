@@ -46,6 +46,7 @@ import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rate
 import { CurrencySign } from '@/resources/codelist';
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 import { TENDER_COMPETITION_SEARCH_FIELDS } from '@/config/ted-search.config';
+import { BuyerService } from '@/resources/buyer/buyer.service';
 
 export interface GatherActiveTendersResult {
   completed?: boolean;
@@ -104,6 +105,7 @@ export class TendersService {
     private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
     @Inject(forwardRef(() => TenderGeneralAnalysisService))
     private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
+    private readonly buyerService: BuyerService,
   ) {}
 
   async upsertTender(notice: TedNotice): Promise<TenderDocument | undefined> {
@@ -112,9 +114,10 @@ export class TendersService {
       return;
     }
 
-    const [estimatedValueEur, lotsWithEur] = await Promise.all([
+    const [estimatedValueEur, lotsWithEur, buyer] = await Promise.all([
       this.calculateEstimatedValueEur(normalizedTender),
       this.getLotsWithEurValues(normalizedTender.lots),
+      this.buyerService.upsertBuyerFromTEDNotice(notice),
     ]);
 
     const sourceHash = this.buildTenderSourceHash(normalizedTender);
@@ -132,10 +135,13 @@ export class TendersService {
           ...tenderSet,
           sourceHash,
         },
+        $setOnInsert: {
+          buyer: buyer._id,
+        },
         $unset: tenderUnset,
       },
       { returnDocument: 'after', upsert: true, strict: false },
-    );
+    ).populate('buyer');
 
     return tenderDoc;
   }

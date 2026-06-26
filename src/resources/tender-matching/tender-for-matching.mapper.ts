@@ -19,7 +19,7 @@ export function mapTenderForMatching(
     description: readString(tender.description),
     cpvCodes: readStringArray(tender.cpvCodes),
     country: null,
-    buyerCountry: readString(tender.buyerCountry),
+    buyer: tender.buyer,
     placeOfPerformanceCountry:
       readStringArray(tender.placeOfPerformanceCountries)[0] ?? null,
     estimatedValue: estimatedValue.amount,
@@ -36,7 +36,6 @@ export function mapTenderForMatching(
         ? [readString(tender.noticeLanguage) as string]
         : []),
     ],
-    buyerName: readString(tender.buyerName),
     lotTitles: readStringArray(tender.lots?.map((lot) => lot.title)),
     lotDescriptions: readStringArray(
       tender.lots?.map((lot) => lot.description),

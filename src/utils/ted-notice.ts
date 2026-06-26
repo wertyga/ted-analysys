@@ -81,6 +81,20 @@ export const getEngValueOrFirst = (field: string, notice: TedNotice) => {
   return Object.values(notice[field])[0];
 };
 
+export const getEngValueOrFirstString = (field: string, notice: TedNotice) => {
+  const value = getEngValueOrFirst(field, notice);
+
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  return value;
+};
+
 export const getDateValue = (field: string, notice: TedNotice) => {
   return parseTenderDate(getStringValue(field, notice));
 };

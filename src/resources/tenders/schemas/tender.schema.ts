@@ -5,6 +5,7 @@ import {
   TenderDto,
   TenderListDto,
 } from '@/resources/tenders/dto/tender.dto';
+import { BuyerDocument } from '@/resources/buyer/schemas';
 
 export type TenderDocumentsLinks = Record<
   'xml' | 'pdf' | 'pdfs' | 'html' | 'htmlDirect',
@@ -73,7 +74,7 @@ export interface TenderShortTitle {
 }
 
 export interface Tender {
-  _id: string;
+  _id: mongoose.Types.ObjectId;
   /** Local canonical id. For TED tenders this is the publication number. */
   id: string;
   /** TED notice-type: notice kind such as contract notice, award notice, or planning notice. */
@@ -103,22 +104,7 @@ export interface Tender {
   noticeLanguage?: string;
   /** TED submission-language: languages allowed for tender submission. */
   submissionLanguages?: string[];
-  /** TED buyer-name: contracting buyer name. */
-  buyerName?: string;
-  /** TED buyer-identifier: buyer national or registry identifier. */
-  buyerIdentifier?: string;
-  /** TED buyer-country: country of the buyer, not necessarily place of performance. */
-  buyerCountry?: string;
-  /** TED buyer-city: buyer city. */
-  buyerCity?: string;
-  /** TED main-activity: buyer main activities. */
-  buyerMainActivities?: string[];
-  /** TED buyer-email: buyer contact email. */
-  buyerEmail?: string;
-  /** TED buyer-internet-address: buyer website. */
-  buyerInternetAddress?: string;
-  /** TED buyer-profile: buyer procurement profile URL. */
-  buyerProfile?: string;
+  buyer: BuyerDocument;
   /** TED publication-date: date when the notice was published on TED. */
   publicationDate?: Date;
   /** TED dispatch-date: date when the notice was dispatched for publication. */
@@ -213,17 +199,11 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
       type: [String],
       default: undefined,
     },
-    buyerName: String,
-    buyerIdentifier: String,
-    buyerCountry: String,
-    buyerCity: String,
-    buyerMainActivities: {
-      type: [String],
-      default: undefined,
+    buyer: {
+      type: Schema.Types.ObjectId,
+      ref: 'Buyer',
+      required: true,
     },
-    buyerEmail: String,
-    buyerInternetAddress: String,
-    buyerProfile: String,
     publicationDate: Date,
     dispatchDate: Date,
     submissionDeadline: Date,
@@ -280,7 +260,7 @@ TenderSchema.index(
   {
     cpvCodes: 1,
     noticeType: 1,
-    buyerCountry: 1,
+    // buyerCountry: 1, // TODO
     publicationDate: -1,
     _id: -1,
   },
@@ -300,37 +280,33 @@ TenderSchema.index(
 TenderSchema.index(
   {
     noticeType: 1,
-    buyerCountry: 1,
+    // buyerCountry: 1,
     publicationDate: -1,
     _id: -1,
   },
   { name: 'idx_notice_country_pubdate' },
 );
 
-function serializeTender(tender: TenderSerializable): TenderDto {
+function serializeTender(tender: TenderSerializable): Tender {
   return filterModel(tender as TenderDocument, {
     excludeFields: ['sourceHash'],
-  }) as TenderDto;
+  }) as Tender;
 }
 
 TenderSchema.statics.serializeDetail = function (
   tender: TenderSerializable,
-): TenderDetailDto {
+): Partial<Tender> {
   return serializeTender(tender);
 };
 
 TenderSchema.statics.serializeList = function (
   tender: TenderSerializable,
-): TenderListDto {
+): Partial<Tender> {
   const {
     links,
     noticeVersion,
     titleProc,
-    buyerIdentifier,
-    buyerCity,
-    buyerEmail,
-    buyerInternetAddress,
-    buyerProfile,
+    buyer,
     dispatchDate,
     deadlineReceiptTender,
     duration,

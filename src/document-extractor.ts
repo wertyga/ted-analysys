@@ -81,7 +81,7 @@ export class DocumentExtractor {
           language: candidate.language,
           documentType: candidate.documentType,
           content: downloaded.content,
-          buyerCountry: tender.buyerCountry,
+          buyerCountry: tender.buyer.address.country,
         });
 
         if (extraction.aiText.length === 0) {
@@ -222,7 +222,7 @@ export class DocumentExtractor {
         language: undefined,
         documentType: TenderSourceDocumentType.TED_XML_NOTICE,
         content: Buffer.from(xmlContent, 'utf8'),
-        buyerCountry: tender.buyerCountry,
+        buyerCountry: tender.buyer.address.country,
       });
 
       if (extraction.aiText.length === 0) {

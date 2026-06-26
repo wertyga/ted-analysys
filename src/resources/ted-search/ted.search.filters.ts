@@ -47,7 +47,7 @@ export class TedSearchFilters {
     );
 
     if (buyerCountries.length) {
-      parts.push({ buyerCountry: { $in: buyerCountries } });
+      parts.push({ buyerCountry: { $in: buyerCountries } }); // TODO
     }
 
     if (resolvedFilters.buyerName?.trim()) {

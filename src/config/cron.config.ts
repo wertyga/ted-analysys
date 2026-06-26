@@ -6,7 +6,7 @@ export const CRON_CONFIG = {
     recentAwardTenders: '0 4 * * *',
   },
   databaseCopy: {
-    toCdn: '0 5 * * *',
+    toCdn: '0 7 * * *',
   },
   tenderMatchNotifications: {
     daily: '0 8 * * *',

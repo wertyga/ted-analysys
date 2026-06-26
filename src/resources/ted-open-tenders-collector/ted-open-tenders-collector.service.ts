@@ -1,6 +1,9 @@
 import { TedSearchService } from '@/resources/ted-search/ted-search.service';
 import { buildTedTenderSearchQuery } from '@/resources/ted-search/ted-builders';
-import { TedDeadlineRange } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
+import {
+  TedDeadlineRange,
+  TedTenderSearchRequestDto,
+} from '@/resources/ted-search/dto/ted-tender-search-request.dto';
 import {
   TedNotice,
   TedPaginationMode,
@@ -67,6 +70,24 @@ export class TedOpenTendersCollectorService {
     private readonly tendersService: TendersService,
     private readonly awardTenderService?: AwardTenderService,
   ) {}
+
+  async collectAnyTendersFromTed(
+    filters: TedTenderSearchRequestDto,
+    fields: string[],
+    options: TedIterationCollectorParams['options'] = {
+      pageLimit: 100,
+      maxPages: 100_000,
+    },
+    saveNotices: TedIterationCollectorParams['saveNotices'],
+  ) {
+    return this.collectTedNoticesByIteration({
+      query: buildTedTenderSearchQuery(filters),
+      scope: TedScope.ALL,
+      fields,
+      options,
+      saveNotices,
+    });
+  }
 
   async collectOpenTendersFromTed(
     options: TedOpenTendersCollectorOptions = {},

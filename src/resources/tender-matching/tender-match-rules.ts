@@ -107,7 +107,7 @@ export function matchCountry(
   filter: CompanyTenderFilterForMatching,
 ): RuleMatchResult {
   const tenderCountry = normalizeCountry(
-    tender.placeOfPerformanceCountry ?? tender.country ?? tender.buyerCountry,
+    tender.placeOfPerformanceCountry ?? tender.country,
   );
   const excludedCountries = filter.excludedCountries.map(normalizeCountry);
   const targetCountries = filter.targetCountries.map(normalizeCountry);

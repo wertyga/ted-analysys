@@ -1,6 +1,7 @@
 import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
 import {
   getArrayValue,
+  getBooleanArrayValue,
   getDateArrayValue,
   getDateValue,
   getEngValueOrFirst,
@@ -14,6 +15,7 @@ import {
 import { TedContractNature } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
 import { AwardTender, AwardTenderLot } from './schemas';
 import { TenderNormalizerService } from '@/resources/tender-normalizer/tender-normalizer.service';
+import { WinnerNormalized } from '@/resources/contractor/contractor.service';
 
 export type NormalizedAwardTenderLot = Omit<
   AwardTenderLot,
@@ -22,7 +24,7 @@ export type NormalizedAwardTenderLot = Omit<
 
 type NormalizedAwardTender = Omit<
   AwardTender,
-  '_id' | 'estimatedValueEur' | 'awardValueEur' | 'winners' | 'lots'
+  '_id' | 'estimatedValueEur' | 'awardValueEur' | 'winners' | 'lots' | 'buyer'
 > & {
   lots: NormalizedAwardTenderLot[];
 };
@@ -116,8 +118,6 @@ export class AwardTenderNormalizer {
 
     return {
       ...data,
-      ...this.tenderNormalizer.normalizeBuyerFieldsFromTEDNotice(notice),
-
       awardDecisionDates: getDateArrayValue('winner-decision-date', notice).map(
         (d) => (d ? d.toISOString() : ''),
       ),
@@ -156,5 +156,50 @@ export class AwardTenderNormalizer {
 
       plannedEndDate: maxEndDate,
     };
+  }
+
+  normalizeWinnersNotice(notice: TedNotice): WinnerNormalized[] {
+    const data: Record<keyof WinnerNormalized, string[] | boolean[]> = {
+      name: getStringArrayValue('winner-name', notice),
+      identifier: getStringArrayValue('winner-identifier', notice),
+      countries: getStringArrayValue('winner-country', notice),
+      countrySubs: getStringArrayValue('winner-country-sub', notice),
+      cities: getStringArrayValue('winner-city', notice),
+      postCodes: getStringArrayValue('winner-post-code', notice),
+      size: getStringArrayValue('winner-size', notice),
+      listed: getBooleanArrayValue('winner-listed', notice),
+      internetAddresses: getStringArrayValue('winner-internet-address', notice),
+      email: getStringArrayValue('winner-email', notice),
+      ownerNationalities: getStringArrayValue(
+        'winner-owner-nationality',
+        notice,
+      ),
+      euRegistrationNumber: getStringArrayValue(
+        'eu-registration-number',
+        notice,
+      ),
+    };
+
+    const maxLength = Math.max(
+      ...Object.values(data).flatMap((r) => r.length),
+      0,
+    );
+
+    if (!maxLength) {
+      return [];
+    }
+
+    const winners = new Array(maxLength).fill(undefined);
+
+    Object.entries(data).forEach(([key, values]) => {
+      for (let i = 0; i < maxLength; i++) {
+        winners[i] = {
+          ...(winners[i] ?? {}),
+          [key]: values[i],
+        };
+      }
+    });
+
+    return winners;
   }
 }

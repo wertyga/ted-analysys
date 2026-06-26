@@ -5,6 +5,7 @@ import { AwardTenderService } from './award-tender.service';
 import { TendersModule } from '@/resources/tenders/tenders.module';
 import { ContractorModule } from '@/resources/contractor/contractor.module';
 import { TenderNormalizerModule } from '@/resources/tender-normalizer/tender-normalizer.module';
+import { BuyerModule } from '@/resources/buyer/buyer.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { TenderNormalizerModule } from '@/resources/tender-normalizer/tender-nor
     TendersModule,
     ContractorModule,
     TenderNormalizerModule,
+    BuyerModule,
   ],
   controllers: [AwardTenderController],
   providers: [AwardTenderService],

@@ -16,6 +16,9 @@ import { AwardTenderModule } from '@/resources/award-tender/award-tender.module'
 import { TedSearchModule } from '@/resources/ted-search/ted-search.module';
 import { TendersModule } from '@/resources/tenders/tenders.module';
 import { TendersCronModule } from '@/resources/cron/tenders-cron/tenders-cron.module';
+import { BuyerTechService } from '@/resources/tech/buyer/buyer.tech.service';
+import { BuyerModule } from '@/resources/buyer/buyer.module';
+import { BuyerTechController } from '@/resources/tech/buyer/buyer.tech.controller';
 
 @Module({
   imports: [
@@ -25,6 +28,7 @@ import { TendersCronModule } from '@/resources/cron/tenders-cron/tenders-cron.mo
     TedSearchModule,
     TendersModule,
     TendersCronModule,
+    BuyerModule,
   ],
   controllers: [
     AwardTendersTechController,
@@ -33,6 +37,7 @@ import { TendersCronModule } from '@/resources/cron/tenders-cron/tenders-cron.mo
     SitemapTechController,
     TendersTechController,
     CpvAdmController,
+    BuyerTechController,
   ],
   providers: [
     AwardTendersTechService,
@@ -40,6 +45,7 @@ import { TendersCronModule } from '@/resources/cron/tenders-cron/tenders-cron.mo
     CpvTechService,
     SitemapTechService,
     TendersTechService,
+    BuyerTechService,
   ],
 })
 export class TechModule {}

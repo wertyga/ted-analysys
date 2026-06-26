@@ -1,4 +1,5 @@
 import { TenderLot } from '@/resources/tenders/schemas';
+import { BuyerDocument } from '@/resources/buyer/schemas';
 
 export type AnalysisOutputLanguage = 'en' | 'ru' | 'pl' | 'de' | 'fr';
 export type RiskSeverity = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -41,13 +42,8 @@ export interface GeneralTenderAnalysisInput {
     procedureTitle?: string | null;
     description?: string | null;
     lots: TenderLot[];
-    buyerName?: string | null;
-    buyerIdentifier?: string | null;
     country?: string | null;
-    buyerCity?: string | null;
-    buyerEmail?: string | null;
-    buyerWebsite?: string | null;
-    buyerProfileUrl?: string | null;
+    buyer: BuyerDocument;
     procedureType?: string | null;
     noticeType?: string | null;
     noticeSubtype?: string | null;

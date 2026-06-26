@@ -21,7 +21,7 @@ import { TedEligibleCountryCode } from '@/resources/codelist';
 import { MoneyValue, TenderLot } from '@/resources/tenders/schemas';
 import { TedContractNature } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
 
-export type NormalizedTenderDto = Omit<TenderDto, '_id'>;
+export type NormalizedTenderDto = Omit<TenderDto, '_id' | 'buyer'>;
 
 export type NormalizedTenderLot = Omit<TenderLot, 'estimatedValueEur'>;
 
@@ -37,24 +37,25 @@ export type BuyerNormalized = {
 
 @Injectable()
 export class TenderNormalizerService {
-  normalizeBuyerFieldsFromTEDNotice(rawNotice: TedNotice): BuyerNormalized {
-    return {
-      buyerCity: getEngValueOrFirst('buyer-city', rawNotice)?.[0],
-      buyerCountry: getStringValue(
-        'buyer-country',
-        rawNotice,
-      ) as TedEligibleCountryCode,
-      buyerIdentifier: getStringValue('buyer-identifier', rawNotice),
-      buyerInternetAddress: this.toOptionalText(
-        getStringValue('buyer-internet-address', rawNotice),
-      ),
-      buyerProfile: this.toOptionalText(
-        getStringValue('buyer-profile', rawNotice),
-      ),
-      buyerMainActivities: getStringArrayValue('main-activity', rawNotice),
-      buyerName: getEngValueOrFirst('buyer-name', rawNotice)?.[0],
-    };
-  }
+  // normalizeBuyerFieldsFromTEDNotice(rawNotice: TedNotice): BuyerNormalized {
+  //   // TODO
+  //   return {
+  //     buyerCity: getEngValueOrFirst('buyer-city', rawNotice)?.[0],
+  //     buyerCountry: getStringValue(
+  //       'buyer-country',
+  //       rawNotice,
+  //     ) as TedEligibleCountryCode,
+  //     buyerIdentifier: getStringValue('buyer-identifier', rawNotice),
+  //     buyerInternetAddress: this.toOptionalText(
+  //       getStringValue('buyer-internet-address', rawNotice),
+  //     ),
+  //     buyerProfile: this.toOptionalText(
+  //       getStringValue('buyer-profile', rawNotice),
+  //     ),
+  //     buyerMainActivities: getStringArrayValue('main-activity', rawNotice),
+  //     buyerName: getEngValueOrFirst('buyer-name', rawNotice)?.[0],
+  //   };
+  // }
 
   normalizeFrameworkFromTEDNotice(notice: TedNotice) {
     const data = {
@@ -380,7 +381,7 @@ export class TenderNormalizerService {
     );
 
     return {
-      ...this.normalizeBuyerFieldsFromTEDNotice(notice),
+      // ...this.normalizeBuyerFieldsFromTEDNotice(notice),
       id: data.id,
       title:
         this.toOptionalText(data.title) ?? this.toOptionalText(data.titleProc),

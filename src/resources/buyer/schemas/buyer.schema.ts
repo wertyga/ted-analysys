@@ -152,18 +152,18 @@ export type Buyer = {
 
   tenders: TenderDocument[];
 
-  totalEstimatedValueEur: number;
-  firstPublicationDate: Date;
-  lastPublicationDate: Date;
+  totalEstimatedValueEur: number; // TODO - nowhere
+  firstPublicationDate?: Date; // TODO - nowhere
+  lastPublicationDate?: Date; // TODO - nowhere
 
   organisationIdentifierBuyer: string;
-  buyerCountry: string;
+  // buyerCountry: string;
 
   createdAt: Date;
   updatedAt: Date;
 };
 
-export type BuyerDocument = Document<Buyer>;
+export type BuyerDocument = Document & Buyer;
 
 const BuyerIdentifierSchema = new Schema<BuyerIdentifier>(
   {
@@ -218,10 +218,10 @@ export const BuyerSchema = new Schema<Buyer>(
       type: String,
       index: true,
     },
-    buyerCountry: {
-      type: String,
-      index: true,
-    },
+    // buyerCountry: {
+    //   type: String,
+    //   index: true,
+    // },
 
     legalTypes: { type: [String], default: [], index: true },
     mainActivities: { type: [String], default: [], index: true },
@@ -235,11 +235,17 @@ export const BuyerSchema = new Schema<Buyer>(
     cpvCodes: { type: [String], default: [] },
     countries: { type: [String], default: [] },
     gateways: { type: [String], default: [] },
+
+    tenders: {
+      type: [Schema.Types.ObjectId],
+      ref: 'Tender',
+      default: [],
+    },
   },
   { timestamps: true },
 );
 
-BuyerSchema.index({ buyerCountry: 1, organisationIdentifierBuyer: 1 });
+BuyerSchema.index({ 'address.country': 1, organisationIdentifierBuyer: 1 });
 
 export const BuyerModel: Model<Buyer> =
   mongoose.models.Buyer ?? mongoose.model<Buyer>('Buyer', BuyerSchema);

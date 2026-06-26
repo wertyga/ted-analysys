@@ -22,6 +22,7 @@ import {
   AwardTenderNormalizer,
   NormalizedAwardTenderLot,
 } from './award-tender.normalizer';
+import { BuyerService } from '@/resources/buyer/buyer.service';
 
 export interface SaveAwardTedTendersResult {
   saved: number;
@@ -41,52 +42,8 @@ export class AwardTenderService {
   constructor(
     private readonly tendersService: TendersService,
     private readonly contractorService: ContractorService,
+    private readonly buyerService: BuyerService,
   ) {}
-
-  normalizeWinnersNotice(notice: TedNotice): WinnerNormalized[] {
-    const data: Record<keyof WinnerNormalized, string[] | boolean[]> = {
-      name: getStringArrayValue('winner-name', notice),
-      identifier: getStringArrayValue('winner-identifier', notice),
-      countries: getStringArrayValue('winner-country', notice),
-      countrySubs: getStringArrayValue('winner-country-sub', notice),
-      cities: getStringArrayValue('winner-city', notice),
-      postCodes: getStringArrayValue('winner-post-code', notice),
-      size: getStringArrayValue('winner-size', notice),
-      listed: getBooleanArrayValue('winner-listed', notice),
-      internetAddresses: getStringArrayValue('winner-internet-address', notice),
-      email: getStringArrayValue('winner-email', notice),
-      ownerNationalities: getStringArrayValue(
-        'winner-owner-nationality',
-        notice,
-      ),
-      euRegistrationNumber: getStringArrayValue(
-        'eu-registration-number',
-        notice,
-      ),
-    };
-
-    const maxLength = Math.max(
-      ...Object.values(data).flatMap((r) => r.length),
-      0,
-    );
-
-    if (!maxLength) {
-      return [];
-    }
-
-    const winners = new Array(maxLength).fill(undefined);
-
-    Object.entries(data).forEach(([key, values]) => {
-      for (let i = 0; i < maxLength; i++) {
-        winners[i] = {
-          ...(winners[i] ?? {}),
-          [key]: values[i],
-        };
-      }
-    });
-
-    return winners;
-  }
 
   async searchAwardTendersLocal(
     tenderId: string,
@@ -101,7 +58,7 @@ export class AwardTenderService {
 
     const query: QueryFilter<AwardTenderDocument> = {
       cpvCodes: { $in: tender.cpvCodes as string[] },
-      buyerCountry: tender.buyerCountry,
+      buyer: tender.buyer._id || tender.buyer,
       contractNature: tender.contractNature,
     };
 
@@ -159,7 +116,7 @@ export class AwardTenderService {
     updateExisting?: boolean,
   ): Promise<AwardTenderDocument | null> {
     const normalizedTender = this.normalizer.normalizeAwardTenderNotice(notice);
-    const winners = this.normalizeWinnersNotice(notice);
+    const winners = this.normalizer.normalizeWinnersNotice(notice);
 
     const { publicationDate, lots, estimatedValue, awardValue, id } =
       normalizedTender;
@@ -168,9 +125,10 @@ export class AwardTenderService {
       return null;
     }
 
-    const [lotsWithEur, tenderEstimatedValueEur, tenderAwardValueEur] =
+    const [lotsWithEur, buyer, tenderEstimatedValueEur, tenderAwardValueEur] =
       await Promise.all([
         this.getLotsWithEurValues(lots, publicationDate),
+        this.buyerService.upsertBuyerFromTEDNotice(notice),
         this.tendersService._calculateEstimatedValueEur(
           estimatedValue.amount,
           estimatedValue.currency,
@@ -188,6 +146,7 @@ export class AwardTenderService {
       estimatedValueEur: tenderEstimatedValueEur,
       awardValueEur: tenderAwardValueEur,
       lots: lotsWithEur,
+      buyer: buyer._id,
       winners: [],
     };
 

@@ -454,8 +454,7 @@ export class TenderMatchingService {
         title: tender.title ?? '',
         description: tender.description,
         cpvCodes: tender.cpvCodes ?? [],
-        buyerName: tender.buyerName,
-        buyerCountry: tender.buyerCountry,
+        buyer: tender.buyer,
         placeOfPerformanceCountries: tender.placeOfPerformanceCountries ?? [],
         estimatedValue: {
           amount: tender.estimatedValue?.amount ?? null,

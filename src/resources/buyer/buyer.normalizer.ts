@@ -2,6 +2,7 @@ import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
 import {
   getArrayValue,
   getEngValueOrFirst,
+  getEngValueOrFirstString,
   getStringArrayValue,
   getUniqArray,
 } from '@/utils';
@@ -140,11 +141,11 @@ export class BuyerNormalizer {
         notice,
       ),
       buyerInternetAddress: getArrayValue('buyer-internet-address', notice),
-      organisationNameBuyer: getEngValueOrFirst(
+      organisationNameBuyer: getEngValueOrFirstString(
         'organisation-name-buyer',
         notice,
       ),
-      buyerName: getEngValueOrFirst('buyer-name', notice),
+      buyerName: getEngValueOrFirstString('buyer-name', notice),
 
       organisationIdentifierBuyer: getStringArrayValue(
         'organisation-identifier-buyer',
@@ -217,7 +218,7 @@ export class BuyerNormalizer {
         data.organisationIdentifierBuyer,
         data.buyerIdentifier,
       )?.[0],
-      buyerCountry: address.country,
+      // buyerCountry: address.country,
 
       legalTypes: getUniqArray(data.buyerLegalType, data.bt11ProcedureBuyer),
       countries: getUniqArray(
