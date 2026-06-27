@@ -4,14 +4,10 @@ import { BuyerNormalizer } from './buyer.normalizer';
 import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
 import {
   BuyerDocument,
-  BuyerIntelligence,
   BuyerModel,
   BuyerStats,
 } from './schemas';
-import {
-  getMongoRelationObjectIdArray,
-  getUniqArray,
-} from '@/utils';
+import { getMongoRelationObjectIdArray, getUniqArray } from '@/utils';
 
 import { TenderModel } from '@/resources/tenders/schemas';
 import {
@@ -20,7 +16,7 @@ import {
 } from '@/resources/award-tender/schemas';
 import { TMongoId } from '@/types';
 import {
-  BuyerIntelligenceSignals,
+  BuyerIntelligenceCalculation,
   calculateBuyerIntelligenceSignals,
   getDatesBuyerTendersStats,
   getEmptyBuyerStats,
@@ -31,22 +27,12 @@ import { ContractorModel } from '@/resources/contractor/schemas';
 
 type BuyerTenderMeta = {
   stats: BuyerStats;
-  intelligence: BuyerIntelligenceSignals;
+  intelligence: BuyerIntelligenceCalculation;
 };
 
 @Injectable()
 export class BuyerService {
   normalizer = new BuyerNormalizer();
-
-  private mergeBuyerIntelligence(
-    existingIntelligence: BuyerDocument['intelligence'] | undefined,
-    signals: BuyerIntelligenceSignals,
-  ): BuyerIntelligence {
-    return {
-      incumbentRisk: signals.incumbentRisk,
-      localSupplierSignal: signals.localSupplierSignal,
-    };
-  }
 
   private async getWinnerCountriesById(
     awardTenders: AwardTenderDocument[],
@@ -107,16 +93,19 @@ export class BuyerService {
       ...getMoneyBuyerTendersStats(tenders, awardTenders),
       ...getTopBuyerTendersStats(tenders, awardTenders),
     };
+
     const winnerCountriesById = await this.getWinnerCountriesById(awardTenders);
+
+    const intelligence = calculateBuyerIntelligenceSignals({
+      buyerCountry,
+      stats,
+      awardTenders,
+      winnerCountriesById,
+    });
 
     return {
       stats,
-      intelligence: calculateBuyerIntelligenceSignals({
-        buyerCountry,
-        stats,
-        awardTenders,
-        winnerCountriesById,
-      }),
+      intelligence,
     };
   }
 
@@ -137,10 +126,7 @@ export class BuyerService {
       {
         $set: {
           stats,
-          intelligence: this.mergeBuyerIntelligence(
-            buyer?.intelligence,
-            intelligence,
-          ),
+          intelligence,
         },
       },
       { returnDocument: 'after' },
@@ -205,10 +191,7 @@ export class BuyerService {
 
     existingBuyer.set({
       stats,
-      intelligence: this.mergeBuyerIntelligence(
-        existingBuyer.intelligence,
-        intelligence,
-      ),
+      intelligence,
       name: getLastExisting(existingBuyer.name, normalizedBuyer.name),
       organisationIdentifierBuyer: getLastExisting(
         existingBuyer.organisationIdentifierBuyer,

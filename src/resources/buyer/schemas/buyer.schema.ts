@@ -71,9 +71,18 @@ export type BuyerStats = {
   topSuppliers: BuyerTopSupplierStats[];
 };
 
-export type BuyerIntelligence = {
-  incumbentRisk: string;
-  localSupplierSignal: string;
+export enum BuyerIntelligenceSignal {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+  UNKNOWN = 'unknown',
+}
+
+export type BuyerStatsIntelligence = {
+  repeatSupplierRate: number | null;
+  localSupplierRate: number | null;
+  incumbentRisk: BuyerIntelligenceSignal;
+  localSupplierSignal: BuyerIntelligenceSignal;
 };
 
 export type Buyer = {
@@ -201,7 +210,7 @@ export type Buyer = {
 
   stats: BuyerStats;
   statsVersion: string;
-  intelligence?: BuyerIntelligence;
+  intelligence: BuyerStatsIntelligence;
 };
 
 export type BuyerDocument = Document & Buyer;
@@ -319,10 +328,20 @@ const BuyerStatsSchema = new Schema<BuyerStats>(
   { _id: false },
 );
 
-const BuyerIntelligenceSchema = new Schema<BuyerIntelligence>(
+const BuyerStatsIntelligenceSchema = new Schema<BuyerStatsIntelligence>(
   {
-    incumbentRisk: { type: String, default: '' },
-    localSupplierSignal: { type: String, default: '' },
+    repeatSupplierRate: { type: Number, default: null },
+    localSupplierRate: { type: Number, default: null },
+    incumbentRisk: {
+      type: String,
+      enum: BuyerIntelligenceSignal,
+      default: BuyerIntelligenceSignal.UNKNOWN,
+    },
+    localSupplierSignal: {
+      type: String,
+      enum: BuyerIntelligenceSignal,
+      default: BuyerIntelligenceSignal.UNKNOWN,
+    },
   },
   { _id: false },
 );
@@ -359,7 +378,7 @@ export const BuyerSchema = new Schema<BuyerDocument, BuyerModelType>(
     },
     statsVersion: { type: String, default: '' },
     intelligence: {
-      type: BuyerIntelligenceSchema,
+      type: BuyerStatsIntelligenceSchema,
     },
   },
   { timestamps: true },

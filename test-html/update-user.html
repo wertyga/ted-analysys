@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Update User Test</title>
+    <style>
+      :root {
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+      }
+
+      body {
+        margin: 0;
+        background: #f6f7f9;
+        color: #1f2933;
+      }
+
+      main {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 32px 20px;
+      }
+
+      h1 {
+        margin: 0 0 20px;
+        font-size: 28px;
+      }
+
+      section {
+        margin-top: 16px;
+        padding: 20px;
+        border: 1px solid #d9dee7;
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #52606d;
+      }
+
+      input,
+      textarea,
+      select {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #cbd2d9;
+        border-radius: 6px;
+        background: #fff;
+        font: inherit;
+      }
+
+      textarea {
+        min-height: 112px;
+        resize: vertical;
+      }
+
+      button {
+        min-height: 40px;
+        padding: 0 14px;
+        border: 0;
+        border-radius: 6px;
+        background: #1f2933;
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      button.secondary {
+        background: #52606d;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .full {
+        grid-column: 1 / -1;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      pre {
+        overflow: auto;
+        min-height: 140px;
+        margin: 0;
+        padding: 14px;
+        border-radius: 6px;
+        background: #101820;
+        color: #e4e7eb;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .muted {
+        margin-top: 8px;
+        color: #697586;
+        font-size: 13px;
+      }
+
+      @media (max-width: 640px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Update User Test</h1>
+
+      <section>
+        <label for="token">Bearer token</label>
+        <input id="token" autocomplete="off" placeholder="Paste user token" />
+        <p class="muted">
+          Use the token returned by auth endpoints. It is sent as
+          Authorization: Bearer token.
+        </p>
+      </section>
+
+      <section>
+        <form id="form">
+          <div class="grid">
+            <div>
+              <label for="companyName">Company name</label>
+              <input id="companyName" required value="Acme Software Ltd." />
+            </div>
+
+            <div>
+              <label for="country">Country</label>
+              <input id="country" required value="PLN" />
+            </div>
+
+            <div>
+              <label for="companySize">Company size</label>
+              <select id="companySize" required>
+                <option value="Micro">Micro</option>
+                <option value="SME" selected>SME</option>
+                <option value="Enterprise">Enterprise</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="languages">Languages</label>
+              <input id="languages" required value="ENG,PLN" />
+            </div>
+
+            <div>
+              <label for="operatingRegions">Operating regions</label>
+              <input id="operatingRegions" required value="PLN,GR" />
+            </div>
+
+            <div>
+              <label for="industries">Industries</label>
+              <input id="industries" required value="3200000,32100000" />
+            </div>
+
+            <div class="full">
+              <label for="mainServices">Main services</label>
+              <input id="mainServices" required value="3201000,32110000" />
+            </div>
+
+            <div class="full">
+              <label for="companyDescription">Company description</label>
+              <textarea id="companyDescription" required>
+Software development company focused on public sector systems.</textarea
+              >
+            </div>
+          </div>
+
+          <div class="actions" style="margin-top: 16px">
+            <button type="submit">Update user</button>
+            <button class="secondary" id="selfButton" type="button">
+              Load /users/self
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section>
+        <label>Result</label>
+        <pre id="result">Waiting...</pre>
+      </section>
+    </main>
+
+    <script>
+      const tokenInput = document.getElementById("token");
+      const form = document.getElementById("form");
+      const result = document.getElementById("result");
+      const selfButton = document.getElementById("selfButton");
+
+      tokenInput.value = localStorage.getItem("userToken") || "";
+
+      function print(value) {
+        result.textContent =
+          typeof value === "string" ? value : JSON.stringify(value, null, 2);
+      }
+
+      function csv(id) {
+        return document
+          .getElementById(id)
+          .value.split(",")
+          .map((value) => value.trim())
+          .filter(Boolean);
+      }
+
+      function token() {
+        const value = tokenInput.value.trim();
+        localStorage.setItem("userToken", value);
+        return value;
+      }
+
+      function headers() {
+        return {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token()}`,
+        };
+      }
+
+      function payload() {
+        return {
+          companyName: document.getElementById("companyName").value.trim(),
+          country: document.getElementById("country").value.trim(),
+          companySize: document.getElementById("companySize").value,
+          operatingRegions: csv("operatingRegions"),
+          industries: csv("industries"),
+          mainServices: csv("mainServices"),
+          languages: csv("languages"),
+          companyDescription: document
+            .getElementById("companyDescription")
+            .value.trim(),
+        };
+      }
+
+      async function request(url, options) {
+        const response = await fetch(url, options);
+        const body = await response.json().catch(async () => {
+          return { text: await response.text().catch(() => "") };
+        });
+
+        print({
+          status: response.status,
+          ok: response.ok,
+          response: body,
+        });
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        await request("/users/update", {
+          method: "PUT",
+          headers: headers(),
+          body: JSON.stringify(payload()),
+        });
+      });
+
+      selfButton.addEventListener("click", async () => {
+        await request("/users/self", {
+          method: "GET",
+          headers: headers(),
+        });
+      });
+    </script>
+  </body>
+</html>

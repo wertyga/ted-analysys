@@ -1,0 +1,449 @@
+{
+  "notice-type": "can-standard",
+  "award-criterion-description-lot": {
+    "swe": [
+      "Kvalitet bedöms utifrån anbudsgivarens utförandebeskrivning."
+    ]
+  },
+  "winner-country": [
+    "SWE",
+    "SWE",
+    "SWE",
+    "SWE",
+    "SWE",
+    "SWE",
+    "SWE",
+    "SWE",
+    "SWE",
+    "SWE",
+    "SWE",
+    "SWE",
+    "SWE",
+    "SWE",
+    "SWE",
+    "SWE",
+    "SWE"
+  ],
+  "BT-10-Procedure-Buyer": [
+    "gen-pub"
+  ],
+  "main-classification-proc": [
+    "45236000"
+  ],
+  "internal-identifier-lot": [
+    "Ramavtal mark- och anläggning 2026"
+  ],
+  "buyer-country-sub": [
+    "SE110"
+  ],
+  "winner-country-sub": [
+    "SE110",
+    "SE110",
+    "SE110",
+    "SE110",
+    "SE110",
+    "SE110",
+    "SE110",
+    "SE110",
+    "SE110",
+    "SE110",
+    "SE110",
+    "SE110",
+    "SE110",
+    "SE110",
+    "SE110",
+    "SE110",
+    "SE110"
+  ],
+  "place-of-performance-country-proc": [
+    "SWE"
+  ],
+  "winner-identifier": [
+    "556909-1548",
+    "556750-7677",
+    "556544-3552",
+    "556851-5992",
+    "559154-5404",
+    "556636-0920",
+    "556513-4060",
+    "556626-8537",
+    "559486-5478",
+    "556855-3688",
+    "559232-6804",
+    "556568-6721",
+    "556636-6877",
+    "559296-7383",
+    "556707-6350",
+    "556897-0437",
+    "559287-2328"
+  ],
+  "authority-main-activity": [
+    "gen-pub"
+  ],
+  "notice-subtype": "29",
+  "winner-selection-status": [
+    "selec-w"
+  ],
+  "links": {
+    "xml": {
+      "MUL": "https://ted.europa.eu/en/notice/391630-2026/xml"
+    },
+    "pdf": {
+      "BUL": "https://ted.europa.eu/bg/notice/391630-2026/pdf",
+      "SPA": "https://ted.europa.eu/es/notice/391630-2026/pdf",
+      "CES": "https://ted.europa.eu/cs/notice/391630-2026/pdf",
+      "DAN": "https://ted.europa.eu/da/notice/391630-2026/pdf",
+      "DEU": "https://ted.europa.eu/de/notice/391630-2026/pdf",
+      "EST": "https://ted.europa.eu/et/notice/391630-2026/pdf",
+      "ELL": "https://ted.europa.eu/el/notice/391630-2026/pdf",
+      "ENG": "https://ted.europa.eu/en/notice/391630-2026/pdf",
+      "FRA": "https://ted.europa.eu/fr/notice/391630-2026/pdf",
+      "GLE": "https://ted.europa.eu/ga/notice/391630-2026/pdf",
+      "HRV": "https://ted.europa.eu/hr/notice/391630-2026/pdf",
+      "ITA": "https://ted.europa.eu/it/notice/391630-2026/pdf",
+      "LAV": "https://ted.europa.eu/lv/notice/391630-2026/pdf",
+      "LIT": "https://ted.europa.eu/lt/notice/391630-2026/pdf",
+      "HUN": "https://ted.europa.eu/hu/notice/391630-2026/pdf",
+      "MLT": "https://ted.europa.eu/mt/notice/391630-2026/pdf",
+      "NLD": "https://ted.europa.eu/nl/notice/391630-2026/pdf",
+      "POL": "https://ted.europa.eu/pl/notice/391630-2026/pdf",
+      "POR": "https://ted.europa.eu/pt/notice/391630-2026/pdf",
+      "RON": "https://ted.europa.eu/ro/notice/391630-2026/pdf",
+      "SLK": "https://ted.europa.eu/sk/notice/391630-2026/pdf",
+      "SLV": "https://ted.europa.eu/sl/notice/391630-2026/pdf",
+      "FIN": "https://ted.europa.eu/fi/notice/391630-2026/pdf",
+      "SWE": "https://ted.europa.eu/sv/notice/391630-2026/pdf"
+    },
+    "pdfs": {
+      "SWE": "https://ted.europa.eu/sv/notice/391630-2026/pdfs"
+    },
+    "html": {
+      "BUL": "https://ted.europa.eu/bg/notice/-/detail/391630-2026",
+      "SPA": "https://ted.europa.eu/es/notice/-/detail/391630-2026",
+      "CES": "https://ted.europa.eu/cs/notice/-/detail/391630-2026",
+      "DAN": "https://ted.europa.eu/da/notice/-/detail/391630-2026",
+      "DEU": "https://ted.europa.eu/de/notice/-/detail/391630-2026",
+      "EST": "https://ted.europa.eu/et/notice/-/detail/391630-2026",
+      "ELL": "https://ted.europa.eu/el/notice/-/detail/391630-2026",
+      "ENG": "https://ted.europa.eu/en/notice/-/detail/391630-2026",
+      "FRA": "https://ted.europa.eu/fr/notice/-/detail/391630-2026",
+      "GLE": "https://ted.europa.eu/ga/notice/-/detail/391630-2026",
+      "HRV": "https://ted.europa.eu/hr/notice/-/detail/391630-2026",
+      "ITA": "https://ted.europa.eu/it/notice/-/detail/391630-2026",
+      "LAV": "https://ted.europa.eu/lv/notice/-/detail/391630-2026",
+      "LIT": "https://ted.europa.eu/lt/notice/-/detail/391630-2026",
+      "HUN": "https://ted.europa.eu/hu/notice/-/detail/391630-2026",
+      "MLT": "https://ted.europa.eu/mt/notice/-/detail/391630-2026",
+      "NLD": "https://ted.europa.eu/nl/notice/-/detail/391630-2026",
+      "POL": "https://ted.europa.eu/pl/notice/-/detail/391630-2026",
+      "POR": "https://ted.europa.eu/pt/notice/-/detail/391630-2026",
+      "RON": "https://ted.europa.eu/ro/notice/-/detail/391630-2026",
+      "SLK": "https://ted.europa.eu/sk/notice/-/detail/391630-2026",
+      "SLV": "https://ted.europa.eu/sl/notice/-/detail/391630-2026",
+      "FIN": "https://ted.europa.eu/fi/notice/-/detail/391630-2026",
+      "SWE": "https://ted.europa.eu/sv/notice/-/detail/391630-2026"
+    },
+    "htmlDirect": {
+      "BUL": "https://ted.europa.eu/bg/notice/391630-2026/html",
+      "SPA": "https://ted.europa.eu/es/notice/391630-2026/html",
+      "CES": "https://ted.europa.eu/cs/notice/391630-2026/html",
+      "DAN": "https://ted.europa.eu/da/notice/391630-2026/html",
+      "DEU": "https://ted.europa.eu/de/notice/391630-2026/html",
+      "EST": "https://ted.europa.eu/et/notice/391630-2026/html",
+      "ELL": "https://ted.europa.eu/el/notice/391630-2026/html",
+      "ENG": "https://ted.europa.eu/en/notice/391630-2026/html",
+      "FRA": "https://ted.europa.eu/fr/notice/391630-2026/html",
+      "GLE": "https://ted.europa.eu/ga/notice/391630-2026/html",
+      "HRV": "https://ted.europa.eu/hr/notice/391630-2026/html",
+      "ITA": "https://ted.europa.eu/it/notice/391630-2026/html",
+      "LAV": "https://ted.europa.eu/lv/notice/391630-2026/html",
+      "LIT": "https://ted.europa.eu/lt/notice/391630-2026/html",
+      "HUN": "https://ted.europa.eu/hu/notice/391630-2026/html",
+      "MLT": "https://ted.europa.eu/mt/notice/391630-2026/html",
+      "NLD": "https://ted.europa.eu/nl/notice/391630-2026/html",
+      "POL": "https://ted.europa.eu/pl/notice/391630-2026/html",
+      "POR": "https://ted.europa.eu/pt/notice/391630-2026/html",
+      "RON": "https://ted.europa.eu/ro/notice/391630-2026/html",
+      "SLK": "https://ted.europa.eu/sk/notice/391630-2026/html",
+      "SLV": "https://ted.europa.eu/sl/notice/391630-2026/html",
+      "FIN": "https://ted.europa.eu/fi/notice/391630-2026/html",
+      "SWE": "https://ted.europa.eu/sv/notice/391630-2026/html"
+    }
+  },
+  "organisation-name-buyer": {
+    "swe": [
+      "Fastighetskontoret"
+    ]
+  },
+  "identifier-lot": [
+    "LOT-0001"
+  ],
+  "contract-duration-end-date-lot": [
+    "2030-05-01+02:00"
+  ],
+  "buyer-city": {
+    "mul": [
+      "Stockholm"
+    ]
+  },
+  "buyer-contact-point": [
+    "Sara Löf"
+  ],
+  "title-proc": {
+    "swe": "Ramavtal mark- och anläggning 2026"
+  },
+  "dps-usage-lot": [
+    "none"
+  ],
+  "organisation-contact-point-buyer": [
+    "Sara Löf"
+  ],
+  "place-of-performance-subdiv-lot": [
+    "SE110"
+  ],
+  "estimated-value-lot": [
+    "100000000"
+  ],
+  "organisation-country-buyer": [
+    "SWE"
+  ],
+  "framework-estimated-value-cur": [
+    "SEK"
+  ],
+  "winner-city": [
+    "STOCKHOLM",
+    "HANINGE",
+    "Nacka Strand",
+    "Hägersten",
+    "Järfälla",
+    "Haninge",
+    "Rönninge",
+    "TUMBA",
+    "Trelleborg",
+    "tumba",
+    "Bromma",
+    "SOLNA",
+    "Bandhagen",
+    "NORRKÖPING",
+    "ÄLTA",
+    "BRO",
+    "Sollentuna"
+  ],
+  "award-criterion-type-lot": [
+    "quality"
+  ],
+  "dispatch-date": "2026-06-05+02:00",
+  "framework-agreement-lot": [
+    "fa-mix"
+  ],
+  "estimated-value-cur-lot": [
+    "SEK"
+  ],
+  "received-submissions-type-val": [
+    "17"
+  ],
+  "description-lot": {
+    "swe": [
+      "Ramavtalet omfattar mark- och anläggningsarbete, exempelvis schakt och ledningsdragning för VA, dränering, stenläggning av gårdsplan eller asfaltering av trottoar, både som utförande- och totalentreprenader. Uppdrag ska kunna avropas både som enskilda arbeten eller som hela entreprenader med större omfattning."
+    ]
+  },
+  "organisation-post-code-buyer": [
+    "104 20"
+  ],
+  "buyer-name": {
+    "swe": [
+      "Fastighetskontoret"
+    ]
+  },
+  "notice-version": 1,
+  "winner-post-code": [
+    "13570",
+    "13621",
+    "131 52",
+    "12679",
+    "175 67",
+    "13644",
+    "14451",
+    "14734",
+    "213 62",
+    "147 43",
+    "168 67",
+    "16928",
+    "124 71",
+    "60233",
+    "13840",
+    "19740",
+    "19147"
+  ],
+  "notice-title": {
+    "hun": "Svédország – Terepegyengetés – Ramavtal mark- och anläggning 2026",
+    "lav": "Zviedrija – Seguma līdzināšana – Ramavtal mark- och anläggning 2026",
+    "swe": "Sverige – Markanläggning – Ramavtal mark- och anläggning 2026",
+    "gle": "An tSualainn – Flatwork – Ramavtal mark- och anläggning 2026",
+    "ell": "Σουηδία – Εργασίες διάστρωσης – Ramavtal mark- och anläggning 2026",
+    "spa": "Suecia – Trabajos de explanación – Ramavtal mark- och anläggning 2026",
+    "est": "Rootsi – Pinnakattetööd – Ramavtal mark- och anläggning 2026",
+    "nld": "Zweden – Aanbrengen van verharding – Ramavtal mark- och anläggning 2026",
+    "fin": "Ruotsi – Maan kiveys ja laatoitus – Ramavtal mark- och anläggning 2026",
+    "pol": "Szwecja – Wyrównywanie terenu – Ramavtal mark- och anläggning 2026",
+    "hrv": "Švedska – Radovi na gornjem ustroju – Ramavtal mark- och anläggning 2026",
+    "ces": "Švédsko – Vyrovnávání povrchu – Ramavtal mark- och anläggning 2026",
+    "dan": "Sverige – Jord- og belægningsarbejde – Ramavtal mark- och anläggning 2026",
+    "ron": "Suedia – Lucrări de nivelare – Ramavtal mark- och anläggning 2026",
+    "por": "Suécia – Nivelamento do terreno – Ramavtal mark- och anläggning 2026",
+    "slk": "Švédsko – Stavebné práce na stavbe plôch – Ramavtal mark- och anläggning 2026",
+    "fra": "Suède – Travaux de nivelage – Ramavtal mark- och anläggning 2026",
+    "mlt": "L-Iżvezja – Xogħol fiċ-ċatt – Ramavtal mark- och anläggning 2026",
+    "deu": "Schweden – Oberbauarbeiten – Ramavtal mark- och anläggning 2026",
+    "lit": "Švedija – Paviršių lyginimo darbai – Ramavtal mark- och anläggning 2026",
+    "ita": "Svezia – Lavori di superficie – Ramavtal mark- och anläggning 2026",
+    "bul": "Швeция – Строителни работи на спортни терени и терени на съоръжения за отдих и развлечение – Ramavtal mark- och anläggning 2026",
+    "slv": "Švedska – Planiranje terenov – Ramavtal mark- och anläggning 2026",
+    "eng": "Sweden – Flatwork – Ramavtal mark- och anläggning 2026"
+  },
+  "tender-lot-identifier": [
+    "LOT-0001",
+    "LOT-0001",
+    "LOT-0001",
+    "LOT-0001",
+    "LOT-0001",
+    "LOT-0001",
+    "LOT-0001",
+    "LOT-0001",
+    "LOT-0001",
+    "LOT-0001",
+    "LOT-0001",
+    "LOT-0001",
+    "LOT-0001",
+    "LOT-0001",
+    "LOT-0001",
+    "LOT-0001",
+    "LOT-0001"
+  ],
+  "organisation-email-buyer": [
+    "sara.lof@stockholm.se"
+  ],
+  "organisation-country-sub-buyer": [
+    "SE110"
+  ],
+  "framework-approximate-value-cur-notice": "SEK",
+  "main-classification-lot": [
+    "45236000"
+  ],
+  "publication-number": "391630-2026",
+  "contract-nature-main-lot": [
+    "works"
+  ],
+  "result-lot-identifier": [
+    "LOT-0001"
+  ],
+  "framework-estimated-value": [
+    "100000000"
+  ],
+  "total-value": 100000000,
+  "winner-email": [
+    "simon@abtot.se",
+    "ahmet.tanik@memaab.se",
+    "max.rendahl@dipart.se",
+    "anbud@pma.se",
+    "andreas@garol.se",
+    "patrik.lundkvist@grundomark.se",
+    "eric@soderby.se",
+    "marknad@orca.se",
+    "sofia.barcefer@va-gruppen.se",
+    "anbud@lestra.nu",
+    "alexander.lundin@nasselgrundet.com",
+    "carolina.vilar@peab.se",
+    "marknad@biteab.se",
+    "jacob.lovgren@spectramark.se",
+    "info@byggomiljo.se",
+    "gustaf@gscc.se",
+    "kalkyl@odjuret.se"
+  ],
+  "additional-classification-lot": [
+    "45112000"
+  ],
+  "organisation-tel-buyer": [
+    "076-1226882"
+  ],
+  "framework-approximate-value-notice": "100000000",
+  "publication-date": "2026-06-08+02:00",
+  "organisation-street-buyer": [
+    "Box 8312"
+  ],
+  "received-submissions-type-code": [
+    "tenders"
+  ],
+  "estimated-value-proc": "100000000",
+  "winner-decision-date": [
+    "2026-04-27+02:00",
+    "2026-04-27+02:00",
+    "2026-04-27+02:00"
+  ],
+  "contract-nature-main-proc": "works",
+  "organisation-city-buyer": [
+    "Stockholm"
+  ],
+  "buyer-post-code": [
+    "104 20"
+  ],
+  "buyer-email": [
+    "sara.lof@stockholm.se"
+  ],
+  "total-value-cur": [
+    "SEK"
+  ],
+  "buyer-legal-type": [
+    "ra"
+  ],
+  "estimated-value-cur-proc": "SEK",
+  "winner-size": [
+    "medium",
+    "medium",
+    "medium"
+  ],
+  "main-activity": [
+    "gen-pub"
+  ],
+  "buyer-country": [
+    "SWE"
+  ],
+  "place-of-performance-country-lot": [
+    "SWE"
+  ],
+  "procedure-type": "open",
+  "classification-cpv": [
+    "45236000",
+    "45112000",
+    "45236000",
+    "45112000"
+  ],
+  "contract-nature": [
+    "works",
+    "works"
+  ],
+  "winner-name": {
+    "swe": [
+      "Pilbäck Mark & Anläggning AB",
+      "Lestra Entreprenad AB",
+      "Nässelgrundet Anläggning AB"
+    ]
+  },
+  "organisation-identifier-buyer": [
+    "212000-0142"
+  ],
+  "title-lot": {
+    "swe": [
+      "Ramavtal mark- och anläggning 2026"
+    ]
+  },
+  "buyer-identifier": [
+    "212000-0142"
+  ],
+  "description-proc": {
+    "swe": "Ramavtalet omfattar mark- och anläggningsarbete, exempelvis schakt och ledningsdragning för VA, dränering, stenläggning av gårdsplan eller asfaltering av trottoar, både som utförande- och totalentreprenader. Uppdrag ska kunna avropas både som enskilda arbeten eller som hela entreprenader med större omfattning."
+  },
+  "BT-11-Procedure-Buyer": [
+    "ra"
+  ]
+}

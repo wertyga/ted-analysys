@@ -15,6 +15,7 @@ export type BuyerNormalized = Omit<
   | 'updatedAt'
   | 'stats'
   | 'statsVersion'
+  | 'intelligence'
 >;
 
 export class BuyerNormalizer {

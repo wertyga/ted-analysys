@@ -1,57 +1,84 @@
 import { AwardTenderDocument } from '@/resources/award-tender/schemas';
-import { BuyerIntelligence, BuyerStats } from '../schemas';
-import { Types } from 'mongoose';
+import {
+  BuyerIntelligenceSignal,
+  BuyerStats,
+  BuyerStatsIntelligence,
+} from '../schemas';
 import { getMongoRelationObjectIdArray } from '@/utils';
 
-type BuyerIntelligenceSignal = 'unknown' | 'low' | 'medium' | 'high';
-
 export type BuyerIntelligenceSignals = Pick<
-  BuyerIntelligence,
-  'incumbentRisk' | 'localSupplierSignal'
+  BuyerStatsIntelligence,
+  'repeatSupplierRate' | 'localSupplierRate' | 'incumbentRisk' | 'localSupplierSignal'
 >;
+
+export type BuyerIntelligenceCalculation = BuyerIntelligenceSignals;
 
 function getAwardTenderWinnerIds(awardTender: AwardTenderDocument): string[] {
   return getMongoRelationObjectIdArray(awardTender.winners ?? []);
 }
 
-export function calculateIncumbentRisk(
+function calculateIncumbentRiskMeta(
   topSuppliers: BuyerStats['topSuppliers'],
-): BuyerIntelligenceSignal {
+): Pick<BuyerIntelligenceCalculation, 'incumbentRisk' | 'repeatSupplierRate'> {
   const totalAwardsWithWinner = topSuppliers.reduce(
     (total, supplier) => total + supplier.wins,
     0,
   );
-
-  if (totalAwardsWithWinner < 5) {
-    return 'unknown';
-  }
-
   const topSupplierWins = topSuppliers[0]?.wins ?? 0;
   const repeatSupplierWins = topSuppliers.reduce(
     (total, supplier) => total + (supplier.wins >= 2 ? supplier.wins : 0),
     0,
   );
-  const topSupplierShare = topSupplierWins / totalAwardsWithWinner;
-  const repeatSupplierRate = repeatSupplierWins / totalAwardsWithWinner;
+  const topSupplierShare =
+    totalAwardsWithWinner > 0 ? topSupplierWins / totalAwardsWithWinner : null;
+  const repeatSupplierRate =
+    totalAwardsWithWinner > 0
+      ? repeatSupplierWins / totalAwardsWithWinner
+      : null;
 
-  if (topSupplierShare >= 0.35 || repeatSupplierRate >= 0.5) {
-    return 'high';
+  if (totalAwardsWithWinner < 5) {
+    return {
+      incumbentRisk: BuyerIntelligenceSignal.UNKNOWN,
+      repeatSupplierRate,
+    };
   }
 
-  if (topSupplierShare >= 0.2 || repeatSupplierRate >= 0.25) {
-    return 'medium';
+  const effectiveTopSupplierShare = topSupplierShare ?? 0;
+  const effectiveRepeatSupplierRate = repeatSupplierRate ?? 0;
+
+  if (effectiveTopSupplierShare >= 0.35 || effectiveRepeatSupplierRate >= 0.5) {
+    return {
+      incumbentRisk: BuyerIntelligenceSignal.HIGH,
+      repeatSupplierRate,
+    };
   }
 
-  return 'low';
+  if (effectiveTopSupplierShare >= 0.2 || effectiveRepeatSupplierRate >= 0.25) {
+    return {
+      incumbentRisk: BuyerIntelligenceSignal.MEDIUM,
+      repeatSupplierRate,
+    };
+  }
+
+  return {
+    incumbentRisk: BuyerIntelligenceSignal.LOW,
+    repeatSupplierRate,
+  };
 }
 
-export function calculateLocalSupplierSignal(
+function calculateLocalSupplierSignalMeta(
   buyerCountry: string | null | undefined,
   awardTenders: AwardTenderDocument[],
   winnerCountriesById: Map<string, string[]>,
-): BuyerIntelligenceSignal {
+): Pick<
+  BuyerIntelligenceCalculation,
+  'localSupplierSignal' | 'localSupplierRate'
+> {
   if (!buyerCountry) {
-    return 'unknown';
+    return {
+      localSupplierSignal: BuyerIntelligenceSignal.UNKNOWN,
+      localSupplierRate: null,
+    };
   }
 
   let awardsWithWinnerCountry = 0;
@@ -75,21 +102,38 @@ export function calculateLocalSupplierSignal(
     }
   }
 
+  const localSupplierRate =
+    awardsWithWinnerCountry > 0
+      ? localWinnerAwards / awardsWithWinnerCountry
+      : null;
+
+  const effectiveLocalSupplierRate = localSupplierRate ?? 0;
+
   if (awardsWithWinnerCountry < 5) {
-    return 'unknown';
+    return {
+      localSupplierSignal: BuyerIntelligenceSignal.UNKNOWN,
+      localSupplierRate,
+    };
   }
 
-  const localSupplierRate = localWinnerAwards / awardsWithWinnerCountry;
-
-  if (localSupplierRate >= 0.75) {
-    return 'high';
+  if (effectiveLocalSupplierRate >= 0.75) {
+    return {
+      localSupplierSignal: BuyerIntelligenceSignal.HIGH,
+      localSupplierRate,
+    };
   }
 
-  if (localSupplierRate >= 0.5) {
-    return 'medium';
+  if (effectiveLocalSupplierRate >= 0.5) {
+    return {
+      localSupplierSignal: BuyerIntelligenceSignal.MEDIUM,
+      localSupplierRate,
+    };
   }
 
-  return 'low';
+  return {
+    localSupplierSignal: BuyerIntelligenceSignal.LOW,
+    localSupplierRate,
+  };
 }
 
 export function calculateBuyerIntelligenceSignals(params: {
@@ -97,13 +141,16 @@ export function calculateBuyerIntelligenceSignals(params: {
   stats: BuyerStats;
   awardTenders: AwardTenderDocument[];
   winnerCountriesById: Map<string, string[]>;
-}): BuyerIntelligenceSignals {
+}): BuyerIntelligenceCalculation {
+  const incumbentRisk = calculateIncumbentRiskMeta(params.stats.topSuppliers);
+  const localSupplierSignal = calculateLocalSupplierSignalMeta(
+    params.buyerCountry,
+    params.awardTenders,
+    params.winnerCountriesById,
+  );
+
   return {
-    incumbentRisk: calculateIncumbentRisk(params.stats.topSuppliers),
-    localSupplierSignal: calculateLocalSupplierSignal(
-      params.buyerCountry,
-      params.awardTenders,
-      params.winnerCountriesById,
-    ),
+    ...incumbentRisk,
+    ...localSupplierSignal,
   };
 }

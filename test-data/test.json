@@ -1,0 +1,479 @@
+{
+  "data": {
+    "identifiers": ["LOT-0005", "LOT-0004", "LOT-0003", "LOT-0001", "LOT-0002"],
+    "resultLotIdentifiers": [
+      "LOT-0001",
+      "LOT-0002",
+      "LOT-0003",
+      "LOT-0004",
+      "LOT-0005"
+    ],
+    "titles": [
+      "část 5: ML Ostrava Mošnov",
+      "část 4: ML Karlovy Vary",
+      "část 3: ML Pardubice",
+      "část 1: ML Praha Ruzyně",
+      "část 2: ML Brno Tuřany"
+    ],
+    "descriptions": [
+      "jazykové kurzy",
+      "jazykové kurzy",
+      "jazykové kurzy",
+      "vzdělávací kurzy",
+      "jazykové kurzy"
+    ],
+    "mainClassifications": [
+      "80580000",
+      "80580000",
+      "80580000",
+      "80580000",
+      "80580000"
+    ],
+    "additionalClassifications": [null],
+    "contractNatures": [
+      "services",
+      "services",
+      "services",
+      "services",
+      "services"
+    ],
+    "estimatedValues": [
+      1363636.36, 1363636.36, 2107438.02, 4710743.8, 2851239.67
+    ],
+    "estimatedValuesCurs": ["CZK"],
+    "frameworkMaximumValues": [],
+    "frameworkMaximumValuesCurs": [null],
+    "areFrameworkAgreements": [true, true, true, true, true],
+    "plannedEndDates": [
+      "2029-10-28T23:00:00.000Z",
+      "2029-10-28T23:00:00.000Z",
+      "2029-10-28T23:00:00.000Z",
+      "2029-10-28T23:00:00.000Z",
+      "2029-10-28T23:00:00.000Z"
+    ],
+    "dpsUsages": [false, false, false, false, false],
+    "durationPeriodValues": [],
+    "durationPeriodUnits": [null],
+    "deadlineDates": [null],
+    "deadlineTimes": [null],
+    "documentUrls": [null],
+    "submissionUrls": [null],
+    "electronicSubmissions": [null],
+    "awardCriterionTypes": ["price", "price", "price", "price", "price"],
+    "awardCriterionNumberWeights": ["per-exa", "per-exa", "per-exa", "per-exa"],
+    "awardCriterionDescriptions": [
+      "nejnižší nabídková cena bez DPH",
+      "nejnižší nabídková cena bez DPH",
+      "nejnižší nabídková cena bez DPH.",
+      "nejnižší nabídková cena bez DPH",
+      "nejnižší nabídková cena bez DPH."
+    ],
+    "selectionCriterionNames": [null],
+    "selectionCriterionDescriptions": [null],
+    "placeOfPerformanceCountries": ["CZE", "CZE", "CZE", "CZE", "CZE"],
+    "placeOfPerformanceCities": [null],
+    "placeOfPerformanceSubdivisions": [
+      "CZ080",
+      "CZ041",
+      "CZ053",
+      "CZ010",
+      "CZ064"
+    ],
+    "resultValues": [],
+    "resultValuesCurs": [null]
+  },
+  "notice": {
+    "notice-type": "can-standard",
+    "award-criterion-description-lot": {
+      "ces": [
+        "nejnižší nabídková cena bez DPH",
+        "nejnižší nabídková cena bez DPH",
+        "nejnižší nabídková cena bez DPH.",
+        "nejnižší nabídková cena bez DPH",
+        "nejnižší nabídková cena bez DPH."
+      ]
+    },
+    "winner-country": ["CZE", "CZE", "SVK", "CZE"],
+    "main-classification-proc": ["80580000"],
+    "internal-identifier-lot": [
+      "část: 5",
+      "část 4",
+      "část 3",
+      "část 1",
+      "část 2"
+    ],
+    "winner-country-sub": ["CZ010", "CZ064", "SK010", "CZ010"],
+    "place-of-performance-country-proc": ["CZE"],
+    "winner-identifier": ["26172062", "03545849", "35730111", "27285359"],
+    "authority-main-activity": ["pub-os"],
+    "notice-subtype": "29",
+    "winner-selection-status": [
+      "selec-w",
+      "selec-w",
+      "selec-w",
+      "selec-w",
+      "selec-w"
+    ],
+    "links": {
+      "xml": { "MUL": "https://ted.europa.eu/en/notice/415248-2026/xml" },
+      "pdf": {
+        "BUL": "https://ted.europa.eu/bg/notice/415248-2026/pdf",
+        "SPA": "https://ted.europa.eu/es/notice/415248-2026/pdf",
+        "CES": "https://ted.europa.eu/cs/notice/415248-2026/pdf",
+        "DAN": "https://ted.europa.eu/da/notice/415248-2026/pdf",
+        "DEU": "https://ted.europa.eu/de/notice/415248-2026/pdf",
+        "EST": "https://ted.europa.eu/et/notice/415248-2026/pdf",
+        "ELL": "https://ted.europa.eu/el/notice/415248-2026/pdf",
+        "ENG": "https://ted.europa.eu/en/notice/415248-2026/pdf",
+        "FRA": "https://ted.europa.eu/fr/notice/415248-2026/pdf",
+        "GLE": "https://ted.europa.eu/ga/notice/415248-2026/pdf",
+        "HRV": "https://ted.europa.eu/hr/notice/415248-2026/pdf",
+        "ITA": "https://ted.europa.eu/it/notice/415248-2026/pdf",
+        "LAV": "https://ted.europa.eu/lv/notice/415248-2026/pdf",
+        "LIT": "https://ted.europa.eu/lt/notice/415248-2026/pdf",
+        "HUN": "https://ted.europa.eu/hu/notice/415248-2026/pdf",
+        "MLT": "https://ted.europa.eu/mt/notice/415248-2026/pdf",
+        "NLD": "https://ted.europa.eu/nl/notice/415248-2026/pdf",
+        "POL": "https://ted.europa.eu/pl/notice/415248-2026/pdf",
+        "POR": "https://ted.europa.eu/pt/notice/415248-2026/pdf",
+        "RON": "https://ted.europa.eu/ro/notice/415248-2026/pdf",
+        "SLK": "https://ted.europa.eu/sk/notice/415248-2026/pdf",
+        "SLV": "https://ted.europa.eu/sl/notice/415248-2026/pdf",
+        "FIN": "https://ted.europa.eu/fi/notice/415248-2026/pdf",
+        "SWE": "https://ted.europa.eu/sv/notice/415248-2026/pdf"
+      },
+      "pdfs": { "CES": "https://ted.europa.eu/cs/notice/415248-2026/pdfs" },
+      "html": {
+        "BUL": "https://ted.europa.eu/bg/notice/-/detail/415248-2026",
+        "SPA": "https://ted.europa.eu/es/notice/-/detail/415248-2026",
+        "CES": "https://ted.europa.eu/cs/notice/-/detail/415248-2026",
+        "DAN": "https://ted.europa.eu/da/notice/-/detail/415248-2026",
+        "DEU": "https://ted.europa.eu/de/notice/-/detail/415248-2026",
+        "EST": "https://ted.europa.eu/et/notice/-/detail/415248-2026",
+        "ELL": "https://ted.europa.eu/el/notice/-/detail/415248-2026",
+        "ENG": "https://ted.europa.eu/en/notice/-/detail/415248-2026",
+        "FRA": "https://ted.europa.eu/fr/notice/-/detail/415248-2026",
+        "GLE": "https://ted.europa.eu/ga/notice/-/detail/415248-2026",
+        "HRV": "https://ted.europa.eu/hr/notice/-/detail/415248-2026",
+        "ITA": "https://ted.europa.eu/it/notice/-/detail/415248-2026",
+        "LAV": "https://ted.europa.eu/lv/notice/-/detail/415248-2026",
+        "LIT": "https://ted.europa.eu/lt/notice/-/detail/415248-2026",
+        "HUN": "https://ted.europa.eu/hu/notice/-/detail/415248-2026",
+        "MLT": "https://ted.europa.eu/mt/notice/-/detail/415248-2026",
+        "NLD": "https://ted.europa.eu/nl/notice/-/detail/415248-2026",
+        "POL": "https://ted.europa.eu/pl/notice/-/detail/415248-2026",
+        "POR": "https://ted.europa.eu/pt/notice/-/detail/415248-2026",
+        "RON": "https://ted.europa.eu/ro/notice/-/detail/415248-2026",
+        "SLK": "https://ted.europa.eu/sk/notice/-/detail/415248-2026",
+        "SLV": "https://ted.europa.eu/sl/notice/-/detail/415248-2026",
+        "FIN": "https://ted.europa.eu/fi/notice/-/detail/415248-2026",
+        "SWE": "https://ted.europa.eu/sv/notice/-/detail/415248-2026"
+      },
+      "htmlDirect": {
+        "BUL": "https://ted.europa.eu/bg/notice/415248-2026/html",
+        "SPA": "https://ted.europa.eu/es/notice/415248-2026/html",
+        "CES": "https://ted.europa.eu/cs/notice/415248-2026/html",
+        "DAN": "https://ted.europa.eu/da/notice/415248-2026/html",
+        "DEU": "https://ted.europa.eu/de/notice/415248-2026/html",
+        "EST": "https://ted.europa.eu/et/notice/415248-2026/html",
+        "ELL": "https://ted.europa.eu/el/notice/415248-2026/html",
+        "ENG": "https://ted.europa.eu/en/notice/415248-2026/html",
+        "FRA": "https://ted.europa.eu/fr/notice/415248-2026/html",
+        "GLE": "https://ted.europa.eu/ga/notice/415248-2026/html",
+        "HRV": "https://ted.europa.eu/hr/notice/415248-2026/html",
+        "ITA": "https://ted.europa.eu/it/notice/415248-2026/html",
+        "LAV": "https://ted.europa.eu/lv/notice/415248-2026/html",
+        "LIT": "https://ted.europa.eu/lt/notice/415248-2026/html",
+        "HUN": "https://ted.europa.eu/hu/notice/415248-2026/html",
+        "MLT": "https://ted.europa.eu/mt/notice/415248-2026/html",
+        "NLD": "https://ted.europa.eu/nl/notice/415248-2026/html",
+        "POL": "https://ted.europa.eu/pl/notice/415248-2026/html",
+        "POR": "https://ted.europa.eu/pt/notice/415248-2026/html",
+        "RON": "https://ted.europa.eu/ro/notice/415248-2026/html",
+        "SLK": "https://ted.europa.eu/sk/notice/415248-2026/html",
+        "SLV": "https://ted.europa.eu/sl/notice/415248-2026/html",
+        "FIN": "https://ted.europa.eu/fi/notice/415248-2026/html",
+        "SWE": "https://ted.europa.eu/sv/notice/415248-2026/html"
+      }
+    },
+    "identifier-lot": [
+      "LOT-0005",
+      "LOT-0004",
+      "LOT-0003",
+      "LOT-0001",
+      "LOT-0002"
+    ],
+    "contract-duration-end-date-lot": [
+      "2029-10-29+01:00",
+      "2029-10-29+01:00",
+      "2029-10-29+01:00",
+      "2029-10-29+01:00",
+      "2029-10-29+01:00"
+    ],
+    "buyer-city": { "mul": ["Praha"] },
+    "title-proc": {
+      "ces": "Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda"
+    },
+    "dps-usage-lot": ["none", "none", "none", "none", "none"],
+    "place-of-performance-subdiv-lot": [
+      "CZ080",
+      "CZ041",
+      "CZ053",
+      "CZ010",
+      "CZ064"
+    ],
+    "estimated-value-lot": [
+      "1363636.36",
+      "1363636.36",
+      "2107438.02",
+      "4710743.8",
+      "2851239.67"
+    ],
+    "winner-city": [
+      "Praha - Nové Město",
+      "Brno - Královo Pole",
+      "Bratislava",
+      "Praha - Staré Město"
+    ],
+    "award-criterion-type-lot": ["price", "price", "price", "price", "price"],
+    "dispatch-date": "2026-06-16+02:00",
+    "framework-agreement-lot": [
+      "fa-wo-rc",
+      "fa-wo-rc",
+      "fa-wo-rc",
+      "fa-wo-rc",
+      "fa-wo-rc"
+    ],
+    "estimated-value-cur-lot": ["CZK"],
+    "received-submissions-type-val": [
+      "0",
+      "1",
+      "0",
+      "0",
+      "0",
+      "0",
+      "1",
+      "0",
+      "1",
+      "1",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "1",
+      "1",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "1",
+      "1",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "1",
+      "1",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "award-criterion-number-weight-lot": [
+      "per-exa",
+      "per-exa",
+      "per-exa",
+      "per-exa"
+    ],
+    "description-lot": {
+      "ces": [
+        "jazykové kurzy",
+        "jazykové kurzy",
+        "jazykové kurzy",
+        "vzdělávací kurzy",
+        "jazykové kurzy"
+      ]
+    },
+    "buyer-name": { "ces": ["Ministerstvo vnitra"] },
+    "notice-version": 1,
+    "winner-post-code": ["11000", "61200", "841 02", "11000"],
+    "notice-title": {
+      "hun": "Csehország – Nyelvtanfolyamok szervezése, nyelvoktatás – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "lav": "Čehija – Valodu mācību kursu pasniegšana – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "swe": "Tjeckien – Tillhandahållande av språkkurser – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "gle": "An tSeicia – Provision of language courses – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "ell": "Τσεχία – Παράδοση μαθημάτων ξένων γλωσσών – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "spa": "Chequia – Provisión de cursos de idiomas – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "est": "Tšehhi – Keelekursuste korraldamine – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "nld": "Tsjechië – Geven van taalcursussen – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "fin": "Tšekki – Kielikurssien järjestäminen – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "pol": "Czechy – Oferowanie kursów językowych – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "hrv": "Češka – Organiziranje tečajeva za učenje jezika – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "ces": "Česko – Poskytování jazykových kurzů – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "dan": "Tjekkiet – Afholdelse af sprogkurser – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "ron": "Cehia – Organizare de cursuri de limbi străine – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "por": "Chéquia – Cursos de línguas – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "slk": "Česko – Poskytovanie jazykových kurzov – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "fra": "Tchéquie – Fourniture de cours de langues – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "mlt": "Iċ-Ċekja – Provvediment ta' korsijiet tal-lingwi – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "deu": "Tschechien – Veranstaltung von Sprachkursen – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "lit": "Čekija – Kalbų kursai – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "ita": "Cechia – Organizzazione di corsi di lingue – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "bul": "Чехия – Осигуряване на курсове по чужди езици – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "slv": "Češka – Prirejanje jezikovnih tečajev – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda",
+      "eng": "Czechia – Provision of language courses – Zajištění a podpora průběžného vzdělávání cizími jazyky příslušníků bezpečnostních složek - Rámcová dohoda"
+    },
+    "tender-lot-identifier": [
+      "LOT-0001",
+      "LOT-0002",
+      "LOT-0003",
+      "LOT-0004",
+      "LOT-0005"
+    ],
+    "main-classification-lot": [
+      "80580000",
+      "80580000",
+      "80580000",
+      "80580000",
+      "80580000"
+    ],
+    "publication-number": "415248-2026",
+    "result-value-notice": "111044.5",
+    "contract-nature-main-lot": [
+      "services",
+      "services",
+      "services",
+      "services",
+      "services"
+    ],
+    "result-lot-identifier": [
+      "LOT-0001",
+      "LOT-0002",
+      "LOT-0003",
+      "LOT-0004",
+      "LOT-0005"
+    ],
+    "total-value": 111044.5,
+    "winner-email": [
+      "info@glossa.cz",
+      "novak@jazykovyservis.cz",
+      "info@pro-education.cz",
+      "jiri.sruma@parole.cz"
+    ],
+    "publication-date": "2026-06-17+02:00",
+    "received-submissions-type-code": [
+      "t-esubm",
+      "t-sme",
+      "t-oth-eea",
+      "t-no-eea",
+      "t-verif-inad-low",
+      "t-verif-inad",
+      "tenders",
+      "part-req",
+      "t-sme",
+      "tenders",
+      "t-esubm",
+      "t-oth-eea",
+      "t-no-eea",
+      "t-verif-inad-low",
+      "t-verif-inad",
+      "part-req",
+      "t-sme",
+      "tenders",
+      "t-esubm",
+      "t-oth-eea",
+      "t-no-eea",
+      "t-verif-inad-low",
+      "t-verif-inad",
+      "part-req",
+      "t-sme",
+      "tenders",
+      "t-esubm",
+      "t-oth-eea",
+      "t-no-eea",
+      "t-verif-inad-low",
+      "t-verif-inad",
+      "part-req",
+      "t-sme",
+      "tenders",
+      "t-esubm",
+      "t-oth-eea",
+      "t-no-eea",
+      "t-verif-inad-low",
+      "t-verif-inad",
+      "part-req"
+    ],
+    "estimated-value-proc": "12396694.21",
+    "winner-decision-date": [
+      "2026-02-18+01:00",
+      "2026-02-18+01:00",
+      "2026-02-18+01:00",
+      "2026-02-18+01:00",
+      "2026-02-18+01:00"
+    ],
+    "contract-nature-main-proc": "services",
+    "total-value-cur": ["CZK"],
+    "buyer-legal-type": ["cga"],
+    "estimated-value-cur-proc": "CZK",
+    "winner-size": ["sme", "sme", "sme", "sme"],
+    "main-activity": ["pub-os"],
+    "buyer-country": ["CZE"],
+    "place-of-performance-country-lot": ["CZE", "CZE", "CZE", "CZE", "CZE"],
+    "procedure-type": "open",
+    "organisation-identifier-tenderer": [
+      "26172062",
+      "03545849",
+      "35730111",
+      "27285359"
+    ],
+    "classification-cpv": [
+      "80580000",
+      "80580000",
+      "80580000",
+      "80580000",
+      "80580000",
+      "80580000"
+    ],
+    "contract-nature": [
+      "services",
+      "services",
+      "services",
+      "services",
+      "services",
+      "services"
+    ],
+    "winner-name": {
+      "ces": [
+        "GLOSSA, s.r.o.",
+        "GLOSSA, s.r.o.",
+        "HOPE Jazykový servis s.r.o.",
+        "PRO EDUCATION International LANGUAGE EDUCATION &CONSULTING CENTRE s.r.o.",
+        "PRO EDUCATION International LANGUAGE EDUCATION &CONSULTING CENTRE s.r.o.",
+        "Agentura Parole s.r.o."
+      ]
+    },
+    "result-value-cur-notice": "CZK",
+    "organisation-identifier-buyer": ["00007064"],
+    "title-lot": {
+      "ces": [
+        "část 5: ML Ostrava Mošnov",
+        "část 4: ML Karlovy Vary",
+        "část 3: ML Pardubice",
+        "část 1: ML Praha Ruzyně",
+        "část 2: ML Brno Tuřany"
+      ]
+    },
+    "buyer-identifier": ["00007064"],
+    "description-proc": {
+      "ces": "Zajištění školitele na prezenční výuku anglického jazyka policistů z inspektorátů cizinecké policie na mezinárodních letištích."
+    }
+  }
+}

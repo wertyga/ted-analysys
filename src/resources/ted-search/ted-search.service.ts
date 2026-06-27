@@ -16,6 +16,7 @@ import { TendersService } from '@/resources/tenders/tenders.service';
 import { devLog, getPaginationMeta } from '@/utils';
 import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rates/currency-exchange-rates.service';
 import { TENDER_COMPETITION_SEARCH_FIELDS } from '@/config/ted-search.config';
+import { AWARD_HISTORY_FIELDS } from '@/config/award-tender.config';
 
 @Injectable()
 export class TedSearchService {
@@ -58,7 +59,9 @@ export class TedSearchService {
       paginationMode: TedPaginationMode.PAGE_NUMBER,
       onlyLatestVersions: true,
       checkQuerySyntax: false,
-      fields: TENDER_COMPETITION_SEARCH_FIELDS,
+      fields: filters.awardFields
+        ? AWARD_HISTORY_FIELDS
+        : TENDER_COMPETITION_SEARCH_FIELDS,
     });
   }
 

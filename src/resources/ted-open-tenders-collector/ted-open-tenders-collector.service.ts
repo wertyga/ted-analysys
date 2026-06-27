@@ -156,6 +156,7 @@ export class TedOpenTendersCollectorService {
       options,
       saveNotices: async (notices) => {
         try {
+          fs.writeFileSync('award-tender.json', JSON.stringify(notices[0]));
           const saveResult =
             await this.awardTenderService!.saveResultTedTenders(notices, {
               updateExisting: options.updateExisting,

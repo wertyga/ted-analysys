@@ -11,11 +11,7 @@ export class AwardTendersTechService {
     private readonly tedSearchService: TedSearchService,
     private readonly tendersService: TendersService,
     private readonly awardTenderService: AwardTenderService,
-  ) {
-    setTimeout(() => {
-      // this.refreshAwardTendersHistory();
-    }, 3000);
-  }
+  ) {}
 
   refreshAwardTendersHistory() {
     return new TedOpenTendersCollectorService(

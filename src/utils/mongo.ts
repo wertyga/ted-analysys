@@ -171,11 +171,16 @@ export const getMongoRelationObjectId = (value: unknown): string | null => {
   return toObjectId(value._id)?.toString() ?? null;
 };
 
-export const getMongoRelationObjectIdArray = (values: unknown[]): string[] => {
+export const getMongoRelationObjectIdArray = (
+  values: unknown[],
+  key?: string,
+): string[] => {
   return Array.from(
     new Set(
       values.flatMap((value) => {
-        const objectId = getMongoRelationObjectId(value);
+        const objectId = getMongoRelationObjectId(
+          typeof value === 'object' && key ? value?.[key] : value,
+        );
 
         return objectId ? [objectId] : [];
       }),

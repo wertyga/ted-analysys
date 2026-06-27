@@ -210,6 +210,14 @@ export function toIsoString(value: unknown): string | null {
   return date instanceof Date ? date.toISOString() : null;
 }
 
+export function toOptionalIsoString(value: unknown): string | undefined {
+  return toIsoString(value) ?? undefined;
+}
+
+export function toNullableFiniteNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
 export function getNormalizedStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
