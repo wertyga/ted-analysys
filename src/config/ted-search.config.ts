@@ -76,7 +76,6 @@ export const TED_SEARCH_CONFIG = {
   localSortFields: {
     [TedTenderSortColumn.PUBLICATION_DATE]: 'publicationDate',
     [TedTenderSortColumn.DEADLINE]: 'submissionDeadline',
-    [TedTenderSortColumn.BUYER_COUNTRY]: 'buyerCountry',
     [TedTenderSortColumn.BUDGET]: 'estimatedValue.amount',
   },
   defaultLocalSortField: 'publicationDate',

@@ -35,13 +35,15 @@ export class ContractorService {
         .sort({ name: 1 })
         .skip(pagination.skip)
         .limit(pagination.limit)
-        .lean(),
+        .exec(),
       ContractorModel.countDocuments(query),
     ]);
 
     return {
       totalCount,
-      contractors,
+      contractors: contractors.map((contractor) =>
+        ContractorModel.serializeList(contractor),
+      ),
     };
   }
 
@@ -79,13 +81,15 @@ export class ContractorService {
         .sort({ name: 1 })
         .skip(pagination.skip)
         .limit(pagination.limit)
-        .lean(),
+        .exec(),
       ContractorModel.countDocuments(query),
     ]);
 
     return {
       totalCount,
-      contractors,
+      contractors: contractors.map((contractor) =>
+        ContractorModel.serializeList(contractor),
+      ),
     };
   }
 

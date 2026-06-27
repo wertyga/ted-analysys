@@ -1,4 +1,5 @@
 import { TenderLot } from '@/resources/tenders/schemas';
+import { BuyerDetailDto } from '@/resources/buyer/schemas';
 
 export type TenderDeepRecommendation =
   | 'strong_go'
@@ -272,20 +273,14 @@ export interface TenderAnalysisTenderDto {
   };
   noticeLanguage?: string;
   submissionLanguages?: string[];
-  buyerName?: string;
-  buyerIdentifier?: string;
-  buyerCountry?: string;
-  buyerCity?: string;
-  buyerEmail?: string;
-  buyerInternetAddress?: string;
-  buyerProfile?: string;
-  publicationDate?: string;
-  dispatchDate?: string;
-  submissionDeadline?: string;
-  deadlineReceiptTender?: string;
-  questionsDeadline?: string;
-  plannedStartDate?: string;
-  plannedEndDate?: string;
+  buyer: BuyerDetailDto;
+  publicationDate?: Date;
+  dispatchDate?: Date;
+  submissionDeadline?: Date;
+  deadlineReceiptTender?: Date;
+  questionsDeadline?: Date;
+  plannedStartDate?: Date;
+  plannedEndDate?: Date;
   duration?: {
     value: number | null | undefined;
     unit: string | null;

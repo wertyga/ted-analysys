@@ -1,24 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TenderGeneralAnalysisDetailDto } from '../../tender-analysis/dto/tender-general-analysis.dto';
-import { TenderLot } from '@/resources/tenders/schemas';
+import { Tender, TenderLot } from '@/resources/tenders/schemas';
 import * as schemas from '@/resources/buyer/schemas';
-
-export class TenderCpvDto {
-  @ApiProperty({ example: '72000000' })
-  code!: string;
-
-  @ApiPropertyOptional({
-    example:
-      'IT services: consulting, software development, Internet and support',
-  })
-  name?: string;
-
-  @ApiPropertyOptional({ example: '72000000' })
-  parentCode?: string;
-
-  @ApiPropertyOptional({ example: 2 })
-  level?: number;
-}
+import { BuyerListDto } from '@/resources/buyer/schemas';
 
 export class TenderEstimatedValueDto {
   @ApiPropertyOptional({ example: 1250000 })
@@ -445,11 +429,6 @@ export type TenderListDto = Omit<
   | 'links'
   | 'noticeVersion'
   | 'titleProc'
-  | 'buyerIdentifier'
-  | 'buyerCity'
-  | 'buyerEmail'
-  | 'buyerInternetAddress'
-  | 'buyerProfile'
   | 'dispatchDate'
   | 'deadlineReceiptTender'
   | 'duration'
@@ -458,4 +437,5 @@ export type TenderListDto = Omit<
   | 'submissionUrls'
   | 'selectionCriteria'
   | 'awardCriteria'
->;
+  | 'buyer'
+> & { buyer: BuyerListDto };

@@ -3,6 +3,7 @@ import { GeneralTenderAnalysisInput } from '@/openai/dto/openai-analysis.dto';
 import { TenderDocument, TenderLot } from '../tenders/schemas';
 import { isRecord } from '@/utils';
 import { DocumentExtractor } from '@/document-extractor';
+import { BuyerModel } from '@/resources/buyer/schemas';
 
 @Injectable()
 export class TenderGeneralAnalysisBuilder {
@@ -23,7 +24,7 @@ export class TenderGeneralAnalysisBuilder {
         procedureTitle: tender.titleProc ?? null,
         description: tender.description ?? null,
         lots: tender.lots ?? [],
-        buyer: tender.buyer,
+        buyer: BuyerModel.serializeDetail(tender.buyer),
         procedureType: tender.procedureType ?? null,
         noticeType: tender.noticeType ?? null,
         noticeSubtype: tender.noticeSubtype ?? null,

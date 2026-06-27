@@ -2,45 +2,152 @@ import mongoose, { Types } from 'mongoose';
 import { Injectable } from '@nestjs/common';
 import { BuyerNormalizer } from './buyer.normalizer';
 import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
-import { Buyer, BuyerDocument, BuyerModel } from './schemas';
-import { getEarliestDate, getLatestDate, getUniqArray } from '@/utils';
+import {
+  BuyerDocument,
+  BuyerIntelligence,
+  BuyerModel,
+  BuyerStats,
+} from './schemas';
+import {
+  getMongoRelationObjectIdArray,
+  getUniqArray,
+} from '@/utils';
 
 import { TenderModel } from '@/resources/tenders/schemas';
+import {
+  AwardTenderDocument,
+  AwardTenderModel,
+} from '@/resources/award-tender/schemas';
+import { TMongoId } from '@/types';
+import {
+  BuyerIntelligenceSignals,
+  calculateBuyerIntelligenceSignals,
+  getDatesBuyerTendersStats,
+  getEmptyBuyerStats,
+  getMoneyBuyerTendersStats,
+  getTopBuyerTendersStats,
+} from './buyer-utils';
+import { ContractorModel } from '@/resources/contractor/schemas';
+
+type BuyerTenderMeta = {
+  stats: BuyerStats;
+  intelligence: BuyerIntelligenceSignals;
+};
 
 @Injectable()
 export class BuyerService {
   normalizer = new BuyerNormalizer();
 
-  async getTendersBuyerMeta(
-    tendersInnerIds: (string | mongoose.Types.ObjectId)[],
-  ): Promise<
-    Pick<
-      Buyer,
-      'totalEstimatedValueEur' | 'firstPublicationDate' | 'lastPublicationDate'
-    >
-  > {
-    const tenders = await TenderModel.find({
-      _id: { $in: tendersInnerIds.map((id) => new Types.ObjectId(id)) },
-    });
-
-    const publicationDates = tenders.map((t) => t.publicationDate);
-    const firstPublicationDate = getEarliestDate(publicationDates);
-    const lastPublicationDate = getLatestDate(publicationDates);
-    const totalEstimatedValueEur = tenders.reduce((acc, t) => {
-      return acc + (t.estimatedValueEur ?? 0);
-    }, 0);
-
+  private mergeBuyerIntelligence(
+    existingIntelligence: BuyerDocument['intelligence'] | undefined,
+    signals: BuyerIntelligenceSignals,
+  ): BuyerIntelligence {
     return {
-      totalEstimatedValueEur,
-      lastPublicationDate,
-      firstPublicationDate,
+      incumbentRisk: signals.incumbentRisk,
+      localSupplierSignal: signals.localSupplierSignal,
     };
   }
 
-  async upsertBuyerFromTEDNotice(
-    notice: TedNotice,
-    tenderInnerIds: string[] = [],
-  ): Promise<BuyerDocument> {
+  private async getWinnerCountriesById(
+    awardTenders: AwardTenderDocument[],
+  ): Promise<Map<string, string[]>> {
+    const winnerIds = getMongoRelationObjectIdArray(
+      awardTenders.flatMap((awardTender) => awardTender.winners ?? []),
+    );
+
+    if (!winnerIds.length) {
+      return new Map();
+    }
+
+    const contractorFilter: Record<string, unknown> = {
+      _id: { $in: winnerIds },
+    };
+    const contractors = await ContractorModel.find(contractorFilter as never)
+      .select('countries')
+      .lean();
+
+    return new Map(
+      contractors.map((contractor) => [
+        contractor._id.toString(),
+        contractor.countries ?? [],
+      ]),
+    );
+  }
+
+  async getTendersBuyerMetaAndIntelligence(
+    buyerId: string | mongoose.Types.ObjectId,
+    buyerCountry?: string,
+  ): Promise<BuyerTenderMeta> {
+    const buyerObjectId = new Types.ObjectId(buyerId);
+    const tenderSelectFields =
+      'publicationDate estimatedValueEur cpvCodes placeOfPerformanceCountries';
+    const awardTenderSelectFields =
+      'publicationDate awardValueEur cpvCodes placeOfPerformanceCountries winners';
+
+    const [tenders, awardTenders] = await Promise.all([
+      TenderModel.find({
+        buyer: buyerObjectId,
+      })
+        .select(tenderSelectFields)
+        .lean(),
+      AwardTenderModel.find({
+        buyer: buyerObjectId,
+      })
+        .select(awardTenderSelectFields)
+        .lean(),
+    ]);
+
+    const tendersCount = tenders.length;
+    const awardTendersCount = awardTenders.length;
+
+    const stats = {
+      tendersCount,
+      awardTendersCount,
+      ...getDatesBuyerTendersStats(tenders, awardTenders),
+      ...getMoneyBuyerTendersStats(tenders, awardTenders),
+      ...getTopBuyerTendersStats(tenders, awardTenders),
+    };
+    const winnerCountriesById = await this.getWinnerCountriesById(awardTenders);
+
+    return {
+      stats,
+      intelligence: calculateBuyerIntelligenceSignals({
+        buyerCountry,
+        stats,
+        awardTenders,
+        winnerCountriesById,
+      }),
+    };
+  }
+
+  async refreshBuyerTenderMeta(
+    buyerId: TMongoId,
+  ): Promise<BuyerDocument | null> {
+    const buyer = await BuyerModel.findById(buyerId).select(
+      'address.country intelligence',
+    );
+    const { stats, intelligence } =
+      await this.getTendersBuyerMetaAndIntelligence(
+        buyerId,
+        buyer?.address?.country,
+      );
+
+    return BuyerModel.findByIdAndUpdate(
+      buyerId,
+      {
+        $set: {
+          stats,
+          intelligence: this.mergeBuyerIntelligence(
+            buyer?.intelligence,
+            intelligence,
+          ),
+        },
+      },
+      { returnDocument: 'after' },
+    );
+  }
+
+  async upsertBuyerFromTEDNotice(notice: TedNotice): Promise<BuyerDocument> {
     const normalizedBuyer = this.normalizer.normalizeBuyerFromTEDNotice(notice);
 
     const identityFilter =
@@ -59,28 +166,54 @@ export class BuyerService {
     const existingBuyer = await BuyerModel.findOne(identityFilter);
 
     if (!existingBuyer) {
-      return BuyerModel.create(normalizedBuyer) as any;
+      return BuyerModel.create({
+        ...normalizedBuyer,
+        stats: getEmptyBuyerStats(),
+      });
     }
 
     const getLastExisting = (...values: Array<string | null | undefined>) =>
       values.findLast((value) => value?.trim()) ?? '';
 
-    const tenderIds = Array.from(
-      new Set([...existingBuyer.tenders, ...tenderInnerIds]),
-    ) as string[];
+    const address = {
+      street: getLastExisting(
+        existingBuyer.address?.street,
+        normalizedBuyer.address.street,
+      ),
+      postCode: getLastExisting(
+        existingBuyer.address?.postCode,
+        normalizedBuyer.address.postCode,
+      ),
+      city: getLastExisting(
+        existingBuyer.address?.city,
+        normalizedBuyer.address.city,
+      ),
+      country: getLastExisting(
+        existingBuyer.address?.country,
+        normalizedBuyer.address.country,
+      ),
+      countrySub: getLastExisting(
+        existingBuyer.address?.countrySub,
+        normalizedBuyer.address.countrySub,
+      ),
+    };
+    const { stats, intelligence } =
+      await this.getTendersBuyerMetaAndIntelligence(
+        existingBuyer._id,
+        address.country,
+      );
 
     existingBuyer.set({
-      ...(await this.getTendersBuyerMeta(tenderIds)),
-      tenders: tenderIds,
+      stats,
+      intelligence: this.mergeBuyerIntelligence(
+        existingBuyer.intelligence,
+        intelligence,
+      ),
       name: getLastExisting(existingBuyer.name, normalizedBuyer.name),
       organisationIdentifierBuyer: getLastExisting(
         existingBuyer.organisationIdentifierBuyer,
         normalizedBuyer.organisationIdentifierBuyer,
       ),
-      // buyerCountry: getLastExisting(
-      //   existingBuyer.buyerCountry,
-      //   normalizedBuyer.buyerCountry,
-      // ),
       contact: {
         contactPoint: getLastExisting(
           existingBuyer.contact?.contactPoint,
@@ -102,37 +235,16 @@ export class BuyerService {
           existingBuyer.contact?.fax,
           normalizedBuyer.contact.fax,
         ),
-        url: getLastExisting(
-          existingBuyer.contact?.url,
-          normalizedBuyer.contact.url,
+        website: getLastExisting(
+          existingBuyer.contact?.website,
+          normalizedBuyer.contact.website,
         ),
         gateway: getLastExisting(
           existingBuyer.contact?.gateway,
           normalizedBuyer.contact.gateway,
         ),
       },
-      address: {
-        street: getLastExisting(
-          existingBuyer.address?.street,
-          normalizedBuyer.address.street,
-        ),
-        postCode: getLastExisting(
-          existingBuyer.address?.postCode,
-          normalizedBuyer.address.postCode,
-        ),
-        city: getLastExisting(
-          existingBuyer.address?.city,
-          normalizedBuyer.address.city,
-        ),
-        country: getLastExisting(
-          existingBuyer.address?.country,
-          normalizedBuyer.address.country,
-        ),
-        countrySub: getLastExisting(
-          existingBuyer.address?.countrySub,
-          normalizedBuyer.address.countrySub,
-        ),
-      },
+      address,
       identifiers: Array.from(
         new Map(
           [...existingBuyer.identifiers, ...normalizedBuyer.identifiers].map(
@@ -161,6 +273,6 @@ export class BuyerService {
       ),
     });
 
-    return existingBuyer.save() as any;
+    return existingBuyer.save();
   }
 }

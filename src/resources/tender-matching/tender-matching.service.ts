@@ -16,7 +16,7 @@ import {
   readStringArray,
   toObjectId,
   toIsoString,
-  tenderCpvPopulateFields,
+  // tenderCpvPopulateFields,
 } from '@/utils';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { mapTenderForMatching } from './tender-for-matching.mapper';
@@ -105,10 +105,10 @@ export class TenderMatchingService {
         .sort({ aiFitScore: -1, updatedAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate({
-          path: 'tender',
-          populate: tenderCpvPopulateFields,
-        })
+        // .populate({
+        //   path: 'tender',
+        //   populate: tenderCpvPopulateFields,
+        // })
         .exec(),
       TenderCompanyMatchModel.countDocuments(query).exec(),
     ]);

@@ -2,7 +2,6 @@ import { TedNoticeType } from '../../tenders/types';
 import { TedSortOrder, TedTenderSortColumn } from '../types/ted-search.types';
 import { buildAdaptiveCpvQuery } from './ted-cpv.builder';
 import {
-  BuyerMainActivity,
   CurrencySign,
   normalizeTedCountryCodes,
   type TedEligibleCountryCode,
@@ -18,11 +17,6 @@ export interface TedTenderSearchFilters {
   text?: string;
   cpvCodes?: string[];
   publicationNumber?: string[];
-  buyerCountries?: TedEligibleCountryCode[];
-  buyerName?: string;
-  buyerIdentifier?: string;
-  buyerCity?: string;
-  buyerMainActivity?: BuyerMainActivity[];
   placeOfPerformance?: TedEligibleCountryCode[];
   submissionLanguage?: string[];
   noticeTypes?: TedNoticeType[];
@@ -47,11 +41,6 @@ export function buildTedTenderSearchQuery(
   const {
     text,
     cpvCodes,
-    buyerName,
-    buyerIdentifier,
-    buyerCountries,
-    buyerCity,
-    buyerMainActivity,
     placeOfPerformance,
     submissionLanguage,
     noticeTypes,
@@ -70,11 +59,6 @@ export function buildTedTenderSearchQuery(
   const parts = [
     buildTextPart('FT', text),
     buildAdaptiveCpvQuery(cpvCodes),
-    buildTextPart('buyer-name', buyerName),
-    buildTextPart('buyer-identifier', buyerIdentifier),
-    buildCountryInPart('buyer-country', [...(buyerCountries ?? [])]),
-    buildTextPart('buyer-city', buyerCity),
-    buildInPart('main-activity', buyerMainActivity),
     buildCountryInPart('place-of-performance', placeOfPerformance),
     buildInPart('submission-language', submissionLanguage),
     buildInPart('notice-type', noticeTypes),

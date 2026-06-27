@@ -13,10 +13,8 @@ export type BuyerNormalized = Omit<
   | '_id'
   | 'createdAt'
   | 'updatedAt'
-  | 'totalEstimatedValueEur'
-  | 'firstPublicationDate'
-  | 'lastPublicationDate'
-  | 'tenders'
+  | 'stats'
+  | 'statsVersion'
 >;
 
 export class BuyerNormalizer {
@@ -75,7 +73,7 @@ export class BuyerNormalizer {
         data.touchpointTelBuyer,
       )[0],
       fax: getUniqArray(data.organisationFaxBuyer, data.touchpointFaxBuyer)[0],
-      url: getUniqArray(data.touchpointInternetAddressBuyer)[0],
+      website: getUniqArray(data.touchpointInternetAddressBuyer)[0],
       gateway: getUniqArray(data.touchpointGatewayBuyer)[0],
     };
   }

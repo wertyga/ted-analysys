@@ -5,9 +5,12 @@ import {
   TenderDocumentsLinks,
   TenderLot,
 } from '@/resources/tenders/schemas';
-import { filterModel } from '@/utils';
-import { ContractorDocument } from '@/resources/contractor/schemas';
-import { BuyerDocument } from '@/resources/buyer/schemas';
+import { filterModel, isPopulatedRecord } from '@/utils';
+import {
+  ContractorDocument,
+  ContractorModel,
+} from '@/resources/contractor/schemas';
+import { BuyerDocument, BuyerModel } from '@/resources/buyer/schemas';
 
 export type AwardTenderLot = TenderLot & {
   resultLotIdentifier: string;
@@ -28,7 +31,7 @@ export interface AwardTender {
   title?: string;
   titleProc?: string;
   description?: string;
-  buyer: BuyerDocument;
+  buyer: string | BuyerDocument;
   publicationDate?: Date;
   dispatchDate?: Date;
   submissionDeadline?: Date;
@@ -70,9 +73,39 @@ export interface AwardTender {
 export type AwardTenderDocument = AwardTender & Document;
 export type AwardTenderRecord = AwardTender & { _id: unknown };
 export type AwardTenderSerializable = AwardTenderDocument | AwardTenderRecord;
+export type AwardTenderDetailDto = Omit<AwardTender, 'links' | 'cpvCodes'>;
+export type AwardTenderListDto = Pick<
+  AwardTender,
+  | '_id'
+  | 'id'
+  | 'noticeType'
+  | 'noticeSubtype'
+  | 'procedureType'
+  | 'title'
+  | 'titleProc'
+  | 'buyer'
+  | 'publicationDate'
+  | 'submissionDeadline'
+  | 'plannedEndDate'
+  | 'contractNature'
+  | 'estimatedValue'
+  | 'awardValue'
+  | 'estimatedValueEur'
+  | 'awardValueEur'
+  | 'awardDecisionDates'
+  | 'selectionStatuses'
+  | 'isFrameworkAgreement'
+  | 'placeOfPerformanceCountries'
+  | 'placeOfPerformanceCities'
+  | 'lots'
+  | 'winners'
+  | 'createdAt'
+  | 'updatedAt'
+>;
 
 export interface AwardTenderModelType extends Model<AwardTenderDocument> {
-  toDetailDto(tender: AwardTenderSerializable): Partial<AwardTender>;
+  serializeList(tender: AwardTenderSerializable): AwardTenderListDto;
+  serializeDetail(tender: AwardTenderSerializable): AwardTenderDetailDto;
 }
 
 const AwardTenderLotValueSchema = new Schema(
@@ -136,6 +169,7 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
       type: Schema.Types.ObjectId,
       ref: 'Buyer',
       required: true,
+      index: true,
     },
     selectionStatuses: { type: [String], default: [] },
     publicationDate: { type: Date },
@@ -195,12 +229,73 @@ AwardTenderSchema.index({
 AwardTenderSchema.index({ 'winners.identifier': 1 });
 AwardTenderSchema.index({ 'winners.name': 1 });
 
-AwardTenderSchema.statics.toDetailDto = function (
+function serializeAwardTenderRelations<T extends Partial<AwardTender>>(
+  tender: T,
+): T {
+  return {
+    ...tender,
+    buyer: isPopulatedRecord(tender.buyer)
+      ? BuyerModel.serializeList(tender.buyer as BuyerDocument)
+      : tender.buyer,
+    winners: Array.isArray(tender.winners)
+      ? tender.winners.map((winner) =>
+          isPopulatedRecord(winner)
+            ? filterModel(winner as ContractorDocument, {
+                excludeFields: ['awardTenders'],
+              })
+            : winner,
+        )
+      : tender.winners,
+  };
+}
+
+AwardTenderSchema.statics.serializeList = function (
   tender: AwardTenderSerializable,
-) {
-  return filterModel(tender, {
-    excludeFields: ['links', 'cpvCodes'],
+): AwardTenderListDto {
+  const { buyer, winners, ...serializedAwardTender } = filterModel(tender, {
+    includeFields: [
+      'id',
+      'noticeType',
+      'noticeSubtype',
+      'procedureType',
+      'title',
+      'titleProc',
+      'buyer',
+      'publicationDate',
+      'submissionDeadline',
+      'plannedEndDate',
+      'contractNature',
+      'estimatedValue',
+      'awardValue',
+      'estimatedValueEur',
+      'awardValueEur',
+      'awardDecisionDates',
+      'selectionStatuses',
+      'isFrameworkAgreement',
+      'placeOfPerformanceCountries',
+      'placeOfPerformanceCities',
+      'lots',
+      'winners',
+      'createdAt',
+      'updatedAt',
+    ],
   });
+
+  return {
+    ...serializedAwardTender,
+    buyer: BuyerModel.serializeList(buyer),
+    winners: winners.map(ContractorModel.serializeList),
+  };
+};
+
+AwardTenderSchema.statics.serializeDetail = function (
+  tender: AwardTenderSerializable,
+): AwardTenderDetailDto {
+  return serializeAwardTenderRelations(
+    filterModel(tender, {
+      excludeFields: ['links', 'cpvCodes'],
+    }),
+  ) as AwardTenderDetailDto;
 };
 
 export const AwardTenderModel: AwardTenderModelType =

@@ -1,11 +1,6 @@
 import _chunk from 'lodash/chunk';
 
-import {
-  Tender,
-  TenderDocument,
-  TenderModel,
-  TenderShortTitle,
-} from '@/resources/tenders/schemas';
+import { TenderModel } from '@/resources/tenders/schemas';
 import { BuyerNormalizer } from '@/resources/buyer/buyer.normalizer';
 import { Injectable } from '@nestjs/common';
 import { TedSearchService } from '@/resources/ted-search/ted-search.service';
@@ -15,7 +10,8 @@ import { TedOpenTendersCollectorService } from '@/resources/ted-open-tenders-col
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { AwardTenderService } from '@/resources/award-tender/award-tender.service';
 import { TENDER_COMPETITION_SEARCH_FIELDS } from '@/config/ted-search.config';
-import mongoose from 'mongoose';
+import { AwardTenderModel } from '@/resources/award-tender/schemas';
+import { AWARD_HISTORY_FIELDS } from '@/config/award-tender.config';
 
 @Injectable()
 export class BuyerTechService {
@@ -36,13 +32,9 @@ export class BuyerTechService {
   }
 
   async collectBuyersFromTenderAndUnsetTenderFields(notice: TedNotice) {
-    const buyer = await this.buyerService.upsertBuyerFromTEDNotice(notice);
     const tender = await TenderModel.findOneAndUpdate(
       { id: notice['publication-number'] },
       {
-        $set: {
-          buyer: buyer._id,
-        },
         $unset: {
           buyerName: 1,
           buyerIdentifier: 1,
@@ -56,16 +48,20 @@ export class BuyerTechService {
       },
       { returnDocument: 'after' },
     );
+    if (!tender) {
+      return;
+    }
 
-    buyer.tenders = Array.from(
-      new Set([...buyer.tenders, (tender as TenderDocument)._id]),
-    ) as TenderDocument[];
+    const buyer = await this.buyerService.upsertBuyerFromTEDNotice(notice);
 
-    buyer.set(
-      await this.buyerService.getTendersBuyerMeta(buyer.tenders as any),
-    );
+    await TenderModel.findByIdAndUpdate(tender._id, {
+      $set: {
+        buyer: buyer._id,
+      },
+    });
+    await this.buyerService.refreshBuyerTenderMeta(buyer._id);
 
-    return buyer.save();
+    return buyer;
   }
 
   async collectBuyersFromTenderAllAndUnsetTenderFields() {
@@ -93,6 +89,68 @@ export class BuyerTechService {
 
             try {
               await this.collectBuyersFromTenderAndUnsetTenderFields(n);
+            } catch (e) {
+              console.log({ e });
+              errors += 1;
+            }
+          }
+
+          return {
+            saved: noticies.length - errors,
+            updated: noticies.length - errors,
+            skipped: errors,
+          };
+        },
+      );
+    }
+  }
+
+  async collectBuyersFromAwardTender(notice: TedNotice) {
+    const awardTender = await AwardTenderModel.findOne({
+      id: notice['publication-number'],
+    });
+
+    if (!awardTender) {
+      return;
+    }
+
+    const buyer = await this.buyerService.upsertBuyerFromTEDNotice(notice);
+
+    await AwardTenderModel.findByIdAndUpdate(awardTender._id, {
+      $set: {
+        buyer: buyer._id,
+      },
+    });
+    await this.buyerService.refreshBuyerTenderMeta(buyer._id);
+
+    return buyer;
+  }
+
+  async collectBuyersFromAwardTenderAll() {
+    const awardTenders = await AwardTenderModel.find({}).select('id').lean();
+
+    const chunkedIds = _chunk(awardTenders, 100);
+
+    for (let i = 0; i < chunkedIds.length; i++) {
+      const chunk = chunkedIds[i];
+
+      await this.collector.collectAnyTendersFromTed(
+        {
+          publicationNumber: chunk.map((t) => t.id),
+        },
+        AWARD_HISTORY_FIELDS,
+        {
+          pageLimit: 50,
+          maxPages: 100_000,
+        },
+        async (noticies: TedNotice[]) => {
+          let errors = 0;
+
+          for (let i = 0; i < noticies.length; i++) {
+            const n = noticies[i];
+
+            try {
+              await this.collectBuyersFromAwardTender(n);
             } catch (e) {
               console.log({ e });
               errors += 1;

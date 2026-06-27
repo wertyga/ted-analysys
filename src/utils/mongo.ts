@@ -98,6 +98,14 @@ export const filterModel = <T extends Record<string, any>>(
     includeFields?: StringKeyOf<T>[];
   } = {},
 ) => {
+  if (typeof document === 'string' || !document) {
+    return document;
+  }
+
+  if (isMongoId(document)) {
+    return document.toString();
+  }
+
   const serializedDocument =
     'toObject' in document ? document.toObject() : document;
   serializedDocument._id = serializedDocument._id.toString();
@@ -147,6 +155,32 @@ export const toObjectId = (value: unknown): Types.ObjectId | null => {
   }
 
   return null;
+};
+
+export const getMongoRelationObjectId = (value: unknown): string | null => {
+  const objectId = toObjectId(value);
+
+  if (objectId) {
+    return objectId.toString();
+  }
+
+  if (!value || typeof value !== 'object' || !('_id' in value)) {
+    return null;
+  }
+
+  return toObjectId(value._id)?.toString() ?? null;
+};
+
+export const getMongoRelationObjectIdArray = (values: unknown[]): string[] => {
+  return Array.from(
+    new Set(
+      values.flatMap((value) => {
+        const objectId = getMongoRelationObjectId(value);
+
+        return objectId ? [objectId] : [];
+      }),
+    ),
+  );
 };
 
 // Check if field is _id, then return _id, but if the field is object - handle object

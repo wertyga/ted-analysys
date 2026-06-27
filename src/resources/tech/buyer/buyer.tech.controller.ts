@@ -11,4 +11,9 @@ export class BuyerTechController {
   async collectBuyersFromTenders() {
     return this.buyerTechService.collectBuyersFromTenderAllAndUnsetTenderFields();
   }
+
+  @Post('/collect-awards')
+  async collectBuyersFromAwardTenders() {
+    return this.buyerTechService.collectBuyersFromAwardTenderAll();
+  }
 }

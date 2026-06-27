@@ -35,6 +35,32 @@ export interface SaveAwardTedTendersOptions {
   updateExisting?: boolean;
 }
 
+const LEGACY_AWARD_TENDER_UNSET_FIELDS = [
+  'additionalClassificationLot',
+  'buyerCity',
+  'buyerCountry',
+  'buyerEmail',
+  'buyerIdentifier',
+  'buyerInternetAddress',
+  'buyerMainActivities',
+  'buyerName',
+  'buyerProfile',
+  'descriptionLot',
+  'internalLotIdentifiers',
+  'mainClassificationLot',
+  'titleLot',
+] as const;
+
+const OPTIONAL_AWARD_TENDER_UNSET_FIELDS = [
+  'noticeSubtype',
+  'noticeVersion',
+  'description',
+  'submissionDeadline',
+  'plannedEndDate',
+  'contractNature',
+  'isFrameworkAgreement',
+] as const;
+
 @Injectable()
 export class AwardTenderService {
   normalizer = new AwardTenderNormalizer();
@@ -68,14 +94,17 @@ export class AwardTenderService {
         .sort({ publicationDate: -1 })
         .skip(skip)
         .limit(limit)
+        .populate('buyer')
         .populate('winners')
-        .lean(),
+        .exec(),
       AwardTenderModel.countDocuments(query),
     ]);
 
     return {
       totalNoticeCount: totalCount,
-      notices: savedTenders,
+      notices: savedTenders.map((tender) =>
+        AwardTenderModel.serializeList(tender),
+      ),
     };
   }
 
@@ -125,10 +154,9 @@ export class AwardTenderService {
       return null;
     }
 
-    const [lotsWithEur, buyer, tenderEstimatedValueEur, tenderAwardValueEur] =
+    const [lotsWithEur, tenderEstimatedValueEur, tenderAwardValueEur] =
       await Promise.all([
         this.getLotsWithEurValues(lots, publicationDate),
-        this.buyerService.upsertBuyerFromTEDNotice(notice),
         this.tendersService._calculateEstimatedValueEur(
           estimatedValue.amount,
           estimatedValue.currency,
@@ -146,20 +174,13 @@ export class AwardTenderService {
       estimatedValueEur: tenderEstimatedValueEur,
       awardValueEur: tenderAwardValueEur,
       lots: lotsWithEur,
-      buyer: buyer._id,
       winners: [],
     };
 
     const payload = updateExisting
       ? {
           $set: insertPayload,
-          $unset: {
-            additionalClassificationLot: '',
-            descriptionLot: '',
-            internalLotIdentifiers: '',
-            mainClassificationLot: '',
-            titleLot: '',
-          },
+          $unset: this.buildAwardTenderUnset(normalizedTender),
         }
       : {
           $setOnInsert: insertPayload,
@@ -180,8 +201,15 @@ export class AwardTenderService {
       return null;
     }
 
+    const buyer = await this.buyerService.upsertBuyerFromTEDNotice(notice);
+
+    awardTender.buyer = buyer._id;
+
     if (!wasTenderCreated && !updateExisting) {
-      return awardTender;
+      await awardTender.save();
+      await this.buyerService.refreshBuyerTenderMeta(buyer._id);
+
+      return awardTender.populate('buyer');
     }
 
     const winnersDocs = await this.contractorService.upsertListAwardWinners(
@@ -194,8 +222,27 @@ export class AwardTenderService {
 
     awardTender.winners = winnersDocs.map((winner) => winner._id);
     await awardTender.save();
+    await this.buyerService.refreshBuyerTenderMeta(buyer._id);
 
-    return awardTender;
+    return awardTender.populate('buyer');
+  }
+
+  private buildAwardTenderUnset(
+    normalizedTender: ReturnType<
+      AwardTenderNormalizer['normalizeAwardTenderNotice']
+    >,
+  ): Record<string, ''> {
+    const unset = Object.fromEntries(
+      LEGACY_AWARD_TENDER_UNSET_FIELDS.map((field) => [field, '']),
+    ) as Record<string, ''>;
+
+    for (const field of OPTIONAL_AWARD_TENDER_UNSET_FIELDS) {
+      if (normalizedTender[field] === undefined) {
+        unset[field] = '';
+      }
+    }
+
+    return unset;
   }
 
   async saveResultTedTenders(

@@ -1,1 +1,1 @@
-export { tenderCpvPopulateFields } from '@/utils';
+export { tenderPopulateFields } from '@/utils';

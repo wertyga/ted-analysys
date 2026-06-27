@@ -1,5 +1,10 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
-import { TenderDocument } from '@/resources/tenders/schemas';
+import { TenderDocument, TenderModel } from '@/resources/tenders/schemas';
+import { filterModel } from '@/utils';
+import {
+  AwardTenderDocument,
+  AwardTenderModel,
+} from '@/resources/award-tender/schemas';
 
 export enum BuyerIdentifierType {
   TED_ORG_ID = 'TED_ORG_ID',
@@ -20,7 +25,7 @@ export type BuyerContact = {
   email: string;
   phone: string;
   fax: string;
-  url: string;
+  website: string;
   gateway: string;
 };
 
@@ -30,6 +35,45 @@ export type BuyerAddress = {
   city: string;
   country: string;
   countrySub: string;
+};
+
+export type BuyerTopCpvCodeStats = {
+  code: string;
+  count: number;
+};
+
+export type BuyerTopCountryStats = {
+  country: string;
+  count: number;
+};
+
+export type BuyerTopSupplierStats = {
+  winner: mongoose.Types.ObjectId;
+  wins: number;
+  totalAwardedValueEur: number;
+};
+
+export type BuyerStats = {
+  tendersCount: number;
+  awardTendersCount: number;
+
+  totalEstimatedValueEur: number;
+  totalAwardedValueEur: number;
+  avgEstimatedValueEur: number;
+  avgAwardedValueEur: number;
+
+  lastAwardDate?: Date;
+  firstPublicationDate?: Date;
+  lastPublicationDate?: Date;
+
+  topCpvCodes: BuyerTopCpvCodeStats[];
+  topCountries: BuyerTopCountryStats[];
+  topSuppliers: BuyerTopSupplierStats[];
+};
+
+export type BuyerIntelligence = {
+  incumbentRisk: string;
+  localSupplierSignal: string;
 };
 
 export type Buyer = {
@@ -150,20 +194,46 @@ export type Buyer = {
    *   */
   countries: string[];
 
-  tenders: TenderDocument[];
-
-  totalEstimatedValueEur: number; // TODO - nowhere
-  firstPublicationDate?: Date; // TODO - nowhere
-  lastPublicationDate?: Date; // TODO - nowhere
-
   organisationIdentifierBuyer: string;
-  // buyerCountry: string;
 
   createdAt: Date;
   updatedAt: Date;
+
+  stats: BuyerStats;
+  statsVersion: string;
+  intelligence?: BuyerIntelligence;
 };
 
 export type BuyerDocument = Document & Buyer;
+export type BuyerSerializable = BuyerDocument | (Buyer & { _id: unknown });
+
+export type BuyerListDto = Pick<
+  Buyer,
+  | '_id'
+  | 'name'
+  | 'contact'
+  | 'address'
+  | 'identifiers'
+  | 'legalTypes'
+  | 'mainActivities'
+  | 'profiles'
+  | 'websites'
+  | 'cpvCodes'
+  | 'countries'
+  | 'organisationIdentifierBuyer'
+  | 'createdAt'
+  | 'updatedAt'
+  | 'stats'
+  | 'statsVersion'
+  | 'intelligence'
+>;
+
+export type BuyerDetailDto = Buyer & {};
+
+export interface BuyerModelType extends Model<BuyerDocument> {
+  serializeList(buyer: BuyerSerializable): BuyerListDto;
+  serializeDetail(buyer: BuyerSerializable): BuyerDetailDto;
+}
 
 const BuyerIdentifierSchema = new Schema<BuyerIdentifier>(
   {
@@ -185,7 +255,7 @@ const BuyerContactSchema = new Schema<BuyerContact>(
     email: { type: String, default: '' },
     phone: { type: String, default: '' },
     fax: { type: String, default: '' },
-    url: { type: String, default: '' },
+    website: { type: String, default: '' },
     gateway: { type: String, default: '' },
   },
   { _id: false },
@@ -202,7 +272,62 @@ const BuyerAddressSchema = new Schema<BuyerAddress>(
   { _id: false },
 );
 
-export const BuyerSchema = new Schema<Buyer>(
+const BuyerTopCpvCodeStatsSchema = new Schema<BuyerTopCpvCodeStats>(
+  {
+    code: { type: String, required: true },
+    count: { type: Number, required: true },
+  },
+  { _id: false },
+);
+
+const BuyerTopCountryStatsSchema = new Schema<BuyerTopCountryStats>(
+  {
+    country: { type: String, required: true },
+    count: { type: Number, required: true },
+  },
+  { _id: false },
+);
+
+const BuyerTopSupplierStatsSchema = new Schema<BuyerTopSupplierStats>(
+  {
+    winner: {
+      type: Schema.Types.ObjectId,
+      ref: 'Contractor',
+      required: true,
+    },
+    wins: { type: Number, required: true },
+    totalAwardedValueEur: { type: Number, required: true },
+  },
+  { _id: false },
+);
+
+const BuyerStatsSchema = new Schema<BuyerStats>(
+  {
+    tendersCount: { type: Number, default: 0 },
+    avgAwardedValueEur: { type: Number, default: 0 },
+    avgEstimatedValueEur: { type: Number, default: 0 },
+    awardTendersCount: { type: Number, default: 0 },
+    totalAwardedValueEur: { type: Number, default: 0 },
+    totalEstimatedValueEur: { type: Number, default: 0 },
+    lastAwardDate: { type: Date },
+    firstPublicationDate: { type: Date },
+    lastPublicationDate: { type: Date },
+    topCpvCodes: { type: [BuyerTopCpvCodeStatsSchema], default: [] },
+    topCountries: { type: [BuyerTopCountryStatsSchema], default: [] },
+    topSuppliers: { type: [BuyerTopSupplierStatsSchema], default: [] },
+  },
+  { _id: false },
+);
+
+const BuyerIntelligenceSchema = new Schema<BuyerIntelligence>(
+  {
+    incumbentRisk: { type: String, default: '' },
+    localSupplierSignal: { type: String, default: '' },
+  },
+  { _id: false },
+);
+
+export const BuyerSchema = new Schema<BuyerDocument, BuyerModelType>(
   {
     name: { type: String, required: true, index: true },
 
@@ -218,10 +343,6 @@ export const BuyerSchema = new Schema<Buyer>(
       type: String,
       index: true,
     },
-    // buyerCountry: {
-    //   type: String,
-    //   index: true,
-    // },
 
     legalTypes: { type: [String], default: [], index: true },
     mainActivities: { type: [String], default: [], index: true },
@@ -229,17 +350,16 @@ export const BuyerSchema = new Schema<Buyer>(
     profiles: { type: [String], default: [] },
     websites: { type: [String], default: [] },
 
-    totalEstimatedValueEur: { type: Number, default: 0 },
-    firstPublicationDate: Date,
-    lastPublicationDate: Date,
     cpvCodes: { type: [String], default: [] },
     countries: { type: [String], default: [] },
     gateways: { type: [String], default: [] },
 
-    tenders: {
-      type: [Schema.Types.ObjectId],
-      ref: 'Tender',
-      default: [],
+    stats: {
+      type: BuyerStatsSchema,
+    },
+    statsVersion: { type: String, default: '' },
+    intelligence: {
+      type: BuyerIntelligenceSchema,
     },
   },
   { timestamps: true },
@@ -247,5 +367,37 @@ export const BuyerSchema = new Schema<Buyer>(
 
 BuyerSchema.index({ 'address.country': 1, organisationIdentifierBuyer: 1 });
 
-export const BuyerModel: Model<Buyer> =
-  mongoose.models.Buyer ?? mongoose.model<Buyer>('Buyer', BuyerSchema);
+BuyerSchema.statics.serializeList = function (
+  buyer: BuyerSerializable,
+): BuyerListDto {
+  return filterModel(buyer, {
+    includeFields: [
+      'name',
+      'contact',
+      'address',
+      'identifiers',
+      'legalTypes',
+      'mainActivities',
+      'profiles',
+      'websites',
+      'stats',
+      'cpvCodes',
+      'countries',
+      'organisationIdentifierBuyer',
+      'createdAt',
+      'updatedAt',
+      'statsVersion',
+      'intelligence',
+    ],
+  });
+};
+
+BuyerSchema.statics.serializeDetail = function (
+  buyer: BuyerSerializable,
+): BuyerDetailDto {
+  return filterModel(buyer);
+};
+
+export const BuyerModel: BuyerModelType =
+  (mongoose.models.Buyer as BuyerModelType | undefined) ??
+  mongoose.model<BuyerDocument, BuyerModelType>('Buyer', BuyerSchema);

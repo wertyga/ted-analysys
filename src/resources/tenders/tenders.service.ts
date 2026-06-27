@@ -31,8 +31,8 @@ import {
   extractPublicationNumberFromNotice,
   isRecord,
   isTedNotice,
+  tenderPopulateFields,
 } from '@/utils';
-import { tenderCpvPopulateFields } from '@/resources/tenders/utils/tender.utils';
 import { SortOrder, Types } from 'mongoose';
 import {
   TenderDeepAnalysisDocument,
@@ -47,23 +47,7 @@ import { CurrencySign } from '@/resources/codelist';
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 import { TENDER_COMPETITION_SEARCH_FIELDS } from '@/config/ted-search.config';
 import { BuyerService } from '@/resources/buyer/buyer.service';
-
-export interface GatherActiveTendersResult {
-  completed?: boolean;
-  totalCount?: number;
-  pagesFetched: number;
-  noticesFetched: number;
-  tendersSkipped: number;
-  tendersSaved: number;
-  resumeIterationNextToken?: string;
-  errorMessage?: string;
-}
-
-export interface MigrateTenderDateFieldsResult {
-  scanned: number;
-  updated: number;
-  skipped: number;
-}
+import { TMongoId } from '@/types';
 
 export interface SaveNewTedTendersResult {
   saved: number;
@@ -81,8 +65,6 @@ const OPTIONAL_TENDER_UNSET_FIELDS = [
   'noticeSubtype',
   'noticeVersion',
   'description',
-  'buyerInternetAddress',
-  'buyerProfile',
   'deadlineReceiptTender',
   'questionsDeadline',
   'plannedStartDate',
@@ -108,16 +90,36 @@ export class TendersService {
     private readonly buyerService: BuyerService,
   ) {}
 
+  private async updateTenderBuyerFromTEDNotice(
+    notice: TedNotice,
+    tenderId: TMongoId,
+  ): Promise<TenderDocument> {
+    const buyer = await this.buyerService.upsertBuyerFromTEDNotice(notice);
+
+    await TenderModel.findByIdAndUpdate(
+      tenderId,
+      {
+        $set: {
+          buyer: buyer._id,
+        },
+      },
+      { returnDocument: 'after' },
+    );
+
+    await this.buyerService.refreshBuyerTenderMeta(buyer._id);
+
+    return TenderModel.findById(tenderId).populate('buyer') as any;
+  }
+
   async upsertTender(notice: TedNotice): Promise<TenderDocument | undefined> {
     const normalizedTender = this.tenderNormalizer.normalizeTedNotice(notice);
     if (!normalizedTender.id) {
       return;
     }
 
-    const [estimatedValueEur, lotsWithEur, buyer] = await Promise.all([
+    const [estimatedValueEur, lotsWithEur] = await Promise.all([
       this.calculateEstimatedValueEur(normalizedTender),
       this.getLotsWithEurValues(normalizedTender.lots),
-      this.buyerService.upsertBuyerFromTEDNotice(notice),
     ]);
 
     const sourceHash = this.buildTenderSourceHash(normalizedTender);
@@ -135,15 +137,12 @@ export class TendersService {
           ...tenderSet,
           sourceHash,
         },
-        $setOnInsert: {
-          buyer: buyer._id,
-        },
         $unset: tenderUnset,
       },
       { returnDocument: 'after', upsert: true, strict: false },
-    ).populate('buyer');
+    );
 
-    return tenderDoc;
+    return this.updateTenderBuyerFromTEDNotice(notice, tenderDoc._id);
   }
 
   private async getLotsWithEurValues(
@@ -433,7 +432,7 @@ export class TendersService {
       { strict: false },
     );
 
-    return localTender.populate(tenderCpvPopulateFields);
+    return localTender;
   }
 
   async getNormalizedTenderWithBaseAnalysis(tedTender: any) {
@@ -449,7 +448,7 @@ export class TendersService {
     return tedTender;
   }
 
-  async fineLocalTenders(
+  async findLocalTenders(
     tenderQuery: Record<string, unknown>,
     options: {
       sort?: Record<string, SortOrder>;
@@ -461,7 +460,7 @@ export class TendersService {
       .sort(options.sort ?? {})
       .skip(options.skip ?? 0)
       .limit(options.limit ?? 0)
-      .populate(tenderCpvPopulateFields);
+      .populate(tenderPopulateFields);
   }
 
   async findMultipleLocalTendersWithBaseAnalysis(
@@ -473,7 +472,7 @@ export class TendersService {
     } = {},
     withoutBaseAnalysisGenerating?: boolean,
   ): Promise<TenderDocumentWithGeneralAnalysis[]> {
-    const localTenders = await this.fineLocalTenders(tenderQuery, options);
+    const localTenders = await this.findLocalTenders(tenderQuery, options);
 
     let generalAnalyses: TenderGeneralAnalysisDocument[] = [];
 
@@ -570,7 +569,9 @@ export class TendersService {
     }
 
     let savedTender: TenderDocument | null | undefined =
-      await TenderModel.findOne({ id: publicationNumber }).exec();
+      await TenderModel.findOne({ id: publicationNumber })
+        .populate(tenderPopulateFields)
+        .exec();
 
     const shouldUpsertTender = this.shouldUpdateTenderFromTedNotice(
       savedTender,
@@ -621,9 +622,7 @@ export class TendersService {
 
     return TenderModel.findOne({
       id: publicationNumber,
-    })
-      .populate(tenderCpvPopulateFields)
-      .exec();
+    }).populate(tenderPopulateFields);
   }
 
   toWholeTenderListDto(

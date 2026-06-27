@@ -62,7 +62,6 @@ export interface TenderForMatching {
   contractNature?: string | null;
   procedureType?: string | null;
   languages?: string[];
-  buyerName?: string | null;
   lotTitles?: string[];
   lotDescriptions?: string[];
 }

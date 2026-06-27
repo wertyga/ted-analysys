@@ -28,7 +28,6 @@ export class TedSearchFilters {
           { 'lots.title': this.buildTextRegex(resolvedFilters.text) },
           { description: this.buildTextRegex(resolvedFilters.text) },
           { 'lots.description': this.buildTextRegex(resolvedFilters.text) },
-          { buyerName: this.buildTextRegex(resolvedFilters.text) },
           { id: this.buildTextRegex(resolvedFilters.text) },
         ],
       });
@@ -40,34 +39,6 @@ export class TedSearchFilters {
 
     if (cpvCodes.length) {
       parts.push({ cpvCodes: { $in: cpvCodes } });
-    }
-
-    const buyerCountries = normalizeTedCountryCodes(
-      resolvedFilters.buyerCountries,
-    );
-
-    if (buyerCountries.length) {
-      parts.push({ buyerCountry: { $in: buyerCountries } }); // TODO
-    }
-
-    if (resolvedFilters.buyerName?.trim()) {
-      parts.push({ buyerName: this.buildTextRegex(resolvedFilters.buyerName) });
-    }
-
-    if (resolvedFilters.buyerIdentifier?.trim()) {
-      parts.push({
-        buyerIdentifier: this.buildTextRegex(resolvedFilters.buyerIdentifier),
-      });
-    }
-
-    if (resolvedFilters.buyerCity?.trim()) {
-      parts.push({ buyerCity: this.buildTextRegex(resolvedFilters.buyerCity) });
-    }
-
-    if (resolvedFilters.buyerMainActivity?.length) {
-      parts.push({
-        buyerMainActivities: { $in: resolvedFilters.buyerMainActivity },
-      });
     }
 
     const placeOfPerformance = normalizeTedCountryCodes(

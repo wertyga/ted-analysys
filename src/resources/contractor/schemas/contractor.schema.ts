@@ -1,5 +1,9 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
-import { AwardTenderDocument } from '@/resources/award-tender/schemas';
+import {
+  AwardTenderDocument,
+  AwardTenderModel,
+} from '@/resources/award-tender/schemas';
+import { filterModel } from '@/utils';
 
 export interface Contractor {
   _id?: string;
@@ -22,8 +26,22 @@ export interface Contractor {
 }
 
 export type ContractorDocument = Contractor & Document;
+export type ContractorRecord = Contractor & { _id: unknown };
+export type ContractorSerializable = ContractorDocument | ContractorRecord;
+export type ContractorListDto = Omit<Contractor, 'awardTenders'>;
+export type ContractorDetailDto = Omit<Contractor, 'awardTenders'> & {
+  awardTenders: ReturnType<typeof AwardTenderModel.serializeList>[];
+};
 
-export const ContractorSchema = new Schema<ContractorDocument>(
+export interface ContractorModelType extends Model<ContractorDocument> {
+  serializeList(contractor: ContractorSerializable): ContractorListDto;
+  serializeDetail(contractor: ContractorSerializable): ContractorDetailDto;
+}
+
+export const ContractorSchema = new Schema<
+  ContractorDocument,
+  ContractorModelType
+>(
   {
     name: { type: String, trim: true },
     identifier: { type: String, trim: true },
@@ -66,6 +84,28 @@ ContractorSchema.index({ email: 1 });
 ContractorSchema.index({ name: 1 });
 ContractorSchema.index({ euRegistrationNumber: 1 });
 
-export const ContractorModel: Model<ContractorDocument> =
-  (mongoose.models.Contractor as Model<ContractorDocument> | undefined) ??
-  mongoose.model<ContractorDocument>('Contractor', ContractorSchema);
+ContractorSchema.statics.serializeList = function (
+  contractor: ContractorSerializable,
+): ContractorListDto {
+  return filterModel(contractor, {
+    excludeFields: ['awardTenders'],
+  }) as ContractorListDto;
+};
+
+ContractorSchema.statics.serializeDetail = function (
+  contractor: ContractorSerializable,
+): ContractorDetailDto {
+  const { awardTenders, ...serializedContractor } = filterModel(contractor);
+
+  return {
+    ...serializedContractor,
+    awardTenders: awardTenders.map(AwardTenderModel.serializeList),
+  } as ContractorDetailDto;
+};
+
+export const ContractorModel: ContractorModelType =
+  (mongoose.models.Contractor as ContractorModelType | undefined) ??
+  mongoose.model<ContractorDocument, ContractorModelType>(
+    'Contractor',
+    ContractorSchema,
+  );

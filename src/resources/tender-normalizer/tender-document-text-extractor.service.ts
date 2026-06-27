@@ -769,7 +769,7 @@ const extraction = await this.textExtractor.extractAndPrepareText({
   isMultilingual: doc.isMultilingual,
   documentType: doc.documentType,
   content: downloadedBuffer,
-  buyerCountry: tender.buyerCountry,
+  buyerCountry: tender.buyer.address.country,
 });
 
 await this.sourceDocumentModel.updateOne(

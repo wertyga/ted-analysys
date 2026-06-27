@@ -8,7 +8,7 @@ import {
   TenderMatchDecision,
   HardMatchStatus,
 } from './tender-match.types';
-import fs from 'node:fs';
+
 import { TENDER_MATCHING_CONFIG } from '@/config/tender-matching.config';
 
 export function normalizeCpv(cpv: string): string {
@@ -19,7 +19,7 @@ export function buildTenderText(tender: TenderForMatching): string {
   return [
     tender.title,
     tender.description,
-    tender.buyerName,
+    tender.buyer.name,
     ...(tender.cpvCodes ?? []),
     ...(tender.lotTitles ?? []),
     ...(tender.lotDescriptions ?? []),

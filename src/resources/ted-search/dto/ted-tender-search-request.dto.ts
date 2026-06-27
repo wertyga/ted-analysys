@@ -22,9 +22,7 @@ import {
   TedTenderSortColumn,
 } from '../types/ted-search.types';
 import {
-  BuyerMainActivity,
   CurrencySign,
-  TED_ELIGIBLE_COUNTRIES,
   TED_ELIGIBLE_COUNTRY_CODES,
   type TedEligibleCountryCode,
 } from '@/resources/codelist';
@@ -89,47 +87,6 @@ export class TedTenderSearchRequestDto implements TedTenderSearchFilters {
   @IsString({ each: true })
   @IsNotEmpty({ each: true })
   publicationNumber?: string[];
-
-  @ApiPropertyOptional({
-    enum: TED_ELIGIBLE_COUNTRY_CODES,
-    isArray: true,
-    example: ['POL', 'DEU'],
-  })
-  @IsOptional()
-  @IsArray()
-  @ArrayNotEmpty()
-  @Transform(({ value }) => normalizeCountryInput(value))
-  @IsIn(TED_ELIGIBLE_COUNTRY_CODES, { each: true })
-  buyerCountries?: TedEligibleCountryCode[]; // ++
-
-  @ApiPropertyOptional({ example: 'Warsaw City Hall' })
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  buyerName?: string; // ++
-
-  @ApiPropertyOptional({ example: '12345' })
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  buyerIdentifier?: string; // ++
-
-  @ApiPropertyOptional({ example: 'warsaw' })
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  buyerCity?: string; // ++
-
-  @ApiPropertyOptional({
-    enum: BuyerMainActivity,
-    isArray: true,
-    example: [BuyerMainActivity.EDUCATION],
-  })
-  @IsOptional()
-  @IsArray()
-  @ArrayNotEmpty()
-  @IsEnum(BuyerMainActivity, { each: true })
-  buyerMainActivity?: BuyerMainActivity[]; // ++
 
   @ApiPropertyOptional({
     enum: TED_ELIGIBLE_COUNTRY_CODES,

@@ -6,6 +6,7 @@ import {
 import { TenderDocument } from '../tenders/schemas';
 import { CompanyTenderFilterDocument } from '@/resources/company-filter/company-filter.schema';
 import { TenderGeneralAnalysisDocument } from '../tender-analysis/schemas';
+import { BuyerModel } from '@/resources/buyer/schemas';
 
 @Injectable()
 export class TenderDeepAnalysisBuilder {
@@ -27,6 +28,7 @@ export class TenderDeepAnalysisBuilder {
       companyDocumentEvidence,
     };
   }
+
   buildInput(params: {
     tender: TenderDocument;
     generalAnalysis: TenderGeneralAnalysisDocument;
@@ -54,8 +56,12 @@ export class TenderDeepAnalysisBuilder {
       tenderValueEur: params.tender.estimatedValueEur || null,
       isExpired: deadline ? deadline.getTime() < now.getTime() : false,
     } as any;
+
     return {
-      tender: params.tender as any,
+      tender: {
+        ...params.tender,
+        buyer: BuyerModel.serializeDetail(params.tender.buyer),
+      },
       generalAnalysis: params.generalAnalysis,
       company: params.company,
       companyAnalysis: params.companyAnalysis,

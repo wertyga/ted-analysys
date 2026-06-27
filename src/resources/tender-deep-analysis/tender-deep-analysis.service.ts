@@ -9,7 +9,7 @@ import {
   getSafeErrorMessage,
   logger,
   QueueAsyncConcurrency,
-  tenderCpvPopulateFields,
+  tenderPopulateFields,
   toRecord,
 } from '@/utils';
 import { UserModel } from '../user/user.schema';
@@ -73,7 +73,7 @@ export class TenderDeepAnalysisService {
     });
     try {
       const [tender, company] = await Promise.all([
-        TenderModel.findOne({ id: tenderId }).populate(tenderCpvPopulateFields),
+        TenderModel.findOne({ id: tenderId }).populate(tenderPopulateFields),
         UserModel.findById(companyId).populate(companyCpvPopulateFields),
       ]);
       if (!tender) {

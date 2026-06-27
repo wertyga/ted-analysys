@@ -167,6 +167,10 @@ export default function AdminApp() {
   const [shortTitlesLoading, setShortTitlesLoading] = useState(false);
   const [dbCopyResult, setDbCopyResult] = useState<DbCopyResult | null>(null);
   const [dbCopyLoading, setDbCopyLoading] = useState(false);
+  const [collectTenderBuyersLoading, setCollectTenderBuyersLoading] =
+    useState(false);
+  const [collectAwardBuyersLoading, setCollectAwardBuyersLoading] =
+    useState(false);
   const [gatherAllStatus, setGatherAllStatus] =
     useState<GatherAllCompetitionTendersStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -608,6 +612,66 @@ export default function AdminApp() {
     }
   }
 
+  async function collectBuyersFromTenders() {
+    const confirmed = window.confirm(
+      'Start buyer collection for all saved tenders? This can take a long time.',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setCollectTenderBuyersLoading(true);
+    setMessage('');
+
+    try {
+      await request('/adm/tech/buyers/collect', {
+        method: 'POST',
+        token,
+      });
+
+      setMessage('Tender buyer collection finished.');
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Failed to collect buyers from tenders',
+      );
+    } finally {
+      setCollectTenderBuyersLoading(false);
+    }
+  }
+
+  async function collectBuyersFromAwardTenders() {
+    const confirmed = window.confirm(
+      'Start buyer collection for all saved award tenders? This can take a long time.',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setCollectAwardBuyersLoading(true);
+    setMessage('');
+
+    try {
+      await request('/adm/tech/buyers/collect-awards', {
+        method: 'POST',
+        token,
+      });
+
+      setMessage('Award tender buyer collection finished.');
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Failed to collect buyers from award tenders',
+      );
+    } finally {
+      setCollectAwardBuyersLoading(false);
+    }
+  }
+
   return (
     <main className="shell">
       <aside className="sidebar">
@@ -764,6 +828,64 @@ export default function AdminApp() {
                     ) : (
                       <Tag>UNKNOWN</Tag>
                     )}
+                  </div>
+                </section>
+
+                <section className="panel panelWide">
+                  <div className="panelHeader">
+                    <div>
+                      <h2>Buyer collection</h2>
+                      <p>
+                        Backfill buyer references and buyer aggregate metadata
+                        from saved tender and award tender notices.
+                      </p>
+                    </div>
+                    <div className="buttonGroup">
+                      <button
+                        disabled={collectTenderBuyersLoading}
+                        onClick={collectBuyersFromTenders}
+                        type="button"
+                      >
+                        {collectTenderBuyersLoading
+                          ? 'Collecting tenders...'
+                          : 'Collect tender buyers'}
+                      </button>
+                      <button
+                        className="secondaryButton"
+                        disabled={collectAwardBuyersLoading}
+                        onClick={collectBuyersFromAwardTenders}
+                        type="button"
+                      >
+                        {collectAwardBuyersLoading
+                          ? 'Collecting awards...'
+                          : 'Collect award buyers'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="statusList">
+                    <div>
+                      <span>Tender buyers</span>
+                      <Tag
+                        color={
+                          collectTenderBuyersLoading ? 'processing' : 'default'
+                        }
+                      >
+                        {collectTenderBuyersLoading ? 'RUNNING' : 'IDLE'}
+                      </Tag>
+                    </div>
+                    <div>
+                      <span>Award tender buyers</span>
+                      <Tag
+                        color={
+                          collectAwardBuyersLoading
+                            ? 'processing'
+                            : 'default'
+                        }
+                      >
+                        {collectAwardBuyersLoading ? 'RUNNING' : 'IDLE'}
+                      </Tag>
+                    </div>
                   </div>
                 </section>
 
