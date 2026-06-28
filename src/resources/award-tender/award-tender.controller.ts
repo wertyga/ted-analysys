@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiOkResponse,
@@ -9,15 +9,11 @@ import {
 } from '@nestjs/swagger';
 import { AwardTenderAwardsRequestDto } from './dto/award-tender-awards-request.dto';
 import { AwardTenderService } from './award-tender.service';
-import { TendersService } from '@/resources/tenders/tenders.service';
 
 @ApiTags('award-tender')
 @Controller('award-tender')
 export class AwardTenderController {
-  constructor(
-    private readonly awardTenderService: AwardTenderService,
-    private readonly tendersService: TendersService,
-  ) {}
+  constructor(private readonly awardTenderService: AwardTenderService) {}
 
   @Get('/awards')
   @ApiOperation({

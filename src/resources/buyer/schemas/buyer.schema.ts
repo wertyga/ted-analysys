@@ -5,6 +5,7 @@ import {
   AwardTenderDocument,
   AwardTenderModel,
 } from '@/resources/award-tender/schemas';
+import { Contractor, ContractorModel } from '@/resources/contractor/schemas';
 
 export enum BuyerIdentifierType {
   TED_ORG_ID = 'TED_ORG_ID',
@@ -220,25 +221,20 @@ export type Buyer = {
 export type BuyerDocument = Document & Buyer;
 export type BuyerSerializable = BuyerDocument | (Buyer & { _id: unknown });
 
+const BUYER_LIST_FIELDS = [
+  'name',
+  'address',
+  'legalTypes',
+  'mainActivities',
+  'organisationIdentifierBuyer',
+  'stats',
+  'intelligence',
+  'updatedAt',
+] satisfies Array<keyof Buyer>;
+
 export type BuyerListDto = Pick<
   Buyer,
-  | '_id'
-  | 'name'
-  | 'contact'
-  | 'address'
-  | 'identifiers'
-  | 'legalTypes'
-  | 'mainActivities'
-  | 'profiles'
-  | 'websites'
-  | 'cpvCodes'
-  | 'countries'
-  | 'organisationIdentifierBuyer'
-  | 'createdAt'
-  | 'updatedAt'
-  | 'stats'
-  | 'statsVersion'
-  | 'intelligence'
+  '_id' | (typeof BUYER_LIST_FIELDS)[number]
 >;
 
 export type BuyerDetailDto = Buyer & {};
@@ -399,33 +395,62 @@ BuyerSchema.index({ 'address.country': 1, organisationIdentifierBuyer: 1 });
 
 BuyerSchema.statics.serializeList = function (
   buyer: BuyerSerializable,
-): BuyerListDto {
-  return filterModel(buyer, {
-    includeFields: [
-      'name',
-      'contact',
-      'address',
-      'identifiers',
-      'legalTypes',
-      'mainActivities',
-      'profiles',
-      'websites',
-      'stats',
-      'cpvCodes',
-      'countries',
-      'organisationIdentifierBuyer',
-      'createdAt',
-      'updatedAt',
-      'statsVersion',
-      'intelligence',
-    ],
+): BuyerListDto | null | string {
+  const serializedBuyer = filterModel(buyer, {
+    includeFields: BUYER_LIST_FIELDS,
   });
+
+  if (!serializedBuyer) {
+    return null;
+  }
+
+  if (typeof serializedBuyer === 'string') {
+    return serializedBuyer;
+  }
+
+  return {
+    ...serializedBuyer,
+    stats: {
+      ...(serializedBuyer.stats ?? {}),
+      topSuppliers:
+        serializedBuyer.stats?.topSuppliers.map((s) => {
+          return {
+            ...s,
+            winner: ContractorModel.serializeList(s.winner),
+          };
+        }) ?? [],
+    },
+  };
 };
 
 BuyerSchema.statics.serializeDetail = function (
   buyer: BuyerSerializable,
-): BuyerDetailDto {
-  return filterModel(buyer);
+): BuyerDetailDto | null | string {
+  const serializedBuyer = filterModel(buyer, {
+    excludeFields: ['statsVersion'],
+  });
+
+  if (!serializedBuyer) {
+    return null;
+  }
+
+  if (typeof serializedBuyer === 'string') {
+    return serializedBuyer;
+  }
+
+  return {
+    ...serializedBuyer,
+    stats: {
+      ...(serializedBuyer.stats ?? {}),
+      topSuppliers:
+        serializedBuyer.stats?.topSuppliers.map((s) => {
+          return {
+            ...s,
+            winner: ContractorModel.serializeList(s.winner),
+          };
+        }) ?? [],
+    },
+  };
 };
 
 export const BuyerModel: BuyerModelType =

@@ -25,13 +25,34 @@ export interface Contractor {
   updatedAt?: Date;
 }
 
+const CONTRACTOR_LIST_FIELDS = [
+  'name',
+  'identifier',
+  'countries',
+  'countrySubs',
+  'cities',
+  'postCodes',
+  'email',
+  'cpvCodes',
+  'createdAt',
+] satisfies Array<keyof Contractor>;
+
+export type ContractorAwardSummary = {
+  awardTendersCount?: number;
+  totalAwardedValueEur?: number;
+};
+
 export type ContractorDocument = Contractor & Document;
 export type ContractorRecord = Contractor & { _id: unknown };
 export type ContractorSerializable = ContractorDocument | ContractorRecord;
-export type ContractorListDto = Omit<Contractor, 'awardTenders'>;
+export type ContractorListDto = Pick<
+  Contractor,
+  '_id' | (typeof CONTRACTOR_LIST_FIELDS)[number]
+> &
+  ContractorAwardSummary;
 export type ContractorDetailDto = Omit<Contractor, 'awardTenders'> & {
   awardTenders: ReturnType<typeof AwardTenderModel.serializeList>[];
-};
+} & ContractorAwardSummary;
 
 export interface ContractorModelType extends Model<ContractorDocument> {
   serializeList(contractor: ContractorSerializable): ContractorListDto;
@@ -88,14 +109,15 @@ ContractorSchema.statics.serializeList = function (
   contractor: ContractorSerializable,
 ): ContractorListDto {
   return filterModel(contractor, {
-    excludeFields: ['awardTenders'],
+    includeFields: CONTRACTOR_LIST_FIELDS,
   }) as ContractorListDto;
 };
 
 ContractorSchema.statics.serializeDetail = function (
   contractor: ContractorSerializable,
 ): ContractorDetailDto {
-  const { awardTenders, ...serializedContractor } = filterModel(contractor);
+  const { awardTenders = [], ...serializedContractor } =
+    filterModel(contractor);
 
   return {
     ...serializedContractor,

@@ -64,21 +64,17 @@ export class AuthController {
     @Body() data: OauthSignInDto,
     @Headers(FREE_USE_COUPON_HEADER) couponCode?: string,
   ) {
-    try {
-      const user = await this.authService.oauthSignIn(data);
+    const user = await this.authService.oauthSignIn(data);
 
-      if (couponCode) {
-        await this.couponService.redeemFreeUseCouponForUser(user, couponCode);
-      }
-
-      return {
-        user: UserModel.serializeUser(user, undefined, {
-          excludeFields: AUTH_EXCLUDE_FIELDS,
-        }),
-      };
-    } catch (e) {
-      console.log({ e });
+    if (couponCode) {
+      await this.couponService.redeemFreeUseCouponForUser(user, couponCode);
     }
+
+    return {
+      user: UserModel.serializeUser(user, undefined, {
+        excludeFields: AUTH_EXCLUDE_FIELDS,
+      }),
+    };
   }
 
   @ApiBody({ type: SignInUserDto })

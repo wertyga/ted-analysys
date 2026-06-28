@@ -1,10 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { logger, normalizeEmail } from '@/utils';
-import { Contractor, ContractorDocument, ContractorModel } from './schemas';
-import { QueryFilter } from 'mongoose';
+import {
+  Contractor,
+  ContractorDocument,
+  ContractorListDto,
+  ContractorModel,
+  ContractorSerializable,
+} from './schemas';
+import { QueryFilter, Types } from 'mongoose';
 import { getPaginationMeta } from '@/utils';
 import { ContractorListRequestDto } from './dto/contractor-list-request.dto';
 import { ContractorSearchRequestDto } from './dto/contractor-search-request.dto';
+import { AwardTenderModel } from '@/resources/award-tender/schemas';
 
 export type WinnerNormalized = Omit<
   Contractor,
@@ -13,6 +20,66 @@ export type WinnerNormalized = Omit<
 
 @Injectable()
 export class ContractorService {
+  private async getContractorAwardSummaryByIds(contractorIds: string[]) {
+    const objectIds = contractorIds
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+
+    if (!objectIds.length) {
+      return new Map<string, { awardTendersCount: number; totalAwardedValueEur: number }>();
+    }
+
+    const stats = await AwardTenderModel.aggregate<{
+      _id: Types.ObjectId;
+      awardTendersCount: number;
+      totalAwardedValueEur: number;
+    }>([
+      { $unwind: '$winners' },
+      { $match: { winners: { $in: objectIds } } },
+      {
+        $group: {
+          _id: '$winners',
+          awardTendersCount: { $sum: 1 },
+          totalAwardedValueEur: { $sum: { $ifNull: ['$awardValueEur', 0] } },
+        },
+      },
+    ]);
+
+    return new Map(
+      stats.map((item) => [
+        item._id.toString(),
+        {
+          awardTendersCount: item.awardTendersCount,
+          totalAwardedValueEur: item.totalAwardedValueEur,
+        },
+      ]),
+    );
+  }
+
+  private async serializeListWithAwardSummary(
+    contractors: ContractorSerializable[],
+  ): Promise<ContractorListDto[]> {
+    const serializedContractors = contractors.map((contractor) =>
+      ContractorModel.serializeList(contractor),
+    );
+    const contractorIds = serializedContractors.flatMap((contractor) =>
+      contractor._id ? [contractor._id.toString()] : [],
+    );
+    const statsByContractorId = await this.getContractorAwardSummaryByIds(
+      contractorIds,
+    );
+
+    return serializedContractors.map((contractor) => ({
+      ...contractor,
+      awardTendersCount:
+        statsByContractorId.get(contractor._id?.toString() ?? '')
+          ?.awardTendersCount ?? 0,
+      totalAwardedValueEur:
+        statsByContractorId.get(contractor._id?.toString() ?? '')
+          ?.totalAwardedValueEur ?? 0,
+    }));
+  }
+
   async searchContractors({
     cpvCodes,
     countries,
@@ -41,9 +108,7 @@ export class ContractorService {
 
     return {
       totalCount,
-      contractors: contractors.map((contractor) =>
-        ContractorModel.serializeList(contractor),
-      ),
+      contractors: await this.serializeListWithAwardSummary(contractors),
     };
   }
 
@@ -87,8 +152,77 @@ export class ContractorService {
 
     return {
       totalCount,
-      contractors: contractors.map((contractor) =>
-        ContractorModel.serializeList(contractor),
+      contractors: await this.serializeListWithAwardSummary(contractors),
+    };
+  }
+
+  async getContractorById(id: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid contractor id');
+    }
+
+    const contractor = await ContractorModel.findById(id)
+      .populate({
+        path: 'awardTenders',
+        options: { sort: { publicationDate: -1, _id: -1 } },
+        populate: [
+          { path: 'buyer' },
+          { path: 'winners' },
+        ],
+      })
+      .exec();
+
+    if (!contractor) {
+      throw new NotFoundException('Contractor not found');
+    }
+
+    const statsByContractorId = await this.getContractorAwardSummaryByIds([id]);
+    const stats = statsByContractorId.get(id) ?? {
+      awardTendersCount: 0,
+      totalAwardedValueEur: 0,
+    };
+
+    return {
+      ...ContractorModel.serializeDetail(contractor),
+      ...stats,
+    };
+  }
+
+  async getContractorAwardTenders(
+    id: string,
+    pagination: { page?: number; limit?: number } = {},
+  ) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid contractor id');
+    }
+
+    const contractorExists = await ContractorModel.exists({
+      _id: new Types.ObjectId(id),
+    } as never);
+
+    if (!contractorExists) {
+      throw new NotFoundException('Contractor not found');
+    }
+
+    const query = {
+      winners: new Types.ObjectId(id),
+    };
+    const { skip, limit } = getPaginationMeta(pagination);
+    const [awardTenders, totalCount] = await Promise.all([
+      AwardTenderModel.find(query)
+        .sort({ publicationDate: -1, _id: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('buyer')
+        .populate('winners')
+        .exec(),
+      AwardTenderModel.countDocuments(query),
+    ]);
+
+    return {
+      totalCount,
+      awardTenders: awardTenders.map((awardTender) =>
+        AwardTenderModel.serializeList(awardTender),
       ),
     };
   }

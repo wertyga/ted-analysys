@@ -13,6 +13,17 @@ import { TENDER_COMPETITION_SEARCH_FIELDS } from '@/config/ted-search.config';
 import { AwardTenderModel } from '@/resources/award-tender/schemas';
 import { AWARD_HISTORY_FIELDS } from '@/config/award-tender.config';
 
+const LEGACY_TENDER_BUYER_FIELDS = [
+  'buyerName',
+  'buyerIdentifier',
+  'buyerCountry',
+  'buyerCity',
+  'buyerMainActivities',
+  'buyerEmail',
+  'buyerInternetAddress',
+  'buyerProfile',
+] as const;
+
 @Injectable()
 export class BuyerTechService {
   normalizer = new BuyerNormalizer();
@@ -32,40 +43,33 @@ export class BuyerTechService {
   }
 
   async collectBuyersFromTenderAndUnsetTenderFields(notice: TedNotice) {
+    const buyer = await this.buyerService.upsertBuyerFromTEDNotice(notice);
+
     const tender = await TenderModel.findOneAndUpdate(
       { id: notice['publication-number'] },
       {
-        $unset: {
-          buyerName: 1,
-          buyerIdentifier: 1,
-          buyerCountry: 1,
-          buyerCity: 1,
-          buyerMainActivities: 1,
-          buyerEmail: 1,
-          buyerInternetAddress: 1,
-          buyerProfile: 1,
+        $set: {
+          buyer: buyer._id,
         },
+        $unset: Object.fromEntries(
+          LEGACY_TENDER_BUYER_FIELDS.map((field) => [field, '']),
+        ),
       },
-      { returnDocument: 'after' },
+      { returnDocument: 'after', strict: false },
     );
+
     if (!tender) {
       return;
     }
 
-    const buyer = await this.buyerService.upsertBuyerFromTEDNotice(notice);
-
-    await TenderModel.findByIdAndUpdate(tender._id, {
-      $set: {
-        buyer: buyer._id,
-      },
-    });
     await this.buyerService.refreshBuyerTenderMeta(buyer._id);
 
     return buyer;
   }
 
   async collectBuyersFromTenderAllAndUnsetTenderFields() {
-    const tenders = await TenderModel.find({}).select('id').lean();
+    const tenders = [{ id: '417784-2026' }];
+    // const tenders = await TenderModel.find({}).select('id').lean();
 
     const chunkedIds = _chunk(tenders, 100);
 

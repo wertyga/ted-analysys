@@ -40,7 +40,7 @@ import {
   BuyerIntelligenceDocument,
   BuyerIntelligenceModel,
   BuyerIntelligenceSerializable,
-} from './schemsa';
+} from './schemas';
 import {
   BuyerIntelligenceAiPayload,
   BuyerIntelligenceCpvPayload,
@@ -444,9 +444,7 @@ export class BuyerIntelligenceService {
       this.generateAndSaveBuyerIntelligence(params),
     );
 
-    return BuyerIntelligenceModel.serializeList(
-      analysis,
-    ) as BuyerIntelligenceDocument;
+    return analysis;
   }
 
   private hasBuyerIntelligenceToBeRecalculated(

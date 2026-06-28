@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
 
 import { TenderDocument, TenderModel } from '@/resources/tenders/schemas';
@@ -17,7 +17,7 @@ import {
   getPaginationMeta,
   getStringArrayValue,
 } from '@/utils';
-import { QueryFilter } from 'mongoose';
+import { QueryFilter, Types } from 'mongoose';
 import {
   AwardTenderNormalizer,
   NormalizedAwardTenderLot,
@@ -104,6 +104,38 @@ export class AwardTenderService {
       totalNoticeCount: totalCount,
       notices: savedTenders.map((tender) =>
         AwardTenderModel.serializeList(tender),
+      ),
+    };
+  }
+
+  async getAwardTendersByBuyerId(
+    buyerId: string,
+    pagination: { page?: number; limit?: number } = {},
+  ) {
+    if (!Types.ObjectId.isValid(buyerId)) {
+      throw new BadRequestException('Invalid buyer id');
+    }
+
+    const query: QueryFilter<AwardTenderDocument> = {
+      buyer: buyerId,
+    };
+
+    const { skip, limit } = getPaginationMeta(pagination);
+    const [awardTenders, totalCount] = await Promise.all([
+      AwardTenderModel.find(query)
+        .sort({ publicationDate: -1, _id: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('buyer')
+        .populate('winners')
+        .exec(),
+      AwardTenderModel.countDocuments(query),
+    ]);
+
+    return {
+      totalCount,
+      awardTenders: awardTenders.map((awardTender) =>
+        AwardTenderModel.serializeList(awardTender),
       ),
     };
   }

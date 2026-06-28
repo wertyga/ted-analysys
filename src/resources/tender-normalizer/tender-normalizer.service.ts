@@ -337,7 +337,7 @@ export class TenderNormalizerService {
       resulValueCur: getStringValue('result-value-cur-notice', notice),
 
       noticeLanguage: getStringValue('official-language', notice),
-      submissionLanguages: getStringArrayValue('submission-language', notice),
+      submissionLanguages: getUniqArray('submission-language', notice),
     };
 
     const lotsCodes: string[] = lots.flatMap(

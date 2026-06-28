@@ -108,7 +108,6 @@ export const filterModel = <T extends Record<string, any>>(
 
   const serializedDocument =
     'toObject' in document ? document.toObject() : document;
-  serializedDocument._id = serializedDocument._id.toString();
 
   for (const key in serializedDocument) {
     if (/^_/.test(key) && key !== '_id') {

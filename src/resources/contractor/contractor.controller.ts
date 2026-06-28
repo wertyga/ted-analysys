@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import {
   ApiOkResponse,
   ApiOperation,
@@ -8,6 +8,7 @@ import {
 import { ContractorService } from './contractor.service';
 import { ContractorListRequestDto } from './dto/contractor-list-request.dto';
 import { ContractorSearchRequestDto } from './dto/contractor-search-request.dto';
+import { ContractorAwardTendersRequestDto } from './dto/contractor-award-tenders-request.dto';
 
 @ApiTags('contractors')
 @Controller('contractors')
@@ -35,5 +36,26 @@ export class ContractorController {
   @ApiOkResponse({ description: 'Contractor stats.' })
   getContractorStats() {
     return this.contractorService.getContractorStats();
+  }
+
+  @Get(':id/award-tenders')
+  @ApiOperation({ summary: 'Get contractor award tenders' })
+  @ApiQuery({ type: ContractorAwardTendersRequestDto })
+  @ApiOkResponse({ description: 'Contractor award tenders.' })
+  getContractorAwardTenders(
+    @Param('id') id: string,
+    @Query() query: ContractorAwardTendersRequestDto,
+  ) {
+    return this.contractorService.getContractorAwardTenders(id, {
+      page: query.page,
+      limit: query.limit,
+    });
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get contractor details' })
+  @ApiOkResponse({ description: 'Contractor details.' })
+  getContractorById(@Param('id') id: string) {
+    return this.contractorService.getContractorById(id);
   }
 }

@@ -1,5 +1,5 @@
-import mongoose, { Types } from 'mongoose';
-import { Injectable } from '@nestjs/common';
+import mongoose, { QueryFilter, Types } from 'mongoose';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { BuyerNormalizer } from './buyer.normalizer';
 import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
 import {
@@ -8,7 +8,11 @@ import {
   BuyerModel,
   BuyerStats,
 } from './schemas';
-import { getMongoRelationObjectIdArray, getUniqArray } from '@/utils';
+import {
+  getMongoRelationObjectIdArray,
+  getPaginationMeta,
+  getUniqArray,
+} from '@/utils';
 
 import { TenderModel } from '@/resources/tenders/schemas';
 import {
@@ -26,6 +30,7 @@ import {
 } from './buyer-utils';
 import { ContractorModel } from '@/resources/contractor/schemas';
 import { getLegalTypes, getMainActivities } from '@/resources/codelist';
+import { BuyerListRequestDto } from './dto/buyer-list-request.dto';
 
 type BuyerTenderMeta = {
   stats: BuyerStats;
@@ -33,9 +38,145 @@ type BuyerTenderMeta = {
   statsVersion: number;
 };
 
+const BUYER_RECENT_TENDERS_LIMIT = 10;
+
+type BuyerMeta = {
+  countries: Array<{ country: string; count: number }>;
+  cpvCodes: Array<{ cpvCode: string; count: number }>;
+  legalTypes: Array<{ code: string; name: string; count: number }>;
+};
+
 @Injectable()
 export class BuyerService {
   normalizer = new BuyerNormalizer();
+
+  async getBuyers({
+    q,
+    countries,
+    cpvCodes,
+    page,
+    limit,
+  }: BuyerListRequestDto) {
+    const query: QueryFilter<BuyerDocument> = {};
+
+    if (countries?.length) {
+      query['address.country'] = { $in: countries };
+    }
+
+    if (cpvCodes?.length) {
+      query.cpvCodes = { $in: cpvCodes };
+    }
+
+    const trimmedQuery = q?.trim();
+
+    if (trimmedQuery) {
+      const searchPattern = new RegExp(this.escapeRegExp(trimmedQuery), 'i');
+
+      query.$or = [
+        { name: searchPattern },
+        { organisationIdentifierBuyer: searchPattern },
+        { 'identifiers.value': searchPattern },
+        { 'contact.email': searchPattern },
+        { 'address.city': searchPattern },
+        { 'address.country': searchPattern },
+      ];
+    }
+
+    const pagination = getPaginationMeta({ page, limit });
+    const [buyers, totalCount] = await Promise.all([
+      BuyerModel.find(query)
+        .sort({ name: 1, _id: 1 })
+        .skip(pagination.skip)
+        .limit(pagination.limit),
+      BuyerModel.countDocuments(query),
+    ]);
+
+    return {
+      totalCount,
+      buyers: buyers.map((buyer) => BuyerModel.serializeList(buyer)),
+    };
+  }
+
+  async getBuyerMeta(): Promise<BuyerMeta> {
+    const [countries, cpvCodes, legalTypes] = await Promise.all([
+      BuyerModel.aggregate<{ country: string; count: number }>([
+        {
+          $match: {
+            'address.country': { $type: 'string', $ne: '' },
+          },
+        },
+        {
+          $group: {
+            _id: '$address.country',
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+        {
+          $project: {
+            _id: 0,
+            country: '$_id',
+            count: 1,
+          },
+        },
+      ]),
+      BuyerModel.aggregate<{ cpvCode: string; count: number }>([
+        { $unwind: '$cpvCodes' },
+        {
+          $match: {
+            cpvCodes: { $type: 'string', $ne: '' },
+          },
+        },
+        {
+          $group: {
+            _id: '$cpvCodes',
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { count: -1, _id: 1 } },
+        {
+          $project: {
+            _id: 0,
+            cpvCode: '$_id',
+            count: 1,
+          },
+        },
+      ]),
+      BuyerModel.aggregate<{ code: string; name: string; count: number }>([
+        { $unwind: '$legalTypes' },
+        {
+          $match: {
+            'legalTypes.code': { $type: 'string', $ne: '' },
+            'legalTypes.name': { $type: 'string', $ne: '' },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              code: '$legalTypes.code',
+              name: '$legalTypes.name',
+            },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { count: -1, '_id.code': 1 } },
+        {
+          $project: {
+            _id: 0,
+            code: '$_id.code',
+            name: '$_id.name',
+            count: 1,
+          },
+        },
+      ]),
+    ]);
+
+    return {
+      countries,
+      cpvCodes,
+      legalTypes,
+    };
+  }
 
   private mergeCodeNameOptions(
     ...options: Array<Array<BuyerCodeName | string> | null | undefined>
@@ -107,8 +248,9 @@ export class BuyerService {
     const tendersCount = tenders.length;
     const awardTendersCount = awardTenders.length;
     const hasStatsVersionToBeCounted =
-      buyer.stats.tendersCount !== tendersCount ||
-      buyer.stats.awardTendersCount !== awardTendersCount;
+      buyer.stats &&
+      (buyer.stats?.tendersCount !== tendersCount ||
+        buyer.stats?.awardTendersCount !== awardTendersCount);
 
     const stats = {
       tendersCount,
@@ -294,5 +436,64 @@ export class BuyerService {
     });
 
     return existingBuyer.save();
+  }
+
+  async getBuyerDetails(buyerId: string) {
+    return BuyerModel.findById(buyerId).populate('stats.topSuppliers.winner');
+  }
+
+  async getRecentTenders(buyerId: string) {
+    const tenders = await TenderModel.find({ buyer: buyerId })
+      .sort({ publicationDate: -1, _id: -1 })
+      .limit(BUYER_RECENT_TENDERS_LIMIT)
+      .exec();
+
+    return tenders.map(TenderModel.serializeList);
+  }
+
+  async getRecentAwardTenders(buyerId: string) {
+    const awardTenders = await AwardTenderModel.find({ buyer: buyerId })
+      .sort({ publicationDate: -1, _id: -1 })
+      .limit(BUYER_RECENT_TENDERS_LIMIT)
+      .populate('winners')
+      .exec();
+
+    return awardTenders.map(AwardTenderModel.serializeList);
+  }
+
+  async getAwardTendersByBuyerId(
+    buyerId: string,
+    pagination: { page?: number; limit?: number } = {},
+  ) {
+    if (!Types.ObjectId.isValid(buyerId)) {
+      throw new BadRequestException('Invalid buyer id');
+    }
+
+    const query: QueryFilter<AwardTenderDocument> = {
+      buyer: buyerId,
+    };
+
+    const { skip, limit } = getPaginationMeta(pagination);
+    const [awardTenders, totalCount] = await Promise.all([
+      AwardTenderModel.find(query)
+        .sort({ publicationDate: -1, _id: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('buyer')
+        .populate('winners')
+        .exec(),
+      AwardTenderModel.countDocuments(query),
+    ]);
+
+    return {
+      totalCount,
+      awardTenders: awardTenders.map((awardTender) =>
+        AwardTenderModel.serializeList(awardTender),
+      ),
+    };
+  }
+
+  private escapeRegExp(value: string) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 }

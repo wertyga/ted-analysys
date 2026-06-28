@@ -263,7 +263,7 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
     noticeLanguage: String,
     submissionLanguages: {
       type: [String],
-      default: undefined,
+      default: [],
     },
     buyer: {
       type: Schema.Types.ObjectId,

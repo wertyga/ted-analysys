@@ -1,5 +1,9 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
-import { BuyerDocument } from '@/resources/buyer/schemas';
+import {
+  BuyerDocument,
+  BuyerModel,
+  BuyerSerializable,
+} from '@/resources/buyer/schemas';
 import { TenderGeneralAnalysisStatus } from '@/resources/tender-analysis/schemas';
 import { filterModel } from '@/utils';
 
@@ -36,7 +40,18 @@ export type BuyerIntelligence = {
   errorMessage?: string;
 
   statsVersion: number;
+
+  createdAt?: Date;
+  updatedAt?: Date;
 };
+
+const BUYER_INTELLIGENCE_LIST_FIELDS = [
+  'buyer',
+  'status',
+  'summary',
+  'statsVersion',
+  'updatedAt',
+] satisfies Array<keyof BuyerIntelligence>;
 
 export type BuyerIntelligenceDocument = BuyerIntelligence & Document;
 export type BuyerIntelligenceRecord = BuyerIntelligence & { _id?: unknown };
@@ -46,7 +61,7 @@ export type BuyerIntelligenceSerializable =
 
 export type BuyerIntelligenceListDto = Pick<
   BuyerIntelligenceRecord,
-  '_id' | 'buyer' | 'status' | 'summary'
+  '_id' | (typeof BUYER_INTELLIGENCE_LIST_FIELDS)[number]
 >;
 
 export type BuyerIntelligenceDetailDto = Omit<
@@ -119,9 +134,16 @@ BuyerIntelligenceSchema.statics.serializeList = function (
     return null;
   }
 
-  return filterModel(intelligence, {
-    includeFields: ['buyer', 'status', 'summary'],
-  }) as BuyerIntelligenceListDto;
+  const intel: BuyerIntelligenceDetailDto = filterModel(intelligence, {
+    includeFields: BUYER_INTELLIGENCE_LIST_FIELDS,
+  });
+
+  return {
+    ...intel,
+    buyer: BuyerModel.serializeList(
+      intel.buyer as BuyerSerializable,
+    ) as BuyerDocument,
+  };
 };
 
 BuyerIntelligenceSchema.statics.serializeDetail = function (
@@ -131,9 +153,16 @@ BuyerIntelligenceSchema.statics.serializeDetail = function (
     return null;
   }
 
-  return filterModel(intelligence, {
-    excludeFields: ['promptVersion', 'llmModel'],
-  }) as BuyerIntelligenceDetailDto;
+  const intel: BuyerIntelligenceDetailDto = filterModel(intelligence, {
+    excludeFields: ['promptVersion', 'llmModel', 'statsVersion'],
+  });
+
+  return {
+    ...intel,
+    buyer: BuyerModel.serializeDetail(
+      intel.buyer as BuyerSerializable,
+    ) as BuyerDocument,
+  };
 };
 
 export const BuyerIntelligenceModel: BuyerIntelligenceModelType =

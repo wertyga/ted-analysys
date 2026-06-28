@@ -1,10 +1,7 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { BuyerIntelligenceService } from './buyer-intelligence.service';
-import {
-  BuyerIntelligenceDetailDto,
-  BuyerIntelligenceModel,
-} from './schemsa';
+import { BuyerIntelligenceDetailDto, BuyerIntelligenceModel } from './schemas';
 
 @ApiTags('buyer-intelligence')
 @Controller('buyer-intelligence')

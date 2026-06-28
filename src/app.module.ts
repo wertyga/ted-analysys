@@ -1,4 +1,5 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { CacheModule } from '@nestjs/cache-manager';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
@@ -27,9 +28,14 @@ import { TechModule } from './resources/tech/tech.module';
 import { CronModule } from './resources/cron/cron.module';
 import { TenderNormalizerModule } from '@/resources/tender-normalizer/tender-normalizer.module';
 import { BuyerIntelligenceModule } from '@/resources/buyer-intelligence';
+import { BuyerModule } from '@/resources/buyer/buyer.module';
 
 @Module({
   imports: [
+    CacheModule.register({
+      isGlobal: true,
+      ttl: 10 * 60 * 1000,
+    }),
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     CronModule,
@@ -55,6 +61,7 @@ import { BuyerIntelligenceModule } from '@/resources/buyer-intelligence';
     TechModule,
     TenderNormalizerModule,
     BuyerIntelligenceModule,
+    BuyerModule,
   ],
   controllers: [AppController],
   providers: [AppService],
