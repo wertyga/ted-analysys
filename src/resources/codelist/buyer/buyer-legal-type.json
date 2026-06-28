@@ -1,225 +1,82 @@
-{
-  "isTreeView": true,
-  "results": [
-    {
-      "codes": ["3"],
-      "label": "Body governed by public law"
-    },
-    {
-      "codes": ["4"],
-      "label": "Body governed by public law, controlled by a central government authority"
-    },
-    {
-      "codes": ["5"],
-      "label": "Body governed by public law, controlled by a local authority"
-    },
-    {
-      "codes": ["6"],
-      "label": "Body governed by public law, controlled by a regional authority"
-    },
-    {
-      "codes": ["7"],
-      "label": "Central government authority"
-    },
-    {
-      "codes": ["8"],
-      "label": "Defence contractor"
-    },
-    {
-      "codes": ["9"],
-      "label": "Entity with special or exclusive rights"
-    },
-    {
-      "codes": ["10"],
-      "nodes": [
-        {
-          "codes": ["11"],
-          "label": "Agencies"
-        },
-        {
-          "codes": ["12"],
-          "label": "Cybersecurity Service for the Union Institutions, Bodies, Offices and Agencies"
-        },
-        {
-          "codes": ["13"],
-          "label": "Council of the European Union"
-        },
-        {
-          "codes": ["14"],
-          "label": "Court of Justice of the European Union"
-        },
-        {
-          "codes": ["15"],
-          "label": "European Central Bank"
-        },
-        {
-          "codes": ["16"],
-          "label": "European Commission"
-        },
-        {
-          "codes": ["17"],
-          "label": "European Committee of the Regions"
-        },
-        {
-          "codes": ["18"],
-          "label": "European Court of Auditors"
-        },
-        {
-          "codes": ["19"],
-          "label": "European Court of Human Rights"
-        },
-        {
-          "codes": ["20"],
-          "label": "European Data Protection Supervisor"
-        },
-        {
-          "codes": ["21"],
-          "label": "European Economic and Social Committee"
-        },
-        {
-          "codes": ["22"],
-          "label": "European External Action Service"
-        },
-        {
-          "codes": ["23"],
-          "label": "European Investment Bank"
-        },
-        {
-          "codes": ["24"],
-          "label": "European Investment Fund"
-        },
-        {
-          "codes": ["25"],
-          "label": "European Ombudsman"
-        },
-        {
-          "codes": ["26"],
-          "label": "European Parliament"
-        },
-        {
-          "codes": ["27"],
-          "label": "European Personnel Selection Office"
-        },
-        {
-          "codes": ["28"],
-          "label": "European schools"
-        },
-        {
-          "codes": ["29"],
-          "label": "Publications Office of the European Union"
-        }
-      ],
-      "label": "EU institution, body or agency"
-    },
-    {
-      "codes": ["56"],
-      "label": "Group of public authorities"
-    },
-    {
-      "codes": ["30"],
-      "nodes": [
-        {
-          "codes": ["31"],
-          "label": "CERN"
-        },
-        {
-          "codes": ["32"],
-          "label": "Council of Europe"
-        },
-        {
-          "codes": ["33"],
-          "label": "Council of Europe Development Bank"
-        },
-        {
-          "codes": ["34"],
-          "label": "Eurocontrol"
-        },
-        {
-          "codes": ["35"],
-          "label": "European Bank for Reconstruction and Development"
-        },
-        {
-          "codes": ["36"],
-          "label": "European Free Trade Association"
-        },
-        {
-          "codes": ["37"],
-          "label": "European Patent Organisation"
-        },
-        {
-          "codes": ["38"],
-          "label": "European Space Agency"
-        },
-        {
-          "codes": ["39"],
-          "label": "European Stability Mechanism"
-        },
-        {
-          "codes": ["40"],
-          "label": "Food and Agriculture Organization"
-        },
-        {
-          "codes": ["41"],
-          "label": "International Energy Agency"
-        },
-        {
-          "codes": ["42"],
-          "label": "International Labour Organization"
-        },
-        {
-          "codes": ["43"],
-          "label": "Interpol"
-        },
-        {
-          "codes": ["44"],
-          "label": "North Atlantic Treaty Organization"
-        },
-        {
-          "codes": ["45"],
-          "label": "Organisation for Economic Co-operation and Development"
-        }
-      ],
-      "label": "International organisation"
-    },
-    {
-      "codes": ["46"],
-      "label": "Local authority"
-    },
-    {
-      "codes": ["47"],
-      "label": "Organisation awarding a contract subsidised by a central government authority"
-    },
-    {
-      "codes": ["48"],
-      "label": "Organisation awarding a contract subsidised by a contracting authority"
-    },
-    {
-      "codes": ["49"],
-      "label": "Organisation awarding a contract subsidised by a local authority"
-    },
-    {
-      "codes": ["50"],
-      "label": "Organisation awarding a contract subsidised by a regional authority"
-    },
-    {
-      "codes": ["51"],
-      "label": "Public undertaking"
-    },
-    {
-      "codes": ["52"],
-      "label": "Public undertaking, controlled by a central government authority"
-    },
-    {
-      "codes": ["53"],
-      "label": "Public undertaking, controlled by a local authority"
-    },
-    {
-      "codes": ["54"],
-      "label": "Public undertaking, controlled by a regional authority"
-    },
-    {
-      "codes": ["55"],
-      "label": "Regional authority"
-    }
-  ]
-}
+[
+  {
+    "code": "cga",
+    "name": "Central government authority"
+  },
+  {
+    "code": "ra",
+    "name": "Regional authority"
+  },
+  {
+    "code": "la",
+    "name": "Local authority"
+  },
+  {
+    "code": "body-pl",
+    "name": "Body governed by public law"
+  },
+  {
+    "code": "body-pl-cga",
+    "name": "Body governed by public law controlled by a central government authority"
+  },
+  {
+    "code": "body-pl-ra",
+    "name": "Body governed by public law controlled by a regional authority"
+  },
+  {
+    "code": "body-pl-la",
+    "name": "Body governed by public law controlled by a local authority"
+  },
+  {
+    "code": "pub-undert",
+    "name": "Public undertaking"
+  },
+  {
+    "code": "pub-undert-cga",
+    "name": "Public undertaking controlled by a central government authority"
+  },
+  {
+    "code": "pub-undert-ra",
+    "name": "Public undertaking controlled by a regional authority"
+  },
+  {
+    "code": "pub-undert-la",
+    "name": "Public undertaking controlled by a local authority"
+  },
+  {
+    "code": "spec-rights-entity",
+    "name": "Entity with special or exclusive rights"
+  },
+  {
+    "code": "def-cont",
+    "name": "Defence contractor"
+  },
+  {
+    "code": "eu-ins-bod-ag",
+    "name": "EU institution, body or agency"
+  },
+  {
+    "code": "int-org",
+    "name": "International organisation"
+  },
+  {
+    "code": "org-sub",
+    "name": "Organisation awarding a contract subsidised by a contracting authority"
+  },
+  {
+    "code": "org-sub-cga",
+    "name": "Organisation awarding a contract subsidised by a central government authority"
+  },
+  {
+    "code": "org-sub-ra",
+    "name": "Organisation awarding a contract subsidised by a regional authority"
+  },
+  {
+    "code": "org-sub-la",
+    "name": "Organisation awarding a contract subsidised by a local authority"
+  },
+  {
+    "code": "grp-p-aut",
+    "name": "Group of public authorities"
+  }
+]

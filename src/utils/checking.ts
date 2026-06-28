@@ -311,3 +311,11 @@ export function getEnumArray<T extends Record<string, string>>(
       )
     : fallback;
 }
+
+export function omitUndefined<T extends Record<string, unknown>>(value: T) {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, value]) =>
+      Array.isArray(value) ? value.length : value,
+    ),
+  ) as Partial<T>;
+}

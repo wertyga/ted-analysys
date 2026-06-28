@@ -3,57 +3,160 @@ export const BUYER_INTELLIGENCE_LLM_JSON_SCHEMA = {
   additionalProperties: false,
   required: [
     'summary',
-    'buyingPatterns',
-    'supplierPatterns',
-    'contractPatterns',
+    'procurementProfile',
+    'marketBehavior',
+    'supplierLandscape',
+    'historicalTrends',
     'dataLimitations',
-    'neutralObservations',
   ],
   properties: {
     summary: {
       type: 'string',
       description:
-        'Short localized neutral summary of the buyer as a public procurement entity. Must describe what is known from the provided buyer profile, statistics, signals, recent tenders, and award history. Do not evaluate any specific bidder or company fit.',
+        'Short localized neutral summary describing the buyer as a procurement entity. Focus on the main procurement characteristics rather than repeating statistics.',
     },
 
-    buyingPatterns: {
-      type: 'array',
-      maxItems: 6,
-      description:
-        'Neutral localized observations about what this buyer usually purchases and how its procurement activity appears over time. Use only provided data. Do not give company-specific advice.',
-      items: { type: 'string' },
+    procurementProfile: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['overview', 'typicalPurchases', 'activityAssessment'],
+      properties: {
+        overview: {
+          type: 'string',
+          description:
+            'Neutral explanation of what kind of procurement organization this buyer appears to be based only on the provided data.',
+        },
+
+        typicalPurchases: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 5,
+          items: {
+            type: 'string',
+          },
+          description:
+            'Recurring or preliminary procurement areas inferred from CPV labels, tender titles, and procurement history. Prefer procurement categories instead of raw CPV codes.',
+        },
+
+        activityAssessment: {
+          type: 'string',
+          description:
+            'Explain what the provided activityLevel indicates about procurement frequency and procurement recency.',
+        },
+      },
     },
 
-    supplierPatterns: {
-      type: 'array',
-      maxItems: 6,
-      description:
-        'Neutral localized observations about historical supplier selection patterns based on award tenders and top suppliers. Supplier repetition and domestic winners are historical signals only, not proof of favoritism, discrimination, corruption, or unlawful behaviour.',
-      items: { type: 'string' },
+    marketBehavior: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['contractPatterns', 'procedurePatterns', 'valuePatterns'],
+      properties: {
+        contractPatterns: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 5,
+          items: {
+            type: 'string',
+          },
+          description:
+            'Recurring or preliminary observations about contract types, contract nature, procurement scope, or place-of-performance.',
+        },
+
+        procedurePatterns: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 5,
+          items: {
+            type: 'string',
+          },
+          description:
+            'Recurring or preliminary observations about procurement procedures or buying approach. Use cautious wording when evidence is limited.',
+        },
+
+        valuePatterns: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 5,
+          items: {
+            type: 'string',
+          },
+          description:
+            'Observations about estimated and awarded value patterns. Explain significance rather than repeating raw monetary values.',
+        },
+      },
     },
 
-    contractPatterns: {
+    supplierLandscape: {
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'overview',
+        'repeatSupplierPattern',
+        'localSupplierPattern',
+        'supplierDiversity',
+      ],
+      properties: {
+        overview: {
+          type: 'string',
+          description:
+            'Neutral overview of the historical supplier landscape based on available award history.',
+        },
+
+        repeatSupplierPattern: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 4,
+          items: {
+            type: 'string',
+          },
+          description:
+            'Explain historical repeat supplier behaviour using the provided incumbentRisk and repeatSupplierRate. Do not imply favoritism or unfairness.',
+        },
+
+        localSupplierPattern: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 4,
+          items: {
+            type: 'string',
+          },
+          description:
+            'Explain historical domestic supplier behaviour using localSupplierSignal and localSupplierRate. Do not imply discrimination or unlawful preference.',
+        },
+
+        supplierDiversity: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 4,
+          items: {
+            type: 'string',
+          },
+          description:
+            'Describe whether the historical supplier base appears concentrated or diverse based only on available award history.',
+        },
+      },
+    },
+
+    historicalTrends: {
       type: 'array',
+      minItems: 1,
       maxItems: 6,
+      items: {
+        type: 'string',
+      },
       description:
-        'Neutral localized observations about typical contract characteristics: value ranges, contract nature, procedure types, CPV areas, or place-of-performance patterns. Do not invent missing values.',
-      items: { type: 'string' },
+        'Higher-level historical procurement trends supported by multiple tenders or awards. Prefer recurring patterns over isolated examples.',
     },
 
     dataLimitations: {
       type: 'array',
+      minItems: 1,
       maxItems: 6,
+      items: {
+        type: 'string',
+      },
       description:
-        'Localized limitations of the available buyer intelligence. Mention missing or weak evidence, limited award history, missing supplier countries, missing values, or low confidence when relevant.',
-      items: { type: 'string' },
-    },
-
-    neutralObservations: {
-      type: 'array',
-      maxItems: 6,
-      description:
-        'Additional neutral localized observations useful for understanding the buyer. Do not include bidder-specific recommendations, win probability, or company fit assessment.',
-      items: { type: 'string' },
+        'Limitations affecting confidence, such as small datasets, missing values, anonymized suppliers, incomplete award history, inconsistent dates, or missing procurement information.',
     },
   },
 } as const;

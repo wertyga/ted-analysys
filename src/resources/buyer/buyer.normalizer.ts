@@ -16,7 +16,12 @@ export type BuyerNormalized = Omit<
   | 'stats'
   | 'statsVersion'
   | 'intelligence'
->;
+  | 'legalTypes'
+  | 'mainActivities'
+> & {
+  legalTypes: string[];
+  mainActivities: string[];
+};
 
 export class BuyerNormalizer {
   private normalizeBuyerContact(notice: TedNotice): BuyerNormalized['contact'] {
@@ -217,7 +222,6 @@ export class BuyerNormalizer {
         data.organisationIdentifierBuyer,
         data.buyerIdentifier,
       )?.[0],
-      // buyerCountry: address.country,
 
       legalTypes: getUniqArray(data.buyerLegalType, data.bt11ProcedureBuyer),
       countries: getUniqArray(

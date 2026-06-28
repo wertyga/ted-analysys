@@ -26,6 +26,7 @@ import { AwardTenderModule } from './resources/award-tender/award-tender.module'
 import { TechModule } from './resources/tech/tech.module';
 import { CronModule } from './resources/cron/cron.module';
 import { TenderNormalizerModule } from '@/resources/tender-normalizer/tender-normalizer.module';
+import { BuyerIntelligenceModule } from '@/resources/buyer-intelligence';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { TenderNormalizerModule } from '@/resources/tender-normalizer/tender-nor
     AwardTenderModule,
     TechModule,
     TenderNormalizerModule,
+    BuyerIntelligenceModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,3 +1,14 @@
+export type BuyerIntelligenceCpvPayload = {
+  code: string;
+  name: string;
+  shortTitle?: string;
+};
+
+export type BuyerIntelligenceCodeNamePayload = {
+  code: string;
+  name: string;
+};
+
 export type BuyerIntelligenceAiPayload = {
   /**
    * Stable buyer profile data.
@@ -27,12 +38,12 @@ export type BuyerIntelligenceAiPayload = {
     /**
      * Legal/category types of the buyer, e.g. public authority, body governed by public law.
      */
-    legalTypes: string[];
+    legalTypes: BuyerIntelligenceCodeNamePayload[];
 
     /**
      * Buyer main activities/sectors, e.g. health, education, general public services, transport.
      */
-    mainActivities: string[];
+    mainActivities: BuyerIntelligenceCodeNamePayload[];
 
     /**
      * Official buyer websites.
@@ -95,7 +106,7 @@ export type BuyerIntelligenceAiPayload = {
      * Used to identify what the buyer usually purchases.
      */
     topCpvCodes: {
-      code: string;
+      cpv: BuyerIntelligenceCpvPayload;
       count: number;
     }[];
 
@@ -104,6 +115,15 @@ export type BuyerIntelligenceAiPayload = {
      * This is not the same as buyer country.
      */
     topCountries: {
+      country: string;
+      count: number;
+    }[];
+
+    /**
+     * Supplier countries aggregated from suppliers that won contracts from this buyer.
+     * Count is the number of wins by suppliers from this country.
+     */
+    supplierCountries: {
       country: string;
       count: number;
     }[];
@@ -127,11 +147,6 @@ export type BuyerIntelligenceAiPayload = {
        * Number of awards won from this buyer.
        */
       wins: number;
-
-      /**
-       * Total known awarded value won by this supplier from this buyer.
-       */
-      totalAwardedValueEur: number | null;
     }[];
 
     /**
@@ -176,11 +191,6 @@ export type BuyerIntelligenceAiPayload = {
    */
   recentTenders: {
     /**
-     * Tender title.
-     */
-    title?: string;
-
-    /**
      * Tender publication date.
      */
     publicationDate?: string;
@@ -191,7 +201,7 @@ export type BuyerIntelligenceAiPayload = {
     estimatedValueEur?: number | null;
 
     /**
-     * CPV codes associated with this tender.
+     * CPV category names associated with this tender.
      */
     cpvCodes?: string[];
 
@@ -217,11 +227,6 @@ export type BuyerIntelligenceAiPayload = {
    */
   recentAwardTenders: {
     /**
-     * Award tender title.
-     */
-    title?: string;
-
-    /**
      * Award/result notice publication date.
      */
     publicationDate?: string;
@@ -232,7 +237,7 @@ export type BuyerIntelligenceAiPayload = {
     awardedValueEur?: number | null;
 
     /**
-     * CPV codes associated with this award tender.
+     * CPV category names associated with this award tender.
      */
     cpvCodes?: string[];
 
@@ -260,27 +265,6 @@ export type BuyerIntelligenceAiPayload = {
        * Awarded value attributed to this winner if available.
        */
       awardedValueEur?: number | null;
-
-      /**
-       * Optional lot-level context won by this supplier.
-       * Do not include raw lot IDs only; include useful context for AI.
-       */
-      lots?: {
-        /**
-         * Lot title or short description.
-         */
-        title?: string;
-
-        /**
-         * Lot CPV codes.
-         */
-        cpvCodes?: string[];
-
-        /**
-         * Lot awarded value in EUR if available.
-         */
-        valueEur?: number | null;
-      }[];
     }[];
   }[];
 };

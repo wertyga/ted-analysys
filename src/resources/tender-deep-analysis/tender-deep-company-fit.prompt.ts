@@ -242,7 +242,6 @@ export function buildTenderDeepCompanyFitUserPrompt(
     '- For UNKNOWN caused by missing company information, usually include evidenceReferences only and omit evidenceQuote.',
     "- If requirement come from external document, put the document's to the url field",
     '',
-    'Return a JSON object only. The JSON must exactly match the required schema.',
   ].join('\n');
 }
 

@@ -37,6 +37,11 @@ export type BuyerAddress = {
   countrySub: string;
 };
 
+export type BuyerCodeName = {
+  code: string;
+  name: string;
+};
+
 export type BuyerTopCpvCodeStats = {
   code: string;
   count: number;
@@ -50,7 +55,6 @@ export type BuyerTopCountryStats = {
 export type BuyerTopSupplierStats = {
   winner: mongoose.Types.ObjectId;
   wins: number;
-  totalAwardedValueEur: number;
 };
 
 export type BuyerStats = {
@@ -147,7 +151,7 @@ export type Buyer = {
    * buyer-legal-type
    * BT-11-Procedure-Buyer
    */
-  legalTypes: string[];
+  legalTypes: BuyerCodeName[];
 
   /**
    * main-activity
@@ -156,7 +160,7 @@ export type Buyer = {
    * activity-sector
    * BT-10-Procedure-Buyer
    */
-  mainActivities: string[];
+  mainActivities: BuyerCodeName[];
 
   /**
    * buyer-profile
@@ -209,7 +213,7 @@ export type Buyer = {
   updatedAt: Date;
 
   stats: BuyerStats;
-  statsVersion: string;
+  statsVersion: number;
   intelligence: BuyerStatsIntelligence;
 };
 
@@ -281,6 +285,14 @@ const BuyerAddressSchema = new Schema<BuyerAddress>(
   { _id: false },
 );
 
+const BuyerCodeNameSchema = new Schema<BuyerCodeName>(
+  {
+    code: { type: String, required: true, index: true },
+    name: { type: String, required: true },
+  },
+  { _id: false },
+);
+
 const BuyerTopCpvCodeStatsSchema = new Schema<BuyerTopCpvCodeStats>(
   {
     code: { type: String, required: true },
@@ -305,7 +317,6 @@ const BuyerTopSupplierStatsSchema = new Schema<BuyerTopSupplierStats>(
       required: true,
     },
     wins: { type: Number, required: true },
-    totalAwardedValueEur: { type: Number, required: true },
   },
   { _id: false },
 );
@@ -363,8 +374,8 @@ export const BuyerSchema = new Schema<BuyerDocument, BuyerModelType>(
       index: true,
     },
 
-    legalTypes: { type: [String], default: [], index: true },
-    mainActivities: { type: [String], default: [], index: true },
+    legalTypes: { type: [BuyerCodeNameSchema], default: [] },
+    mainActivities: { type: [BuyerCodeNameSchema], default: [] },
 
     profiles: { type: [String], default: [] },
     websites: { type: [String], default: [] },
@@ -376,7 +387,7 @@ export const BuyerSchema = new Schema<BuyerDocument, BuyerModelType>(
     stats: {
       type: BuyerStatsSchema,
     },
-    statsVersion: { type: String, default: '' },
+    statsVersion: { type: Number, default: 1 },
     intelligence: {
       type: BuyerStatsIntelligenceSchema,
     },

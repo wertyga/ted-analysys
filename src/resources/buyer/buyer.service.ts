@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { BuyerNormalizer } from './buyer.normalizer';
 import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
 import {
+  BuyerCodeName,
   BuyerDocument,
   BuyerModel,
   BuyerStats,
@@ -24,15 +25,36 @@ import {
   getTopBuyerTendersStats,
 } from './buyer-utils';
 import { ContractorModel } from '@/resources/contractor/schemas';
+import { getLegalTypes, getMainActivities } from '@/resources/codelist';
 
 type BuyerTenderMeta = {
   stats: BuyerStats;
   intelligence: BuyerIntelligenceCalculation;
+  statsVersion: number;
 };
 
 @Injectable()
 export class BuyerService {
   normalizer = new BuyerNormalizer();
+
+  private mergeCodeNameOptions(
+    ...options: Array<Array<BuyerCodeName | string> | null | undefined>
+  ): BuyerCodeName[] {
+    return Array.from(
+      new Map(
+        options
+          .flatMap((items) => items ?? [])
+          .map((item) => {
+            if (typeof item === 'string') {
+              return [item, { code: item, name: item }] as const;
+            }
+
+            return [item.code, item] as const;
+          })
+          .filter(([code]) => code),
+      ).values(),
+    );
+  }
 
   private async getWinnerCountriesById(
     awardTenders: AwardTenderDocument[],
@@ -61,10 +83,9 @@ export class BuyerService {
   }
 
   async getTendersBuyerMetaAndIntelligence(
-    buyerId: string | mongoose.Types.ObjectId,
+    buyer: BuyerDocument,
     buyerCountry?: string,
   ): Promise<BuyerTenderMeta> {
-    const buyerObjectId = new Types.ObjectId(buyerId);
     const tenderSelectFields =
       'publicationDate estimatedValueEur cpvCodes placeOfPerformanceCountries';
     const awardTenderSelectFields =
@@ -72,12 +93,12 @@ export class BuyerService {
 
     const [tenders, awardTenders] = await Promise.all([
       TenderModel.find({
-        buyer: buyerObjectId,
+        buyer: buyer._id,
       })
         .select(tenderSelectFields)
         .lean(),
       AwardTenderModel.find({
-        buyer: buyerObjectId,
+        buyer: buyer._id,
       })
         .select(awardTenderSelectFields)
         .lean(),
@@ -85,6 +106,9 @@ export class BuyerService {
 
     const tendersCount = tenders.length;
     const awardTendersCount = awardTenders.length;
+    const hasStatsVersionToBeCounted =
+      buyer.stats.tendersCount !== tendersCount ||
+      buyer.stats.awardTendersCount !== awardTendersCount;
 
     const stats = {
       tendersCount,
@@ -106,6 +130,9 @@ export class BuyerService {
     return {
       stats,
       intelligence,
+      statsVersion: hasStatsVersionToBeCounted
+        ? buyer.statsVersion + 1
+        : buyer.statsVersion,
     };
   }
 
@@ -115,10 +142,14 @@ export class BuyerService {
     const buyer = await BuyerModel.findById(buyerId).select(
       'address.country intelligence',
     );
-    const { stats, intelligence } =
+    if (!buyer) {
+      return null;
+    }
+
+    const { stats, intelligence, statsVersion } =
       await this.getTendersBuyerMetaAndIntelligence(
-        buyerId,
-        buyer?.address?.country,
+        buyer,
+        buyer.address?.country,
       );
 
     return BuyerModel.findByIdAndUpdate(
@@ -127,6 +158,7 @@ export class BuyerService {
         $set: {
           stats,
           intelligence,
+          statsVersion,
         },
       },
       { returnDocument: 'after' },
@@ -154,6 +186,8 @@ export class BuyerService {
     if (!existingBuyer) {
       return BuyerModel.create({
         ...normalizedBuyer,
+        legalTypes: getLegalTypes(normalizedBuyer.legalTypes),
+        mainActivities: getMainActivities(normalizedBuyer.mainActivities),
         stats: getEmptyBuyerStats(),
       });
     }
@@ -183,50 +217,53 @@ export class BuyerService {
         normalizedBuyer.address.countrySub,
       ),
     };
-    const { stats, intelligence } =
+    const contact = {
+      contactPoint: getLastExisting(
+        existingBuyer.contact?.contactPoint,
+        normalizedBuyer.contact.contactPoint,
+      ),
+      person: getLastExisting(
+        existingBuyer.contact?.person,
+        normalizedBuyer.contact.person,
+      ),
+      email: getLastExisting(
+        existingBuyer.contact?.email,
+        normalizedBuyer.contact.email,
+      ),
+      phone: getLastExisting(
+        existingBuyer.contact?.phone,
+        normalizedBuyer.contact.phone,
+      ),
+      fax: getLastExisting(
+        existingBuyer.contact?.fax,
+        normalizedBuyer.contact.fax,
+      ),
+      website: getLastExisting(
+        existingBuyer.contact?.website,
+        normalizedBuyer.contact.website,
+      ),
+      gateway: getLastExisting(
+        existingBuyer.contact?.gateway,
+        normalizedBuyer.contact.gateway,
+      ),
+    };
+
+    const { stats, intelligence, statsVersion } =
       await this.getTendersBuyerMetaAndIntelligence(
-        existingBuyer._id,
+        existingBuyer,
         address.country,
       );
 
     existingBuyer.set({
       stats,
       intelligence,
+      statsVersion,
       name: getLastExisting(existingBuyer.name, normalizedBuyer.name),
       organisationIdentifierBuyer: getLastExisting(
         existingBuyer.organisationIdentifierBuyer,
         normalizedBuyer.organisationIdentifierBuyer,
       ),
-      contact: {
-        contactPoint: getLastExisting(
-          existingBuyer.contact?.contactPoint,
-          normalizedBuyer.contact.contactPoint,
-        ),
-        person: getLastExisting(
-          existingBuyer.contact?.person,
-          normalizedBuyer.contact.person,
-        ),
-        email: getLastExisting(
-          existingBuyer.contact?.email,
-          normalizedBuyer.contact.email,
-        ),
-        phone: getLastExisting(
-          existingBuyer.contact?.phone,
-          normalizedBuyer.contact.phone,
-        ),
-        fax: getLastExisting(
-          existingBuyer.contact?.fax,
-          normalizedBuyer.contact.fax,
-        ),
-        website: getLastExisting(
-          existingBuyer.contact?.website,
-          normalizedBuyer.contact.website,
-        ),
-        gateway: getLastExisting(
-          existingBuyer.contact?.gateway,
-          normalizedBuyer.contact.gateway,
-        ),
-      },
+      contact,
       address,
       identifiers: Array.from(
         new Map(
@@ -238,13 +275,13 @@ export class BuyerService {
           ),
         ).values(),
       ),
-      legalTypes: getUniqArray(
+      legalTypes: this.mergeCodeNameOptions(
         existingBuyer.legalTypes,
-        normalizedBuyer.legalTypes,
+        getLegalTypes(normalizedBuyer.legalTypes),
       ),
-      mainActivities: getUniqArray(
+      mainActivities: this.mergeCodeNameOptions(
         existingBuyer.mainActivities,
-        normalizedBuyer.mainActivities,
+        getMainActivities(normalizedBuyer.mainActivities),
       ),
       profiles: getUniqArray(existingBuyer.profiles, normalizedBuyer.profiles),
       gateways: getUniqArray(existingBuyer.gateways, normalizedBuyer.gateways),
