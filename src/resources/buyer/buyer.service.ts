@@ -243,7 +243,7 @@ export class BuyerService {
   ): Promise<BuyerTenderMeta> {
     const tenderSelectFields =
       'publicationDate estimatedValueEur cpvCodes placeOfPerformanceCountries nonLeadBuyers leadBuyers';
-    const awardTenderSelectFields = `${tenderSelectFields} winners`;
+    const awardTenderSelectFields = `${tenderSelectFields} awardValueEur lots winners`;
 
     const [nonLeadTenders, leadTenders, nonLeadAwardTenders, leadAwardTenders] =
       await Promise.all([

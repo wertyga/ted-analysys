@@ -18,7 +18,7 @@ import {
 import { TMongoId } from '@/types';
 
 export type AwardTenderLot = TenderLot & {
-  resultLotIdentifier: string;
+  resultLotIdentifier?: string;
   awardValue?: {
     amount: MoneyValue;
     currency: string | null;
@@ -129,7 +129,6 @@ const AwardTenderLotValueSchema = new Schema(
 const AwardTenderLotSchema = new Schema<AwardTenderLot>(
   {
     identifier: String,
-    resultLotIdentifier: String,
     title: String,
     description: String,
     mainClassification: { type: [String], default: [] },
@@ -247,6 +246,8 @@ AwardTenderSchema.index({
   contractNature: 1,
   publicationDate: -1,
 });
+AwardTenderSchema.index({ winners: 1 });
+AwardTenderSchema.index({ 'lots.winner': 1 });
 AwardTenderSchema.index({ 'winners.identifier': 1 });
 AwardTenderSchema.index({ 'winners.name': 1 });
 
@@ -266,9 +267,7 @@ function serializeAwardTenderRelations<T extends Partial<AwardTender>>(
     winners: Array.isArray(tender.winners)
       ? tender.winners.map((winner) =>
           isPopulatedRecord(winner)
-            ? filterModel(winner as ContractorDocument, {
-                excludeFields: ['awardTenders'],
-              })
+            ? filterModel(winner as ContractorDocument)
             : winner,
         )
       : tender.winners,

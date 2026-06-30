@@ -2,6 +2,31 @@ import { AwardTenderDocument } from '@/resources/award-tender/schemas';
 import { TenderDocument } from '@/resources/tenders/schemas';
 import { BuyerStats } from '../schemas';
 
+function getFiniteNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function getAwardTenderAwardValueEur(
+  awardTender: AwardTenderDocument,
+): number | null {
+  const tenderAwardValue = getFiniteNumber(awardTender.awardValueEur);
+
+  if (tenderAwardValue !== null) {
+    return tenderAwardValue;
+  }
+
+  const lotAwardValue = (awardTender.lots ?? [])
+    .map((lot) => getFiniteNumber(lot.awardValueEur))
+    .filter((value): value is number => value !== null)
+    .reduce((acc, value) => acc + value, 0);
+
+  if (lotAwardValue > 0) {
+    return lotAwardValue;
+  }
+
+  return getFiniteNumber(awardTender.estimatedValueEur);
+}
+
 export function getMoneyBuyerTendersStats(
   tenders: TenderDocument[],
   awardTenders: AwardTenderDocument[],
@@ -13,22 +38,15 @@ export function getMoneyBuyerTendersStats(
   | 'avgAwardedValueEur'
 > {
   const estimatedValueEurValues = tenders.flatMap((tender) => {
-    const isMoneyValid =
-      typeof tender.estimatedValueEur === 'number' &&
-      Number.isFinite(tender.estimatedValueEur) &&
-      tender.leadBuyers.length;
+    const money = getFiniteNumber(tender.estimatedValueEur);
+    const isMoneyValid = money !== null && tender.leadBuyers.length;
 
-    return isMoneyValid
-      ? [(tender.estimatedValueEur as number) / tender.leadBuyers.length]
-      : [];
+    return isMoneyValid ? [money / tender.leadBuyers.length] : [];
   });
 
   const awardedValueEurValues = awardTenders.flatMap((awardTender) => {
-    const money = awardTender.awardValueEur || awardTender.estimatedValueEur;
-    const isMoneyValid =
-      typeof money === 'number' &&
-      Number.isFinite(money) &&
-      awardTender.leadBuyers.length;
+    const money = getAwardTenderAwardValueEur(awardTender);
+    const isMoneyValid = money !== null && awardTender.leadBuyers.length;
 
     return isMoneyValid ? [money / awardTender.leadBuyers.length] : [];
   });

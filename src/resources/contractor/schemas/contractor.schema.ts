@@ -1,14 +1,11 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
-import {
-  AwardTenderDocument,
-  AwardTenderModel,
-} from '@/resources/award-tender/schemas';
+import { AwardTenderModel } from '@/resources/award-tender/schemas';
 import { filterModel } from '@/utils';
 
 export interface Contractor {
   _id?: string;
   name?: string;
-  identifier?: string;
+  identifiers?: string[];
   countries?: string[];
   countrySubs?: string[];
   cities?: string[];
@@ -16,15 +13,16 @@ export interface Contractor {
   size?: string;
   listed?: string;
   internetAddresses?: string[];
-  email?: string;
+  emails?: string[];
   ownerNationalities?: string[];
   euRegistrationNumber?: string;
   cpvCodes: string[];
 
-  awardTenders?: AwardTenderDocument[];
-
   stats: {
-    lastAwardWinDate: Date;
+    lastAwardWinDate: Date | null;
+    totalAwardAmountEur: number;
+    awardTendersCount: number;
+    awardLotsCount: number;
   };
 
   createdAt?: Date;
@@ -33,19 +31,19 @@ export interface Contractor {
 
 const CONTRACTOR_LIST_FIELDS = [
   'name',
-  'identifier',
+  'identifiers',
   'countries',
   'countrySubs',
   'cities',
   'postCodes',
-  'email',
+  'emails',
   'cpvCodes',
   'createdAt',
 ] satisfies Array<keyof Contractor>;
 
 export type ContractorAwardSummary = {
-  awardTendersCount?: number;
-  totalAwardedValueEur?: number;
+  // awardTendersCount?: number;
+  // totalAwardedValueEur?: number;
 };
 
 export type ContractorDocument = Contractor & Document;
@@ -56,7 +54,7 @@ export type ContractorListDto = Pick<
   '_id' | (typeof CONTRACTOR_LIST_FIELDS)[number]
 > &
   ContractorAwardSummary;
-export type ContractorDetailDto = Omit<Contractor, 'awardTenders'> & {
+export type ContractorDetailDto = Contractor & {
   awardTenders: ReturnType<typeof AwardTenderModel.serializeList>[];
 } & ContractorAwardSummary;
 
@@ -68,6 +66,9 @@ export interface ContractorModelType extends Model<ContractorDocument> {
 const ContractorStatsSchema = new Schema<Contractor['stats']>(
   {
     lastAwardWinDate: { type: Date },
+    totalAwardAmountEur: { type: Number },
+    awardTendersCount: { type: Number },
+    awardLotsCount: { type: Number },
   },
   { _id: false },
 );
@@ -78,7 +79,7 @@ export const ContractorSchema = new Schema<
 >(
   {
     name: { type: String, trim: true },
-    identifier: { type: String, trim: true },
+    identifiers: { type: [String], trim: true },
 
     countries: { type: [String], default: [] },
 
@@ -93,19 +94,13 @@ export const ContractorSchema = new Schema<
 
     internetAddresses: { type: [String], default: [] },
 
-    email: { type: String, trim: true, lowercase: true },
+    emails: { type: [String], trim: true, lowercase: true },
 
     ownerNationalities: { type: [String], default: [] },
 
     euRegistrationNumber: { type: String, trim: true },
 
     cpvCodes: { type: [String], default: [] },
-
-    awardTenders: {
-      type: [Schema.Types.ObjectId],
-      ref: 'AwardTender',
-      default: [],
-    },
 
     stats: {
       type: ContractorStatsSchema,
@@ -117,8 +112,8 @@ export const ContractorSchema = new Schema<
   },
 );
 
-ContractorSchema.index({ identifier: 1 });
-ContractorSchema.index({ email: 1 });
+ContractorSchema.index({ identifiers: 1 });
+ContractorSchema.index({ emails: 1 });
 ContractorSchema.index({ name: 1 });
 ContractorSchema.index({ euRegistrationNumber: 1 });
 
@@ -133,13 +128,7 @@ ContractorSchema.statics.serializeList = function (
 ContractorSchema.statics.serializeDetail = function (
   contractor: ContractorSerializable,
 ): ContractorDetailDto {
-  const { awardTenders = [], ...serializedContractor } =
-    filterModel(contractor);
-
-  return {
-    ...serializedContractor,
-    awardTenders: awardTenders.map(AwardTenderModel.serializeList),
-  } as ContractorDetailDto;
+  return filterModel(contractor) as ContractorDetailDto;
 };
 
 export const ContractorModel: ContractorModelType =

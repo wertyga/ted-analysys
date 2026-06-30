@@ -185,7 +185,12 @@ export class AwardTenderService {
     updateExisting?: boolean,
   ): Promise<AwardTenderDocument | null> {
     const normalizedTender = this.normalizer.normalizeAwardTenderNotice(notice);
-    const winnersNormalized = this.normalizer.normalizeWinnersNotice(notice);
+    const {
+      lots: awardLots,
+      winners: winnersNormalized,
+      lotWinners,
+    } = await this.normalizer.normalizeAwardTenderLotsAndWinners(notice);
+    normalizedTender.lots = awardLots;
 
     const { publicationDate, lots, estimatedValue, awardValue, id } =
       normalizedTender;
@@ -193,6 +198,15 @@ export class AwardTenderService {
     if (!id) {
       return null;
     }
+
+    const oldWinnerIds = updateExisting
+      ? await AwardTenderModel.findOne({ id })
+          .select('winners')
+          .lean()
+          .then((tender) =>
+            (tender?.winners ?? []).map((winner) => winner.toString()),
+          )
+      : [];
 
     const [lotsWithEur, tenderEstimatedValueEur, tenderAwardValueEur] =
       await Promise.all([
@@ -238,7 +252,6 @@ export class AwardTenderService {
       },
     );
 
-    const wasTenderCreated = result?.lastErrorObject?.updatedExisting === false;
     const awardTender = result?.value;
 
     if (!awardTender) {
@@ -256,24 +269,56 @@ export class AwardTenderService {
     awardTender.leadBuyers = savedPureBuyers.leadIds;
     awardTender.nonLeadBuyers = savedPureBuyers.nonLeadIds;
 
-    if (!wasTenderCreated && !updateExisting) {
-      await awardTender.save();
+    const lotWinnerKeys = new Set(
+      lotWinners.map((lotWinner) => lotWinner.winnerKey),
+    );
+    const lotWinnersNormalized = winnersNormalized.filter((winner) => {
+      const winnerKey = this.normalizer.getWinnerKey(winner);
 
-      await this.buyerService.refreshBuyersTenderMeta(buyersIds);
+      return winnerKey ? lotWinnerKeys.has(winnerKey) : false;
+    });
 
-      return awardTender;
-    }
+    const winnerResults = await Promise.all(
+      lotWinnersNormalized.map((winner) =>
+        this.contractorService.upsertAwardWinner(winner, {
+          awardTenderId: awardTender._id.toString(),
+        }),
+      ),
+    );
+    const winnerDocByKey = new Map(
+      winnerResults.flatMap((winnerDoc, index) => {
+        const winnerKey = this.normalizer.getWinnerKey(
+          lotWinnersNormalized[index],
+        );
 
-    const winnersDocs = await this.contractorService.upsertListAwardWinners(
-      winnersNormalized,
-      {
-        awardTenderId: awardTender._id.toString(),
-        cpvCodes: normalizedTender.cpvCodes,
-      },
+        return winnerDoc && winnerKey ? [[winnerKey, winnerDoc]] : [];
+      }),
+    );
+    const lotWinnerByLotIdentifier = new Map(
+      lotWinners.map((lotWinner) => [lotWinner.lotIdentifier, lotWinner]),
     );
 
-    awardTender.winners = winnersDocs.map((winner) => winner._id);
+    awardTender.lots = lotsWithEur.map((lot) => {
+      const lotWinner = lotWinnerByLotIdentifier.get(lot.identifier);
+      const winner = lotWinner
+        ? winnerDocByKey.get(lotWinner.winnerKey)?._id
+        : undefined;
+
+      return {
+        ...lot,
+        ...(winner ? { winner } : {}),
+      };
+    });
+
+    awardTender.winners = Array.from(
+      new Set(awardTender.lots.flatMap((lot) => lot.winner?.toString() ?? [])),
+    ).map((winnerId) => new Types.ObjectId(winnerId));
     await awardTender.save();
+
+    await this.contractorService.refreshContractorsAwardMeta([
+      ...oldWinnerIds,
+      ...awardTender.winners.map((winner) => winner.toString()),
+    ]);
 
     await this.buyerService.refreshBuyersTenderMeta(buyersIds);
 
