@@ -70,47 +70,51 @@ export class BuyerController {
   @ApiOperation({ summary: 'Get buyer details with buyer intelligence' })
   @ApiOkResponse({ description: 'Buyer details.' })
   async getBuyerById(@Param('id') id: string, @Req() req) {
-    const buyer = await this.buyerService.getBuyerDetails(id);
+    try {
+      const buyer = await this.buyerService.getBuyerDetails(id);
 
-    if (!buyer) {
-      throw new NotFoundException('Buyer not found');
+      if (!buyer) {
+        throw new NotFoundException('Buyer not found');
+      }
+
+      const tariffType = await this.tariffService.getUserTariffType(req.user);
+
+      const promises: any[] = [
+        this.buyerService.getRecentTenders(id),
+        this.buyerService.getRecentAwardTenders(id),
+      ];
+
+      if (tariffType !== TariffType.free) {
+        promises.push(
+          this.buyerIntelligenceService.ensureBuyerIntelligence({
+            buyerId: id,
+          }),
+        );
+      }
+
+      const [recentTenders, recentAwardTenders, buyerIntelligence] =
+        await Promise.all(promises);
+
+      const buyerIntel =
+        BuyerIntelligenceModel.serializeDetail(buyerIntelligence);
+
+      if (
+        buyerIntel &&
+        typeof buyerIntel === 'object' &&
+        'buyer' in buyerIntelligence
+      ) {
+        // @ts-ignore
+        delete buyerIntel.buyer;
+      }
+
+      return {
+        buyer: BuyerModel.serializeDetail(buyer),
+        buyerIntelligence: buyerIntel,
+        recentTenders,
+        recentAwardTenders,
+      };
+    } catch (e) {
+      console.log({ e });
     }
-
-    const tariffType = await this.tariffService.getUserTariffType(req.user);
-
-    const promises: any[] = [
-      this.buyerService.getRecentTenders(id),
-      this.buyerService.getRecentAwardTenders(id),
-    ];
-
-    if (tariffType !== TariffType.free) {
-      promises.push(
-        this.buyerIntelligenceService.ensureBuyerIntelligence({
-          buyerId: id,
-        }),
-      );
-    }
-
-    const [recentTenders, recentAwardTenders, buyerIntelligence] =
-      await Promise.all(promises);
-
-    const buyerIntel =
-      BuyerIntelligenceModel.serializeDetail(buyerIntelligence);
-
-    if (
-      buyerIntel &&
-      typeof buyerIntel === 'object' &&
-      'buyer' in buyerIntelligence
-    ) {
-      // @ts-ignore
-      delete buyerIntel.buyer;
-    }
-
-    return {
-      buyer: BuyerModel.serializeDetail(buyer),
-      buyerIntelligence: buyerIntel,
-      recentTenders,
-      recentAwardTenders,
-    };
   }
 }

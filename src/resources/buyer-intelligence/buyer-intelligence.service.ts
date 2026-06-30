@@ -3,6 +3,7 @@ import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 import { CpvService } from '@/resources/cpv/cpv.service';
 import {
   AwardTender,
+  AwardTenderDocument,
   AwardTenderModel,
 } from '@/resources/award-tender/schemas';
 import {
@@ -49,6 +50,7 @@ import { buildTenderDeepCompanyFitSystemPrompt } from '@/resources/tender-deep-a
 import { DEEP_COMPANY_FIT_LLM_JSON_SCHEMA } from '@/openai/schemas/deep-analysis';
 import { BUYER_INTELLIGENCE_LLM_JSON_SCHEMA } from '@/openai/schemas/buyer-intelligence';
 import fs from 'node:fs';
+import { getAwardTenderAwardValueEur } from '@/resources/buyer/buyer-utils';
 
 const DEFAULT_RECENT_TENDERS_LIMIT = 30;
 
@@ -175,18 +177,41 @@ export class BuyerIntelligenceService {
     awardTenders: AwardTender[],
     cpvByCode: Map<string, BuyerIntelligenceCpvPayload>,
   ): BuyerIntelligenceAiPayload['recentAwardTenders'] {
-    return awardTenders.map((awardTender) => ({
-      publicationDate: toOptionalIsoString(awardTender.publicationDate),
-      awardedValueEur: toNullableFiniteNumber(awardTender.awardValueEur),
-      cpvCodes: this.getCpvNames(awardTender.cpvCodes ?? [], cpvByCode),
-      winners: awardTender.winners.map((contractor: ContractorDocument) => {
-        return {
-          name: contractor.name ?? '',
-          country: contractor.countries?.[0],
-          city: contractor.cities?.[0],
-        };
-      }),
-    }));
+    return awardTenders.map((awardTender) => {
+      const awardedValueEurByWinnerId = new Map<string, number>();
+
+      for (const lot of awardTender.lots ?? []) {
+        const winnerId = lot.winner?.toString();
+        const awardedValueEur = toNullableFiniteNumber(lot.awardValueEur);
+
+        if (!winnerId || awardedValueEur === null) {
+          continue;
+        }
+
+        awardedValueEurByWinnerId.set(
+          winnerId,
+          (awardedValueEurByWinnerId.get(winnerId) ?? 0) + awardedValueEur,
+        );
+      }
+
+      return {
+        publicationDate: toOptionalIsoString(awardTender.publicationDate),
+        awardedValueEur: toNullableFiniteNumber(
+          getAwardTenderAwardValueEur(awardTender as AwardTenderDocument),
+        ),
+        cpvCodes: this.getCpvNames(awardTender.cpvCodes ?? [], cpvByCode),
+        winners: awardTender.winners.map((contractor: ContractorDocument) => {
+          return {
+            name: contractor.name ?? '',
+            country: contractor.countries?.[0],
+            city: contractor.cities?.[0],
+            awardedValueEur: toNullableFiniteNumber(
+              awardedValueEurByWinnerId.get(contractor._id.toString()),
+            ),
+          };
+        }),
+      };
+    });
   }
 
   private getTopCountries(stats?: BuyerStats): BuyerTopCountryStats[] {

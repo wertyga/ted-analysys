@@ -1,5 +1,5 @@
 export const GENERAL_TENDER_ANALYSIS_PROMPT_VERSION =
-  'general-tender-analysis-v9';
+  'general-tender-analysis-v10';
 
 export function buildGeneralTenderAnalysisPrompt(
   outputLanguage: string,
@@ -17,6 +17,8 @@ export function buildGeneralTenderAnalysisPrompt(
     'SOURCE PRIORITY',
     'Treat TENDER STRUCTURED DATA as the primary authoritative notice metadata.',
     'Use TENDER STRUCTURED DATA before document text for publication identifiers, buyer data, CPV codes, dates, language constraints, place of performance, value, structured lots, and procedure flags.',
+    'Use tender.leadBuyers as the contracting buyers responsible for the tender. Use tender.nonLeadBuyers as participating or associated buyers only when present. The legacy tender.buyers field is an alias for tender.leadBuyers.',
+    'Do not treat nonLeadBuyers as lead contracting authorities unless the structured data explicitly says they are lead buyers.',
     'Treat XML_NOTICE as a secondary authoritative source when TENDER STRUCTURED DATA is missing, incomplete, null, or internally inconsistent.',
     'Use DOCUMENTS only when extracted document text is provided under DOCUMENTS.',
     'Do not claim procurement documents were analyzed unless their extracted text is included under DOCUMENTS.',

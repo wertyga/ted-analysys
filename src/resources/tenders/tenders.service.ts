@@ -146,6 +146,8 @@ export class TendersService {
 
     await this.buyerService.refreshBuyersTenderMeta(buyersIds);
 
+    await tenderDoc.populate(tenderPopulateFields);
+
     return tenderDoc;
   }
 

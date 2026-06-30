@@ -9,13 +9,11 @@ export const companyCpvPopulateFields: PopulateOptions[] = [
 export const tenderPopulateFields: PopulateOptions[] = [
   { path: 'nonLeadBuyers' },
   { path: 'leadBuyers' },
-  { path: 'lots.buyer' },
 ];
 
 export const awardTenderPopulateFields: PopulateOptions[] = [
   { path: 'nonLeadBuyers' },
   { path: 'leadBuyers' },
-  { path: 'lots.buyer' },
   { path: 'winners' },
 ];
 

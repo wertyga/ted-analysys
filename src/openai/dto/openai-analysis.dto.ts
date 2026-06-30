@@ -43,6 +43,8 @@ export interface GeneralTenderAnalysisInput {
     description?: string | null;
     lots: TenderLot[];
     country?: string | null;
+    leadBuyers: BuyerDetailDto[];
+    nonLeadBuyers: BuyerDetailDto[];
     buyers: BuyerDetailDto[];
     procedureType?: string | null;
     noticeType?: string | null;

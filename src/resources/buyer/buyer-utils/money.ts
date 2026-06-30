@@ -6,7 +6,7 @@ function getFiniteNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
-function getAwardTenderAwardValueEur(
+export function getAwardTenderAwardValueEur(
   awardTender: AwardTenderDocument,
 ): number | null {
   const tenderAwardValue = getFiniteNumber(awardTender.awardValueEur);
@@ -24,7 +24,7 @@ function getAwardTenderAwardValueEur(
     return lotAwardValue;
   }
 
-  return getFiniteNumber(awardTender.estimatedValueEur);
+  return null;
 }
 
 export function getMoneyBuyerTendersStats(

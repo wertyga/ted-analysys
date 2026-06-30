@@ -17,6 +17,9 @@ export class TenderGeneralAnalysisBuilder {
       ['xml'],
     );
 
+    const leadBuyers = tender.leadBuyers.map(BuyerModel.serializeDetail);
+    const nonLeadBuyers = tender.nonLeadBuyers.map(BuyerModel.serializeDetail);
+
     return {
       tender: {
         id: tender.id,
@@ -24,7 +27,9 @@ export class TenderGeneralAnalysisBuilder {
         procedureTitle: tender.titleProc ?? null,
         description: tender.description ?? null,
         lots: tender.lots ?? [],
-        buyers: tender.leadBuyers.map(BuyerModel.serializeDetail),
+        leadBuyers,
+        nonLeadBuyers,
+        buyers: leadBuyers,
         procedureType: tender.procedureType ?? null,
         noticeType: tender.noticeType ?? null,
         noticeSubtype: tender.noticeSubtype ?? null,

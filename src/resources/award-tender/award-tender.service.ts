@@ -180,6 +180,57 @@ export class AwardTenderService {
     });
   }
 
+  private getAwardValueFallbackFromLots(lots: AwardTenderLot[]): {
+    amount: number | null;
+    currency: string | null;
+  } {
+    const lotAwardValues = lots.flatMap((lot) => {
+      const amount = lot.awardValue?.amount;
+
+      return typeof amount === 'number' && Number.isFinite(amount)
+        ? [{ amount, currency: lot.awardValue?.currency ?? null }]
+        : [];
+    });
+
+    if (!lotAwardValues.length) {
+      return {
+        amount: null,
+        currency: null,
+      };
+    }
+
+    const currencies = Array.from(
+      new Set(lotAwardValues.map((value) => value.currency).filter(Boolean)),
+    );
+
+    if (currencies.length !== 1) {
+      return {
+        amount: null,
+        currency: null,
+      };
+    }
+
+    return {
+      amount: lotAwardValues.reduce((acc, value) => acc + value.amount, 0),
+      currency: currencies[0],
+    };
+  }
+
+  private getAwardValueEurFallbackFromLots(
+    lots: AwardTenderLot[],
+  ): number | null {
+    const amount = lots
+      .flatMap((lot) => {
+        return typeof lot.awardValueEur === 'number' &&
+          Number.isFinite(lot.awardValueEur)
+          ? [lot.awardValueEur]
+          : [];
+      })
+      .reduce((acc, value) => acc + value, 0);
+
+    return amount > 0 ? amount : null;
+  }
+
   async upsertAwardTender(
     notice: TedNotice,
     updateExisting?: boolean,
@@ -222,11 +273,19 @@ export class AwardTenderService {
           publicationDate,
         ),
       ]);
+    const lotAwardValue = this.getAwardValueFallbackFromLots(lotsWithEur);
+    const awardValueWithFallback = {
+      amount: awardValue.amount ?? lotAwardValue.amount,
+      currency: awardValue.currency ?? lotAwardValue.currency,
+    };
+    const awardValueEurWithFallback =
+      tenderAwardValueEur ?? this.getAwardValueEurFallbackFromLots(lotsWithEur);
 
     const insertPayload = {
       ...normalizedTender,
+      awardValue: awardValueWithFallback,
       estimatedValueEur: tenderEstimatedValueEur,
-      awardValueEur: tenderAwardValueEur,
+      awardValueEur: awardValueEurWithFallback,
       lots: lotsWithEur,
     };
 

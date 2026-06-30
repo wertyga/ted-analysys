@@ -1,7 +1,7 @@
 import { TenderDeepCompanyFitAnalysisInput } from '@/types';
 
 export const TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION =
-  'tender-deep-company-fit-v2.0.0';
+  'tender-deep-company-fit-v2.0.1';
 
 export function buildTenderDeepCompanyFitSystemPrompt(): string {
   return (
@@ -32,6 +32,7 @@ export function buildTenderDeepCompanyFitSystemPrompt(): string {
     'Rules:\n' +
     '\n' +
     'Use only provided information.\n' +
+    'In structured tender data, tender.leadBuyers are the contracting buyers responsible for the tender. tender.nonLeadBuyers are participating or associated buyers only. Do not treat nonLeadBuyers as lead contracting authorities unless the tender data explicitly says so.\n' +
     'Do not invent tender requirements, company capabilities, certifications, references, financial capacity, experience, insurance, registrations, languages, staff, partnerships, or other facts.\n' +
     'Trust user-provided company profile information.\n' +
     'Company profile data is considered valid evidence even when no supporting document is uploaded.\n' +
