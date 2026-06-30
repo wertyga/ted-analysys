@@ -20,7 +20,13 @@ export interface Contractor {
   ownerNationalities?: string[];
   euRegistrationNumber?: string;
   cpvCodes: string[];
+
   awardTenders?: AwardTenderDocument[];
+
+  stats: {
+    lastAwardWinDate: Date;
+  };
+
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -59,6 +65,13 @@ export interface ContractorModelType extends Model<ContractorDocument> {
   serializeDetail(contractor: ContractorSerializable): ContractorDetailDto;
 }
 
+const ContractorStatsSchema = new Schema<Contractor['stats']>(
+  {
+    lastAwardWinDate: { type: Date },
+  },
+  { _id: false },
+);
+
 export const ContractorSchema = new Schema<
   ContractorDocument,
   ContractorModelType
@@ -92,6 +105,10 @@ export const ContractorSchema = new Schema<
       type: [Schema.Types.ObjectId],
       ref: 'AwardTender',
       default: [],
+    },
+
+    stats: {
+      type: ContractorStatsSchema,
     },
   },
   {

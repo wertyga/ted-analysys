@@ -13,17 +13,6 @@ import { TENDER_COMPETITION_SEARCH_FIELDS } from '@/config/ted-search.config';
 import { AwardTenderModel } from '@/resources/award-tender/schemas';
 import { AWARD_HISTORY_FIELDS } from '@/config/award-tender.config';
 
-const LEGACY_TENDER_BUYER_FIELDS = [
-  'buyerName',
-  'buyerIdentifier',
-  'buyerCountry',
-  'buyerCity',
-  'buyerMainActivities',
-  'buyerEmail',
-  'buyerInternetAddress',
-  'buyerProfile',
-] as const;
-
 @Injectable()
 export class BuyerTechService {
   normalizer = new BuyerNormalizer();
@@ -43,33 +32,19 @@ export class BuyerTechService {
   }
 
   async collectBuyersFromTenderAndUnsetTenderFields(notice: TedNotice) {
-    const buyer = await this.buyerService.upsertBuyerFromTEDNotice(notice);
-
-    const tender = await TenderModel.findOneAndUpdate(
-      { id: notice['publication-number'] },
-      {
-        $set: {
-          buyer: buyer._id,
-        },
-        $unset: Object.fromEntries(
-          LEGACY_TENDER_BUYER_FIELDS.map((field) => [field, '']),
-        ),
-      },
-      { returnDocument: 'after', strict: false },
-    );
+    const tender = await TenderModel.findOne({
+      id: notice['publication-number'],
+    });
 
     if (!tender) {
       return;
     }
 
-    await this.buyerService.refreshBuyerTenderMeta(buyer._id);
-
-    return buyer;
+    return await this.tendersService.upsertTender(notice);
   }
 
   async collectBuyersFromTenderAllAndUnsetTenderFields() {
-    const tenders = [{ id: '417784-2026' }];
-    // const tenders = await TenderModel.find({}).select('id').lean();
+    const tenders = await TenderModel.find({}).select('id').lean();
 
     const chunkedIds = _chunk(tenders, 100);
 
@@ -118,16 +93,7 @@ export class BuyerTechService {
       return;
     }
 
-    const buyer = await this.buyerService.upsertBuyerFromTEDNotice(notice);
-
-    await AwardTenderModel.findByIdAndUpdate(awardTender._id, {
-      $set: {
-        buyer: buyer._id,
-      },
-    });
-    await this.buyerService.refreshBuyerTenderMeta(buyer._id);
-
-    return buyer;
+    return this.awardTenderService.upsertAwardTender(notice);
   }
 
   async collectBuyersFromAwardTenderAll() {

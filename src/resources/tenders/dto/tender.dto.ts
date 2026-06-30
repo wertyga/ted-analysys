@@ -229,7 +229,12 @@ export class TenderDto {
   @ApiPropertyOptional({
     description: 'Buyer obj',
   })
-  buyer: schemas.BuyerDocument;
+  nonLeadBuyers: schemas.BuyerDocument[];
+
+  @ApiPropertyOptional({
+    description: 'Buyer obj',
+  })
+  leadBuyers: schemas.BuyerDocument[];
 
   @ApiPropertyOptional({
     example: '2023-12-13Z',
@@ -437,5 +442,6 @@ export type TenderListDto = Omit<
   | 'submissionUrls'
   | 'selectionCriteria'
   | 'awardCriteria'
-  | 'buyer'
-> & { buyer: BuyerListDto };
+  | 'nonLeadBuyers'
+  | 'leadBuyers'
+> & { nonLeadBuyers: BuyerListDto[]; leadBuyers: BuyerListDto[] };

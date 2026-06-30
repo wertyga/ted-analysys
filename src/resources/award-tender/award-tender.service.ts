@@ -1,8 +1,17 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
 
 import { TenderDocument, TenderModel } from '@/resources/tenders/schemas';
-import { TendersService } from '@/resources/tenders/tenders.service';
+import {
+  OPTIONAL_TENDER_UNSET_FIELDS,
+  TendersService,
+} from '@/resources/tenders/tenders.service';
 import {
   AwardTenderModel,
   AwardTenderDocument,
@@ -13,6 +22,7 @@ import {
   WinnerNormalized,
 } from '@/resources/contractor/contractor.service';
 import {
+  awardTenderPopulateFields,
   getBooleanArrayValue,
   getPaginationMeta,
   getStringArrayValue,
@@ -35,39 +45,41 @@ export interface SaveAwardTedTendersOptions {
   updateExisting?: boolean;
 }
 
-const LEGACY_AWARD_TENDER_UNSET_FIELDS = [
-  'additionalClassificationLot',
-  'buyerCity',
-  'buyerCountry',
-  'buyerEmail',
-  'buyerIdentifier',
-  'buyerInternetAddress',
-  'buyerMainActivities',
-  'buyerName',
-  'buyerProfile',
-  'descriptionLot',
-  'internalLotIdentifiers',
-  'mainClassificationLot',
-  'titleLot',
-] as const;
-
-const OPTIONAL_AWARD_TENDER_UNSET_FIELDS = [
-  'noticeSubtype',
-  'noticeVersion',
-  'description',
-  'submissionDeadline',
-  'plannedEndDate',
-  'contractNature',
-  'isFrameworkAgreement',
-] as const;
+// const LEGACY_AWARD_TENDER_UNSET_FIELDS = [
+//   'additionalClassificationLot',
+//   'buyerCity',
+//   'buyerCountry',
+//   'buyerEmail',
+//   'buyerIdentifier',
+//   'buyerInternetAddress',
+//   'buyerMainActivities',
+//   'buyerName',
+//   'buyerProfile',
+//   'descriptionLot',
+//   'internalLotIdentifiers',
+//   'mainClassificationLot',
+//   'titleLot',
+// ] as const;
+//
+// const OPTIONAL_AWARD_TENDER_UNSET_FIELDS = [
+//   'noticeSubtype',
+//   'noticeVersion',
+//   'description',
+//   'submissionDeadline',
+//   'plannedEndDate',
+//   'contractNature',
+//   'isFrameworkAgreement',
+// ] as const;
 
 @Injectable()
 export class AwardTenderService {
   normalizer = new AwardTenderNormalizer();
 
   constructor(
+    @Inject(forwardRef(() => TendersService))
     private readonly tendersService: TendersService,
     private readonly contractorService: ContractorService,
+    @Inject(forwardRef(() => BuyerService))
     private readonly buyerService: BuyerService,
   ) {}
 
@@ -84,7 +96,7 @@ export class AwardTenderService {
 
     const query: QueryFilter<AwardTenderDocument> = {
       cpvCodes: { $in: tender.cpvCodes as string[] },
-      buyer: tender.buyer._id || tender.buyer,
+      // buyer: tender.buyer._id || tender.buyer, // TODO: ??
       contractNature: tender.contractNature,
     };
 
@@ -94,8 +106,7 @@ export class AwardTenderService {
         .sort({ publicationDate: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('buyer')
-        .populate('winners')
+        .populate(awardTenderPopulateFields)
         .exec(),
       AwardTenderModel.countDocuments(query),
     ]);
@@ -117,7 +128,7 @@ export class AwardTenderService {
     }
 
     const query: QueryFilter<AwardTenderDocument> = {
-      buyer: buyerId,
+      $or: [{ leadBuyers: buyerId }, { nonLeadBuyers: buyerId }],
     };
 
     const { skip, limit } = getPaginationMeta(pagination);
@@ -126,17 +137,14 @@ export class AwardTenderService {
         .sort({ publicationDate: -1, _id: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('buyer')
-        .populate('winners')
+        .populate(awardTenderPopulateFields)
         .exec(),
       AwardTenderModel.countDocuments(query),
     ]);
 
     return {
       totalCount,
-      awardTenders: awardTenders.map((awardTender) =>
-        AwardTenderModel.serializeList(awardTender),
-      ),
+      awardTenders: awardTenders.map(AwardTenderModel.serializeList),
     };
   }
 
@@ -177,7 +185,7 @@ export class AwardTenderService {
     updateExisting?: boolean,
   ): Promise<AwardTenderDocument | null> {
     const normalizedTender = this.normalizer.normalizeAwardTenderNotice(notice);
-    const winners = this.normalizer.normalizeWinnersNotice(notice);
+    const winnersNormalized = this.normalizer.normalizeWinnersNotice(notice);
 
     const { publicationDate, lots, estimatedValue, awardValue, id } =
       normalizedTender;
@@ -206,13 +214,12 @@ export class AwardTenderService {
       estimatedValueEur: tenderEstimatedValueEur,
       awardValueEur: tenderAwardValueEur,
       lots: lotsWithEur,
-      winners: [],
     };
 
     const payload = updateExisting
       ? {
           $set: insertPayload,
-          $unset: this.buildAwardTenderUnset(normalizedTender),
+          $unset: this.buildAwardTenderUnset(),
         }
       : {
           $setOnInsert: insertPayload,
@@ -223,7 +230,12 @@ export class AwardTenderService {
         id: normalizedTender.id,
       },
       payload,
-      { returnDocument: 'after', upsert: true, includeResultMetadata: true },
+      {
+        returnDocument: 'after',
+        upsert: true,
+        includeResultMetadata: true,
+        strict: false,
+      },
     );
 
     const wasTenderCreated = result?.lastErrorObject?.updatedExisting === false;
@@ -233,19 +245,27 @@ export class AwardTenderService {
       return null;
     }
 
-    const buyer = await this.buyerService.upsertBuyerFromTEDNotice(notice);
+    const savedPureBuyers =
+      await this.buyerService.upsertPureBuyersFromTEDNotice(notice);
 
-    awardTender.buyer = buyer._id;
+    const buyersIds = [
+      ...savedPureBuyers.leadIds,
+      ...savedPureBuyers.nonLeadIds,
+    ];
+
+    awardTender.leadBuyers = savedPureBuyers.leadIds;
+    awardTender.nonLeadBuyers = savedPureBuyers.nonLeadIds;
 
     if (!wasTenderCreated && !updateExisting) {
       await awardTender.save();
-      await this.buyerService.refreshBuyerTenderMeta(buyer._id);
 
-      return awardTender.populate('buyer');
+      await this.buyerService.refreshBuyersTenderMeta(buyersIds);
+
+      return awardTender;
     }
 
     const winnersDocs = await this.contractorService.upsertListAwardWinners(
-      winners,
+      winnersNormalized,
       {
         awardTenderId: awardTender._id.toString(),
         cpvCodes: normalizedTender.cpvCodes,
@@ -254,24 +274,17 @@ export class AwardTenderService {
 
     awardTender.winners = winnersDocs.map((winner) => winner._id);
     await awardTender.save();
-    await this.buyerService.refreshBuyerTenderMeta(buyer._id);
 
-    return awardTender.populate('buyer');
+    await this.buyerService.refreshBuyersTenderMeta(buyersIds);
+
+    return awardTender;
   }
 
-  private buildAwardTenderUnset(
-    normalizedTender: ReturnType<
-      AwardTenderNormalizer['normalizeAwardTenderNotice']
-    >,
-  ): Record<string, ''> {
-    const unset = Object.fromEntries(
-      LEGACY_AWARD_TENDER_UNSET_FIELDS.map((field) => [field, '']),
-    ) as Record<string, ''>;
+  private buildAwardTenderUnset(): Record<string, ''> {
+    const unset: Record<string, ''> = {};
 
-    for (const field of OPTIONAL_AWARD_TENDER_UNSET_FIELDS) {
-      if (normalizedTender[field] === undefined) {
-        unset[field] = '';
-      }
+    for (const field of OPTIONAL_TENDER_UNSET_FIELDS) {
+      unset[field] = '';
     }
 
     return unset;

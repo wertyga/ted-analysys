@@ -1,12 +1,13 @@
 import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
 import {
-  getArrayValue,
+  getArrayFallbackValueByIndex,
+  getArrayFallbackValueByIndexUniqArray,
+  getBooleanArrayValue,
   getEngValueOrFirst,
-  getEngValueOrFirstString,
   getStringArrayValue,
   getUniqArray,
 } from '@/utils';
-import { Buyer, BuyerIdentifierType } from '@/resources/buyer/schemas';
+import { Buyer } from '@/resources/buyer/schemas';
 
 export type BuyerNormalized = Omit<
   Buyer,
@@ -21,72 +22,128 @@ export type BuyerNormalized = Omit<
 > & {
   legalTypes: string[];
   mainActivities: string[];
+  isLead: boolean;
 };
 
 export class BuyerNormalizer {
-  private normalizeBuyerContact(notice: TedNotice): BuyerNormalized['contact'] {
-    const data = {
+  private getEngArrayValue(field: string, notice: TedNotice): string[] {
+    const value = getEngValueOrFirst(field, notice);
+    const values = Array.isArray(value) ? value : [value];
+
+    return values
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  private normalizeBuyerContacts(
+    notice: TedNotice,
+  ): BuyerNormalized['contact'][] {
+    const data: Record<string, string[]> = {
       organisationContactPointBuyer: getStringArrayValue(
         'organisation-contact-point-buyer',
         notice,
       ),
       buyerContactPoint: getStringArrayValue('buyer-contact-point', notice),
-      touchpointContactPointBuyer: getArrayValue(
+      touchpointContactPointBuyer: getStringArrayValue(
         'touchpoint-contact-point-buyer',
         notice,
       ),
-      organisationPersonBuyer: getArrayValue(
+      organisationPersonBuyer: getStringArrayValue(
         'organisation-person-buyer',
         notice,
       ),
-      buyerPerson: getArrayValue('buyer-person', notice),
+      buyerPerson: getStringArrayValue('buyer-person', notice),
       organisationEmailBuyer: getStringArrayValue(
         'organisation-email-buyer',
         notice,
       ),
       buyerEmail: getStringArrayValue('buyer-email', notice),
-      touchpointEmailBuyer: getArrayValue('touchpoint-email-buyer', notice),
+      touchpointEmailBuyer: getStringArrayValue(
+        'touchpoint-email-buyer',
+        notice,
+      ),
       organisationTelBuyer: getStringArrayValue(
         'organisation-tel-buyer',
         notice,
       ),
-      touchpointTelBuyer: getArrayValue('touchpoint-tel-buyer', notice),
-      organisationFaxBuyer: getArrayValue('organisation-fax-buyer', notice),
-      touchpointFaxBuyer: getArrayValue('touchpoint-fax-buyer', notice),
+      touchpointTelBuyer: getStringArrayValue('touchpoint-tel-buyer', notice),
+      organisationFaxBuyer: getStringArrayValue(
+        'organisation-fax-buyer',
+        notice,
+      ),
+      touchpointFaxBuyer: getStringArrayValue('touchpoint-fax-buyer', notice),
 
-      touchpointInternetAddressBuyer: getArrayValue(
+      touchpointInternetAddressBuyer: getStringArrayValue(
         'touchpoint-internet-address-buyer',
         notice,
       ),
 
-      touchpointGatewayBuyer: getArrayValue('touchpoint-gateway-buyer', notice),
+      touchpointGatewayBuyer: getStringArrayValue(
+        'touchpoint-gateway-buyer',
+        notice,
+      ),
     };
 
-    return {
-      contactPoint: getUniqArray(
-        data.organisationContactPointBuyer,
-        data.buyerContactPoint,
-        data.touchpointContactPointBuyer,
-      )[0],
-      person: getUniqArray(data.organisationPersonBuyer, data.buyerPerson)[0],
-      email: getUniqArray(
-        data.organisationEmailBuyer,
-        data.buyerEmail,
-        data.touchpointEmailBuyer,
-      )[0],
-      phone: getUniqArray(
-        data.organisationTelBuyer,
-        data.touchpointTelBuyer,
-      )[0],
-      fax: getUniqArray(data.organisationFaxBuyer, data.touchpointFaxBuyer)[0],
-      website: getUniqArray(data.touchpointInternetAddressBuyer)[0],
-      gateway: getUniqArray(data.touchpointGatewayBuyer)[0],
-    };
+    const length = Math.max(...Object.values(data).map((v) => v.length), 0);
+
+    if (length === 0) {
+      return [];
+    }
+
+    return Array.from({ length }).map(
+      (_, index) =>
+        ({
+          contactPoint: getArrayFallbackValueByIndex(
+            data,
+            index,
+            'buyerContactPoint',
+            'touchpointContactPointBuyer',
+          ),
+          person: getArrayFallbackValueByIndex(
+            data,
+            index,
+            'buyerPerson',
+            'organisationPersonBuyer',
+          ),
+          email: getArrayFallbackValueByIndex(
+            data,
+            index,
+            'buyerEmail',
+            'organisationEmailBuyer',
+            'touchpointEmailBuyer',
+          ),
+          phone: getArrayFallbackValueByIndex(
+            data,
+            index,
+            'organisationTelBuyer',
+            'touchpointTelBuyer',
+          ),
+          fax: getArrayFallbackValueByIndex(
+            data,
+            index,
+            'organisationFaxBuyer',
+            'touchpointFaxBuyer',
+          ),
+          website: getArrayFallbackValueByIndex(
+            data,
+            index,
+            'touchpointInternetAddressBuyer',
+          ),
+          gateway: getArrayFallbackValueByIndex(
+            data,
+            index,
+            'touchpointGatewayBuyer',
+          ),
+        }) as BuyerNormalized['contact'],
+    );
   }
 
-  private normalizeBuyerAddress(notice: TedNotice): BuyerNormalized['address'] {
-    const data = {
-      organisationStreetBuyer: getArrayValue(
+  private normalizeBuyerAddresses(
+    notice: TedNotice,
+  ): BuyerNormalized['address'][] {
+    const data: Record<string, (string | undefined)[]> = {
+      organisationStreetBuyer: getStringArrayValue(
         'organisation-street-buyer',
         notice,
       ),
@@ -106,56 +163,110 @@ export class BuyerNormalizer {
         'organisation-country-sub-buyer',
         notice,
       ),
+      touchpointStreetBuyer: getStringArrayValue(
+        'touchpoint-street-buyer',
+        notice,
+      ),
+      touchpointPostCodeBuyer: getStringArrayValue(
+        'touchpoint-post-code-buyer',
+        notice,
+      ),
+      touchpointCityBuyer: getStringArrayValue('touchpoint-city-buyer', notice),
+      touchpointCountryBuyer: getStringArrayValue(
+        'touchpoint-country-buyer',
+        notice,
+      ),
+      touchpointCountrySubBuyer: getStringArrayValue(
+        'touchpoint-country-sub-buyer',
+        notice,
+      ),
       buyerCity: getEngValueOrFirst('buyer-city', notice),
       buyerCountry: getStringArrayValue('buyer-country', notice),
       buyerCountrySub: getStringArrayValue('buyer-country-sub', notice),
       buyerPostCode: getStringArrayValue('buyer-post-code', notice),
     };
 
-    return {
-      street: getUniqArray(data.organisationStreetBuyer)[0],
-      postCode: getUniqArray(
-        data.organisationPostCodeBuyer,
-        data.buyerPostCode,
-      )[0],
-      city: getUniqArray(
-        data.organisationCityBuyer,
-        Array.isArray(data.buyerCity) ? data.buyerCity : [data.buyerCity],
-      )[0],
-      country: getUniqArray(
-        data.organisationCountryBuyer,
-        data.buyerCountry,
-      )[0],
-      countrySub: getUniqArray(
-        data.organisationCountrySubBuyer,
-        data.buyerCountrySub,
-      )[0],
-    };
+    const length = Math.max(...Object.values(data).map((v) => v?.length ?? 0));
+
+    if (length === 0) {
+      return [];
+    }
+
+    return Array.from(new Array(length)).map((_, index) => {
+      return {
+        street: getArrayFallbackValueByIndex(
+          data,
+          index,
+          'organisationStreetBuyer',
+          'touchpointStreetBuyer',
+        ),
+        postCode: getArrayFallbackValueByIndex(
+          data,
+          index,
+          'buyerPostCode',
+          'organisationPostCodeBuyer',
+          'touchpointPostCodeBuyer',
+        ),
+        city: getArrayFallbackValueByIndex(
+          data,
+          index,
+          'buyerCity',
+          'organisationCityBuyer',
+          'touchpointCityBuyer',
+        ),
+        country: getArrayFallbackValueByIndex(
+          data,
+          index,
+          'buyerCountry',
+          'organisationCountryBuyer',
+          'touchpointCountryBuyer',
+        ),
+        countrySub: getArrayFallbackValueByIndex(
+          data,
+          index,
+          'buyerCountrySub',
+          'organisationCountrySubBuyer',
+          'touchpointCountrySubBuyer',
+        ),
+      } as BuyerNormalized['address'];
+    });
   }
 
-  normalizeBuyerFromTEDNotice(notice: TedNotice): BuyerNormalized {
+  normalizeBuyersFromTEDNotice(notice: TedNotice): BuyerNormalized[] {
     const data = {
-      organisationGatewayBuyer: getArrayValue(
+      organisationGatewayBuyer: getStringArrayValue(
         'organisation-gateway-buyer',
         notice,
       ),
-      buyerGateway: getArrayValue('buyer-gateway', notice),
-      organisationInternetAddressBuyer: getArrayValue(
+      buyerGroupLeads: getBooleanArrayValue('buyer-group-lead', notice),
+      buyerGateway: getStringArrayValue('buyer-gateway', notice),
+      organisationInternetAddressBuyer: getStringArrayValue(
         'organisation-internet-address-buyer',
         notice,
       ),
-      buyerInternetAddress: getArrayValue('buyer-internet-address', notice),
-      organisationNameBuyer: getEngValueOrFirstString(
+      touchpointInternetAddressBuyer: getStringArrayValue(
+        'touchpoint-internet-address-buyer',
+        notice,
+      ),
+      buyerInternetAddress: getStringArrayValue(
+        'buyer-internet-address',
+        notice,
+      ),
+      organisationNameBuyer: this.getEngArrayValue(
         'organisation-name-buyer',
         notice,
       ),
-      buyerName: getEngValueOrFirstString('buyer-name', notice),
+      touchpointNameBuyer: this.getEngArrayValue(
+        'touchpoint-name-buyer',
+        notice,
+      ),
+      buyerName: this.getEngArrayValue('buyer-name', notice),
 
       organisationIdentifierBuyer: getStringArrayValue(
         'organisation-identifier-buyer',
         notice,
       ),
-      buyerIdentifier: getStringArrayValue('buyer-identifier', notice),
+      buyerIdentifiers: getStringArrayValue('buyer-identifier', notice),
 
       buyerLegalType: getStringArrayValue('buyer-legal-type', notice),
       bt11ProcedureBuyer: getStringArrayValue('BT-11-Procedure-Buyer', notice),
@@ -165,8 +276,8 @@ export class BuyerNormalizer {
         'authority-main-activity',
         notice,
       ),
-      entityMainActivity: getArrayValue('entity-main-activity', notice),
-      activitySector: getArrayValue('activity-sector', notice),
+      entityMainActivity: getStringArrayValue('entity-main-activity', notice),
+      activitySector: getStringArrayValue('activity-sector', notice),
 
       bt10ProcedureBuyer: getStringArrayValue('BT-10-Procedure-Buyer', notice),
 
@@ -176,72 +287,115 @@ export class BuyerNormalizer {
         notice,
       ),
 
-      acquiringCpbBuyer: getArrayValue('acquiring-cpb-buyer', notice),
+      acquiringCpbBuyer: getStringArrayValue('acquiring-cpb-buyer', notice),
 
-      placeOfPerformanceCountryProc: getArrayValue(
+      placeOfPerformanceCountryProc: getStringArrayValue(
         'place-of-performance-country-proc',
         notice,
       ),
-      placeOfPerformanceCountryLot: getArrayValue(
+      placeOfPerformanceCountryLot: getStringArrayValue(
         'place-of-performance-country-lot',
         notice,
       ),
 
-      classificationCpv: getStringArrayValue('classification-cpv', notice),
-      mainClassificationProc: getStringArrayValue(
+      classificationsCpv: getStringArrayValue('classification-cpv', notice),
+      mainClassificationsProc: getStringArrayValue(
         'main-classification-proc',
         notice,
       ),
-      mainClassificationLot: getStringArrayValue(
+      mainClassificationsLot: getStringArrayValue(
         'main-classification-lot',
         notice,
       ),
     };
 
-    const address = this.normalizeBuyerAddress(notice);
+    const addresses = this.normalizeBuyerAddresses(notice);
+    const contacts = this.normalizeBuyerContacts(notice);
 
-    return {
-      name: data.buyerName || data.organisationNameBuyer,
-      contact: this.normalizeBuyerContact(notice),
-      address,
-      profiles: getUniqArray(data.buyerProfile, data.bt508ProcedureBuyer),
-      websites: getUniqArray(
-        data.organisationInternetAddressBuyer,
-        data.buyerInternetAddress,
-      ),
-      gateways: getUniqArray(data.organisationGatewayBuyer, data.buyerGateway),
-      identifiers: getUniqArray(
-        data.organisationIdentifierBuyer,
-        data.buyerIdentifier,
-      ).map((value) => ({
-        type: BuyerIdentifierType.UNKNOWN,
-        value: String(value),
-      })),
+    const length = Math.max(
+      data.buyerName.length,
+      data.organisationNameBuyer.length,
+      data.touchpointNameBuyer.length,
+      addresses.length,
+      contacts.length,
+      0,
+    );
 
-      organisationIdentifierBuyer: getUniqArray(
-        data.organisationIdentifierBuyer,
-        data.buyerIdentifier,
-      )?.[0],
+    if (length === 0) {
+      return [];
+    }
 
-      legalTypes: getUniqArray(data.buyerLegalType, data.bt11ProcedureBuyer),
-      countries: getUniqArray(
-        data.placeOfPerformanceCountryProc,
-        data.placeOfPerformanceCountryLot,
-      ),
+    const hasALead = !!data.buyerGroupLeads?.find((l) => !!l);
 
-      cpvCodes: getUniqArray(
-        data.classificationCpv,
-        data.mainClassificationProc,
-        data.mainClassificationLot,
-      ),
+    return Array.from({ length })
+      .map((_, index) => {
+        return {
+          isLead: hasALead
+            ? !!getArrayFallbackValueByIndex(data, index, 'buyerGroupLeads')
+            : true,
+          name: getArrayFallbackValueByIndex(
+            data,
+            index,
+            'buyerName',
+            'organisationNameBuyer',
+            'touchpointNameBuyer',
+          ),
+          contact: contacts[index] ?? {},
+          address: addresses[index] ?? {},
+          profiles: getArrayFallbackValueByIndexUniqArray(
+            data,
+            index,
+            'buyerProfile',
+            'bt508ProcedureBuyer',
+          ),
+          websites: getArrayFallbackValueByIndexUniqArray(
+            data,
+            index,
+            'buyerInternetAddress',
+            'organisationInternetAddressBuyer',
+            'touchpointInternetAddressBuyer',
+          ),
+          gateways: getArrayFallbackValueByIndexUniqArray(
+            data,
+            index,
+            'buyerGateway',
+            'organisationGatewayBuyer',
+          ),
+          identifiers: getArrayFallbackValueByIndexUniqArray(
+            data,
+            index,
+            'buyerIdentifiers',
+            'organisationIdentifierBuyer',
+          ),
 
-      mainActivities: getUniqArray(
-        data.mainActivity,
-        data.authorityMainActivity,
-        data.entityMainActivity,
-        data.activitySector,
-        data.bt10ProcedureBuyer,
-      ),
-    };
+          legalTypes: getArrayFallbackValueByIndexUniqArray(
+            data,
+            index,
+            'buyerLegalType',
+            'bt11ProcedureBuyer',
+          ),
+          countries: getUniqArray(
+            data.placeOfPerformanceCountryProc,
+            data.placeOfPerformanceCountryLot,
+          ),
+
+          cpvCodes: getUniqArray(
+            data.classificationsCpv,
+            data.mainClassificationsProc,
+            data.mainClassificationsLot,
+          ),
+
+          mainActivities: getArrayFallbackValueByIndexUniqArray(
+            data,
+            index,
+            'mainActivity',
+            'authorityMainActivity',
+            'entityMainActivity',
+            'activitySector',
+            'bt10ProcedureBuyer',
+          ),
+        };
+      })
+      .filter((b) => !!b.name);
   }
 }

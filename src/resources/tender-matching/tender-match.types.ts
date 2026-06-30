@@ -53,7 +53,7 @@ export interface TenderForMatching {
   description?: string;
   cpvCodes: string[];
   country?: string | null;
-  buyer: BuyerDocument;
+  buyers: BuyerDocument[];
   placeOfPerformanceCountry?: string | null;
   estimatedValue?: number | null;
   currency?: string | null;
@@ -134,7 +134,7 @@ export type CompanyTenderFitAiPayload = {
     title: string;
     description?: string;
     cpvCodes: string[];
-    buyer: BuyerDocument;
+    buyers: BuyerDocument[];
     placeOfPerformanceCountries: string[];
     estimatedValue: {
       amount: number | null;

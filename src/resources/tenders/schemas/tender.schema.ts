@@ -5,6 +5,7 @@ import {
   TenderListDto,
 } from '@/resources/tenders/dto/tender.dto';
 import { BuyerDocument, BuyerModel } from '@/resources/buyer/schemas';
+import { TMongoId } from '@/types';
 
 export type TenderDocumentsLinks = Record<
   'xml' | 'pdf' | 'pdfs' | 'html' | 'htmlDirect',
@@ -19,7 +20,7 @@ export interface TenderDuration {
 }
 
 export interface TenderLot {
-  identifier?: string;
+  identifier: string;
   title?: string;
   description?: string;
   mainClassification?: string[];
@@ -103,7 +104,6 @@ export interface Tender {
   noticeLanguage?: string;
   /** TED submission-language: languages allowed for tender submission. */
   submissionLanguages?: string[];
-  buyer: BuyerDocument;
   /** TED publication-date: date when the notice was published on TED. */
   publicationDate?: Date;
   /** TED dispatch-date: date when the notice was dispatched for publication. */
@@ -160,6 +160,9 @@ export interface Tender {
   sourceHash: string;
   createdAt?: Date;
   updatedAt?: Date;
+
+  nonLeadBuyers: (TMongoId | BuyerDocument)[];
+  leadBuyers: (TMongoId | BuyerDocument)[];
 }
 
 export type TenderDocument = Tender & Document;
@@ -265,11 +268,17 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
       type: [String],
       default: [],
     },
-    buyer: {
-      type: Schema.Types.ObjectId,
+    nonLeadBuyers: {
+      type: [Schema.Types.ObjectId],
       ref: 'Buyer',
-      required: true,
       index: true,
+      default: [],
+    },
+    leadBuyers: {
+      type: [Schema.Types.ObjectId],
+      ref: 'Buyer',
+      index: true,
+      default: [],
     },
     publicationDate: Date,
     dispatchDate: Date,
@@ -371,7 +380,8 @@ TenderSchema.statics.serializeList = function (
     links,
     noticeVersion,
     titleProc,
-    buyer,
+    nonLeadBuyers,
+    leadBuyers,
     dispatchDate,
     deadlineReceiptTender,
     duration,
@@ -385,7 +395,8 @@ TenderSchema.statics.serializeList = function (
 
   return {
     ...rest,
-    buyer: BuyerModel.serializeList(buyer),
+    nonLeadBuyers: nonLeadBuyers.map(BuyerModel.serializeList),
+    leadBuyers: leadBuyers.map(BuyerModel.serializeList),
   };
 };
 

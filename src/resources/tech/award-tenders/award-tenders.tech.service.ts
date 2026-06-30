@@ -4,6 +4,7 @@ import { TedOpenTendersCollectorService } from '@/resources/ted-open-tenders-col
 import { TedSearchService } from '@/resources/ted-search/ted-search.service';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { AWARD_TENDER_CONFIG } from '@/config/award-tender.config';
+import { TedTenderSearchFilters } from '@/resources/ted-search/ted-builders';
 
 @Injectable()
 export class AwardTendersTechService {
@@ -13,13 +14,13 @@ export class AwardTendersTechService {
     private readonly awardTenderService: AwardTenderService,
   ) {}
 
-  refreshAwardTendersHistory() {
+  refreshAwardTendersHistory(filters?: TedTenderSearchFilters) {
     return new TedOpenTendersCollectorService(
       this.tedSearchService,
       this.tendersService,
       this.awardTenderService,
     ).collectResultTendersFromTed(
-      { lookbackYears: AWARD_TENDER_CONFIG.historyYearsBack },
+      { lookbackYears: AWARD_TENDER_CONFIG.historyYearsBack, filters },
       {
         updateExisting: true,
       },

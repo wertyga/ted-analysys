@@ -6,6 +6,7 @@ import {
   AwardTenderModel,
 } from '@/resources/award-tender/schemas';
 import { Contractor, ContractorModel } from '@/resources/contractor/schemas';
+import { TMongoId } from '@/types';
 
 export enum BuyerIdentifierType {
   TED_ORG_ID = 'TED_ORG_ID',
@@ -14,11 +15,6 @@ export enum BuyerIdentifierType {
   ORG_NAME = 'ORG_NAME',
   UNKNOWN = 'UNKNOWN',
 }
-
-export type BuyerIdentifier = {
-  type: BuyerIdentifierType;
-  value: string;
-};
 
 export type BuyerContact = {
   contactPoint: string;
@@ -60,7 +56,9 @@ export type BuyerTopSupplierStats = {
 
 export type BuyerStats = {
   tendersCount: number;
+  participatedTendersCount: number;
   awardTendersCount: number;
+  participatedAwardTendersCount: number;
 
   totalEstimatedValueEur: number;
   totalAwardedValueEur: number;
@@ -146,7 +144,7 @@ export type Buyer = {
    * organisation-identifier-buyer
    * buyer-identifier
    */
-  identifiers: BuyerIdentifier[];
+  identifiers: string[];
 
   /**
    * buyer-legal-type
@@ -208,8 +206,6 @@ export type Buyer = {
    *   */
   countries: string[];
 
-  organisationIdentifierBuyer: string;
-
   createdAt: Date;
   updatedAt: Date;
 
@@ -226,7 +222,6 @@ const BUYER_LIST_FIELDS = [
   'address',
   'legalTypes',
   'mainActivities',
-  'organisationIdentifierBuyer',
   'stats',
   'intelligence',
   'updatedAt',
@@ -240,22 +235,13 @@ export type BuyerListDto = Pick<
 export type BuyerDetailDto = Buyer & {};
 
 export interface BuyerModelType extends Model<BuyerDocument> {
-  serializeList(buyer: BuyerSerializable): BuyerListDto;
-  serializeDetail(buyer: BuyerSerializable): BuyerDetailDto;
+  serializeList(
+    buyer: BuyerSerializable | TMongoId | BuyerDocument,
+  ): BuyerListDto;
+  serializeDetail(
+    buyer: BuyerSerializable | TMongoId | BuyerDocument,
+  ): BuyerDetailDto;
 }
-
-const BuyerIdentifierSchema = new Schema<BuyerIdentifier>(
-  {
-    type: {
-      type: String,
-      enum: BuyerIdentifierType,
-      required: true,
-      index: true,
-    },
-    value: { type: String, required: true },
-  },
-  { _id: false },
-);
 
 const BuyerContactSchema = new Schema<BuyerContact>(
   {
@@ -320,9 +306,11 @@ const BuyerTopSupplierStatsSchema = new Schema<BuyerTopSupplierStats>(
 const BuyerStatsSchema = new Schema<BuyerStats>(
   {
     tendersCount: { type: Number, default: 0 },
+    participatedTendersCount: { type: Number, default: 0 },
     avgAwardedValueEur: { type: Number, default: 0 },
     avgEstimatedValueEur: { type: Number, default: 0 },
     awardTendersCount: { type: Number, default: 0 },
+    participatedAwardTendersCount: { type: Number, default: 0 },
     totalAwardedValueEur: { type: Number, default: 0 },
     totalEstimatedValueEur: { type: Number, default: 0 },
     lastAwardDate: { type: Date },
@@ -355,20 +343,12 @@ const BuyerStatsIntelligenceSchema = new Schema<BuyerStatsIntelligence>(
 
 export const BuyerSchema = new Schema<BuyerDocument, BuyerModelType>(
   {
-    name: { type: String, required: true, index: true },
+    name: { type: String },
 
-    identifiers: {
-      type: [BuyerIdentifierSchema],
-      default: [],
-    },
+    identifiers: { type: [String], default: [] },
 
     contact: BuyerContactSchema,
     address: BuyerAddressSchema,
-
-    organisationIdentifierBuyer: {
-      type: String,
-      index: true,
-    },
 
     legalTypes: { type: [BuyerCodeNameSchema], default: [] },
     mainActivities: { type: [BuyerCodeNameSchema], default: [] },
@@ -390,8 +370,6 @@ export const BuyerSchema = new Schema<BuyerDocument, BuyerModelType>(
   },
   { timestamps: true },
 );
-
-BuyerSchema.index({ 'address.country': 1, organisationIdentifierBuyer: 1 });
 
 BuyerSchema.statics.serializeList = function (
   buyer: BuyerSerializable,

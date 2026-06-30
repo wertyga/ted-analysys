@@ -12,26 +12,33 @@ export function getMoneyBuyerTendersStats(
   | 'avgEstimatedValueEur'
   | 'avgAwardedValueEur'
 > {
-  const estimatedValueEurValues = tenders.flatMap((tender) =>
-    typeof tender.estimatedValueEur === 'number' &&
-    Number.isFinite(tender.estimatedValueEur)
-      ? [tender.estimatedValueEur]
-      : [],
-  );
-  const awardedValueEurValues = awardTenders.flatMap((awardTender) =>
-    typeof awardTender.awardValueEur === 'number' &&
-    Number.isFinite(awardTender.awardValueEur)
-      ? [awardTender.awardValueEur]
-      : [],
-  );
-  const totalEstimatedValueEur = estimatedValueEurValues.reduce(
-    (acc, value) => acc + value,
-    0,
-  );
-  const totalAwardedValueEur = awardedValueEurValues.reduce(
-    (acc, value) => acc + value,
-    0,
-  );
+  const estimatedValueEurValues = tenders.flatMap((tender) => {
+    const isMoneyValid =
+      typeof tender.estimatedValueEur === 'number' &&
+      Number.isFinite(tender.estimatedValueEur) &&
+      tender.leadBuyers.length;
+
+    return isMoneyValid
+      ? [(tender.estimatedValueEur as number) / tender.leadBuyers.length]
+      : [];
+  });
+
+  const awardedValueEurValues = awardTenders.flatMap((awardTender) => {
+    const money = awardTender.awardValueEur || awardTender.estimatedValueEur;
+    const isMoneyValid =
+      typeof money === 'number' &&
+      Number.isFinite(money) &&
+      awardTender.leadBuyers.length;
+
+    return isMoneyValid ? [money / awardTender.leadBuyers.length] : [];
+  });
+
+  const totalEstimatedValueEur: number = estimatedValueEurValues
+    .filter(Boolean)
+    .reduce((acc: number, value: number) => acc + value, 0);
+  const totalAwardedValueEur: number = awardedValueEurValues
+    .filter(Boolean)
+    .reduce((acc: number, value: number) => acc + value, 0);
 
   return {
     totalEstimatedValueEur,

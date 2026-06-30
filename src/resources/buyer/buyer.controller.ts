@@ -4,6 +4,7 @@ import {
   NotFoundException,
   Param,
   Query,
+  Req,
   UseInterceptors,
 } from '@nestjs/common';
 import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
@@ -21,6 +22,7 @@ import {
 } from './dto/buyer-list-request.dto';
 import { BuyerModel } from './schemas';
 import { BuyerService } from './buyer.service';
+import { TariffService, TariffType } from '@/resources/tariff';
 
 @ApiTags('buyers')
 @Controller('buyers')
@@ -28,6 +30,7 @@ export class BuyerController {
   constructor(
     private readonly buyerService: BuyerService,
     private readonly buyerIntelligenceService: BuyerIntelligenceService,
+    private readonly tariffService: TariffService,
   ) {}
 
   @Get()
@@ -66,26 +69,46 @@ export class BuyerController {
   @Get(':id')
   @ApiOperation({ summary: 'Get buyer details with buyer intelligence' })
   @ApiOkResponse({ description: 'Buyer details.' })
-  async getBuyerById(@Param('id') id: string) {
+  async getBuyerById(@Param('id') id: string, @Req() req) {
     const buyer = await this.buyerService.getBuyerDetails(id);
 
     if (!buyer) {
       throw new NotFoundException('Buyer not found');
     }
 
-    const [buyerIntelligence, recentTenders, recentAwardTenders] =
-      await Promise.all([
+    const tariffType = await this.tariffService.getUserTariffType(req.user);
+
+    const promises: any[] = [
+      this.buyerService.getRecentTenders(id),
+      this.buyerService.getRecentAwardTenders(id),
+    ];
+
+    if (tariffType !== TariffType.free) {
+      promises.push(
         this.buyerIntelligenceService.ensureBuyerIntelligence({
           buyerId: id,
         }),
-        this.buyerService.getRecentTenders(id),
-        this.buyerService.getRecentAwardTenders(id),
-      ]);
+      );
+    }
+
+    const [recentTenders, recentAwardTenders, buyerIntelligence] =
+      await Promise.all(promises);
+
+    const buyerIntel =
+      BuyerIntelligenceModel.serializeDetail(buyerIntelligence);
+
+    if (
+      buyerIntel &&
+      typeof buyerIntel === 'object' &&
+      'buyer' in buyerIntelligence
+    ) {
+      // @ts-ignore
+      delete buyerIntel.buyer;
+    }
 
     return {
       buyer: BuyerModel.serializeDetail(buyer),
-      buyerIntelligence:
-        BuyerIntelligenceModel.serializeDetail(buyerIntelligence),
+      buyerIntelligence: buyerIntel,
       recentTenders,
       recentAwardTenders,
     };

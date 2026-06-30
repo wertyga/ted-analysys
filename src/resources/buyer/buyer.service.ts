@@ -1,6 +1,11 @@
 import mongoose, { QueryFilter, Types } from 'mongoose';
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { BuyerNormalizer } from './buyer.normalizer';
+import {
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
+import { BuyerNormalized, BuyerNormalizer } from './buyer.normalizer';
 import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
 import {
   BuyerCodeName,
@@ -10,13 +15,16 @@ import {
 } from './schemas';
 import {
   getMongoRelationObjectIdArray,
+  awardTenderPopulateFields,
   getPaginationMeta,
+  tenderPopulateFields,
   getUniqArray,
 } from '@/utils';
 
-import { TenderModel } from '@/resources/tenders/schemas';
+import { TenderLot, TenderModel } from '@/resources/tenders/schemas';
 import {
   AwardTenderDocument,
+  AwardTenderLot,
   AwardTenderModel,
 } from '@/resources/award-tender/schemas';
 import { TMongoId } from '@/types';
@@ -31,6 +39,7 @@ import {
 import { ContractorModel } from '@/resources/contractor/schemas';
 import { getLegalTypes, getMainActivities } from '@/resources/codelist';
 import { BuyerListRequestDto } from './dto/buyer-list-request.dto';
+import { AwardTenderService } from '@/resources/award-tender/award-tender.service';
 
 type BuyerTenderMeta = {
   stats: BuyerStats;
@@ -49,6 +58,11 @@ type BuyerMeta = {
 @Injectable()
 export class BuyerService {
   normalizer = new BuyerNormalizer();
+
+  constructor(
+    @Inject(forwardRef(() => AwardTenderService))
+    private awardTenderService: AwardTenderService,
+  ) {}
 
   async getBuyers({
     q,
@@ -74,8 +88,8 @@ export class BuyerService {
 
       query.$or = [
         { name: searchPattern },
+        { identifier: searchPattern },
         { organisationIdentifierBuyer: searchPattern },
-        { 'identifiers.value': searchPattern },
         { 'contact.email': searchPattern },
         { 'address.city': searchPattern },
         { 'address.country': searchPattern },
@@ -228,44 +242,63 @@ export class BuyerService {
     buyerCountry?: string,
   ): Promise<BuyerTenderMeta> {
     const tenderSelectFields =
-      'publicationDate estimatedValueEur cpvCodes placeOfPerformanceCountries';
-    const awardTenderSelectFields =
-      'publicationDate awardValueEur cpvCodes placeOfPerformanceCountries winners';
+      'publicationDate estimatedValueEur cpvCodes placeOfPerformanceCountries nonLeadBuyers leadBuyers';
+    const awardTenderSelectFields = `${tenderSelectFields} winners`;
 
-    const [tenders, awardTenders] = await Promise.all([
-      TenderModel.find({
-        buyer: buyer._id,
-      })
-        .select(tenderSelectFields)
-        .lean(),
-      AwardTenderModel.find({
-        buyer: buyer._id,
-      })
-        .select(awardTenderSelectFields)
-        .lean(),
-    ]);
+    const [nonLeadTenders, leadTenders, nonLeadAwardTenders, leadAwardTenders] =
+      await Promise.all([
+        TenderModel.find({
+          nonLeadBuyers: buyer._id,
+        })
+          .select(tenderSelectFields)
+          .lean(),
+        TenderModel.find({
+          leadBuyers: buyer._id,
+        })
+          .select(tenderSelectFields)
+          .lean(),
+        AwardTenderModel.find({
+          nonLeadBuyers: buyer._id,
+        })
+          .select(awardTenderSelectFields)
+          .lean(),
+        AwardTenderModel.find({
+          leadBuyers: buyer._id,
+        })
+          .select(awardTenderSelectFields)
+          .lean(),
+      ]);
 
-    const tendersCount = tenders.length;
-    const awardTendersCount = awardTenders.length;
+    const tendersCount = leadTenders.length;
+    const awardTendersCount = leadAwardTenders.length;
+    const participatedTendersCount = nonLeadTenders.length;
+    const participatedAwardTendersCount = nonLeadAwardTenders.length;
+
     const hasStatsVersionToBeCounted =
       buyer.stats &&
       (buyer.stats?.tendersCount !== tendersCount ||
-        buyer.stats?.awardTendersCount !== awardTendersCount);
+        buyer.stats?.awardTendersCount !== awardTendersCount ||
+        buyer.stats?.participatedTendersCount !== participatedTendersCount ||
+        buyer.stats?.participatedAwardTendersCount !==
+          participatedAwardTendersCount);
 
-    const stats = {
+    const stats: BuyerStats = {
       tendersCount,
       awardTendersCount,
-      ...getDatesBuyerTendersStats(tenders, awardTenders),
-      ...getMoneyBuyerTendersStats(tenders, awardTenders),
-      ...getTopBuyerTendersStats(tenders, awardTenders),
+      participatedTendersCount,
+      participatedAwardTendersCount,
+      ...getDatesBuyerTendersStats(leadTenders, leadAwardTenders),
+      ...getMoneyBuyerTendersStats(leadTenders, leadAwardTenders),
+      ...getTopBuyerTendersStats(leadTenders, leadAwardTenders),
     };
 
-    const winnerCountriesById = await this.getWinnerCountriesById(awardTenders);
+    const winnerCountriesById =
+      await this.getWinnerCountriesById(leadAwardTenders);
 
     const intelligence = calculateBuyerIntelligenceSignals({
       buyerCountry,
       stats,
-      awardTenders,
+      awardTenders: leadAwardTenders,
       winnerCountriesById,
     });
 
@@ -278,44 +311,79 @@ export class BuyerService {
     };
   }
 
-  async refreshBuyerTenderMeta(
-    buyerId: TMongoId,
-  ): Promise<BuyerDocument | null> {
-    const buyer = await BuyerModel.findById(buyerId).select(
-      'address.country intelligence',
-    );
-    if (!buyer) {
-      return null;
+  async refreshBuyersTenderMeta(
+    buyersIds: TMongoId[],
+  ): Promise<BuyerDocument[]> {
+    const buyers = await BuyerModel.find({
+      _id: { $in: buyersIds as any },
+    }).select('address.country intelligence');
+
+    if (!buyers.length) {
+      return [];
     }
 
-    const { stats, intelligence, statsVersion } =
-      await this.getTendersBuyerMetaAndIntelligence(
-        buyer,
-        buyer.address?.country,
-      );
+    const buyersMetas = await Promise.all(
+      buyers.map((buyer) => {
+        return this.getTendersBuyerMetaAndIntelligence(
+          buyer,
+          buyer.address?.country,
+        );
+      }),
+    );
 
-    return BuyerModel.findByIdAndUpdate(
-      buyerId,
-      {
-        $set: {
-          stats,
-          intelligence,
-          statsVersion,
-        },
+    return Promise.all(
+      buyersMetas.map((bm, i) => {
+        return BuyerModel.findByIdAndUpdate(
+          buyers[i]._id,
+          {
+            $set: {
+              stats: bm.stats,
+              intelligence: bm.intelligence,
+              statsVersion: bm.statsVersion,
+            },
+          },
+          { returnDocument: 'after' },
+        );
+      }),
+    ) as unknown as BuyerDocument[];
+  }
+
+  async upsertPureBuyersFromTEDNotice(
+    notice: TedNotice,
+  ): Promise<{ leadIds: string[]; nonLeadIds: string[] }> {
+    const normalizedBuyers =
+      this.normalizer.normalizeBuyersFromTEDNotice(notice);
+
+    const map = new Map<string, { buyer: BuyerDocument; isLead: boolean }>();
+
+    for (let i = 0; i < normalizedBuyers.length; i++) {
+      const normBuyer = normalizedBuyers[i];
+      const buyer = await this.upsertPureNormalizedBuyer(normBuyer);
+
+      map.set(buyer._id.toString(), { buyer, isLead: normBuyer.isLead });
+    }
+
+    return Array.from(map.values()).reduce(
+      (acc, b) => {
+        if (b.isLead) {
+          acc.leadIds.push(b.buyer._id);
+        } else {
+          acc.nonLeadIds.push(b.buyer._id);
+        }
+        return acc;
       },
-      { returnDocument: 'after' },
+      { leadIds: [] as any[], nonLeadIds: [] as any[] },
     );
   }
 
-  async upsertBuyerFromTEDNotice(notice: TedNotice): Promise<BuyerDocument> {
-    const normalizedBuyer = this.normalizer.normalizeBuyerFromTEDNotice(notice);
-
+  private async upsertPureNormalizedBuyer(
+    normalizedBuyer: BuyerNormalized,
+  ): Promise<BuyerDocument> {
+    const identifiers = normalizedBuyer.identifiers;
     const identityFilter =
-      normalizedBuyer.organisationIdentifierBuyer &&
-      normalizedBuyer.address.country
+      identifiers.length && normalizedBuyer.address.country
         ? {
-            organisationIdentifierBuyer:
-              normalizedBuyer.organisationIdentifierBuyer,
+            identifiers: { $in: identifiers },
             'address.country': normalizedBuyer.address.country,
           }
         : {
@@ -328,6 +396,7 @@ export class BuyerService {
     if (!existingBuyer) {
       return BuyerModel.create({
         ...normalizedBuyer,
+        cpvCodes: normalizedBuyer.isLead ? normalizedBuyer.cpvCodes : [],
         legalTypes: getLegalTypes(normalizedBuyer.legalTypes),
         mainActivities: getMainActivities(normalizedBuyer.mainActivities),
         stats: getEmptyBuyerStats(),
@@ -390,33 +459,14 @@ export class BuyerService {
       ),
     };
 
-    const { stats, intelligence, statsVersion } =
-      await this.getTendersBuyerMetaAndIntelligence(
-        existingBuyer,
-        address.country,
-      );
-
     existingBuyer.set({
-      stats,
-      intelligence,
-      statsVersion,
       name: getLastExisting(existingBuyer.name, normalizedBuyer.name),
-      organisationIdentifierBuyer: getLastExisting(
-        existingBuyer.organisationIdentifierBuyer,
-        normalizedBuyer.organisationIdentifierBuyer,
+      identifier: getLastExisting(
+        ...existingBuyer.identifiers,
+        ...normalizedBuyer.identifiers,
       ),
       contact,
       address,
-      identifiers: Array.from(
-        new Map(
-          [...existingBuyer.identifiers, ...normalizedBuyer.identifiers].map(
-            (identifier) => [
-              `${identifier.type}:${identifier.value}`,
-              identifier,
-            ],
-          ),
-        ).values(),
-      ),
       legalTypes: this.mergeCodeNameOptions(
         existingBuyer.legalTypes,
         getLegalTypes(normalizedBuyer.legalTypes),
@@ -428,7 +478,9 @@ export class BuyerService {
       profiles: getUniqArray(existingBuyer.profiles, normalizedBuyer.profiles),
       gateways: getUniqArray(existingBuyer.gateways, normalizedBuyer.gateways),
       websites: getUniqArray(existingBuyer.websites, normalizedBuyer.websites),
-      cpvCodes: getUniqArray(existingBuyer.cpvCodes, normalizedBuyer.cpvCodes),
+      cpvCodes: normalizedBuyer.isLead
+        ? getUniqArray(existingBuyer.cpvCodes, normalizedBuyer.cpvCodes)
+        : existingBuyer.cpvCodes,
       countries: getUniqArray(
         existingBuyer.countries,
         normalizedBuyer.countries,
@@ -443,19 +495,24 @@ export class BuyerService {
   }
 
   async getRecentTenders(buyerId: string) {
-    const tenders = await TenderModel.find({ buyer: buyerId })
+    const tenders = await TenderModel.find({
+      $or: [{ leadBuyers: buyerId }, { nonLeadBuyers: buyerId }],
+    })
       .sort({ publicationDate: -1, _id: -1 })
       .limit(BUYER_RECENT_TENDERS_LIMIT)
+      .populate(tenderPopulateFields)
       .exec();
 
     return tenders.map(TenderModel.serializeList);
   }
 
   async getRecentAwardTenders(buyerId: string) {
-    const awardTenders = await AwardTenderModel.find({ buyer: buyerId })
+    const awardTenders = await AwardTenderModel.find({
+      $or: [{ leadBuyers: buyerId }, { nonLeadBuyers: buyerId }],
+    })
       .sort({ publicationDate: -1, _id: -1 })
       .limit(BUYER_RECENT_TENDERS_LIMIT)
-      .populate('winners')
+      .populate(awardTenderPopulateFields)
       .exec();
 
     return awardTenders.map(AwardTenderModel.serializeList);
@@ -470,7 +527,7 @@ export class BuyerService {
     }
 
     const query: QueryFilter<AwardTenderDocument> = {
-      buyer: buyerId,
+      $or: [{ leadBuyers: buyerId }, { nonLeadBuyers: buyerId }],
     };
 
     const { skip, limit } = getPaginationMeta(pagination);
@@ -479,8 +536,7 @@ export class BuyerService {
         .sort({ publicationDate: -1, _id: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('buyer')
-        .populate('winners')
+        .populate(awardTenderPopulateFields)
         .exec(),
       AwardTenderModel.countDocuments(query),
     ]);

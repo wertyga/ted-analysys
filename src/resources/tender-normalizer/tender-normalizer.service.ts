@@ -20,9 +20,17 @@ import {
 import { MoneyValue, TenderLot } from '@/resources/tenders/schemas';
 import { TedContractNature } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
 
-export type NormalizedTenderDto = Omit<TenderDto, '_id' | 'buyer'>;
+export type NormalizedTenderLot = Omit<
+  TenderLot,
+  'estimatedValueEur' | 'buyer'
+>;
 
-export type NormalizedTenderLot = Omit<TenderLot, 'estimatedValueEur'>;
+export type NormalizedTenderDto = Omit<
+  TenderDto,
+  '_id' | 'nonLeadBuyers' | 'leadBuyers' | 'lots'
+> & {
+  lots: NormalizedTenderLot[];
+};
 
 @Injectable()
 export class TenderNormalizerService {
@@ -337,7 +345,9 @@ export class TenderNormalizerService {
       resulValueCur: getStringValue('result-value-cur-notice', notice),
 
       noticeLanguage: getStringValue('official-language', notice),
-      submissionLanguages: getUniqArray('submission-language', notice),
+      submissionLanguages: getUniqArray(
+        getStringValue('submission-language', notice),
+      ),
     };
 
     const lotsCodes: string[] = lots.flatMap(

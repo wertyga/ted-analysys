@@ -3,6 +3,7 @@
 
 - BE - указывать источник причины
 - BE - vat price from freemium
+- BE - awardCriteria (award-criterion-number-lot там цифры)
 
 buyerProfile: https://ch-giorgi.sudest-marchespublics.com
 пробовать доставать portalUrl для deep analysis

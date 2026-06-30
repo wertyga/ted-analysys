@@ -41,6 +41,7 @@ import { COMPANY_TENDER_FIT_SYSTEM_PROMPT } from './company-tender-fit.prompt';
 import { UserModel } from '@/resources/user/user.schema';
 import { TariffService } from '@/resources/tariff';
 import { TENDER_MATCHING_CONFIG } from '@/config/tender-matching.config';
+import { BuyerDocument } from '@/resources/buyer/schemas';
 
 @Injectable()
 export class TenderMatchingService {
@@ -454,7 +455,7 @@ export class TenderMatchingService {
         title: tender.title ?? '',
         description: tender.description,
         cpvCodes: tender.cpvCodes ?? [],
-        buyer: tender.buyer,
+        buyers: tender.leadBuyers as BuyerDocument[],
         placeOfPerformanceCountries: tender.placeOfPerformanceCountries ?? [],
         estimatedValue: {
           amount: tender.estimatedValue?.amount ?? null,

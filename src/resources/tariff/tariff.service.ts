@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PaymentsService } from '@/resources/payments/payments.service';
-import { UserDocument } from '@/resources/user/user.types';
+import { USER_TYPE, UserDocument } from '@/resources/user/user.types';
 import { TARIFF_RULES } from './tariff-rules';
 import { TariffType, UserTariff } from './tariff.types';
 
@@ -20,6 +20,10 @@ export class TariffService {
   async getUserTariffType(user?: UserDocument | null): Promise<TariffType> {
     if (!user) {
       return TariffType.free;
+    }
+
+    if (user?.status === USER_TYPE.ADMIN) {
+      return TariffType.pro;
     }
 
     const entitlement = await this.paymentsService.getUserEntitlement(user);

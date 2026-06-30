@@ -7,6 +7,7 @@ import { USER_TYPE } from '@/resources/user/user.types';
 export class GetUserMiddleware implements NestMiddleware {
   async use(req: Request, res: Response, next: NextFunction) {
     const userToken = (req.headers.authorization || '').replace('Bearer ', '');
+
     if (!userToken) {
       return next();
     }

@@ -61,7 +61,7 @@ export type TenderDocumentWithGeneralAnalysis = TenderDocument & {
 };
 
 const SHORT_TITLE_GENERATION_BATCH_SIZE = 20;
-const OPTIONAL_TENDER_UNSET_FIELDS = [
+export const OPTIONAL_TENDER_UNSET_FIELDS = [
   'noticeSubtype',
   'noticeVersion',
   'description',
@@ -73,6 +73,23 @@ const OPTIONAL_TENDER_UNSET_FIELDS = [
   'electronicSubmission',
   'isSmeSuitable',
   'euFundLot',
+  'buyerName',
+  'buyerIdentifier',
+  'buyerCountry',
+  'buyerCity',
+  'buyerMainActivities',
+  'buyerEmail',
+  'buyerInternetAddress',
+  'buyerProfile',
+  'classificationCpv',
+  'publicationNumber',
+  'titleLot',
+  'descriptionLot',
+  'mainClassificationLot',
+  'additionalClassificationLot',
+  'buyerAuthorityMainActivities',
+  'buyerEntityMainActivities',
+  'buyerLegalTypes',
 ] as const;
 
 @Injectable()
@@ -87,44 +104,29 @@ export class TendersService {
     private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
     @Inject(forwardRef(() => TenderGeneralAnalysisService))
     private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
+    @Inject(forwardRef(() => BuyerService))
     private readonly buyerService: BuyerService,
   ) {}
 
-  private async updateTenderBuyerFromTEDNotice(
-    notice: TedNotice,
-    tenderId: TMongoId,
-  ): Promise<TenderDocument> {
-    const buyer = await this.buyerService.upsertBuyerFromTEDNotice(notice);
-
-    await TenderModel.findByIdAndUpdate(
-      tenderId,
-      {
-        $set: {
-          buyer: buyer._id,
-        },
-      },
-      { returnDocument: 'after' },
-    );
-
-    await this.buyerService.refreshBuyerTenderMeta(buyer._id);
-
-    return TenderModel.findById(tenderId).populate('buyer') as any;
-  }
-
   async upsertTender(notice: TedNotice): Promise<TenderDocument | undefined> {
     const normalizedTender = this.tenderNormalizer.normalizeTedNotice(notice);
+
     if (!normalizedTender.id) {
       return;
     }
 
-    const [estimatedValueEur, lotsWithEur] = await Promise.all([
+    const [estimatedValueEur, lotsWithEur, buyers] = await Promise.all([
       this.calculateEstimatedValueEur(normalizedTender),
       this.getLotsWithEurValues(normalizedTender.lots),
+      this.buyerService.upsertPureBuyersFromTEDNotice(notice),
     ]);
 
-    const sourceHash = this.buildTenderSourceHash(normalizedTender);
+    const sourceHash = this.buildTenderSourceHash(notice);
+    const buyersIds = [...buyers.leadIds, ...buyers.nonLeadIds];
     const tenderSet = this.omitUndefinedFields({
       ...normalizedTender,
+      nonLeadBuyers: buyers.nonLeadIds,
+      leadBuyers: buyers.leadIds,
       lots: lotsWithEur,
       estimatedValueEur,
     });
@@ -142,7 +144,9 @@ export class TendersService {
       { returnDocument: 'after', upsert: true, strict: false },
     );
 
-    return this.updateTenderBuyerFromTEDNotice(notice, tenderDoc._id);
+    await this.buyerService.refreshBuyersTenderMeta(buyersIds);
+
+    return tenderDoc;
   }
 
   private async getLotsWithEurValues(
@@ -399,10 +403,7 @@ export class TendersService {
       return true;
     }
 
-    const normalizedTenderDto =
-      this.tenderNormalizer.normalizeTedNotice(notice);
-
-    const sourceHash = this.buildTenderSourceHash(normalizedTenderDto);
+    const sourceHash = this.buildTenderSourceHash(notice);
 
     return tender.sourceHash !== sourceHash;
   }
@@ -705,9 +706,9 @@ export class TendersService {
     });
   }
 
-  buildTenderSourceHash(normalizedTender: NormalizedTenderDto): string {
+  buildTenderSourceHash(notice: TedNotice): string {
     return createHash('sha256')
-      .update(JSON.stringify(normalizedTender))
+      .update((notice['notice-version'] ?? 1).toString())
       .digest('hex');
   }
 
@@ -722,17 +723,7 @@ export class TendersService {
   private buildTenderUnset(
     normalizedTender: NormalizedTenderDto,
   ): Record<string, ''> {
-    const unset: Record<string, ''> = {
-      classificationCpv: '',
-      publicationNumber: '',
-      titleLot: '',
-      descriptionLot: '',
-      mainClassificationLot: '',
-      additionalClassificationLot: '',
-      buyerAuthorityMainActivities: '',
-      buyerEntityMainActivities: '',
-      buyerLegalTypes: '',
-    };
+    const unset: Record<string, ''> = {};
 
     for (const field of OPTIONAL_TENDER_UNSET_FIELDS) {
       if (normalizedTender[field] === undefined) {

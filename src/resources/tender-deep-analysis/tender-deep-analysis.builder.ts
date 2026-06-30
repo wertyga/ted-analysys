@@ -60,7 +60,10 @@ export class TenderDeepAnalysisBuilder {
     return {
       tender: {
         ...params.tender,
-        buyer: BuyerModel.serializeDetail(params.tender.buyer),
+        leadBuyers: params.tender.leadBuyers.map(BuyerModel.serializeDetail),
+        nonLeadBuyers: params.tender.nonLeadBuyers.map(
+          BuyerModel.serializeDetail,
+        ),
       },
       generalAnalysis: params.generalAnalysis,
       company: params.company,

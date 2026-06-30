@@ -19,7 +19,7 @@ export function buildTenderText(tender: TenderForMatching): string {
   return [
     tender.title,
     tender.description,
-    tender.buyer.name,
+    tender.buyers.map((b) => b.name),
     ...(tender.cpvCodes ?? []),
     ...(tender.lotTitles ?? []),
     ...(tender.lotDescriptions ?? []),

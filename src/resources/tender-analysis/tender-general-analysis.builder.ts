@@ -24,7 +24,7 @@ export class TenderGeneralAnalysisBuilder {
         procedureTitle: tender.titleProc ?? null,
         description: tender.description ?? null,
         lots: tender.lots ?? [],
-        buyer: BuyerModel.serializeDetail(tender.buyer),
+        buyers: tender.leadBuyers.map(BuyerModel.serializeDetail),
         procedureType: tender.procedureType ?? null,
         noticeType: tender.noticeType ?? null,
         noticeSubtype: tender.noticeSubtype ?? null,

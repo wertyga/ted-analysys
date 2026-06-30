@@ -1,5 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { logger, normalizeEmail } from '@/utils';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { getLatestDate, logger, normalizeEmail } from '@/utils';
 import {
   Contractor,
   ContractorDocument,
@@ -15,7 +19,7 @@ import { AwardTenderModel } from '@/resources/award-tender/schemas';
 
 export type WinnerNormalized = Omit<
   Contractor,
-  '_id' | 'awardTenders' | 'createdAt' | 'updatedAt' | 'cpvCodes'
+  '_id' | 'awardTenders' | 'createdAt' | 'updatedAt' | 'cpvCodes' | 'stats'
 >;
 
 @Injectable()
@@ -26,7 +30,10 @@ export class ContractorService {
       .map((id) => new Types.ObjectId(id));
 
     if (!objectIds.length) {
-      return new Map<string, { awardTendersCount: number; totalAwardedValueEur: number }>();
+      return new Map<
+        string,
+        { awardTendersCount: number; totalAwardedValueEur: number }
+      >();
     }
 
     const stats = await AwardTenderModel.aggregate<{
@@ -65,9 +72,8 @@ export class ContractorService {
     const contractorIds = serializedContractors.flatMap((contractor) =>
       contractor._id ? [contractor._id.toString()] : [],
     );
-    const statsByContractorId = await this.getContractorAwardSummaryByIds(
-      contractorIds,
-    );
+    const statsByContractorId =
+      await this.getContractorAwardSummaryByIds(contractorIds);
 
     return serializedContractors.map((contractor) => ({
       ...contractor,
@@ -165,10 +171,7 @@ export class ContractorService {
       .populate({
         path: 'awardTenders',
         options: { sort: { publicationDate: -1, _id: -1 } },
-        populate: [
-          { path: 'buyer' },
-          { path: 'winners' },
-        ],
+        populate: [{ path: 'buyer' }, { path: 'winners' }],
       })
       .exec();
 
@@ -297,7 +300,7 @@ export class ContractorService {
       };
       const identityFilter = this.buildWinnerIdentityFilter(normalized);
 
-      return await ContractorModel.findOneAndUpdate(
+      const contractor = await ContractorModel.findOneAndUpdate(
         identityFilter,
         {
           $set: normalized,
@@ -307,7 +310,13 @@ export class ContractorService {
           },
         },
         { returnDocument: 'after', upsert: true },
-      );
+      ).populate({
+        path: 'awardTenders',
+      });
+
+      // const lastAwardWinDate = getLatestDate(contractor.awardTenders);
+
+      return contractor;
     } catch (e) {
       await logger.error('upsertAwardWinner::Error', e);
 

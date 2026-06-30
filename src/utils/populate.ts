@@ -6,7 +6,18 @@ export const companyCpvPopulateFields: PopulateOptions[] = [
   { path: 'mainServices', select: CPV_CODES_LIST_FIELDS },
 ];
 
-export const tenderPopulateFields: PopulateOptions[] = [{ path: 'buyer' }];
+export const tenderPopulateFields: PopulateOptions[] = [
+  { path: 'nonLeadBuyers' },
+  { path: 'leadBuyers' },
+  { path: 'lots.buyer' },
+];
+
+export const awardTenderPopulateFields: PopulateOptions[] = [
+  { path: 'nonLeadBuyers' },
+  { path: 'leadBuyers' },
+  { path: 'lots.buyer' },
+  { path: 'winners' },
+];
 
 export const deepAnalysisPopulateFields: PopulateOptions[] = [
   { path: 'generalAnalysis' },

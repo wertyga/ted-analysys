@@ -3,6 +3,7 @@ import {
   getArrayValue,
   getBooleanArrayValue,
   getDateArrayValue,
+  getDateISOStringArrayValue,
   getDateValue,
   getEngValueOrFirst,
   getLatestDate,
@@ -11,11 +12,13 @@ import {
   getStringArrayValue,
   getStringValue,
   getUniqArray,
+  sortLots,
 } from '@/utils';
 import { TedContractNature } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
 import { AwardTender, AwardTenderLot } from './schemas';
 import { TenderNormalizerService } from '@/resources/tender-normalizer/tender-normalizer.service';
 import { WinnerNormalized } from '@/resources/contractor/contractor.service';
+import { extractLotWinnersFromXml } from '@/resources/award-tender/utils';
 
 export type NormalizedAwardTenderLot = Omit<
   AwardTenderLot,
@@ -24,7 +27,13 @@ export type NormalizedAwardTenderLot = Omit<
 
 type NormalizedAwardTender = Omit<
   AwardTender,
-  '_id' | 'estimatedValueEur' | 'awardValueEur' | 'winners' | 'lots' | 'buyer'
+  | '_id'
+  | 'estimatedValueEur'
+  | 'awardValueEur'
+  | 'winners'
+  | 'lots'
+  | 'nonLeadBuyers'
+  | 'leadBuyers'
 > & {
   lots: NormalizedAwardTenderLot[];
 };
@@ -46,8 +55,11 @@ export class AwardTenderNormalizer {
         ...l,
         resultLotIdentifier: data.resultLotIdentifiers?.[i],
         awardValue: {
-          amount: data.resultValues?.[i] ?? null,
-          currency: data.resultValuesCurs?.[i] ?? data.resultValuesCurs?.[0],
+          amount: data.resultValues?.[i] ?? l.estimatedValue?.amount,
+          currency:
+            data.resultValuesCurs?.[i] ??
+            data.resultValuesCurs?.[0] ??
+            l.estimatedValue?.currency,
         },
       };
     });
@@ -104,6 +116,15 @@ export class AwardTenderNormalizer {
 
       resulValue: getNumberValue('result-value-notice', notice),
       resulValueCur: getStringValue('result-value-cur-notice', notice),
+
+      awardDecisionDates: getDateISOStringArrayValue(
+        'winner-decision-date',
+        notice,
+      ),
+      contractConclusionDates: getDateArrayValue(
+        'contract-conclusion-date',
+        notice,
+      ),
     };
 
     const lotsCodes: string[] = awardLots.flatMap(
@@ -118,9 +139,6 @@ export class AwardTenderNormalizer {
 
     return {
       ...data,
-      awardDecisionDates: getDateArrayValue('winner-decision-date', notice).map(
-        (d) => (d ? d.toISOString() : ''),
-      ),
       awardValue: this.tenderNormalizer.getMoneyValueFromNotice(
         ['result-value-notice', 'total-value'],
         ['result-value-cur-notice', 'total-value-cur'],
@@ -159,8 +177,13 @@ export class AwardTenderNormalizer {
   }
 
   normalizeWinnersNotice(notice: TedNotice): WinnerNormalized[] {
-    const data: Record<keyof WinnerNormalized, string[] | boolean[]> = {
-      name: getStringArrayValue('winner-name', notice),
+    // Names - Pause for now
+    const names = getStringArrayValue('winner-name', notice); // Names have lots structure, can be more then the other fields length
+
+    const data: Record<
+      keyof Omit<WinnerNormalized, 'name'>,
+      string[] | boolean[]
+    > = {
       identifier: getStringArrayValue('winner-identifier', notice),
       countries: getStringArrayValue('winner-country', notice),
       countrySubs: getStringArrayValue('winner-country-sub', notice),

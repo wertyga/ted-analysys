@@ -12,6 +12,9 @@ import { TedSearchResponse } from './types/ted-search.types';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { AdminAccessGuard } from '@/guards';
+import { getEngValueOrFirst } from '@/utils';
+import { extractLotWinnersFromXml } from '@/resources/award-tender/utils';
+import fs from 'node:fs';
 
 @Controller('/ted/adm')
 @UseGuards(AdminAccessGuard)
@@ -38,6 +41,9 @@ export class TedSearchAdminController {
       noticeTypes:
         body.noticeTypes !== null ? TENDER_COMPETITION_NOTICE_TYPES : undefined,
     });
+
+    const c = await extractLotWinnersFromXml(noticeData.notices[0].links);
+    fs.writeFileSync('winners-lot-from-xml.json', JSON.stringify(c));
 
     // const tendersWithBaseAnalysis =
     //   await this.tendersService.upsertIfNeededMultipleTendersWithGeneralAnalysis(

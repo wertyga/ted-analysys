@@ -20,7 +20,7 @@ import { BuyerModule } from '@/resources/buyer/buyer.module';
     DeepSeekModule,
     TariffModule,
     TenderNormalizerModule,
-    BuyerModule,
+    forwardRef(() => BuyerModule),
   ],
   controllers: [TendersAdmController, TendersController],
   providers: [TendersService],

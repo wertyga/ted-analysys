@@ -1,5 +1,8 @@
 import { TedSearchService } from '@/resources/ted-search/ted-search.service';
-import { buildTedTenderSearchQuery } from '@/resources/ted-search/ted-builders';
+import {
+  buildTedTenderSearchQuery,
+  TedTenderSearchFilters,
+} from '@/resources/ted-search/ted-builders';
 import {
   TedDeadlineRange,
   TedTenderSearchRequestDto,
@@ -124,9 +127,11 @@ export class TedOpenTendersCollectorService {
     {
       lookbackDays,
       lookbackYears,
+      filters,
     }: {
       lookbackDays?: number;
       lookbackYears?: number;
+      filters?: TedTenderSearchFilters;
     } = {},
     options: TedOpenTendersCollectorOptions<AwardTenderDocument>,
   ): Promise<TedOpenTendersCollectorResult> {
@@ -140,7 +145,8 @@ export class TedOpenTendersCollectorService {
       );
     }
 
-    const query = buildTedTenderSearchQuery({
+    const querySearch = buildTedTenderSearchQuery({
+      ...(filters ?? {}),
       noticeTypes: TENDER_RESULT_NOTICE_TYPES,
       publicationDateFrom: getTedDate(publicationDateFrom),
       publicationDateTo: getTedDate(),
@@ -150,13 +156,13 @@ export class TedOpenTendersCollectorService {
     });
 
     return this.collectTedNoticesByIteration({
-      query,
+      query: querySearch,
       scope: TedScope.ALL,
       fields: AWARD_HISTORY_FIELDS,
       options,
       saveNotices: async (notices) => {
         try {
-          fs.writeFileSync('award-tender.json', JSON.stringify(notices[0]));
+          fs.writeFileSync('award-tender_2.json', JSON.stringify(notices[0]));
           const saveResult =
             await this.awardTenderService!.saveResultTedTenders(notices, {
               updateExisting: options.updateExisting,

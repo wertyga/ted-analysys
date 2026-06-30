@@ -75,6 +75,8 @@ export const WINNER_FIELDS = [
   'winner-email',
   'winner-owner-nationality',
   'eu-registration-number',
+
+  'contract-conclusion-date',
 ];
 
 export const FRAMEWORK_FIELDS = [

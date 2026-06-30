@@ -273,7 +273,8 @@ export interface TenderAnalysisTenderDto {
   };
   noticeLanguage?: string;
   submissionLanguages?: string[];
-  buyer: BuyerDetailDto;
+  leadBuyers: BuyerDetailDto[];
+  nonLeadBuyers: BuyerDetailDto[];
   publicationDate?: Date;
   dispatchDate?: Date;
   submissionDeadline?: Date;

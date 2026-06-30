@@ -16,6 +16,7 @@ import {
   findXmlUrl,
 } from '@/resources/tender-normalizer/tender-normalizer-xml';
 import { DOCUMENT_EXTRACTOR_CONFIG } from '@/config/document-extractor.config';
+import { BuyerDocument } from '@/resources/buyer/schemas';
 
 export type TenderAnalysisDocumentSource =
   | 'xml'
@@ -81,7 +82,8 @@ export class DocumentExtractor {
           language: candidate.language,
           documentType: candidate.documentType,
           content: downloaded.content,
-          buyerCountry: tender.buyer.address.country,
+          buyerCountry: (tender.leadBuyers[0] as BuyerDocument)?.address
+            .country,
         });
 
         if (extraction.aiText.length === 0) {
@@ -222,7 +224,7 @@ export class DocumentExtractor {
         language: undefined,
         documentType: TenderSourceDocumentType.TED_XML_NOTICE,
         content: Buffer.from(xmlContent, 'utf8'),
-        buyerCountry: tender.buyer.address.country,
+        buyerCountry: (tender.leadBuyers[0] as BuyerDocument)?.address.country,
       });
 
       if (extraction.aiText.length === 0) {

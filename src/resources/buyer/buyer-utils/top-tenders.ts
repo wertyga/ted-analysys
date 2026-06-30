@@ -11,17 +11,15 @@ export function getTopBuyerTendersStats(
   const allTenders = [...tenders, ...awardTenders];
 
   return {
-    topCpvCodes: countUniqueValuesPerTender(
-      allTenders,
-      (tender) => tender.cpvCodes,
-    ).map(({ value, count }) => ({
+    topCpvCodes: countUniqueValuesPerTender(allTenders, (tender) => {
+      return tender.cpvCodes;
+    }).map(({ value, count }) => ({
       code: value,
       count,
     })),
-    topCountries: countUniqueValuesPerTender(
-      allTenders,
-      (tender) => tender.placeOfPerformanceCountries,
-    ).map(({ value, count }) => ({
+    topCountries: countUniqueValuesPerTender(allTenders, (tender) => {
+      return tender.placeOfPerformanceCountries;
+    }).map(({ value, count }) => ({
       country: value,
       count,
     })),

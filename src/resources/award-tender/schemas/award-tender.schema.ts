@@ -10,7 +10,12 @@ import {
   ContractorDocument,
   ContractorModel,
 } from '@/resources/contractor/schemas';
-import { BuyerDocument, BuyerModel } from '@/resources/buyer/schemas';
+import {
+  BuyerDocument,
+  BuyerModel,
+  BuyerSerializable,
+} from '@/resources/buyer/schemas';
+import { TMongoId } from '@/types';
 
 export type AwardTenderLot = TenderLot & {
   resultLotIdentifier: string;
@@ -19,6 +24,7 @@ export type AwardTenderLot = TenderLot & {
     currency: string | null;
   };
   awardValueEur?: MoneyValue;
+  winner?: string | ContractorDocument;
 };
 
 export interface AwardTender {
@@ -31,7 +37,7 @@ export interface AwardTender {
   title?: string;
   titleProc?: string;
   description?: string;
-  buyer: string | BuyerDocument;
+
   publicationDate?: Date;
   dispatchDate?: Date;
   submissionDeadline?: Date;
@@ -68,6 +74,9 @@ export interface AwardTender {
   links: TenderDocumentsLinks;
   createdAt?: Date;
   updatedAt?: Date;
+
+  nonLeadBuyers: (TMongoId | BuyerDocument)[];
+  leadBuyers: (TMongoId | BuyerDocument)[];
 }
 
 export type AwardTenderDocument = AwardTender & Document;
@@ -83,7 +92,8 @@ export type AwardTenderListDto = Pick<
   | 'procedureType'
   | 'title'
   | 'titleProc'
-  | 'buyer'
+  | 'nonLeadBuyers'
+  | 'leadBuyers'
   | 'publicationDate'
   | 'submissionDeadline'
   | 'plannedEndDate'
@@ -151,6 +161,11 @@ const AwardTenderLotSchema = new Schema<AwardTenderLot>(
     awardCriteria: { type: Schema.Types.Mixed },
     selectionCriteria: { type: Schema.Types.Mixed },
     selectionCriteriaSource: String,
+
+    winner: {
+      type: Schema.Types.ObjectId,
+      ref: 'Contractor',
+    },
   },
   { _id: false, strict: false },
 );
@@ -165,12 +180,6 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
     title: String,
     titleProc: String,
     description: String,
-    buyer: {
-      type: Schema.Types.ObjectId,
-      ref: 'Buyer',
-      required: true,
-      index: true,
-    },
     selectionStatuses: { type: [String], default: [] },
     publicationDate: { type: Date },
     dispatchDate: Date,
@@ -212,6 +221,19 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
       ref: 'Contractor',
       default: [],
     },
+    nonLeadBuyers: {
+      type: [Schema.Types.ObjectId],
+      ref: 'Buyer',
+      index: true,
+      default: [],
+    },
+    leadBuyers: {
+      type: [Schema.Types.ObjectId],
+      ref: 'Buyer',
+      index: true,
+      default: [],
+    },
+
     links: Schema.Types.Mixed,
   },
   {
@@ -222,7 +244,6 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
 
 AwardTenderSchema.index({
   cpvCodes: 1,
-  buyerCountry: 1, // TODO
   contractNature: 1,
   publicationDate: -1,
 });
@@ -234,9 +255,14 @@ function serializeAwardTenderRelations<T extends Partial<AwardTender>>(
 ): T {
   return {
     ...tender,
-    buyer: isPopulatedRecord(tender.buyer)
-      ? BuyerModel.serializeList(tender.buyer as BuyerDocument)
-      : tender.buyer,
+    nonLeadBuyers:
+      tender.nonLeadBuyers?.map((b) =>
+        BuyerModel.serializeList(b as BuyerSerializable),
+      ) ?? [],
+    leadBuyers:
+      tender.leadBuyers?.map((b) =>
+        BuyerModel.serializeList(b as BuyerSerializable),
+      ) ?? [],
     winners: Array.isArray(tender.winners)
       ? tender.winners.map((winner) =>
           isPopulatedRecord(winner)
@@ -252,7 +278,7 @@ function serializeAwardTenderRelations<T extends Partial<AwardTender>>(
 AwardTenderSchema.statics.serializeList = function (
   tender: AwardTenderSerializable,
 ): AwardTenderListDto {
-  const { buyer, winners, ...serializedAwardTender } = filterModel(tender, {
+  const { winners, ...serializedAwardTender } = filterModel(tender, {
     includeFields: [
       'id',
       'noticeType',
@@ -260,7 +286,8 @@ AwardTenderSchema.statics.serializeList = function (
       'procedureType',
       'title',
       'titleProc',
-      'buyer',
+      'nonLeadBuyers',
+      'leadBuyers',
       'publicationDate',
       'submissionDeadline',
       'plannedEndDate',
@@ -283,7 +310,14 @@ AwardTenderSchema.statics.serializeList = function (
 
   return {
     ...serializedAwardTender,
-    buyer: BuyerModel.serializeList(buyer),
+    nonLeadBuyers:
+      serializedAwardTender.nonLeadBuyers?.map((buyer) =>
+        BuyerModel.serializeList(buyer as BuyerSerializable),
+      ) ?? [],
+    leadBuyers:
+      serializedAwardTender.leadBuyers?.map((buyer) =>
+        BuyerModel.serializeList(buyer as BuyerSerializable),
+      ) ?? [],
     winners: winners.map(ContractorModel.serializeList),
   };
 };

@@ -209,17 +209,17 @@ export class BuyerIntelligenceService {
     const [buyer, recentTenders, recentAwardTenders, tendersLast12Months] =
       await Promise.all([
         BuyerModel.findById(params.buyerId).lean(),
-        TenderModel.find({ buyer: params.buyerId })
+        TenderModel.find({ leadBuyers: params.buyerId })
           .sort({ publicationDate: -1, _id: -1 })
           .limit(recentTendersLimit)
           .lean(),
-        AwardTenderModel.find({ buyer: params.buyerId })
+        AwardTenderModel.find({ leadBuyers: params.buyerId })
           .sort({ publicationDate: -1, _id: -1 })
           .limit(recentTendersLimit)
           .populate('winners', 'name countries cities')
           .lean(),
         TenderModel.countDocuments({
-          buyer: params.buyerId,
+          leadBuyers: params.buyerId,
           publicationDate: { $gte: last12Months },
         }),
       ]);
