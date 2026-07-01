@@ -14,6 +14,7 @@ export const DEEP_COMPANY_FIT_LLM_JSON_SCHEMA = {
     'finalRecommendation',
     'bidNoBidDecision',
     'opportunityAnalysis',
+    'buyerSelectionAssessment',
   ],
   properties: {
     executiveSummary: {
@@ -461,6 +462,74 @@ export const DEEP_COMPANY_FIT_LLM_JSON_SCHEMA = {
           enum: ['low', 'medium', 'high', 'unknown'],
           description:
             'Estimated competition level based only on provided tender context. Use unknown if not enough information.',
+        },
+      },
+    },
+
+    buyerSelectionAssessment: {
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'probabilityScore',
+        'probabilityLevel',
+        'summary',
+        'rationale',
+        'positiveFactors',
+        'negativeFactors',
+        'assumptions',
+        'buyerSignalsUsed',
+      ],
+      properties: {
+        probabilityScore: {
+          type: 'number',
+          minimum: 0,
+          maximum: 100,
+          description:
+            'Estimated probability from 0 to 100 that the buyer would select this company if all formal tender requirements are satisfied and a compliant bid is submitted. This is a cautious analytical estimate, not a prediction guarantee.',
+        },
+        probabilityLevel: {
+          type: 'string',
+          enum: ['low', 'medium', 'high', 'unknown'],
+          description:
+            'Qualitative probability level. Use unknown when buyer intelligence or competition evidence is insufficient.',
+        },
+        summary: {
+          type: 'string',
+          description:
+            'Localized short summary of buyer-selection likelihood for this company.',
+        },
+        rationale: {
+          type: 'string',
+          description:
+            'Localized explanation using buyer intelligence, tender fit, and company evidence. Do not claim certainty or unfair preference.',
+        },
+        positiveFactors: {
+          type: 'array',
+          maxItems: 5,
+          items: { type: 'string' },
+          description:
+            'Localized factors that may increase the chance of selection if the bid is compliant. Maximum 5 items.',
+        },
+        negativeFactors: {
+          type: 'array',
+          maxItems: 5,
+          items: { type: 'string' },
+          description:
+            'Localized factors that may reduce the chance of selection. Maximum 5 items.',
+        },
+        assumptions: {
+          type: 'array',
+          maxItems: 5,
+          items: { type: 'string' },
+          description:
+            'Localized assumptions behind the estimate, including that formal requirements are met and bid is compliant. Maximum 5 items.',
+        },
+        buyerSignalsUsed: {
+          type: 'array',
+          maxItems: 5,
+          items: { type: 'string' },
+          description:
+            'Localized buyer intelligence signals used, such as repeat-supplier pattern, local supplier pattern, value pattern, or data limitations. Maximum 5 items.',
         },
       },
     },

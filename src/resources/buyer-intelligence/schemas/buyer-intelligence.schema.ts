@@ -15,31 +15,25 @@ export type BuyerIntelligence = {
 
   procurementProfile: {
     overview: string;
-    typicalPurchases: string[];
-    activityAssessment: string;
+    highlights: string[];
   };
 
   marketBehavior: {
-    contractPatterns: string[];
-    procedurePatterns: string[];
-    valuePatterns: string[];
+    overview: string;
+    highlights: string[];
   };
 
   supplierLandscape: {
     overview: string;
-    repeatSupplierPattern: string[];
-    localSupplierPattern: string[];
-    supplierDiversity: string[];
+    highlights: string[];
   };
 
   historicalTrends: string[];
   dataLimitations: string[];
 
-  promptVersion: string;
-  llmModel: string;
   errorMessage?: string;
 
-  statsVersion: number;
+  sourceHash: string;
 
   createdAt?: Date;
   updatedAt?: Date;
@@ -49,7 +43,7 @@ const BUYER_INTELLIGENCE_LIST_FIELDS = [
   'buyer',
   'status',
   'summary',
-  'statsVersion',
+  'sourceHash',
   'updatedAt',
 ] satisfies Array<keyof BuyerIntelligence>;
 
@@ -99,30 +93,24 @@ export const BuyerIntelligenceSchema = new Schema<
     summary: { type: String, default: '' },
     procurementProfile: {
       overview: { type: String, default: '' },
-      typicalPurchases: { type: [String], default: [] },
-      activityAssessment: { type: String, default: '' },
+      highlights: { type: [String], default: [] },
     },
 
     marketBehavior: {
-      contractPatterns: { type: [String], default: [] },
-      procedurePatterns: { type: [String], default: [] },
-      valuePatterns: { type: [String], default: [] },
+      overview: { type: String, default: '' },
+      highlights: { type: [String], default: [] },
     },
 
     supplierLandscape: {
       overview: { type: String, default: '' },
-      repeatSupplierPattern: { type: [String], default: [] },
-      localSupplierPattern: { type: [String], default: [] },
-      supplierDiversity: { type: [String], default: [] },
+      highlights: { type: [String], default: [] },
     },
 
     historicalTrends: { type: [String], default: [] },
     dataLimitations: { type: [String], default: [] },
-    promptVersion: { type: String, default: '' },
-    llmModel: { type: String, default: '' },
     errorMessage: { type: String },
 
-    statsVersion: { type: Number, default: 1 },
+    sourceHash: { type: String },
   },
   { timestamps: true, collection: 'buyer_intelligence' },
 );
@@ -154,7 +142,7 @@ BuyerIntelligenceSchema.statics.serializeDetail = function (
   }
 
   const intel: BuyerIntelligenceDetailDto = filterModel(intelligence, {
-    excludeFields: ['promptVersion', 'llmModel', 'statsVersion'],
+    excludeFields: ['sourceHash'],
   });
 
   return {

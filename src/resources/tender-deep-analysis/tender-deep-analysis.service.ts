@@ -6,6 +6,7 @@ import {
   deepAnalysisPopulateFields,
   devLog,
   getPaginationMeta,
+  getMongoRelationObjectIdArray,
   getSafeErrorMessage,
   logger,
   QueueAsyncConcurrency,
@@ -37,6 +38,10 @@ import {
 import { CompanyProfileDocumentsService } from '@/resources/company-profile-documents/company-profile-documents.service';
 import { TENDER_DEEP_ANALYSIS_CONFIG } from '@/config/tender-deep-analysis.config';
 import fs from 'node:fs';
+import { BuyerIntelligenceModel } from '@/resources/buyer-intelligence/schemas';
+import { TenderGeneralAnalysisStatus } from '@/resources/tender-analysis/schemas';
+import { TenderDeepBuyerIntelligenceInput } from '@/types';
+import { BuyerIntelligenceService } from '@/resources/buyer-intelligence';
 @Injectable()
 export class TenderDeepAnalysisService {
   private readonly deepCompanyFitAnalysisQueue = new QueueAsyncConcurrency(
@@ -49,6 +54,7 @@ export class TenderDeepAnalysisService {
     private readonly tendersService: TendersService,
     private readonly companyFilterService: CompanyFilterService,
     private readonly companyProfileDocumentsService: CompanyProfileDocumentsService,
+    private readonly buyerIntelligenceService: BuyerIntelligenceService,
     @Inject(forwardRef(() => TenderGeneralAnalysisService))
     private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
   ) {}
@@ -97,6 +103,8 @@ export class TenderDeepAnalysisService {
         company,
         companyDocumentEvidence,
       );
+      const buyerIntelligence =
+        await this.getBuyerIntelligenceInputForTender(tender);
       const tenderDocumentsInput =
         await this.deepDocumentInputService.buildDeepDocumentInput(tender);
       const input = this.deepAnalysisBuilder.buildInput({
@@ -104,6 +112,7 @@ export class TenderDeepAnalysisService {
         generalAnalysis,
         company: companyDto,
         companyAnalysis,
+        buyerIntelligence,
         documentMetadata: tenderDocumentsInput.documentMetadata,
         documentTextSnippets: tenderDocumentsInput.documentTextSnippets,
         outputLanguage: language,
@@ -188,10 +197,13 @@ export class TenderDeepAnalysisService {
       this.tenderGeneralAnalysisService.ensureAnalysisForTender(tender),
       this.companyFilterService.generateAnalysisForCompany(company),
     ]);
+    const buyerIntelligenceSourceHash =
+      await this.getBuyerIntelligenceSourceHashForTender(tender);
     const sourceHash = this.buildSourceHash({
       generalAnalysisSourceHash: generalAnalysis.sourceHash,
       companyAnalysisSourceHash: companyAnalysis.sourceHash,
       tenderSourceHash: tender.sourceHash,
+      buyerIntelligenceSourceHash,
       outputLanguage: language,
     });
     const { deepAnalysis: localDeepAnalysis, shouldStart } =
@@ -365,6 +377,7 @@ export class TenderDeepAnalysisService {
     tenderSourceHash: string;
     generalAnalysisSourceHash: string;
     companyAnalysisSourceHash: string;
+    buyerIntelligenceSourceHash?: string;
     outputLanguage?: string;
   }): string {
     const outputLanguage = normalizeDeepAnalysisLanguage(input.outputLanguage);
@@ -376,11 +389,102 @@ export class TenderDeepAnalysisService {
           outputLanguage,
           generalAnalysisSourceHash: input.generalAnalysisSourceHash,
           companyAnalysisSourceHash: input.companyAnalysisSourceHash,
+          buyerIntelligenceSourceHash: input.buyerIntelligenceSourceHash ?? '',
           tenderSourceHash: input.tenderSourceHash,
         }),
       )
       .digest('hex');
   }
+
+  private async getBuyerIntelligenceInputForTender(
+    tender: Pick<TenderDocument, 'leadBuyers'>,
+  ): Promise<TenderDeepBuyerIntelligenceInput[]> {
+    const buyerIds = getMongoRelationObjectIdArray(tender.leadBuyers ?? []);
+
+    if (!buyerIds.length) {
+      return [];
+    }
+
+    const records = await Promise.all(
+      buyerIds.map((buyerId) =>
+        this.buyerIntelligenceService.getFinishedBuyerIntelligence({ buyerId }),
+      ),
+    );
+
+    return records.map((record) => {
+      const buyer = record.buyer as { _id?: unknown; name?: string } | string;
+      const buyerId =
+        typeof buyer === 'string'
+          ? buyer
+          : (buyer?._id?.toString() ?? record.buyer.toString());
+
+      return {
+        buyerId,
+        buyerName: typeof buyer === 'object' ? buyer.name : undefined,
+        summary: record.summary,
+        procurementProfile: record.procurementProfile,
+        marketBehavior: record.marketBehavior,
+        supplierLandscape: record.supplierLandscape,
+        historicalTrends: record.historicalTrends,
+        dataLimitations: record.dataLimitations,
+      };
+    });
+  }
+
+  private async getBuyerIntelligenceSourceHashForTender(
+    tender: Pick<TenderDocument, 'leadBuyers'>,
+  ): Promise<string> {
+    const buyerIds = getMongoRelationObjectIdArray(tender.leadBuyers ?? []);
+
+    if (!buyerIds.length) {
+      return '';
+    }
+
+    const records = await BuyerIntelligenceModel.find({
+      buyer: { $in: buyerIds },
+      status: TenderGeneralAnalysisStatus.DONE,
+    })
+      .select('buyer sourceHash')
+      .sort({ buyer: 1 })
+      .lean()
+      .exec();
+
+    return createHash('sha256')
+      .update(
+        JSON.stringify(
+          records.map((record) => ({
+            buyer: record.buyer?.toString(),
+            sourceHash: record.sourceHash,
+          })),
+        ),
+      )
+      .digest('hex');
+  }
+
+  private async getBuyerIntelligenceSourceHashForDeepAnalysis(
+    deepAnalysis: TenderDeepAnalysisDocument | TenderDeepAnalysisRecord,
+  ): Promise<string> {
+    if (!deepAnalysis.tender) {
+      return '';
+    }
+
+    if (
+      typeof deepAnalysis.tender === 'object' &&
+      'leadBuyers' in deepAnalysis.tender
+    ) {
+      return this.getBuyerIntelligenceSourceHashForTender(
+        deepAnalysis.tender as unknown as Pick<TenderDocument, 'leadBuyers'>,
+      );
+    }
+
+    const tender = await TenderModel.findById(deepAnalysis.tender)
+      .select('leadBuyers')
+      .lean<Pick<TenderDocument, 'leadBuyers'>>()
+      .exec();
+
+    return tender ? this.getBuyerIntelligenceSourceHashForTender(tender) : '';
+  }
+
   private async isSourceHashIsOutOfDate(
     deepAnalysis: TenderDeepAnalysisDocument | TenderDeepAnalysisRecord,
     companyAnalysis?: { sourceHash?: string } | null,
@@ -389,12 +493,14 @@ export class TenderDeepAnalysisService {
       tenderSourceHash,
       generalAnalysisSourceHash,
       companyAnalysisSourceHash,
+      buyerIntelligenceSourceHash,
     ] = await Promise.all([
       getTenderSourceHash(deepAnalysis),
       getGeneralAnalysisSourceHash(deepAnalysis),
       companyAnalysis?.sourceHash
         ? companyAnalysis.sourceHash
         : getCompanyAnalysisSourceHash(deepAnalysis),
+      this.getBuyerIntelligenceSourceHashForDeepAnalysis(deepAnalysis),
     ]);
     if (
       !deepAnalysis.sourceHash ||
@@ -408,6 +514,7 @@ export class TenderDeepAnalysisService {
       tenderSourceHash,
       generalAnalysisSourceHash,
       companyAnalysisSourceHash,
+      buyerIntelligenceSourceHash,
       outputLanguage: normalizeDeepAnalysisLanguage(deepAnalysis.language),
     });
     return deepAnalysis.sourceHash !== currentSourceHash;

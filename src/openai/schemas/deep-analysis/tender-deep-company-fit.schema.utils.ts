@@ -221,6 +221,18 @@ export const TENDER_DEEP_COMPANY_FIT_LLM_RESPONSE_SCHEMA = z
         likelyCompetitionLevel: z.enum(['low', 'medium', 'high', 'unknown']),
       })
       .strict(),
+    buyerSelectionAssessment: z
+      .object({
+        probabilityScore: scoreSchema,
+        probabilityLevel: z.enum(['low', 'medium', 'high', 'unknown']),
+        summary: z.string(),
+        rationale: z.string(),
+        positiveFactors: z.array(z.string()).max(5),
+        negativeFactors: z.array(z.string()).max(5),
+        assumptions: z.array(z.string()).max(5),
+        buyerSignalsUsed: z.array(z.string()).max(5),
+      })
+      .strict(),
   })
   .strict();
 
@@ -244,6 +256,7 @@ const DEEP_COMPANY_FIT_ENUM_DEFAULTS: Record<string, string> = {
   'finalRecommendation.value': 'investigate',
   'bidNoBidDecision.decision': 'bid_if_profile_completed',
   'opportunityAnalysis.likelyCompetitionLevel': 'unknown',
+  'buyerSelectionAssessment.probabilityLevel': 'unknown',
 };
 
 /**

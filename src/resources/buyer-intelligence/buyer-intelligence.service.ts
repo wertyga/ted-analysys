@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  RequestTimeoutException,
+} from '@nestjs/common';
 import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
 import { CpvService } from '@/resources/cpv/cpv.service';
 import {
@@ -27,6 +31,7 @@ import {
   getString,
   isRecord,
   QueueAsyncConcurrency,
+  sleep,
   toNullableFiniteNumber,
   toOptionalIsoString,
   filterModel,
@@ -51,6 +56,9 @@ import { DEEP_COMPANY_FIT_LLM_JSON_SCHEMA } from '@/openai/schemas/deep-analysis
 import { BUYER_INTELLIGENCE_LLM_JSON_SCHEMA } from '@/openai/schemas/buyer-intelligence';
 import fs from 'node:fs';
 import { getAwardTenderAwardValueEur } from '@/resources/buyer/buyer-utils';
+import { TENDER_ANALYSIS_CONFIG } from '@/config/tender-analysis.config';
+import { createHash } from 'crypto';
+import { GENERAL_TENDER_ANALYSIS_PROMPT_VERSION } from '@/resources/tender-analysis/general-tender-analysis.prompt';
 
 const DEFAULT_RECENT_TENDERS_LIMIT = 30;
 
@@ -396,8 +404,6 @@ export class BuyerIntelligenceService {
           $set: {
             ...result,
             status: TenderGeneralAnalysisStatus.DONE,
-            promptVersion: BUYER_INTELLIGENCE_PROMPT_VERSION,
-            llmModel: this.deepSeekAnalysisService.getGeneralAnalysisModel(),
             errorMessage: null,
           },
           $setOnInsert: {
@@ -423,6 +429,18 @@ export class BuyerIntelligenceService {
     }
   }
 
+  private async getBuyerStatsVersion(buyerId: TMongoId): Promise<number> {
+    const buyer = await BuyerModel.findById(buyerId)
+      .select('statsVersion')
+      .lean();
+
+    if (!buyer) {
+      throw new NotFoundException('Buyer not found');
+    }
+
+    return buyer.statsVersion ?? 1;
+  }
+
   async ensureBuyerIntelligence(params: {
     buyerId: TMongoId;
     recentTendersLimit?: number;
@@ -431,9 +449,11 @@ export class BuyerIntelligenceService {
       buyer: params.buyerId,
       status: { $ne: TenderGeneralAnalysisStatus.FAILED },
     }).populate('buyer');
+    const buyerStatsVersion = await this.getBuyerStatsVersion(params.buyerId);
 
     const needToCalculate = this.hasBuyerIntelligenceToBeRecalculated(
-      existing as BuyerIntelligenceSerializable,
+      buyerStatsVersion,
+      existing,
     );
 
     if (existing && !needToCalculate) {
@@ -441,9 +461,7 @@ export class BuyerIntelligenceService {
         existing.status === TenderGeneralAnalysisStatus.PROCESSING;
 
       if (isInProcess) {
-        return BuyerIntelligenceModel.serializeList(
-          existing,
-        ) as BuyerIntelligenceDocument;
+        return existing;
       }
 
       return existing;
@@ -454,8 +472,7 @@ export class BuyerIntelligenceService {
       {
         $set: {
           status: TenderGeneralAnalysisStatus.PROCESSING,
-          promptVersion: BUYER_INTELLIGENCE_PROMPT_VERSION,
-          llmModel: this.deepSeekAnalysisService.getGeneralAnalysisModel(),
+          sourceHash: this.getBuyerIntelSourceHash(buyerStatsVersion),
           errorMessage: null,
         },
         $setOnInsert: {
@@ -472,8 +489,41 @@ export class BuyerIntelligenceService {
     return analysis;
   }
 
+  async getFinishedBuyerIntelligence(params: {
+    buyerId: TMongoId;
+    recentTendersLimit?: number;
+  }): Promise<BuyerIntelligenceDocument> {
+    let analysis = await this.ensureBuyerIntelligence(params);
+    const waitUntil = Date.now() + TENDER_ANALYSIS_CONFIG.wait.timeoutMs;
+
+    while (analysis.status !== TenderGeneralAnalysisStatus.DONE) {
+      if (Date.now() >= waitUntil) {
+        throw new RequestTimeoutException(
+          `Buyer intelligence for buyer ${params.buyerId} was not finished within 10 minutes`,
+        );
+      }
+
+      analysis = (await BuyerIntelligenceModel.findById(
+        analysis._id,
+      )) as BuyerIntelligenceDocument;
+
+      if (analysis.status === TenderGeneralAnalysisStatus.FAILED) {
+        throw new Error(
+          `Buyer intelligence for buyer ${params.buyerId} failed: ${
+            analysis.errorMessage ?? 'unknown error'
+          }`,
+        );
+      }
+
+      await sleep(TENDER_ANALYSIS_CONFIG.wait.intervalMs);
+    }
+
+    return analysis;
+  }
+
   private hasBuyerIntelligenceToBeRecalculated(
-    buyerIntel?: BuyerIntelligenceSerializable,
+    buyerStatsVersion: number,
+    buyerIntel: BuyerIntelligenceSerializable | null | undefined,
   ) {
     if (!buyerIntel) {
       return true;
@@ -484,8 +534,7 @@ export class BuyerIntelligenceService {
     }
 
     return (
-      (buyerIntel.buyer as BuyerDocument).statsVersion !==
-      buyerIntel.statsVersion
+      buyerIntel.sourceHash !== this.getBuyerIntelSourceHash(buyerStatsVersion)
     );
   }
 
@@ -493,12 +542,7 @@ export class BuyerIntelligenceService {
     value: unknown,
   ): Omit<
     BuyerIntelligence,
-    | 'buyer'
-    | 'status'
-    | 'promptVersion'
-    | 'llmModel'
-    | 'errorMessage'
-    | 'statsVersion'
+    'buyer' | 'status' | 'errorMessage' | 'sourceHash'
   > {
     if (!isRecord(value)) {
       throw new Error('Buyer intelligence result must be a JSON object');
@@ -521,37 +565,32 @@ export class BuyerIntelligenceService {
 
       procurementProfile: {
         overview: getString(procurementProfile, 'overview'),
-        typicalPurchases: getNormalizedStringArray(
-          procurementProfile.typicalPurchases,
-        ),
-        activityAssessment: getString(procurementProfile, 'activityAssessment'),
+        highlights: getNormalizedStringArray(procurementProfile.highlights),
       },
 
       marketBehavior: {
-        contractPatterns: getNormalizedStringArray(
-          marketBehavior.contractPatterns,
-        ),
-        procedurePatterns: getNormalizedStringArray(
-          marketBehavior.procedurePatterns,
-        ),
-        valuePatterns: getNormalizedStringArray(marketBehavior.valuePatterns),
+        overview: getString(marketBehavior, 'overview'),
+        highlights: getNormalizedStringArray(marketBehavior.highlights),
       },
 
       supplierLandscape: {
         overview: getString(supplierLandscape, 'overview'),
-        repeatSupplierPattern: getNormalizedStringArray(
-          supplierLandscape.repeatSupplierPattern,
-        ),
-        localSupplierPattern: getNormalizedStringArray(
-          supplierLandscape.localSupplierPattern,
-        ),
-        supplierDiversity: getNormalizedStringArray(
-          supplierLandscape.supplierDiversity,
-        ),
+        highlights: getNormalizedStringArray(supplierLandscape.highlights),
       },
 
       historicalTrends: getNormalizedStringArray(value.historicalTrends),
       dataLimitations: getNormalizedStringArray(value.dataLimitations),
     };
+  }
+
+  private getBuyerIntelSourceHash(buyerVersion: number) {
+    return createHash('sha256')
+      .update(
+        JSON.stringify({
+          buyerVersion,
+          promptVersion: BUYER_INTELLIGENCE_PROMPT_VERSION,
+        }),
+      )
+      .digest('hex');
   }
 }

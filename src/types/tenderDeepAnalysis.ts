@@ -1,5 +1,5 @@
 import { TenderLot } from '@/resources/tenders/schemas';
-import { BuyerDetailDto } from '@/resources/buyer/schemas';
+import { GeneralTenderAnalysisBuyerInput } from '@/openai/dto/openai-analysis.dto';
 
 export type TenderDeepRecommendation =
   | 'strong_go'
@@ -153,6 +153,16 @@ export interface TenderDeepAnalysisResult {
     whyThisMayNotBeWorthIt: string[];
     likelyCompetitionLevel: 'low' | 'medium' | 'high' | 'unknown';
   };
+  buyerSelectionAssessment: {
+    probabilityScore: number;
+    probabilityLevel: 'low' | 'medium' | 'high' | 'unknown';
+    summary: string;
+    rationale: string;
+    positiveFactors: string[];
+    negativeFactors: string[];
+    assumptions: string[];
+    buyerSignalsUsed: string[];
+  };
 }
 
 export interface TenderDeepRiskItem {
@@ -273,8 +283,8 @@ export interface TenderAnalysisTenderDto {
   };
   noticeLanguage?: string;
   submissionLanguages?: string[];
-  leadBuyers: BuyerDetailDto[];
-  nonLeadBuyers: BuyerDetailDto[];
+  leadBuyers: GeneralTenderAnalysisBuyerInput[];
+  nonLeadBuyers: GeneralTenderAnalysisBuyerInput[];
   publicationDate?: Date;
   dispatchDate?: Date;
   submissionDeadline?: Date;
@@ -342,7 +352,28 @@ export interface TenderDeepCompanyFitAnalysisInput {
   generalAnalysis: unknown;
   company: CompanyAnalysisDto;
   companyAnalysis?: unknown;
+  buyerIntelligence?: TenderDeepBuyerIntelligenceInput[];
   derived: TenderCompanyFitDerivedMetadata;
   documentMetadata?: unknown[];
   documentTextSnippets?: unknown[];
+}
+
+export interface TenderDeepBuyerIntelligenceInput {
+  buyerId: string;
+  buyerName?: string;
+  summary?: string;
+  procurementProfile?: {
+    overview?: string;
+    highlights?: string[];
+  };
+  marketBehavior?: {
+    overview?: string;
+    highlights?: string[];
+  };
+  supplierLandscape?: {
+    overview?: string;
+    highlights?: string[];
+  };
+  historicalTrends?: string[];
+  dataLimitations?: string[];
 }

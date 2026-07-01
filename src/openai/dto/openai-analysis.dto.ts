@@ -1,5 +1,9 @@
 import { TenderLot } from '@/resources/tenders/schemas';
-import { BuyerDetailDto } from '@/resources/buyer/schemas';
+import {
+  BuyerAddress,
+  BuyerCodeName,
+  BuyerContact,
+} from '@/resources/buyer/schemas';
 
 export type AnalysisOutputLanguage = 'en' | 'ru' | 'pl' | 'de' | 'fr';
 export type RiskSeverity = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -43,9 +47,8 @@ export interface GeneralTenderAnalysisInput {
     description?: string | null;
     lots: TenderLot[];
     country?: string | null;
-    leadBuyers: BuyerDetailDto[];
-    nonLeadBuyers: BuyerDetailDto[];
-    buyers: BuyerDetailDto[];
+    leadBuyers: GeneralTenderAnalysisBuyerInput[];
+    nonLeadBuyers: GeneralTenderAnalysisBuyerInput[];
     procedureType?: string | null;
     noticeType?: string | null;
     noticeSubtype?: string | null;
@@ -88,6 +91,17 @@ export interface GeneralTenderAnalysisInput {
   };
   documents: DocumentInputAnalysis[];
 }
+
+export type GeneralTenderAnalysisBuyerInput = {
+  name?: string;
+  identifiers?: string[];
+  contact?: Partial<BuyerContact>;
+  address?: Partial<BuyerAddress>;
+  legalTypes?: BuyerCodeName[];
+  mainActivities?: BuyerCodeName[];
+  profiles?: string[];
+  websites?: string[];
+};
 
 export interface GeneralTenderAnalysisResult {
   summary: string;

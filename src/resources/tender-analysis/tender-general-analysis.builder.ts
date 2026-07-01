@@ -1,9 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { GeneralTenderAnalysisInput } from '@/openai/dto/openai-analysis.dto';
+import {
+  GeneralTenderAnalysisBuyerInput,
+  GeneralTenderAnalysisInput,
+} from '@/openai/dto/openai-analysis.dto';
 import { TenderDocument, TenderLot } from '../tenders/schemas';
 import { isRecord } from '@/utils';
 import { DocumentExtractor } from '@/document-extractor';
-import { BuyerModel } from '@/resources/buyer/schemas';
+import { Buyer, BuyerDocument } from '@/resources/buyer/schemas';
 
 @Injectable()
 export class TenderGeneralAnalysisBuilder {
@@ -17,8 +20,12 @@ export class TenderGeneralAnalysisBuilder {
       ['xml'],
     );
 
-    const leadBuyers = tender.leadBuyers.map(BuyerModel.serializeDetail);
-    const nonLeadBuyers = tender.nonLeadBuyers.map(BuyerModel.serializeDetail);
+    const leadBuyers = tender.leadBuyers.flatMap((buyer) =>
+      this.buildBuyerInput(buyer),
+    );
+    const nonLeadBuyers = tender.nonLeadBuyers.flatMap((buyer) =>
+      this.buildBuyerInput(buyer),
+    );
 
     return {
       tender: {
@@ -29,7 +36,6 @@ export class TenderGeneralAnalysisBuilder {
         lots: tender.lots ?? [],
         leadBuyers,
         nonLeadBuyers,
-        buyers: leadBuyers,
         procedureType: tender.procedureType ?? null,
         noticeType: tender.noticeType ?? null,
         noticeSubtype: tender.noticeSubtype ?? null,
@@ -80,6 +86,66 @@ export class TenderGeneralAnalysisBuilder {
 
   private formatDate(value: Date | undefined): string | null {
     return value?.toISOString() ?? null;
+  }
+
+  buildBuyerInput(
+    buyer: string | BuyerDocument | Buyer | unknown,
+  ): GeneralTenderAnalysisBuyerInput[] {
+    if (!isRecord(buyer)) {
+      return [];
+    }
+
+    return [
+      {
+        name: typeof buyer.name === 'string' ? buyer.name : undefined,
+        identifiers: Array.isArray(buyer.identifiers)
+          ? buyer.identifiers.filter(
+              (identifier): identifier is string =>
+                typeof identifier === 'string' && identifier.trim().length > 0,
+            )
+          : [],
+        contact: isRecord(buyer.contact)
+          ? {
+              contactPoint: this.getOptionalString(buyer.contact.contactPoint),
+              person: this.getOptionalString(buyer.contact.person),
+              email: this.getOptionalString(buyer.contact.email),
+              phone: this.getOptionalString(buyer.contact.phone),
+              website: this.getOptionalString(buyer.contact.website),
+              gateway: this.getOptionalString(buyer.contact.gateway),
+            }
+          : undefined,
+        address: isRecord(buyer.address)
+          ? {
+              street: this.getOptionalString(buyer.address.street),
+              postCode: this.getOptionalString(buyer.address.postCode),
+              city: this.getOptionalString(buyer.address.city),
+              country: this.getOptionalString(buyer.address.country),
+              countrySub: this.getOptionalString(buyer.address.countrySub),
+            }
+          : undefined,
+        legalTypes: Array.isArray(buyer.legalTypes) ? buyer.legalTypes : [],
+        mainActivities: Array.isArray(buyer.mainActivities)
+          ? buyer.mainActivities
+          : [],
+        profiles: this.getStringArray(buyer.profiles),
+        websites: this.getStringArray(buyer.websites),
+      },
+    ];
+  }
+
+  private getOptionalString(value: unknown): string | undefined {
+    return typeof value === 'string' && value.trim().length > 0
+      ? value
+      : undefined;
+  }
+
+  private getStringArray(value: unknown): string[] {
+    return Array.isArray(value)
+      ? value.filter(
+          (item): item is string =>
+            typeof item === 'string' && item.trim().length > 0,
+        )
+      : [];
   }
 
   private buildLotInput(lot: TenderLot) {

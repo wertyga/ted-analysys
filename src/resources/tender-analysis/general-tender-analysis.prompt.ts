@@ -1,5 +1,5 @@
 export const GENERAL_TENDER_ANALYSIS_PROMPT_VERSION =
-  'general-tender-analysis-v10';
+  'general-tender-analysis-v11';
 
 export function buildGeneralTenderAnalysisPrompt(
   outputLanguage: string,
@@ -17,7 +17,7 @@ export function buildGeneralTenderAnalysisPrompt(
     'SOURCE PRIORITY',
     'Treat TENDER STRUCTURED DATA as the primary authoritative notice metadata.',
     'Use TENDER STRUCTURED DATA before document text for publication identifiers, buyer data, CPV codes, dates, language constraints, place of performance, value, structured lots, and procedure flags.',
-    'Use tender.leadBuyers as the contracting buyers responsible for the tender. Use tender.nonLeadBuyers as participating or associated buyers only when present. The legacy tender.buyers field is an alias for tender.leadBuyers.',
+    'Use tender.leadBuyers as the contracting buyers responsible for the tender. Use tender.nonLeadBuyers as participating or associated buyers only when present.',
     'Do not treat nonLeadBuyers as lead contracting authorities unless the structured data explicitly says they are lead buyers.',
     'Treat XML_NOTICE as a secondary authoritative source when TENDER STRUCTURED DATA is missing, incomplete, null, or internally inconsistent.',
     'Use DOCUMENTS only when extracted document text is provided under DOCUMENTS.',
@@ -41,6 +41,14 @@ export function buildGeneralTenderAnalysisPrompt(
     'If lotIdentifiers count differs from available lot titles, descriptions, or values, mention a structured data extraction issue and lower confidenceScore.',
     'If lot-level values are present, use them to explain the value structure.',
     'If lot-level values share the same currency and represent separate lots, you may aggregate them into an overall estimatedValue.amount, but explain the aggregation in estimatedValue.description.',
+
+    'BUYERS',
+    'Use leadBuyers and nonLeadBuyers only as tender participant metadata.',
+    'For buyers, use name, identifiers, address, contact, legalTypes, mainActivities, profiles, and websites only when these fields are explicitly present.',
+    'Do not infer procurement scope, eligibility requirements, procedure type, or formal procurement role from buyer name, buyer website, legal type, main activity, or historical assumptions.',
+    'Do not describe nonLeadBuyers as contracting authorities, lead buyers, or decision makers unless the structured tender data explicitly says so.',
+    'If multiple leadBuyers are present, describe them as multiple contracting buyers only when relevant to the tender analysis.',
+    'Buyer address country is not the same as place of performance. Use placeOfPerformance for delivery/performance geography.',
 
     'VALUE EXTRACTION',
     'Always extract the estimated contract value, budget, framework value, DPS value, lot value, or maximum contract value if present.',

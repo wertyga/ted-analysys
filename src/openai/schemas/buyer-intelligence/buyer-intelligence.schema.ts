@@ -13,35 +13,26 @@ export const BUYER_INTELLIGENCE_LLM_JSON_SCHEMA = {
     summary: {
       type: 'string',
       description:
-        'Short localized neutral summary describing the buyer as a procurement entity. Focus on the main procurement characteristics rather than repeating statistics.',
+        'Maximum 2 sentences. Concise neutral buyer-level overview focused on procurement characteristics and interpretation. Do not repeat buyer metadata, statistics, dates, or values already shown in the UI.',
     },
 
     procurementProfile: {
       type: 'object',
       additionalProperties: false,
-      required: ['overview', 'typicalPurchases', 'activityAssessment'],
+      required: ['overview', 'highlights'],
       properties: {
         overview: {
           type: 'string',
           description:
-            'Neutral explanation of what kind of procurement organization this buyer appears to be based only on the provided data.',
+            'Maximum 2 sentences. Explain procurement focus and activity interpretation. Do not repeat legal type, country, or deterministic statistics.',
         },
-
-        typicalPurchases: {
+        highlights: {
           type: 'array',
-          minItems: 1,
-          maxItems: 5,
-          items: {
-            type: 'string',
-          },
+          minItems: 0,
+          maxItems: 3,
+          items: { type: 'string' },
           description:
-            'Recurring or preliminary procurement areas inferred from CPV labels, tender titles, and procurement history. Prefer procurement categories instead of raw CPV codes.',
-        },
-
-        activityAssessment: {
-          type: 'string',
-          description:
-            'Explain what the provided activityLevel indicates about procurement frequency and procurement recency.',
+            'Up to 3 concise observations about typical purchases, procurement focus, or activity level. Each item should add new information and avoid repeating the overview. Do not infer direct awards or non-competitive buying from missing competition tender notices.',
         },
       },
     },
@@ -49,39 +40,20 @@ export const BUYER_INTELLIGENCE_LLM_JSON_SCHEMA = {
     marketBehavior: {
       type: 'object',
       additionalProperties: false,
-      required: ['contractPatterns', 'procedurePatterns', 'valuePatterns'],
+      required: ['overview', 'highlights'],
       properties: {
-        contractPatterns: {
-          type: 'array',
-          minItems: 1,
-          maxItems: 5,
-          items: {
-            type: 'string',
-          },
+        overview: {
+          type: 'string',
           description:
-            'Recurring or preliminary observations about contract types, contract nature, procurement scope, or place-of-performance.',
+            'Maximum 2 sentences. Explain recurring procurement behaviour and purchasing patterns. Focus on meaning, not raw facts.',
         },
-
-        procedurePatterns: {
+        highlights: {
           type: 'array',
-          minItems: 1,
-          maxItems: 5,
-          items: {
-            type: 'string',
-          },
+          minItems: 0,
+          maxItems: 3,
+          items: { type: 'string' },
           description:
-            'Recurring or preliminary observations about procurement procedures or buying approach. Use cautious wording when evidence is limited.',
-        },
-
-        valuePatterns: {
-          type: 'array',
-          minItems: 1,
-          maxItems: 5,
-          items: {
-            type: 'string',
-          },
-          description:
-            'Observations about estimated and awarded value patterns. Explain significance rather than repeating raw monetary values.',
+            'Up to 3 concise observations about contract patterns, procedure patterns, value patterns, or place-of-performance. Prefer recurring patterns over isolated examples.',
         },
       },
     },
@@ -89,74 +61,40 @@ export const BUYER_INTELLIGENCE_LLM_JSON_SCHEMA = {
     supplierLandscape: {
       type: 'object',
       additionalProperties: false,
-      required: [
-        'overview',
-        'repeatSupplierPattern',
-        'localSupplierPattern',
-        'supplierDiversity',
-      ],
+      required: ['overview', 'highlights'],
       properties: {
         overview: {
           type: 'string',
           description:
-            'Neutral overview of the historical supplier landscape based on available award history.',
+            'Maximum 2 sentences. Explain supplier concentration, supplier diversity, and supplier composition. Do not imply unfairness, favoritism, or discrimination.',
         },
-
-        repeatSupplierPattern: {
+        highlights: {
           type: 'array',
-          minItems: 1,
-          maxItems: 4,
-          items: {
-            type: 'string',
-          },
+          minItems: 0,
+          maxItems: 3,
+          items: { type: 'string' },
           description:
-            'Explain historical repeat supplier behaviour using the provided incumbentRisk and repeatSupplierRate. Do not imply favoritism or unfairness.',
-        },
-
-        localSupplierPattern: {
-          type: 'array',
-          minItems: 1,
-          maxItems: 4,
-          items: {
-            type: 'string',
-          },
-          description:
-            'Explain historical domestic supplier behaviour using localSupplierSignal and localSupplierRate. Do not imply discrimination or unlawful preference.',
-        },
-
-        supplierDiversity: {
-          type: 'array',
-          minItems: 1,
-          maxItems: 4,
-          items: {
-            type: 'string',
-          },
-          description:
-            'Describe whether the historical supplier base appears concentrated or diverse based only on available award history.',
+            'Up to 3 concise observations about repeat suppliers, domestic supplier patterns, and supplier diversity. Explain what backend signals mean without repeating percentages already shown in the UI.',
         },
       },
     },
 
     historicalTrends: {
       type: 'array',
-      minItems: 1,
-      maxItems: 6,
-      items: {
-        type: 'string',
-      },
+      minItems: 0,
+      maxItems: 3,
+      items: { type: 'string' },
       description:
-        'Higher-level historical procurement trends supported by multiple tenders or awards. Prefer recurring patterns over isolated examples.',
+        'Only recurring long-term procurement trends supported by multiple tenders or awards. Return an empty array if history is too small or trends are not meaningful.',
     },
 
     dataLimitations: {
       type: 'array',
-      minItems: 1,
-      maxItems: 6,
-      items: {
-        type: 'string',
-      },
+      minItems: 0,
+      maxItems: 3,
+      items: { type: 'string' },
       description:
-        'Limitations affecting confidence, such as small datasets, missing values, anonymized suppliers, incomplete award history, inconsistent dates, or missing procurement information.',
+        'Only limitations that materially reduce confidence. Avoid obvious limitations already visible from UI statistics. Do not mention disagreement between recent examples and backend signals.',
     },
   },
 } as const;

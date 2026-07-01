@@ -1,7 +1,7 @@
 import { TenderDeepCompanyFitAnalysisInput } from '@/types';
 
 export const TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION =
-  'tender-deep-company-fit-v2.0.1';
+  'tender-deep-company-fit-v2.1.0';
 
 export function buildTenderDeepCompanyFitSystemPrompt(): string {
   return (
@@ -27,12 +27,16 @@ export function buildTenderDeepCompanyFitSystemPrompt(): string {
     'which requirements cannot be confirmed;\n' +
     'what risks exist;\n' +
     'what information is missing;\n' +
+    'how likely the buyer is to select this company if all formal requirements are satisfied;\n' +
     'whether the opportunity should be pursued.\n' +
     '\n' +
     'Rules:\n' +
     '\n' +
     'Use only provided information.\n' +
     'In structured tender data, tender.leadBuyers are the contracting buyers responsible for the tender. tender.nonLeadBuyers are participating or associated buyers only. Do not treat nonLeadBuyers as lead contracting authorities unless the tender data explicitly says so.\n' +
+    'Use buyerIntelligence as historical buyer context only. It may include a summary, procurement profile, market behavior, supplier landscape highlights, historical trends, and data limitations. Do not treat buyerIntelligence as a tender requirement or proof of future buyer behaviour.\n' +
+    'The buyerSelectionAssessment must estimate selection likelihood under the assumption that the company satisfies all formal tender requirements and submits a compliant bid. It is not a legal, statistical, or guaranteed win probability.\n' +
+    'When buyerIntelligence is missing or weak, set buyerSelectionAssessment.probabilityLevel to unknown or use cautious low/medium reasoning based on tender/company fit only.\n' +
     'Do not invent tender requirements, company capabilities, certifications, references, financial capacity, experience, insurance, registrations, languages, staff, partnerships, or other facts.\n' +
     'Trust user-provided company profile information.\n' +
     'Company profile data is considered valid evidence even when no supporting document is uploaded.\n' +
@@ -98,6 +102,7 @@ export function buildTenderDeepCompanyFitSystemPrompt(): string {
     'clarification questions;\n' +
     'bid preparation actions;\n' +
     'score breakdown;\n' +
+    'buyer selection assessment;\n' +
     'final recommendation.\n' +
     '\n' +
     'Recommendation rules:\n' +
@@ -166,10 +171,13 @@ export function buildTenderDeepCompanyFitUserPrompt(
     '5. Derived Metadata:',
     safeStringify(input.derived),
     '',
-    '6. Extracted Tender Document Metadata:',
+    '6. Buyer Intelligence Context:',
+    safeStringify(input.buyerIntelligence ?? []),
+    '',
+    '7. Extracted Tender Document Metadata:',
     safeStringify(input.documentMetadata ?? []),
     '',
-    '7. Extracted Tender Document Text Snippets:',
+    '8. Extracted Tender Document Text Snippets:',
     safeStringify(input.documentTextSnippets ?? []),
     '',
     '### Output Rules:',
@@ -217,6 +225,9 @@ export function buildTenderDeepCompanyFitUserPrompt(
     '- If finalRecommendation.value is no_go, fitScore should usually be 0-40.',
     '- If finalRecommendation.value is go, fitScore should usually be 65-85.',
     '- If finalRecommendation.value is strong_go, fitScore should usually be 80-100.',
+    '- buyerSelectionAssessment.probabilityScore must be from 0 to 100 and must not be high only because the company is compliant; compliance is assumed for this section.',
+    '- buyerSelectionAssessment must consider buyer historical patterns from buyerIntelligence when available, company fit, local/operating country fit, likely competition, repeat supplier context, and data limitations.',
+    '- Do not claim that the buyer will choose or prefer the company. Use cautious probabilistic language.',
     '',
     '### Summary Consistency Rules:',
     '- executiveSummary must match scores.fitScore and finalRecommendation.value.',
