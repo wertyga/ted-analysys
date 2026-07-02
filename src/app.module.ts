@@ -4,7 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { DeepSeekModule } from './deepseek/deepseek.module';
+import { LlmModule } from './llm/llm.module';
 import { CpvModule } from './resources/cpv/cpv.module';
 import { TedSearchModule } from './resources/ted-search/ted-search.module';
 import { TenderGeneralAnalysisModule } from './resources/tender-analysis/tender-general-analysis.module';
@@ -45,7 +45,7 @@ import { BuyerModule } from '@/resources/buyer/buyer.module';
     TendersModule,
     TenderGeneralAnalysisModule,
     TenderDeepAnalysisModule,
-    DeepSeekModule,
+    LlmModule,
     AuthModule,
     UsersModule,
     CodelistModule,

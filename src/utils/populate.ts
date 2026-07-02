@@ -15,6 +15,7 @@ export const awardTenderPopulateFields: PopulateOptions[] = [
   { path: 'nonLeadBuyers' },
   { path: 'leadBuyers' },
   { path: 'winners' },
+  { path: 'lots.winner', select: 'name identifiers' },
 ];
 
 export const deepAnalysisPopulateFields: PopulateOptions[] = [

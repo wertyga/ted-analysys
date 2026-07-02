@@ -39,12 +39,8 @@ const CONTRACTOR_LIST_FIELDS = [
   'emails',
   'cpvCodes',
   'createdAt',
+  'stats',
 ] satisfies Array<keyof Contractor>;
-
-export type ContractorAwardSummary = {
-  // awardTendersCount?: number;
-  // totalAwardedValueEur?: number;
-};
 
 export type ContractorDocument = Contractor & Document;
 export type ContractorRecord = Contractor & { _id: unknown };
@@ -52,11 +48,10 @@ export type ContractorSerializable = ContractorDocument | ContractorRecord;
 export type ContractorListDto = Pick<
   Contractor,
   '_id' | (typeof CONTRACTOR_LIST_FIELDS)[number]
-> &
-  ContractorAwardSummary;
+>;
 export type ContractorDetailDto = Contractor & {
   awardTenders: ReturnType<typeof AwardTenderModel.serializeList>[];
-} & ContractorAwardSummary;
+};
 
 export interface ContractorModelType extends Model<ContractorDocument> {
   serializeList(contractor: ContractorSerializable): ContractorListDto;

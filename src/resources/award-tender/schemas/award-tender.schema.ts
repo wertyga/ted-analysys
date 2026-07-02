@@ -82,7 +82,7 @@ export interface AwardTender {
 export type AwardTenderDocument = AwardTender & Document;
 export type AwardTenderRecord = AwardTender & { _id: unknown };
 export type AwardTenderSerializable = AwardTenderDocument | AwardTenderRecord;
-export type AwardTenderDetailDto = Omit<AwardTender, 'links' | 'cpvCodes'>;
+export type AwardTenderDetailDto = Omit<AwardTender, 'links'>;
 export type AwardTenderListDto = Pick<
   AwardTender,
   | '_id'
@@ -92,6 +92,7 @@ export type AwardTenderListDto = Pick<
   | 'procedureType'
   | 'title'
   | 'titleProc'
+  | 'cpvCodes'
   | 'nonLeadBuyers'
   | 'leadBuyers'
   | 'publicationDate'
@@ -304,6 +305,7 @@ AwardTenderSchema.statics.serializeList = function (
       'winners',
       'createdAt',
       'updatedAt',
+      'cpvCodes',
     ],
   });
 
@@ -326,7 +328,7 @@ AwardTenderSchema.statics.serializeDetail = function (
 ): AwardTenderDetailDto {
   return serializeAwardTenderRelations(
     filterModel(tender, {
-      excludeFields: ['links', 'cpvCodes'],
+      excludeFields: ['links'],
     }),
   ) as AwardTenderDetailDto;
 };

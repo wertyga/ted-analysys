@@ -118,7 +118,7 @@ export class TenderNormalizerService {
       areFrameworkAgreements: getArrayValue(
         'framework-agreement-lot',
         notice,
-      ).map((s) => !!s && s !== 'none'),
+      ).map((s) => !!s && s.toLowerCase() !== 'none'),
 
       plannedEndDates: getDateArrayValue(
         'contract-duration-end-date-lot',
@@ -130,7 +130,7 @@ export class TenderNormalizerService {
       ),
 
       dpsUsages: getArrayValue('dps-usage-lot', notice).map(
-        (c) => !!c && c !== 'none',
+        (c) => !!c && c.toLowerCase() !== 'none',
       ),
       durationPeriodValues: getNumberArrayValue(
         'duration-period-value-lot',

@@ -5,7 +5,7 @@ import {
   RequestTimeoutException,
 } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
+import { LlmAnalysisService } from '@/llm/llm-analysis.service';
 import { CurrencySign } from '@/resources/codelist';
 import { TedContractNature } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
 import { UserDocument } from '@/resources/user/user.types';
@@ -106,7 +106,7 @@ export class CompanyFilterService {
   >;
 
   constructor(
-    private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
+    private readonly llmAnalysisService: LlmAnalysisService,
     private readonly tenderMatchingService: TenderMatchingService,
     private readonly companyProfileDocumentsService: CompanyProfileDocumentsService,
   ) {
@@ -263,6 +263,8 @@ export class CompanyFilterService {
             : undefined,
           minDaysBeforeDeadline: user.minDaysBeforeDeadline,
           companyDocumentEvidenceSourceHash,
+          provider: this.llmAnalysisService.getProvider(),
+          model: this.llmAnalysisService.getGeneralAnalysisModel(),
         }),
       )
       .digest('hex');
@@ -295,7 +297,7 @@ export class CompanyFilterService {
     payload: CompanyTenderFilterAiPayload,
   ): Promise<CompanyTenderFilterAiResult> {
     const response =
-      await this.deepSeekAnalysisService.createGeneralJsonResponse(
+      await this.llmAnalysisService.createGeneralJsonResponse(
         COMPANY_TENDER_FILTER_SYSTEM_PROMPT,
         this.buildUserPrompt(payload),
       );
@@ -638,3 +640,5 @@ function normalizeCpvForHash(values: unknown): unknown[] {
     };
   });
 }
+
+

@@ -3,7 +3,7 @@ import {
   NotFoundException,
   RequestTimeoutException,
 } from '@nestjs/common';
-import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
+import { LlmAnalysisService } from '@/llm/llm-analysis.service';
 import { CpvService } from '@/resources/cpv/cpv.service';
 import {
   AwardTender,
@@ -67,7 +67,7 @@ export class BuyerIntelligenceService {
   private readonly buyerIntelligenceQueue = new QueueAsyncConcurrency(20);
 
   constructor(
-    private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
+    private readonly llmAnalysisService: LlmAnalysisService,
     private readonly cpvService: CpvService,
   ) {}
 
@@ -391,7 +391,7 @@ export class BuyerIntelligenceService {
       ].join('\n');
 
       const response =
-        await this.deepSeekAnalysisService.createGeneralJsonResponse(
+        await this.llmAnalysisService.createGeneralJsonResponse(
           prompt,
           context,
         );
@@ -589,8 +589,12 @@ export class BuyerIntelligenceService {
         JSON.stringify({
           buyerVersion,
           promptVersion: BUYER_INTELLIGENCE_PROMPT_VERSION,
+          provider: this.llmAnalysisService.getProvider(),
+          model: this.llmAnalysisService.getGeneralAnalysisModel(),
         }),
       )
       .digest('hex');
   }
 }
+
+

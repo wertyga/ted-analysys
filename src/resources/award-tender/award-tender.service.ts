@@ -33,6 +33,7 @@ import {
   NormalizedAwardTenderLot,
 } from './award-tender.normalizer';
 import { BuyerService } from '@/resources/buyer/buyer.service';
+import fs from 'node:fs';
 
 export interface SaveAwardTedTendersResult {
   saved: number;
@@ -148,6 +149,18 @@ export class AwardTenderService {
     };
   }
 
+  async getAwardTenderById(id: string) {
+    const awardTender = await AwardTenderModel.findOne({ id })
+      .populate(awardTenderPopulateFields)
+      .exec();
+
+    if (!awardTender) {
+      throw new NotFoundException('Award tender not found');
+    }
+
+    return AwardTenderModel.serializeDetail(awardTender);
+  }
+
   private async getLotsWithEurValues(
     lots: NormalizedAwardTenderLot[],
     publicationDate?: Date,
@@ -258,7 +271,7 @@ export class AwardTenderService {
             (tender?.winners ?? []).map((winner) => winner.toString()),
           )
       : [];
-
+    fs.writeFileSync('lots.json', JSON.stringify(lots, null, 2));
     const [lotsWithEur, tenderEstimatedValueEur, tenderAwardValueEur] =
       await Promise.all([
         this.getLotsWithEurValues(lots, publicationDate),
@@ -274,13 +287,14 @@ export class AwardTenderService {
         ),
       ]);
     const lotAwardValue = this.getAwardValueFallbackFromLots(lotsWithEur);
+    console.log({ lotAwardValue, awardValue, lotsWithEur });
     const awardValueWithFallback = {
       amount: awardValue.amount ?? lotAwardValue.amount,
       currency: awardValue.currency ?? lotAwardValue.currency,
     };
     const awardValueEurWithFallback =
       tenderAwardValueEur ?? this.getAwardValueEurFallbackFromLots(lotsWithEur);
-
+    console.log({ awardValueEurWithFallback });
     const insertPayload = {
       ...normalizedTender,
       awardValue: awardValueWithFallback,
@@ -292,7 +306,7 @@ export class AwardTenderService {
     const payload = updateExisting
       ? {
           $set: insertPayload,
-          $unset: this.buildAwardTenderUnset(),
+          $unset: this.buildAwardTenderUnset(insertPayload),
         }
       : {
           $setOnInsert: insertPayload,
@@ -384,11 +398,15 @@ export class AwardTenderService {
     return awardTender;
   }
 
-  private buildAwardTenderUnset(): Record<string, ''> {
+  private buildAwardTenderUnset(
+    normalizedTender: Partial<AwardTenderDocument>,
+  ): Record<string, ''> {
     const unset: Record<string, ''> = {};
 
     for (const field of OPTIONAL_TENDER_UNSET_FIELDS) {
-      unset[field] = '';
+      if (normalizedTender[field] === undefined) {
+        unset[field] = '';
+      }
     }
 
     return unset;

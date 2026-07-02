@@ -1,4 +1,5 @@
 import { BUYER_FIELDS } from '@/config/buyer.config';
+import { FRAMEWORK_FIELDS } from '@/config/ted-search.config';
 
 export const AWARD_TENDER_CONFIG = {
   historyYearsBack: 3,
@@ -79,20 +80,6 @@ export const WINNER_FIELDS = [
   'contract-conclusion-date',
 ];
 
-export const FRAMEWORK_FIELDS = [
-  'framework-estimated-value',
-  'framework-estimated-value-cur',
-
-  'framework-value-notice',
-  'framework-value-cur-notice',
-
-  'framework-approximate-value-notice',
-  'framework-approximate-value-cur-notice',
-
-  'result-framework-maximum-value-notice',
-  'result-framework-maximum-value-cur-notice',
-];
-
 export const AWARD_TENDER_LOT_FIELDS = [
   'identifier-lot',
   'internal-identifier-lot',
@@ -119,8 +106,6 @@ export const AWARD_TENDER_LOT_FIELDS = [
 
   'duration-period-value-lot',
   'duration-period-unit-lot',
-
-  'framework-agreement-lot',
 
   'dps-usage-lot',
 

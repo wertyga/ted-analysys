@@ -3,7 +3,7 @@ import {
   Injectable,
   RequestTimeoutException,
 } from '@nestjs/common';
-import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
+import { LlmAnalysisService } from '@/llm/llm-analysis.service';
 import {
   TenderDocumentTextExtractorService,
   TenderSourceDocumentType,
@@ -51,7 +51,7 @@ export class CompanyProfileDocumentsService {
   );
 
   constructor(
-    private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
+    private readonly llmAnalysisService: LlmAnalysisService,
     private readonly textExtractor: TenderDocumentTextExtractorService,
     private readonly cpvService: CpvService,
   ) {}
@@ -226,7 +226,7 @@ export class CompanyProfileDocumentsService {
       .join('\n\n---\n\n')
       .slice(0, COMPANY_PROFILE_DOCUMENTS_CONFIG.context.maxChars);
 
-    return this.deepSeekAnalysisService.createGeneralJsonResponse(
+    return this.llmAnalysisService.createGeneralJsonResponse(
       COMPANY_PROFILE_DOCUMENT_SYSTEM_PROMPT,
       context,
     );
@@ -270,7 +270,7 @@ export class CompanyProfileDocumentsService {
   ) {
     try {
       const response =
-        await this.deepSeekAnalysisService.createGeneralJsonResponse(
+        await this.llmAnalysisService.createGeneralJsonResponse(
           COMPANY_PROFILE_SINGLE_DOCUMENT_ANALYSIS_PROMPT,
           [
             `Document: ${document.file.originalname}`,
@@ -367,7 +367,7 @@ export class CompanyProfileDocumentsService {
             size: document.file.size,
             status: CompanyProfileDocumentAnalysisStatus.PROCESSING,
             promptVersion: COMPANY_PROFILE_DOCUMENT_ANALYSIS_PROMPT_VERSION,
-            model: this.deepSeekAnalysisService.getGeneralAnalysisModel(),
+            model: this.llmAnalysisService.getGeneralAnalysisModel(),
             errorMessage: null,
           },
         },
@@ -542,3 +542,5 @@ export class CompanyProfileDocumentsService {
     return result.min || result.max || result.currency ? result : undefined;
   }
 }
+
+

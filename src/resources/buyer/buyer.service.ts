@@ -391,7 +391,8 @@ export class BuyerService {
             'address.country': normalizedBuyer.address.country,
           };
 
-    const existingBuyer = await BuyerModel.findOne(identityFilter);
+    const existingBuyer: BuyerDocument | null =
+      await BuyerModel.findOne(identityFilter);
 
     if (!existingBuyer) {
       return BuyerModel.create({
@@ -428,7 +429,7 @@ export class BuyerService {
         normalizedBuyer.address.countrySub,
       ),
     };
-    const contact = {
+    const contact: BuyerDocument['contact'] = {
       contactPoint: getLastExisting(
         existingBuyer.contact?.contactPoint,
         normalizedBuyer.contact.contactPoint,

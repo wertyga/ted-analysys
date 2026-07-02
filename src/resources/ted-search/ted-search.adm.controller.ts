@@ -42,9 +42,6 @@ export class TedSearchAdminController {
         body.noticeTypes !== null ? TENDER_COMPETITION_NOTICE_TYPES : undefined,
     });
 
-    const c = await extractLotWinnersFromXml(noticeData.notices[0].links);
-    fs.writeFileSync('winners-lot-from-xml.json', JSON.stringify(c));
-
     // const tendersWithBaseAnalysis =
     //   await this.tendersService.upsertIfNeededMultipleTendersWithGeneralAnalysis(
     //     noticeData.notices ?? [],

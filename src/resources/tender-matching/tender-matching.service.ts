@@ -36,7 +36,7 @@ import {
   TenderCompanyMatchDocument,
   TenderCompanyMatchModel,
 } from './schemas/tender-company-match.schema';
-import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
+import { LlmAnalysisService } from '@/llm/llm-analysis.service';
 import { COMPANY_TENDER_FIT_SYSTEM_PROMPT } from './company-tender-fit.prompt';
 import { UserModel } from '@/resources/user/user.schema';
 import { TariffService } from '@/resources/tariff';
@@ -55,7 +55,7 @@ export class TenderMatchingService {
   >;
 
   constructor(
-    private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
+    private readonly llmAnalysisService: LlmAnalysisService,
     private readonly tariffService: TariffService,
   ) {
     this.companyProfileRematches = new DebouncedAsyncLatestQueueByKey({
@@ -361,7 +361,7 @@ export class TenderMatchingService {
     payload: CompanyTenderFitAiPayload,
   ): Promise<CompanyTenderFitAiResult> {
     const response =
-      await this.deepSeekAnalysisService.createGeneralJsonResponse(
+      await this.llmAnalysisService.createGeneralJsonResponse(
         COMPANY_TENDER_FIT_SYSTEM_PROMPT,
         this.buildCompanyTenderFitUserPrompt(payload),
       );
@@ -614,3 +614,5 @@ function getAiFitDecision(score: number): AiFitDecision {
   if (score >= 50) return AiFitDecision.MAYBE;
   return AiFitDecision.REJECT;
 }
+
+

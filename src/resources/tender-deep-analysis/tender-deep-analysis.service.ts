@@ -1,6 +1,6 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
+import { LlmAnalysisService } from '@/llm/llm-analysis.service';
 import {
   companyCpvPopulateFields,
   deepAnalysisPopulateFields,
@@ -48,7 +48,7 @@ export class TenderDeepAnalysisService {
     TENDER_DEEP_ANALYSIS_CONFIG.companyFitAnalysis.concurrency,
   );
   constructor(
-    private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
+    private readonly llmAnalysisService: LlmAnalysisService,
     private readonly deepAnalysisBuilder: TenderDeepAnalysisBuilder,
     private readonly deepDocumentInputService: TenderDeepDocumentInputService,
     private readonly tendersService: TendersService,
@@ -118,7 +118,7 @@ export class TenderDeepAnalysisService {
         outputLanguage: language,
       });
       const rawResult = await this.deepCompanyFitAnalysisQueue.push(() =>
-        this.deepSeekAnalysisService.analyzeTenderDeepCompanyFit(input),
+        this.llmAnalysisService.analyzeTenderDeepCompanyFit(input),
       );
 
       const normalized = this.deepAnalysisBuilder.normalizeResult(
@@ -384,7 +384,8 @@ export class TenderDeepAnalysisService {
     return createHash('sha256')
       .update(
         JSON.stringify({
-          model: this.deepSeekAnalysisService.getDeepAnalysisModel(),
+          provider: this.llmAnalysisService.getProvider(),
+          model: this.llmAnalysisService.getDeepAnalysisModel(),
           promptVersion: TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION,
           outputLanguage,
           generalAnalysisSourceHash: input.generalAnalysisSourceHash,
@@ -533,3 +534,5 @@ export class TenderDeepAnalysisService {
     };
   }
 }
+
+

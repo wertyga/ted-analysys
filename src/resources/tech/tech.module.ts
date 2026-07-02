@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { DeepSeekModule } from '@/deepseek/deepseek.module';
+import { LlmModule } from '@/llm/llm.module';
 import { DbCopyTechController } from './cron/db-copy.tech.controller';
 import { DbCopyCronModule } from '@/resources/cron/db-copy-cron/db-copy-cron.module';
 import { ContractorsTechController } from './contractors/contractors.tech.controller';
@@ -22,7 +22,7 @@ import { BuyerTechController } from '@/resources/tech/buyer/buyer.tech.controlle
 
 @Module({
   imports: [
-    DeepSeekModule,
+    LlmModule,
     DbCopyCronModule,
     AwardTenderModule,
     TedSearchModule,

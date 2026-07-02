@@ -44,7 +44,7 @@ import {
 } from '@/resources/tender-wishlist/schemas';
 import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rates/currency-exchange-rates.service';
 import { CurrencySign } from '@/resources/codelist';
-import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
+import { LlmAnalysisService } from '@/llm/llm-analysis.service';
 import { TENDER_COMPETITION_SEARCH_FIELDS } from '@/config/ted-search.config';
 import { BuyerService } from '@/resources/buyer/buyer.service';
 import { TMongoId } from '@/types';
@@ -101,7 +101,7 @@ export class TendersService {
     private readonly tedSearchService: TedSearchService,
     private readonly tenderNormalizer: TenderNormalizerService,
     private readonly currencyExchangeRatesService: CurrencyExchangeRatesService,
-    private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
+    private readonly llmAnalysisService: LlmAnalysisService,
     @Inject(forwardRef(() => TenderGeneralAnalysisService))
     private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
     @Inject(forwardRef(() => BuyerService))
@@ -330,7 +330,7 @@ export class TendersService {
 
       try {
         const generated =
-          await this.deepSeekAnalysisService.generateTenderShortTitles(
+          await this.llmAnalysisService.generateTenderShortTitles(
             batch.map((tender) => ({
               id: tender.id,
               title: tender.title ?? '',
@@ -736,3 +736,5 @@ export class TendersService {
     return unset;
   }
 }
+
+

@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
+import { LlmAnalysisService } from '@/llm/llm-analysis.service';
 import { TenderModel } from '@/resources/tenders/schemas';
 
 @Injectable()
 export class TendersTechService {
-  constructor(private readonly deepSeekAnalysisService: DeepSeekAnalysisService) {}
+  constructor(private readonly llmAnalysisService: LlmAnalysisService) {}
 
   async generateMissingTenderShortTitles(options: {
     limit?: number;
@@ -35,7 +35,7 @@ export class TendersTechService {
 
       try {
         const generated =
-          await this.deepSeekAnalysisService.generateTenderShortTitles(
+          await this.llmAnalysisService.generateTenderShortTitles(
             batch.map((tender) => ({
               id: tender.id,
               title: tender.title ?? '',
@@ -85,3 +85,5 @@ export class TendersTechService {
     };
   }
 }
+
+

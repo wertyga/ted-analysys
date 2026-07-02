@@ -1,6 +1,24 @@
 import { TedTenderSortColumn } from '@/resources/ted-search/types/ted-search.types';
 import { BUYER_FIELDS } from '@/config/buyer.config';
 
+export const FRAMEWORK_FIELDS = [
+  'framework-estimated-value',
+  'framework-estimated-value-cur',
+
+  'framework-value-notice',
+  'framework-value-cur-notice',
+
+  'framework-approximate-value-notice',
+  'framework-approximate-value-cur-notice',
+
+  'result-framework-maximum-value-notice',
+  'result-framework-maximum-value-cur-notice',
+
+  'framework-maximum-value-lot',
+  'framework-maximum-value-cur-lot',
+  'framework-agreement-lot',
+];
+
 export const COMPETITION_FIELDS = [
   'identifier-lot',
   'internal-identifier-lot',
@@ -11,26 +29,30 @@ export const COMPETITION_FIELDS = [
   'contract-nature-main-lot',
   'estimated-value-lot',
   'estimated-value-cur-lot',
-  'framework-maximum-value-lot',
-  'framework-maximum-value-cur-lot',
-  'framework-agreement-lot',
+
   'dps-usage-lot',
+
   'duration-period-value-lot',
   'duration-period-unit-lot',
+
   'deadline-receipt-tender-date-lot',
   'deadline-receipt-tender-time-lot',
+
   'document-url-lot',
   'submission-url-lot',
   'electronic-submission-lot',
   'submission-language',
+
   'place-of-performance-country-lot',
   'place-of-performance-subdiv-lot',
   'place-of-performance-city-lot',
+
   'award-criterion-type-lot',
   'award-criterion-name-lot',
   'award-criterion-description-lot',
   'award-criterion-number-lot',
   'award-criterion-number-weight-lot',
+
   'selection-criterion-name-lot',
   'selection-criterion-description-lot',
   'selection-criteria-source',
@@ -82,5 +104,10 @@ export const TED_SEARCH_CONFIG = {
 };
 
 export const TENDER_COMPETITION_SEARCH_FIELDS = Array.from(
-  new Set([...BUYER_FIELDS, ...COMPETITION_FIELDS, ...SEARCH_DEFAULT_FIELDS]),
+  new Set([
+    ...BUYER_FIELDS,
+    ...COMPETITION_FIELDS,
+    ...FRAMEWORK_FIELDS,
+    ...SEARCH_DEFAULT_FIELDS,
+  ]),
 );

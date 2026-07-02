@@ -177,6 +177,7 @@ export class TedOpenTendersCollectorService {
             skipped: saveResult.skipped,
           };
         } catch (e) {
+          console.log({ e });
           return {
             saved: 0,
             updated: 0,

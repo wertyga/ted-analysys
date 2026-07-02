@@ -1,5 +1,5 @@
 import { forwardRef, Module } from '@nestjs/common';
-import { DeepSeekModule } from '@/deepseek/deepseek.module';
+import { LlmModule } from '@/llm/llm.module';
 import { TendersModule } from '../tenders/tenders.module';
 import { TenderGeneralAnalysisBuilder } from './tender-general-analysis.builder';
 import { TenderGeneralAnalysisController } from './tender-general-analysis.controller';
@@ -9,7 +9,7 @@ import { TenderNormalizerModule } from '@/resources/tender-normalizer/tender-nor
 
 @Module({
   imports: [
-    DeepSeekModule,
+    LlmModule,
     forwardRef(() => TendersModule),
     TariffModule,
     TenderNormalizerModule,
