@@ -1,5 +1,7 @@
 import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
 import { readNumber, readDate } from './checking';
+import { TenderLot } from '@/resources/tenders/schemas';
+import { AwardTenderLot } from '@/resources/award-tender/schemas';
 
 function booleanFromValue(value: unknown): boolean | undefined {
   if (value === undefined || value === null) {
@@ -81,12 +83,36 @@ export const getEngValueOrFirst = (field: string, notice: TedNotice) => {
   return Object.values(notice[field])[0];
 };
 
+export const getEngValueOrFirstString = (field: string, notice: TedNotice) => {
+  const value = getEngValueOrFirst(field, notice);
+
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  return value;
+};
+
 export const getDateValue = (field: string, notice: TedNotice) => {
   return parseTenderDate(getStringValue(field, notice));
 };
 
 export const getDateArrayValue = (field: string, notice: TedNotice) => {
   return getStringArrayValue(field, notice).map((d) => parseTenderDate(d));
+};
+export const getDateISOStringArrayValue = (
+  field: string,
+  notice: TedNotice,
+) => {
+  return getStringArrayValue(field, notice).map((date) => {
+    const d = parseTenderDate(date);
+
+    return d ? d.toISOString() : '';
+  });
 };
 
 export const getNumberValue = (field: string, notice: TedNotice) => {
@@ -257,3 +283,33 @@ export function getLatestDate<
 >(dates: T[], key?: string) {
   return getDatesSorted(dates, 'ASC', key);
 }
+
+export const getArrayFallbackValueByIndex = <T extends Record<string, any>>(
+  data: T,
+  index: number,
+  ...keys: (keyof T)[]
+) => {
+  const key = keys.find((k) =>
+    Array.isArray(data[k]) ? data[k][index] : data[k],
+  );
+
+  return key ? (Array.isArray(data[key]) ? data[key][index] : data[key]) : '';
+};
+export const getArrayFallbackValueByIndexUniqArray = (
+  ...params: Parameters<typeof getArrayFallbackValueByIndex>
+) => {
+  const value = getArrayFallbackValueByIndex(...params);
+
+  return Array.isArray(value) ? getUniqArray(value) : [value];
+};
+
+export const sortLots = <T extends TenderLot | AwardTenderLot>(
+  lots: T[],
+): T[] => {
+  return lots.sort((a, b) => {
+    const numA = Number(a.identifier.match(/\d+$/)?.[0] ?? 0);
+    const numB = Number(b.identifier.match(/\d+$/)?.[0] ?? 0);
+
+    return numA - numB;
+  });
+};

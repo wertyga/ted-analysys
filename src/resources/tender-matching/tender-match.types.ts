@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import { BuyerDocument } from '@/resources/buyer/schemas';
 
 export enum TenderMatchDecision {
   REJECT = 'reject',
@@ -52,7 +53,7 @@ export interface TenderForMatching {
   description?: string;
   cpvCodes: string[];
   country?: string | null;
-  buyerCountry?: string | null;
+  buyers: BuyerDocument[];
   placeOfPerformanceCountry?: string | null;
   estimatedValue?: number | null;
   currency?: string | null;
@@ -61,7 +62,6 @@ export interface TenderForMatching {
   contractNature?: string | null;
   procedureType?: string | null;
   languages?: string[];
-  buyerName?: string | null;
   lotTitles?: string[];
   lotDescriptions?: string[];
 }
@@ -109,6 +109,13 @@ export interface TenderCompanyMatchResult {
 }
 
 export type CompanyTenderFitAiPayload = {
+  hardMatch: {
+    score: number;
+    decision: TenderMatchDecision;
+    reasons: string[];
+    risks: string[];
+    keywordHits: string[];
+  };
   company: {
     name?: string;
     summary?: string;
@@ -133,9 +140,11 @@ export type CompanyTenderFitAiPayload = {
     id: string;
     title: string;
     description?: string;
-    cpvCodes: string[];
-    buyerName?: string;
-    buyerCountry?: string;
+    cpvCodes: {
+      code: string;
+      label?: string;
+    }[];
+    buyers: BuyerDocument[];
     placeOfPerformanceCountries: string[];
     estimatedValue: {
       amount: number | null;

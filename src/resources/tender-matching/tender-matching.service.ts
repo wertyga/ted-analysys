@@ -16,7 +16,7 @@ import {
   readStringArray,
   toObjectId,
   toIsoString,
-  tenderCpvPopulateFields,
+  // tenderCpvPopulateFields,
 } from '@/utils';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { mapTenderForMatching } from './tender-for-matching.mapper';
@@ -36,12 +36,14 @@ import {
   TenderCompanyMatchDocument,
   TenderCompanyMatchModel,
 } from './schemas/tender-company-match.schema';
-import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
+import { LlmAnalysisService } from '@/llm/llm-analysis.service';
 import { COMPANY_TENDER_FIT_SYSTEM_PROMPT } from './company-tender-fit.prompt';
 import { UserModel } from '@/resources/user/user.schema';
 import { TariffService } from '@/resources/tariff';
 import { TENDER_MATCHING_CONFIG } from '@/config/tender-matching.config';
+import { BuyerDocument } from '@/resources/buyer/schemas';
 import { buildCompanyTenderFitUserPrompt } from './tender-matching.prompt';
+import { CpvService } from '@/resources/cpv/cpv.service';
 
 @Injectable()
 export class TenderMatchingService {
@@ -55,8 +57,9 @@ export class TenderMatchingService {
   >;
 
   constructor(
-    private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
+    private readonly llmAnalysisService: LlmAnalysisService,
     private readonly tariffService: TariffService,
+    private readonly cpvService: CpvService,
   ) {
     this.companyProfileRematches = new DebouncedAsyncLatestQueueByKey({
       delayMs: TENDER_MATCHING_CONFIG.companyProfileRematch.debounceMs,
@@ -106,10 +109,10 @@ export class TenderMatchingService {
         .sort({ aiFitScore: -1, updatedAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate({
-          path: 'tender',
-          populate: tenderCpvPopulateFields,
-        })
+        // .populate({
+        //   path: 'tender',
+        //   populate: tenderCpvPopulateFields,
+        // })
         .exec(),
       TenderCompanyMatchModel.countDocuments(query).exec(),
     ]);
@@ -258,7 +261,11 @@ export class TenderMatchingService {
     await this.setTenderMatchPendingStatus(match._id);
 
     try {
-      const payload = await this.buildCompanyTenderFitPayload(tender, filter);
+      const payload = await this.buildCompanyTenderFitPayload(
+        tender,
+        filter,
+        match,
+      );
       const result = await this.analyzeCompanyTenderFit(payload);
 
       const updatedMatch = await TenderCompanyMatchModel.findByIdAndUpdate(
@@ -355,7 +362,7 @@ export class TenderMatchingService {
     payload: CompanyTenderFitAiPayload,
   ): Promise<CompanyTenderFitAiResult> {
     const response =
-      await this.deepSeekAnalysisService.createGeneralJsonResponse(
+      await this.llmAnalysisService.createGeneralJsonResponse(
         COMPANY_TENDER_FIT_SYSTEM_PROMPT,
         buildCompanyTenderFitUserPrompt(payload),
       );
@@ -395,9 +402,22 @@ export class TenderMatchingService {
   private async buildCompanyTenderFitPayload(
     tender: TenderDocument,
     filter: CompanyTenderFilterForMatching,
+    match: TenderCompanyMatchDocument,
   ): Promise<CompanyTenderFitAiPayload> {
     const companyName = await this.getCompanyName(filter.user);
+    const cpvLabelsByCode = await this.resolveCpvCodeLabels([
+      ...(tender.cpvCodes ?? []),
+      ...(filter.cpvCodes ?? []).map((cpvCode) => cpvCode.code),
+    ]);
+
     return {
+      hardMatch: {
+        score: match.hardMatchScore,
+        decision: match.decision,
+        reasons: match.reasons ?? [],
+        risks: match.risks ?? [],
+        keywordHits: match.keywordHits ?? [],
+      },
       company: {
         name: companyName,
         summary: filter.summary,
@@ -409,12 +429,16 @@ export class TenderMatchingService {
         minBudget: filter.minBudget ?? null,
         maxBudget: filter.maxBudget ?? null,
         currency: filter.currency ?? null,
-        cpvCodes: (filter.cpvCodes ?? []).map((cpvCode) => ({
-          code: cpvCode.code,
-          label: cpvCode.label,
-          source: cpvCode.source,
-          matchLevel: cpvCode.matchLevel,
-        })),
+        cpvCodes: (filter.cpvCodes ?? []).map((cpvCode) => {
+          const code = this.normalizeCpvCode(cpvCode.code);
+
+          return {
+            code: cpvCode.code,
+            label: cpvCode.label || cpvLabelsByCode.get(code),
+            source: cpvCode.source,
+            matchLevel: cpvCode.matchLevel,
+          };
+        }),
         optionalKeywords: filter.optionalKeywords ?? [],
         requiredKeywords: filter.requiredKeywords ?? [],
       },
@@ -422,9 +446,15 @@ export class TenderMatchingService {
         id: tender.id,
         title: tender.title ?? '',
         description: tender.description,
-        cpvCodes: tender.cpvCodes ?? [],
-        buyerName: tender.buyerName,
-        buyerCountry: tender.buyerCountry,
+        cpvCodes: (tender.cpvCodes ?? []).map((code) => {
+          const normalizedCode = this.normalizeCpvCode(code);
+
+          return {
+            code,
+            label: cpvLabelsByCode.get(normalizedCode),
+          };
+        }),
+        buyers: tender.leadBuyers as BuyerDocument[],
         placeOfPerformanceCountries: tender.placeOfPerformanceCountries ?? [],
         estimatedValue: {
           amount: tender.estimatedValue?.amount ?? null,
@@ -454,6 +484,40 @@ export class TenderMatchingService {
       .exec();
 
     return readString(company?.companyName);
+  }
+
+  private async resolveCpvCodeLabels(
+    codes: string[],
+  ): Promise<Map<string, string>> {
+    const normalizedCodes = Array.from(
+      new Set(codes.map((code) => this.normalizeCpvCode(code)).filter(Boolean)),
+    );
+    const labelsByCode = new Map<string, string>();
+
+    if (normalizedCodes.length === 0) {
+      return labelsByCode;
+    }
+
+    const dbCategories = await this.cpvService.resolveCpvCodeIds(
+      normalizedCodes,
+      true,
+    );
+
+    for (const category of dbCategories) {
+      labelsByCode.set(category.code, category.name);
+    }
+
+    for (const rawCode of this.cpvService.resolveRawCodes(normalizedCodes)) {
+      if (!labelsByCode.has(rawCode.code)) {
+        labelsByCode.set(rawCode.code, rawCode.name);
+      }
+    }
+
+    return labelsByCode;
+  }
+
+  private normalizeCpvCode(code: string | null | undefined): string {
+    return readString(code)?.replace(/\D/g, '').slice(0, 8) ?? '';
   }
 
   private async isTenderMatchingEnabled(

@@ -1,4 +1,4 @@
-import { Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiDefaultResponse, ApiTags } from '@nestjs/swagger';
 import { AdminAccessGuard } from '@/guards';
 import { AwardTendersTechService } from './award-tenders.tech.service';
@@ -16,7 +16,7 @@ export class AwardTendersTechController {
     description: 'Refreshed award tenders from TED result notices.',
   })
   @Post('/refresh')
-  refreshAwardTendersHistory() {
-    return this.awardTendersTechService.refreshAwardTendersHistory();
+  refreshAwardTendersHistory(@Body() body: any) {
+    return this.awardTendersTechService.refreshAwardTendersHistory(body);
   }
 }

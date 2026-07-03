@@ -1,4 +1,12 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
+import { TenderDocument, TenderModel } from '@/resources/tenders/schemas';
+import { filterModel } from '@/utils';
+import {
+  AwardTenderDocument,
+  AwardTenderModel,
+} from '@/resources/award-tender/schemas';
+import { Contractor, ContractorModel } from '@/resources/contractor/schemas';
+import { TMongoId } from '@/types';
 
 export enum BuyerIdentifierType {
   TED_ORG_ID = 'TED_ORG_ID',
@@ -8,36 +16,76 @@ export enum BuyerIdentifierType {
   UNKNOWN = 'UNKNOWN',
 }
 
-export type BuyerIdentifier = {
-  type: BuyerIdentifierType;
-  value: string;
-};
-
 export type BuyerContact = {
-  contactPoint?: string;
-  person?: string;
-  email?: string;
-  phone?: string;
-  fax?: string;
-  url?: string;
-  gateway?: string;
+  contactPoint: string;
+  person: string;
+  email: string;
+  phone: string;
+  fax: string;
+  website: string;
+  gateway: string;
 };
 
 export type BuyerAddress = {
-  street?: string;
-  postCode?: string;
-  city?: string;
-  country?: string;
-  countrySub?: string;
+  street: string;
+  postCode: string;
+  city: string;
+  country: string;
+  countrySub: string;
+};
+
+export type BuyerCodeName = {
+  code: string;
+  name: string;
+};
+
+export type BuyerTopCpvCodeStats = {
+  code: string;
+  count: number;
+};
+
+export type BuyerTopCountryStats = {
+  country: string;
+  count: number;
+};
+
+export type BuyerTopSupplierStats = {
+  winner: mongoose.Types.ObjectId;
+  wins: number;
 };
 
 export type BuyerStats = {
-  tenderCount: number;
+  tendersCount: number;
+  participatedTendersCount: number;
+  awardTendersCount: number;
+  participatedAwardTendersCount: number;
+
   totalEstimatedValueEur: number;
+  totalAwardedValueEur: number;
+  avgEstimatedValueEur: number;
+  avgAwardedValueEur: number;
+
+  lastAwardDate?: Date;
   firstPublicationDate?: Date;
   lastPublicationDate?: Date;
-  cpvCodes: string[];
-  countries: string[];
+
+  topCpvCodes: BuyerTopCpvCodeStats[];
+  topCountries: BuyerTopCountryStats[];
+  topSuppliers: BuyerTopSupplierStats[];
+};
+
+export enum BuyerIntelligenceSignal {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+  UNKNOWN = 'unknown',
+}
+
+export type BuyerStatsIntelligence = {
+  repeatSupplierRate: number | null;
+  localSupplierRate: number | null;
+  incumbentRisk: BuyerIntelligenceSignal;
+  localSupplierSignal: BuyerIntelligenceSignal;
 };
 
 export type Buyer = {
@@ -75,7 +123,7 @@ export type Buyer = {
    * buyer-gateway
    * touchpoint-gateway-buyer
    */
-  contact?: BuyerContact;
+  contact: BuyerContact;
 
   /**
    * organisation-street-buyer
@@ -90,19 +138,19 @@ export type Buyer = {
    * buyer-country-sub
    * buyer-post-code
    */
-  address?: BuyerAddress;
+  address: BuyerAddress;
 
   /**
    * organisation-identifier-buyer
    * buyer-identifier
    */
-  identifiers: BuyerIdentifier[];
+  identifiers: string[];
 
   /**
    * buyer-legal-type
    * BT-11-Procedure-Buyer
    */
-  legalTypes: string[];
+  legalTypes: BuyerCodeName[];
 
   /**
    * main-activity
@@ -111,7 +159,7 @@ export type Buyer = {
    * activity-sector
    * BT-10-Procedure-Buyer
    */
-  mainActivities: string[];
+  mainActivities: BuyerCodeName[];
 
   /**
    * buyer-profile
@@ -119,47 +167,14 @@ export type Buyer = {
    */
   profiles: string[];
 
+  gateways: string[];
+
   /**
    * organisation-internet-address-buyer
    * buyer-internet-address
    * touchpoint-internet-address-buyer
    */
   websites: string[];
-
-  /**
-   * organisation-email-buyer
-   * buyer-email
-   * touchpoint-email-buyer
-   */
-  emails: string[];
-
-  /**
-   * organisation-tel-buyer
-   * touchpoint-tel-buyer
-   */
-  phones: string[];
-
-  /**
-   * organisation-gateway-buyer
-   * buyer-gateway
-   * touchpoint-gateway-buyer
-   */
-  gateways: string[];
-
-  /**
-   * acquiring-cpb-buyer
-   */
-  isCentralPurchasingBody: boolean;
-
-  /**
-   * awarding-cpb-org
-   */
-  isAwardingCentralPurchasingBody: boolean;
-
-  /**
-   * buyer-group-lead
-   */
-  isGroupLead: boolean;
 
   /**
    * calculated from imported tenders
@@ -182,100 +197,240 @@ export type Buyer = {
    *   classification-cpv
    *   main-classification-proc
    *   main-classification-lot
-   *
-   * countries:
+   */
+  cpvCodes: string[];
+
+  /** countries:
    *   place-of-performance-country-proc
    *   place-of-performance-country-lot
-   */
-  stats: BuyerStats;
+   *   */
+  countries: string[];
 
   createdAt: Date;
   updatedAt: Date;
+
+  stats: BuyerStats;
+  statsVersion: number;
+  intelligence: BuyerStatsIntelligence;
 };
 
-export type BuyerDocument = Document<Buyer>;
+export type BuyerDocument = Document & Buyer;
+export type BuyerSerializable = BuyerDocument | (Buyer & { _id: unknown });
 
-const BuyerIdentifierSchema = new Schema<BuyerIdentifier>(
-  {
-    type: {
-      type: String,
-      enum: BuyerIdentifierType,
-      required: true,
-      index: true,
-    },
-    value: { type: String, required: true },
-  },
-  { _id: false },
-);
+const BUYER_LIST_FIELDS = [
+  'name',
+  'address',
+  'legalTypes',
+  'mainActivities',
+  'stats',
+  'intelligence',
+  'updatedAt',
+] satisfies Array<keyof Buyer>;
+
+export type BuyerListDto = Pick<
+  Buyer,
+  '_id' | (typeof BUYER_LIST_FIELDS)[number]
+>;
+
+export type BuyerDetailDto = Buyer & {};
+
+export interface BuyerModelType extends Model<BuyerDocument> {
+  serializeList(
+    buyer: BuyerSerializable | TMongoId | BuyerDocument,
+  ): BuyerListDto;
+  serializeDetail(
+    buyer: BuyerSerializable | TMongoId | BuyerDocument,
+  ): BuyerDetailDto;
+}
 
 const BuyerContactSchema = new Schema<BuyerContact>(
   {
-    contactPoint: String,
-    person: String,
+    contactPoint: { type: String, default: '' },
+    person: { type: String, default: '' },
+    email: { type: String, default: '' },
+    phone: { type: String, default: '' },
+    fax: { type: String, default: '' },
+    website: { type: String, default: '' },
+    gateway: { type: String, default: '' },
   },
   { _id: false },
 );
 
 const BuyerAddressSchema = new Schema<BuyerAddress>(
   {
-    street: String,
-    postCode: String,
-    city: { type: String, index: true },
-    country: { type: String, index: true },
-    countrySub: { type: String, index: true },
+    street: { type: String, default: '' },
+    postCode: { type: String, default: '' },
+    city: { type: String, default: '', index: true },
+    country: { type: String, default: '', index: true },
+    countrySub: { type: String, default: '', index: true },
+  },
+  { _id: false },
+);
+
+const BuyerCodeNameSchema = new Schema<BuyerCodeName>(
+  {
+    code: { type: String, required: true, index: true },
+    name: { type: String, required: true },
+  },
+  { _id: false },
+);
+
+const BuyerTopCpvCodeStatsSchema = new Schema<BuyerTopCpvCodeStats>(
+  {
+    code: { type: String, required: true },
+    count: { type: Number, required: true },
+  },
+  { _id: false },
+);
+
+const BuyerTopCountryStatsSchema = new Schema<BuyerTopCountryStats>(
+  {
+    country: { type: String, required: true },
+    count: { type: Number, required: true },
+  },
+  { _id: false },
+);
+
+const BuyerTopSupplierStatsSchema = new Schema<BuyerTopSupplierStats>(
+  {
+    winner: {
+      type: Schema.Types.ObjectId,
+      ref: 'Contractor',
+      required: true,
+    },
+    wins: { type: Number, required: true },
   },
   { _id: false },
 );
 
 const BuyerStatsSchema = new Schema<BuyerStats>(
   {
-    tenderCount: { type: Number, default: 0 },
+    tendersCount: { type: Number, default: 0 },
+    participatedTendersCount: { type: Number, default: 0 },
+    avgAwardedValueEur: { type: Number, default: 0 },
+    avgEstimatedValueEur: { type: Number, default: 0 },
+    awardTendersCount: { type: Number, default: 0 },
+    participatedAwardTendersCount: { type: Number, default: 0 },
+    totalAwardedValueEur: { type: Number, default: 0 },
     totalEstimatedValueEur: { type: Number, default: 0 },
-    firstPublicationDate: Date,
-    lastPublicationDate: Date,
-    cpvCodes: { type: [String], default: [] },
-    countries: { type: [String], default: [] },
+    lastAwardDate: { type: Date },
+    firstPublicationDate: { type: Date },
+    lastPublicationDate: { type: Date },
+    topCpvCodes: { type: [BuyerTopCpvCodeStatsSchema], default: [] },
+    topCountries: { type: [BuyerTopCountryStatsSchema], default: [] },
+    topSuppliers: { type: [BuyerTopSupplierStatsSchema], default: [] },
   },
   { _id: false },
 );
 
-export const BuyerSchema = new Schema<Buyer>(
+const BuyerStatsIntelligenceSchema = new Schema<BuyerStatsIntelligence>(
   {
-    name: { type: String, required: true, index: true },
-
-    identifiers: {
-      type: [BuyerIdentifierSchema],
-      default: [],
+    repeatSupplierRate: { type: Number, default: null },
+    localSupplierRate: { type: Number, default: null },
+    incumbentRisk: {
+      type: String,
+      enum: BuyerIntelligenceSignal,
+      default: BuyerIntelligenceSignal.UNKNOWN,
     },
+    localSupplierSignal: {
+      type: String,
+      enum: BuyerIntelligenceSignal,
+      default: BuyerIntelligenceSignal.UNKNOWN,
+    },
+  },
+  { _id: false },
+);
+
+export const BuyerSchema = new Schema<BuyerDocument, BuyerModelType>(
+  {
+    name: { type: String },
+
+    identifiers: { type: [String], default: [] },
 
     contact: BuyerContactSchema,
     address: BuyerAddressSchema,
 
-    legalTypes: { type: [String], default: [], index: true },
-    mainActivities: { type: [String], default: [], index: true },
+    legalTypes: { type: [BuyerCodeNameSchema], default: [] },
+    mainActivities: { type: [BuyerCodeNameSchema], default: [] },
 
     profiles: { type: [String], default: [] },
     websites: { type: [String], default: [] },
-    emails: { type: [String], default: [] },
-    phones: { type: [String], default: [] },
-    gateways: { type: [String], default: [] },
 
-    isCentralPurchasingBody: { type: Boolean, default: false },
-    isAwardingCentralPurchasingBody: { type: Boolean, default: false },
-    isGroupLead: { type: Boolean, default: false },
+    cpvCodes: { type: [String], default: [] },
+    countries: { type: [String], default: [] },
+    gateways: { type: [String], default: [] },
 
     stats: {
       type: BuyerStatsSchema,
-      default: () => ({
-        tenderCount: 0,
-        totalEstimatedValueEur: 0,
-        cpvCodes: [],
-        countries: [],
-      }),
+    },
+    statsVersion: { type: Number, default: 1 },
+    intelligence: {
+      type: BuyerStatsIntelligenceSchema,
     },
   },
   { timestamps: true },
 );
 
-export const BuyerModel: Model<Buyer> =
-  mongoose.models.Buyer ?? mongoose.model<Buyer>('Buyer', BuyerSchema);
+BuyerSchema.statics.serializeList = function (
+  buyer: BuyerSerializable,
+): BuyerListDto | null | string {
+  const serializedBuyer = filterModel(buyer, {
+    includeFields: BUYER_LIST_FIELDS,
+  });
+
+  if (!serializedBuyer) {
+    return null;
+  }
+
+  if (typeof serializedBuyer === 'string') {
+    return serializedBuyer;
+  }
+
+  return {
+    ...serializedBuyer,
+    stats: {
+      ...(serializedBuyer.stats ?? {}),
+      topSuppliers:
+        serializedBuyer.stats?.topSuppliers.map((s) => {
+          return {
+            ...s,
+            winner: ContractorModel.serializeList(s.winner),
+          };
+        }) ?? [],
+    },
+  };
+};
+
+BuyerSchema.statics.serializeDetail = function (
+  buyer: BuyerSerializable,
+): BuyerDetailDto | null | string {
+  const serializedBuyer = filterModel(buyer, {
+    excludeFields: ['statsVersion'],
+  });
+
+  if (!serializedBuyer) {
+    return null;
+  }
+
+  if (typeof serializedBuyer === 'string') {
+    return serializedBuyer;
+  }
+
+  return {
+    ...serializedBuyer,
+    stats: {
+      ...(serializedBuyer.stats ?? {}),
+      topSuppliers:
+        serializedBuyer.stats?.topSuppliers.map((s) => {
+          return {
+            ...s,
+            winner: ContractorModel.serializeList(s.winner),
+          };
+        }) ?? [],
+    },
+  };
+};
+
+export const BuyerModel: BuyerModelType =
+  (mongoose.models.Buyer as BuyerModelType | undefined) ??
+  mongoose.model<BuyerDocument, BuyerModelType>('Buyer', BuyerSchema);

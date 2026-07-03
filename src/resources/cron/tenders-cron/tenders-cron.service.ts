@@ -1,7 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { TedSearchService } from '@/resources/ted-search/ted-search.service';
-import { TendersService } from '@/resources/tenders/tenders.service';
 import { TenderDocument } from '@/resources/tenders/schemas';
 import { devLog, logger } from '@/utils';
 import { TenderCompanyMatchDocument } from '@/resources/tender-matching/schemas/tender-company-match.schema';
@@ -9,7 +7,6 @@ import { TenderMatchingService } from '@/resources/tender-matching/tender-matchi
 import { TedOpenTendersCollectorService } from '@/resources/ted-open-tenders-collector/ted-open-tenders-collector.service';
 import { TenderMatchSource } from '@/resources/tender-matching/tender-match.types';
 import { TenderMatchNotificationsService } from '@/resources/tender-match-notifications/tender-match-notifications.service';
-import { AwardTenderService } from '@/resources/award-tender/award-tender.service';
 import { CRON_CONFIG } from '@/config/cron.config';
 import { CronTaskQueueService } from '@/resources/cron/cron-task-queue/cron-task-queue.service';
 import { TED_OPEN_TENDERS_COLLECTOR_CONFIG } from '@/config/ted-open-tenders-collector.config';
@@ -23,11 +20,9 @@ export class TendersCronService {
   private isGatheringRecentAwardTenders = false;
 
   constructor(
-    private readonly tedSearchService: TedSearchService,
-    private readonly tendersService: TendersService,
+    private readonly tedOpenTendersCollectorService: TedOpenTendersCollectorService,
     private readonly tenderMatchingService: TenderMatchingService,
     private readonly tenderMatchNotificationsService: TenderMatchNotificationsService,
-    private readonly awardTenderService: AwardTenderService,
     private readonly cronTaskQueueService: CronTaskQueueService,
   ) {}
 
@@ -49,26 +44,10 @@ export class TendersCronService {
     this.isGatheringAllCompetitionTenders = true;
 
     try {
-      let matchesSaved = 0;
-
-      const result = await new TedOpenTendersCollectorService(
-        this.tedSearchService,
-        this.tendersService,
-        this.awardTenderService,
-      ).collectOpenTendersFromTed({
-        onChangedTenders: async (tenders) => {
-          const matches = await this.matchChangedTenders(tenders);
-
-          matchesSaved += matches.length;
-        },
+      await this.tedOpenTendersCollectorService.collectOpenTendersFromTed({
+        pageLimit: 70,
+        maxPages: 100_000,
       });
-
-      await logger.info('TED_ALL_COMPETITION_COLLECTED', {
-        ...result,
-        matchesSaved,
-      });
-
-      await this.sendInstantTenderMatchReports();
     } catch (e: unknown) {
       const error = e instanceof Error ? e.message : 'unknown error';
 
@@ -100,11 +79,8 @@ export class TendersCronService {
     try {
       let matchesSaved = 0;
 
-      const result = await new TedOpenTendersCollectorService(
-        this.tedSearchService,
-        this.tendersService,
-        this.awardTenderService,
-      ).collectRecentCompetitionTendersFromTed({
+      const result =
+        await this.tedOpenTendersCollectorService.collectRecentCompetitionTendersFromTed({
         onChangedTenders: async (tenders) => {
           const matches = await this.matchChangedTenders(tenders);
 
@@ -155,11 +131,8 @@ export class TendersCronService {
     this.isGatheringRecentAwardTenders = true;
 
     try {
-      const result = await new TedOpenTendersCollectorService(
-        this.tedSearchService,
-        this.tendersService,
-        this.awardTenderService,
-      ).collectResultTendersFromTed(
+      const result =
+        await this.tedOpenTendersCollectorService.collectResultTendersFromTed(
         {
           lookbackDays:
             TED_OPEN_TENDERS_COLLECTOR_CONFIG.recentResult.lookbackDays,

@@ -17,45 +17,23 @@ import {
   getUniqArray,
   parseNoticeDateTime,
 } from '@/utils';
-import { TedEligibleCountryCode } from '@/resources/codelist';
 import { MoneyValue, TenderLot } from '@/resources/tenders/schemas';
 import { TedContractNature } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
 
-export type NormalizedTenderDto = Omit<TenderDto, '_id'>;
+export type NormalizedTenderLot = Omit<
+  TenderLot,
+  'estimatedValueEur' | 'buyer'
+>;
 
-export type NormalizedTenderLot = Omit<TenderLot, 'estimatedValueEur'>;
-
-export type BuyerNormalized = {
-  buyerName: string;
-  buyerIdentifier: string;
-  buyerCity: string;
-  buyerInternetAddress?: string;
-  buyerProfile?: string;
-  buyerMainActivities: string[];
-  buyerCountry: TedEligibleCountryCode;
+export type NormalizedTenderDto = Omit<
+  TenderDto,
+  '_id' | 'nonLeadBuyers' | 'leadBuyers' | 'lots'
+> & {
+  lots: NormalizedTenderLot[];
 };
 
 @Injectable()
 export class TenderNormalizerService {
-  normalizeBuyerFieldsFromTEDNotice(rawNotice: TedNotice): BuyerNormalized {
-    return {
-      buyerCity: getEngValueOrFirst('buyer-city', rawNotice)?.[0],
-      buyerCountry: getStringValue(
-        'buyer-country',
-        rawNotice,
-      ) as TedEligibleCountryCode,
-      buyerIdentifier: getStringValue('buyer-identifier', rawNotice),
-      buyerInternetAddress: this.toOptionalText(
-        getStringValue('buyer-internet-address', rawNotice),
-      ),
-      buyerProfile: this.toOptionalText(
-        getStringValue('buyer-profile', rawNotice),
-      ),
-      buyerMainActivities: getStringArrayValue('main-activity', rawNotice),
-      buyerName: getEngValueOrFirst('buyer-name', rawNotice)?.[0],
-    };
-  }
-
   normalizeFrameworkFromTEDNotice(notice: TedNotice) {
     const data = {
       frameworkEstimatedValues: getNumberArrayValue(
@@ -140,7 +118,7 @@ export class TenderNormalizerService {
       areFrameworkAgreements: getArrayValue(
         'framework-agreement-lot',
         notice,
-      ).map((s) => !!s && s !== 'none'),
+      ).map((s) => !!s && s.toLowerCase() !== 'none'),
 
       plannedEndDates: getDateArrayValue(
         'contract-duration-end-date-lot',
@@ -152,7 +130,7 @@ export class TenderNormalizerService {
       ),
 
       dpsUsages: getArrayValue('dps-usage-lot', notice).map(
-        (c) => !!c && c !== 'none',
+        (c) => !!c && c.toLowerCase() !== 'none',
       ),
       durationPeriodValues: getNumberArrayValue(
         'duration-period-value-lot',
@@ -367,7 +345,9 @@ export class TenderNormalizerService {
       resulValueCur: getStringValue('result-value-cur-notice', notice),
 
       noticeLanguage: getStringValue('official-language', notice),
-      submissionLanguages: getStringArrayValue('submission-language', notice),
+      submissionLanguages: getUniqArray(
+        getStringValue('submission-language', notice),
+      ),
     };
 
     const lotsCodes: string[] = lots.flatMap(
@@ -380,7 +360,6 @@ export class TenderNormalizerService {
     );
 
     return {
-      ...this.normalizeBuyerFieldsFromTEDNotice(notice),
       id: data.id,
       title:
         this.toOptionalText(data.title) ?? this.toOptionalText(data.titleProc),

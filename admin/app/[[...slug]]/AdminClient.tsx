@@ -79,6 +79,8 @@ type GatherAllCompetitionTendersStatus = {
   isRunning: boolean;
 };
 
+type TechJobResult = Record<string, unknown>;
+
 const tokenStorageKey = 'ted-admin-token';
 
 class ApiRequestError extends Error {
@@ -167,6 +169,16 @@ export default function AdminApp() {
   const [shortTitlesLoading, setShortTitlesLoading] = useState(false);
   const [dbCopyResult, setDbCopyResult] = useState<DbCopyResult | null>(null);
   const [dbCopyLoading, setDbCopyLoading] = useState(false);
+  const [collectTenderBuyersLoading, setCollectTenderBuyersLoading] =
+    useState(false);
+  const [collectAwardBuyersLoading, setCollectAwardBuyersLoading] =
+    useState(false);
+  const [gatherAllCompetitionLoading, setGatherAllCompetitionLoading] =
+    useState(false);
+  const [awardTendersRefreshLoading, setAwardTendersRefreshLoading] =
+    useState(false);
+  const [awardTendersRefreshResult, setAwardTendersRefreshResult] =
+    useState<TechJobResult | null>(null);
   const [gatherAllStatus, setGatherAllStatus] =
     useState<GatherAllCompetitionTendersStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -494,6 +506,7 @@ export default function AdminApp() {
     setShortTitlesResult(null);
     setDbCopyResult(null);
     setGatherAllStatus(null);
+    setAwardTendersRefreshResult(null);
   }
 
   async function generateSitemap(event: FormEvent<HTMLFormElement>) {
@@ -605,6 +618,133 @@ export default function AdminApp() {
       );
     } finally {
       setDbCopyLoading(false);
+    }
+  }
+
+  async function collectBuyersFromTenders() {
+    const confirmed = window.confirm(
+      'Start buyer collection for all saved tenders? This can take a long time.',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setCollectTenderBuyersLoading(true);
+    setMessage('');
+
+    try {
+      await request('/adm/tech/buyers/collect', {
+        method: 'POST',
+        token,
+      });
+
+      setMessage('Tender buyer collection finished.');
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Failed to collect buyers from tenders',
+      );
+    } finally {
+      setCollectTenderBuyersLoading(false);
+    }
+  }
+
+  async function collectBuyersFromAwardTenders() {
+    const confirmed = window.confirm(
+      'Start buyer collection for all saved award tenders? This can take a long time.',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setCollectAwardBuyersLoading(true);
+    setMessage('');
+
+    try {
+      await request('/adm/tech/buyers/collect-awards', {
+        method: 'POST',
+        token,
+      });
+
+      setMessage('Award tender buyer collection finished.');
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Failed to collect buyers from award tenders',
+      );
+    } finally {
+      setCollectAwardBuyersLoading(false);
+    }
+  }
+
+  async function gatherAllCompetitionTenders() {
+    const confirmed = window.confirm(
+      'Start full competition tender gathering from TED? This can take a long time.',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setGatherAllCompetitionLoading(true);
+    setMessage('');
+
+    try {
+      await request('/adm/tech/tenders/gather-all-competition', {
+        method: 'POST',
+        token,
+      });
+
+      setMessage('Full competition tender gathering started.');
+      await loadGatherAllStatus(token);
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Failed to start full competition tender gathering',
+      );
+    } finally {
+      setGatherAllCompetitionLoading(false);
+    }
+  }
+
+  async function refreshAwardTendersHistory() {
+    const confirmed = window.confirm(
+      'Refresh award tenders from TED result notices? This can take a long time.',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setAwardTendersRefreshLoading(true);
+    setAwardTendersRefreshResult(null);
+    setMessage('');
+
+    try {
+      const result = await request<TechJobResult>(
+        '/adm/tech/award-tenders/refresh',
+        {
+          method: 'POST',
+          body: JSON.stringify({}),
+          token,
+        },
+      );
+
+      setAwardTendersRefreshResult(result ?? {});
+      setMessage('Award tender refresh finished.');
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Failed to refresh award tenders',
+      );
+    } finally {
+      setAwardTendersRefreshLoading(false);
     }
   }
 
@@ -764,6 +904,138 @@ export default function AdminApp() {
                     ) : (
                       <Tag>UNKNOWN</Tag>
                     )}
+                  </div>
+                </section>
+
+                <section className="panel panelWide">
+                  <div className="panelHeader">
+                    <div>
+                      <h2>Tender history refresh</h2>
+                      <p>
+                        Run TED history jobs for competition tenders and award
+                        result notices.
+                      </p>
+                    </div>
+                    <div className="buttonGroup">
+                      <button
+                        disabled={
+                          gatherAllCompetitionLoading ||
+                          Boolean(gatherAllStatus?.isRunning)
+                        }
+                        onClick={gatherAllCompetitionTenders}
+                        type="button"
+                      >
+                        {gatherAllCompetitionLoading ||
+                        gatherAllStatus?.isRunning
+                          ? 'Gathering competition...'
+                          : 'Gather all competition'}
+                      </button>
+                      <button
+                        className="secondaryButton"
+                        disabled={awardTendersRefreshLoading}
+                        onClick={refreshAwardTendersHistory}
+                        type="button"
+                      >
+                        {awardTendersRefreshLoading
+                          ? 'Refreshing awards...'
+                          : 'Refresh award tenders'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="statusList">
+                    <div>
+                      <span>Competition gathering</span>
+                      <Tag
+                        color={
+                          gatherAllCompetitionLoading ||
+                          gatherAllStatus?.isRunning
+                            ? 'processing'
+                            : 'default'
+                        }
+                      >
+                        {gatherAllCompetitionLoading ||
+                        gatherAllStatus?.isRunning
+                          ? 'RUNNING'
+                          : 'IDLE'}
+                      </Tag>
+                    </div>
+                    <div>
+                      <span>Award tender refresh</span>
+                      <Tag
+                        color={
+                          awardTendersRefreshLoading
+                            ? 'processing'
+                            : 'default'
+                        }
+                      >
+                        {awardTendersRefreshLoading ? 'RUNNING' : 'IDLE'}
+                      </Tag>
+                    </div>
+                  </div>
+
+                  {awardTendersRefreshResult ? (
+                    <pre className="jsonResult">
+                      {JSON.stringify(awardTendersRefreshResult, null, 2)}
+                    </pre>
+                  ) : null}
+                </section>
+
+                <section className="panel panelWide">
+                  <div className="panelHeader">
+                    <div>
+                      <h2>Buyer collection</h2>
+                      <p>
+                        Backfill buyer references and buyer aggregate metadata
+                        from saved tender and award tender notices.
+                      </p>
+                    </div>
+                    <div className="buttonGroup">
+                      <button
+                        disabled={collectTenderBuyersLoading}
+                        onClick={collectBuyersFromTenders}
+                        type="button"
+                      >
+                        {collectTenderBuyersLoading
+                          ? 'Collecting tenders...'
+                          : 'Collect tender buyers'}
+                      </button>
+                      <button
+                        className="secondaryButton"
+                        disabled={collectAwardBuyersLoading}
+                        onClick={collectBuyersFromAwardTenders}
+                        type="button"
+                      >
+                        {collectAwardBuyersLoading
+                          ? 'Collecting awards...'
+                          : 'Collect award buyers'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="statusList">
+                    <div>
+                      <span>Tender buyers</span>
+                      <Tag
+                        color={
+                          collectTenderBuyersLoading ? 'processing' : 'default'
+                        }
+                      >
+                        {collectTenderBuyersLoading ? 'RUNNING' : 'IDLE'}
+                      </Tag>
+                    </div>
+                    <div>
+                      <span>Award tender buyers</span>
+                      <Tag
+                        color={
+                          collectAwardBuyersLoading
+                            ? 'processing'
+                            : 'default'
+                        }
+                      >
+                        {collectAwardBuyersLoading ? 'RUNNING' : 'IDLE'}
+                      </Tag>
+                    </div>
                   </div>
                 </section>
 

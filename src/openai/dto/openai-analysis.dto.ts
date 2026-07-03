@@ -1,4 +1,9 @@
 import { TenderLot } from '@/resources/tenders/schemas';
+import {
+  BuyerAddress,
+  BuyerCodeName,
+  BuyerContact,
+} from '@/resources/buyer/schemas';
 
 export type AnalysisOutputLanguage = 'en' | 'ru' | 'pl' | 'de' | 'fr';
 export type RiskSeverity = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -33,6 +38,12 @@ export type DocumentInputAnalysis = {
   extractedText: string;
 };
 
+export type GeneralTenderAnalysisCpvInput = {
+  code: string;
+  name?: string;
+  shortTitle?: string;
+};
+
 export interface GeneralTenderAnalysisInput {
   outputLanguage?: AnalysisOutputLanguage;
   tender: {
@@ -41,13 +52,9 @@ export interface GeneralTenderAnalysisInput {
     procedureTitle?: string | null;
     description?: string | null;
     lots: TenderLot[];
-    buyerName?: string | null;
-    buyerIdentifier?: string | null;
     country?: string | null;
-    buyerCity?: string | null;
-    buyerEmail?: string | null;
-    buyerWebsite?: string | null;
-    buyerProfileUrl?: string | null;
+    leadBuyers: GeneralTenderAnalysisBuyerInput[];
+    nonLeadBuyers: GeneralTenderAnalysisBuyerInput[];
     procedureType?: string | null;
     noticeType?: string | null;
     noticeSubtype?: string | null;
@@ -65,8 +72,8 @@ export interface GeneralTenderAnalysisInput {
     };
     contractNature?: string | null;
     legalBasis?: string | null;
-    cpvCodes?: string[];
-    mainCpv?: string[];
+    cpvCodes?: GeneralTenderAnalysisCpvInput[];
+    mainCpv?: GeneralTenderAnalysisCpvInput[];
     estimatedValue?: {
       amount: number | null;
       currency: string | null;
@@ -90,6 +97,17 @@ export interface GeneralTenderAnalysisInput {
   };
   documents: DocumentInputAnalysis[];
 }
+
+export type GeneralTenderAnalysisBuyerInput = {
+  name?: string;
+  identifiers?: string[];
+  contact?: Partial<BuyerContact>;
+  address?: Partial<BuyerAddress>;
+  legalTypes?: BuyerCodeName[];
+  mainActivities?: BuyerCodeName[];
+  profiles?: string[];
+  websites?: string[];
+};
 
 export interface GeneralTenderAnalysisResult {
   summary: string;

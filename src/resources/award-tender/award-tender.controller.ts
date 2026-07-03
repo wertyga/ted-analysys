@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiOkResponse,
@@ -9,17 +9,14 @@ import {
 } from '@nestjs/swagger';
 import { AwardTenderAwardsRequestDto } from './dto/award-tender-awards-request.dto';
 import { AwardTenderService } from './award-tender.service';
-import { TendersService } from '@/resources/tenders/tenders.service';
+import { AwardTenderDetailDto } from './schemas';
 
 @ApiTags('award-tender')
-@Controller('award-tender')
+@Controller('awards')
 export class AwardTenderController {
-  constructor(
-    private readonly awardTenderService: AwardTenderService,
-    private readonly tendersService: TendersService,
-  ) {}
+  constructor(private readonly awardTenderService: AwardTenderService) {}
 
-  @Get('/awards')
+  @Get('/search')
   @ApiOperation({
     summary: 'Search historical award tenders',
   })
@@ -32,5 +29,14 @@ export class AwardTenderController {
       page: query.page,
       limit: query.limit,
     });
+  }
+
+  @Get('/:id')
+  @ApiOperation({ summary: 'Get award tender by publication number' })
+  @ApiOkResponse({ description: 'Award tender detail.' })
+  async getAwardTenderById(
+    @Param('id') id: string,
+  ): Promise<AwardTenderDetailDto> {
+    return this.awardTenderService.getAwardTenderById(id);
   }
 }

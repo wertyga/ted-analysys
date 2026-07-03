@@ -8,7 +8,7 @@ import {
 import { AdminAccessGuard } from '@/guards';
 import { PaginationAndSortDto } from '@/Dto';
 import { SORT_DIRECTION } from '@/types';
-import { tenderCpvPopulateFields } from '@/resources/tenders/utils/tender.utils';
+import { tenderPopulateFields } from '@/resources/tenders/utils/tender.utils';
 import { TenderModel } from '@/resources/tenders/schemas';
 
 class GetTendersRequestDto extends PaginationAndSortDto {}
@@ -31,7 +31,7 @@ export class TendersAdmController {
         .sort({ createdAt: sortDirection })
         .skip(offset)
         .limit(limit)
-        .populate(tenderCpvPopulateFields)
+        .populate(tenderPopulateFields)
         .exec(),
       TenderModel.countDocuments({}).exec(),
     ]);

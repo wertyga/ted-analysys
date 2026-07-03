@@ -22,6 +22,7 @@ import { getSafeErrorMessage, isDuplicateKeyError, logger } from '@/utils';
 import { TenderMatchNotificationLogModel } from './schemas';
 import { TariffService } from '@/resources/tariff';
 import { TENDER_MATCH_NOTIFICATIONS_CONFIG } from '@/config/tender-match-notifications.config';
+import { BuyerDocument } from '@/resources/buyer/schemas';
 
 type NotifiableFrequency =
   | UserNotificationFrequency.INSTANT
@@ -358,8 +359,13 @@ export class TenderMatchNotificationsService {
       .map((match) => {
         const tender = match.tender;
         const title = this.escapeHtml(tender.title || tender.id);
-        const buyer = tender.buyerName
-          ? this.escapeHtml(tender.buyerName)
+        const buyer = tender.leadBuyers
+          ? this.escapeHtml(
+              tender.leadBuyers
+                .map((b: BuyerDocument) => b.name)
+                .filter(Boolean)
+                .join(' '),
+            )
           : 'Not specified';
         const deadline =
           tender.submissionDeadline ?? tender.deadlineReceiptTender;
@@ -423,6 +429,10 @@ export class TenderMatchNotificationsService {
   }
 
   private getMatchBadgeClass(decision?: AiFitDecision | null): string {
+    if (decision === AiFitDecision.STRONG_FIT) {
+      return 'badge-strong';
+    }
+
     if (decision === AiFitDecision.GOOD_FIT) {
       return 'badge-good';
     }

@@ -7,6 +7,7 @@ import { TendersCronService } from './tenders-cron.service';
 import { TendersCronTechService } from './tenders-cron.tech.service';
 import { TenderMatchNotificationsModule } from '@/resources/tender-match-notifications/tender-match-notifications.module';
 import { AwardTenderModule } from '@/resources/award-tender/award-tender.module';
+import { TedOpenTendersCollectorModule } from '@/resources/ted-open-tenders-collector/ted-open-tenders-collector.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { AwardTenderModule } from '@/resources/award-tender/award-tender.module'
     TenderMatchNotificationsModule,
     CurrencyExchangeRatesModule,
     AwardTenderModule,
+    TedOpenTendersCollectorModule,
   ],
   providers: [TendersCronService, TendersCronTechService],
   exports: [TendersCronService],

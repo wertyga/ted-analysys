@@ -21,7 +21,7 @@ import {
   QueueAsyncConcurrency,
   sleep,
 } from '@/utils';
-import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
+import { LlmAnalysisService } from '@/llm/llm-analysis.service';
 import { TENDER_ANALYSIS_CONFIG } from '@/config/tender-analysis.config';
 import { GENERAL_TENDER_ANALYSIS_PROMPT_VERSION } from '@/resources/tender-analysis/general-tender-analysis.prompt';
 
@@ -39,7 +39,7 @@ export class TenderGeneralAnalysisService {
 
   constructor(
     private readonly analysisBuilder: TenderGeneralAnalysisBuilder,
-    private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
+    private readonly llmAnalysisService: LlmAnalysisService,
   ) {}
 
   async fetchBaseAnalysis(
@@ -262,9 +262,9 @@ export class TenderGeneralAnalysisService {
       .update(
         JSON.stringify({
           promptVersion: GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
-          provider: 'deepseek',
+          provider: this.llmAnalysisService.getProvider(),
           tenderSourceHash: tender.sourceHash,
-          model: this.deepSeekAnalysisService.getGeneralAnalysisModel(),
+          model: this.llmAnalysisService.getGeneralAnalysisModel(),
         }),
       )
       .digest('hex');
@@ -287,7 +287,7 @@ export class TenderGeneralAnalysisService {
     input: GeneralTenderAnalysisInput,
   ): Promise<TenderAnalysisExecutionResult> {
     const result =
-      await this.deepSeekAnalysisService.analyzeTenderGeneral(input);
+      await this.llmAnalysisService.analyzeTenderGeneral(input);
 
     devLog(
       `General tender analysis completed: tender=${input.tender.id}`,
@@ -297,7 +297,9 @@ export class TenderGeneralAnalysisService {
     return {
       result,
       promptVersion: GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
-      model: this.deepSeekAnalysisService.getGeneralAnalysisModel(),
+      model: this.llmAnalysisService.getGeneralAnalysisModel(),
     };
   }
 }
+
+

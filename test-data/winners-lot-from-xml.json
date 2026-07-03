@@ -1,0 +1,42 @@
+[
+  {
+    "lotId": "LOT-0001",
+    "resultId": "RES-0001",
+    "lotTenderId": "TEN-0001",
+    "tenderingPartyId": "TPA-0001",
+    "winnerOrgId": "ORG-0007",
+    "winner": {
+      "identifier": "1663067-1-1-1",
+      "name": "EUROVIA ILE DE FRANCE",
+      "email": "massy@eurovia.com",
+      "website": null,
+      "country": "FRA",
+      "city": "Massy",
+      "postCode": "91300",
+      "street": "2 Rte De La Bonde",
+      "size": null
+    },
+    "awardValue": 571268.96,
+    "awardCurrency": "EUR"
+  },
+  {
+    "lotId": "LOT-0002",
+    "resultId": "RES-0002",
+    "lotTenderId": null,
+    "tenderingPartyId": null,
+    "winnerOrgId": null,
+    "winner": {
+      "identifier": null,
+      "name": null,
+      "email": null,
+      "website": null,
+      "country": null,
+      "city": null,
+      "postCode": null,
+      "street": null,
+      "size": null
+    },
+    "awardValue": null,
+    "awardCurrency": null
+  }
+]

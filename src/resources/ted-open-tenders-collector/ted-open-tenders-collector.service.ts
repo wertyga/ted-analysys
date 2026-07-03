@@ -1,6 +1,13 @@
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { TedSearchService } from '@/resources/ted-search/ted-search.service';
-import { buildTedTenderSearchQuery } from '@/resources/ted-search/ted-builders';
-import { TedDeadlineRange } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
+import {
+  buildTedTenderSearchQuery,
+  TedTenderSearchFilters,
+} from '@/resources/ted-search/ted-builders';
+import {
+  TedDeadlineRange,
+  TedTenderSearchRequestDto,
+} from '@/resources/ted-search/dto/ted-tender-search-request.dto';
 import {
   TedNotice,
   TedPaginationMode,
@@ -22,7 +29,6 @@ import { TED_OPEN_TENDERS_COLLECTOR_CONFIG } from '@/config/ted-open-tenders-col
 import { AWARD_HISTORY_FIELDS } from '@/config/award-tender.config';
 import { AwardTenderDocument } from '@/resources/award-tender/schemas';
 import { TENDER_COMPETITION_SEARCH_FIELDS } from '@/config/ted-search.config';
-import fs from 'node:fs';
 
 export interface TedOpenTendersCollectorOptions<
   TChangedTender = TenderDocument,
@@ -61,12 +67,34 @@ interface TedIterationCollectorParams {
   saveNotices: (notices: TedNotice[]) => Promise<TedNoticeBatchSaveResult>;
 }
 
+@Injectable()
 export class TedOpenTendersCollectorService {
   constructor(
+    @Inject(forwardRef(() => TedSearchService))
     private readonly tedSearchService: TedSearchService,
+    @Inject(forwardRef(() => TendersService))
     private readonly tendersService: TendersService,
-    private readonly awardTenderService?: AwardTenderService,
+    @Inject(forwardRef(() => AwardTenderService))
+    private readonly awardTenderService: AwardTenderService,
   ) {}
+
+  async collectAnyTendersFromTed(
+    filters: TedTenderSearchRequestDto,
+    fields: string[],
+    options: TedIterationCollectorParams['options'] = {
+      pageLimit: 100,
+      maxPages: 100_000,
+    },
+    saveNotices: TedIterationCollectorParams['saveNotices'],
+  ) {
+    return this.collectTedNoticesByIteration({
+      query: buildTedTenderSearchQuery(filters),
+      scope: TedScope.ALL,
+      fields,
+      options,
+      saveNotices,
+    });
+  }
 
   async collectOpenTendersFromTed(
     options: TedOpenTendersCollectorOptions = {},
@@ -103,9 +131,11 @@ export class TedOpenTendersCollectorService {
     {
       lookbackDays,
       lookbackYears,
+      filters,
     }: {
       lookbackDays?: number;
       lookbackYears?: number;
+      filters?: TedTenderSearchFilters;
     } = {},
     options: TedOpenTendersCollectorOptions<AwardTenderDocument>,
   ): Promise<TedOpenTendersCollectorResult> {
@@ -119,7 +149,8 @@ export class TedOpenTendersCollectorService {
       );
     }
 
-    const query = buildTedTenderSearchQuery({
+    const querySearch = buildTedTenderSearchQuery({
+      ...(filters ?? {}),
       noticeTypes: TENDER_RESULT_NOTICE_TYPES,
       publicationDateFrom: getTedDate(publicationDateFrom),
       publicationDateTo: getTedDate(),
@@ -129,14 +160,14 @@ export class TedOpenTendersCollectorService {
     });
 
     return this.collectTedNoticesByIteration({
-      query,
+      query: querySearch,
       scope: TedScope.ALL,
       fields: AWARD_HISTORY_FIELDS,
       options,
       saveNotices: async (notices) => {
         try {
           const saveResult =
-            await this.awardTenderService!.saveResultTedTenders(notices, {
+            await this.awardTenderService.saveResultTedTenders(notices, {
               updateExisting: options.updateExisting,
             });
 
@@ -150,6 +181,7 @@ export class TedOpenTendersCollectorService {
             skipped: saveResult.skipped,
           };
         } catch (e) {
+          console.log({ e });
           return {
             saved: 0,
             updated: 0,

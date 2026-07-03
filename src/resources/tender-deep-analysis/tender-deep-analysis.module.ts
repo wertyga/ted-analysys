@@ -1,5 +1,5 @@
 import { forwardRef, Module } from '@nestjs/common';
-import { DeepSeekModule } from '@/deepseek/deepseek.module';
+import { LlmModule } from '@/llm/llm.module';
 import { TendersModule } from '../tenders/tenders.module';
 import { TenderGeneralAnalysisModule } from '../tender-analysis/tender-general-analysis.module';
 import { CompanyFilterModule } from '@/resources/company-filter/company-filter.module';
@@ -11,14 +11,16 @@ import {
 } from './tender-deep-analysis.controller';
 import { TenderDeepDocumentInputService } from './tender-deep-document-input.service';
 import { TenderDeepAnalysisService } from './tender-deep-analysis.service';
+import { BuyerIntelligenceModule } from '@/resources/buyer-intelligence';
 
 @Module({
   imports: [
-    DeepSeekModule,
+    LlmModule,
     CompanyFilterModule,
     CompanyProfileDocumentsModule,
     forwardRef(() => TendersModule),
     forwardRef(() => TenderGeneralAnalysisModule),
+    BuyerIntelligenceModule,
   ],
   controllers: [TenderDeepAnalysisController, UserTenderDeepAnalysisController],
   providers: [

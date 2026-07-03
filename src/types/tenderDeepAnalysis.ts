@@ -1,4 +1,5 @@
 import { TenderLot } from '@/resources/tenders/schemas';
+import { GeneralTenderAnalysisBuyerInput } from '@/openai/dto/openai-analysis.dto';
 
 export type TenderDeepRecommendation =
   | 'strong_go'
@@ -152,6 +153,26 @@ export interface TenderDeepAnalysisResult {
     whyThisMayNotBeWorthIt: string[];
     likelyCompetitionLevel: 'low' | 'medium' | 'high' | 'unknown';
   };
+  buyerSelectionAssessment: {
+    probabilityScore: number;
+    probabilityLevel: 'low' | 'medium' | 'high' | 'unknown';
+    summary: string;
+    buyerBehaviorSummary: string;
+    idealSupplierProfile: string[];
+    companyAlignmentWithBuyer: {
+      matches: string[];
+      mismatches: string[];
+    };
+    competitivePosition: {
+      level: 'strong' | 'average' | 'weak' | 'unknown';
+      explanation: string;
+    };
+    winDrivers: string[];
+    lossDrivers: string[];
+    recommendationsToIncreaseWinProbability: string[];
+    buyerSignalsUsed: string[];
+    dataLimitations: string[];
+  };
 }
 
 export interface TenderDeepRiskItem {
@@ -272,20 +293,15 @@ export interface TenderAnalysisTenderDto {
   };
   noticeLanguage?: string;
   submissionLanguages?: string[];
-  buyerName?: string;
-  buyerIdentifier?: string;
-  buyerCountry?: string;
-  buyerCity?: string;
-  buyerEmail?: string;
-  buyerInternetAddress?: string;
-  buyerProfile?: string;
-  publicationDate?: string;
-  dispatchDate?: string;
-  submissionDeadline?: string;
-  deadlineReceiptTender?: string;
-  questionsDeadline?: string;
-  plannedStartDate?: string;
-  plannedEndDate?: string;
+  leadBuyers: GeneralTenderAnalysisBuyerInput[];
+  nonLeadBuyers: GeneralTenderAnalysisBuyerInput[];
+  publicationDate?: Date;
+  dispatchDate?: Date;
+  submissionDeadline?: Date;
+  deadlineReceiptTender?: Date;
+  questionsDeadline?: Date;
+  plannedStartDate?: Date;
+  plannedEndDate?: Date;
   duration?: {
     value: number | null | undefined;
     unit: string | null;
@@ -296,7 +312,7 @@ export interface TenderAnalysisTenderDto {
   isFrameworkAgreement?: boolean;
   isSmeSuitable?: boolean;
   electronicSubmission?: string;
-  cpvCodes?: string[];
+  cpvCodes?: CpvAnalysisRef[];
   placeOfPerformanceCountries?: string[];
   placeOfPerformanceCities?: string[];
   documentUrls?: string[];
@@ -346,7 +362,34 @@ export interface TenderDeepCompanyFitAnalysisInput {
   generalAnalysis: unknown;
   company: CompanyAnalysisDto;
   companyAnalysis?: unknown;
+  buyerIntelligence?: TenderDeepBuyerIntelligenceInput[];
   derived: TenderCompanyFitDerivedMetadata;
   documentMetadata?: unknown[];
   documentTextSnippets?: unknown[];
+}
+
+export interface TenderDeepBuyerIntelligenceInput {
+  buyerId: string;
+  buyerName?: string;
+  summary?: string;
+  procurementProfile?: {
+    overview?: string;
+    highlights?: string[];
+  };
+  marketBehavior?: {
+    overview?: string;
+    highlights?: string[];
+  };
+  supplierLandscape?: {
+    overview?: string;
+    highlights?: string[];
+  };
+  historicalTrends?: string[];
+  dataLimitations?: string[];
+  buyerDecisionSignals?: {
+    idealSupplierProfile?: string[];
+    supplierPatternSignals?: string[];
+    competitionSignals?: string[];
+    dataConfidence?: 'low' | 'medium' | 'high';
+  };
 }

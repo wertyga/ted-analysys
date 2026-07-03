@@ -2,6 +2,7 @@ import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import axios from 'axios';
 import { Types } from 'mongoose';
 import { CpvCategoryModel, CpvCategory } from './schemas';
+import cpvRawCodes from './cpv-raw-codes.json';
 import { string_to_slug } from '@/utils/string';
 import {
   CpvCategoriesResponse,
@@ -10,6 +11,14 @@ import {
 } from './types';
 
 export const CPV_CODES_LIST_FIELDS = 'code name slug parentCode level';
+
+export type CpvRawCode = {
+  code: string;
+  level: number;
+  name: string;
+  parentCode?: string;
+  shortTitle?: string;
+};
 
 @Injectable()
 export class CpvService {
@@ -94,26 +103,18 @@ export class CpvService {
     };
   }
 
-  async findByCodes(codes: string[]): Promise<CpvCategoryResponseItem[]> {
-    const normalizedCodes = this.normalizeCodes(codes);
-
-    if (normalizedCodes.length === 0) {
+  resolveRawCodes(codes: string[]): CpvRawCode[] {
+    if (codes.length === 0) {
       return [];
     }
 
-    const items = await CpvCategoryModel.find({
-      code: { $in: normalizedCodes },
-    })
-      .select(CPV_CODES_LIST_FIELDS)
-      .lean();
-
     const byCode = new Map(
-      items.map((item) => [item.code, this.toResponseItem(item)]),
+      (cpvRawCodes as CpvRawCode[]).map((item) => [item.code, item]),
     );
 
-    return normalizedCodes
+    return codes
       .map((code) => byCode.get(code))
-      .filter((item): item is CpvCategoryResponseItem => !!item);
+      .filter((item): item is CpvRawCode => !!item);
   }
 
   async resolveCpvCodeIds(codes: string[]): Promise<Types.ObjectId[]>;
@@ -143,14 +144,12 @@ export class CpvService {
   }
 
   async findDescendants(codes: string[]): Promise<CpvCategoriesResponse> {
-    const normalizedCodes = this.normalizeCodes(codes);
-
-    if (normalizedCodes.length === 0) {
+    if (codes.length === 0) {
       return { count: 0, items: [] };
     }
 
     const categories = await CpvCategoryModel.find({
-      $or: normalizedCodes.map((code) => {
+      $or: codes.map((code) => {
         return {
           code: { $regex: `^${this.getSignificantPrefix(code)}` },
         };
@@ -159,22 +158,12 @@ export class CpvService {
       .select(CPV_CODES_LIST_FIELDS)
       .sort({ level: 1 })
       .lean()
-      .then((codes) => codes.slice(normalizedCodes.length));
+      .then((cds) => cds.slice(codes.length));
 
     return {
       count: categories.length,
       items: categories.map((category) => this.toResponseItem(category)),
     };
-  }
-
-  private normalizeCodes(codes: string[]): string[] {
-    return Array.from(
-      new Set(
-        codes
-          .map((code) => code.toString().trim())
-          .filter((code) => /^\d{8}$/.test(code)),
-      ),
-    );
   }
 
   private getSignificantPrefix(code: string): string {

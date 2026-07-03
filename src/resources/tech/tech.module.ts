@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { DeepSeekModule } from '@/deepseek/deepseek.module';
+import { LlmModule } from '@/llm/llm.module';
 import { DbCopyTechController } from './cron/db-copy.tech.controller';
 import { DbCopyCronModule } from '@/resources/cron/db-copy-cron/db-copy-cron.module';
 import { ContractorsTechController } from './contractors/contractors.tech.controller';
@@ -16,15 +16,21 @@ import { AwardTenderModule } from '@/resources/award-tender/award-tender.module'
 import { TedSearchModule } from '@/resources/ted-search/ted-search.module';
 import { TendersModule } from '@/resources/tenders/tenders.module';
 import { TendersCronModule } from '@/resources/cron/tenders-cron/tenders-cron.module';
+import { BuyerTechService } from '@/resources/tech/buyer/buyer.tech.service';
+import { BuyerModule } from '@/resources/buyer/buyer.module';
+import { BuyerTechController } from '@/resources/tech/buyer/buyer.tech.controller';
+import { TedOpenTendersCollectorModule } from '@/resources/ted-open-tenders-collector/ted-open-tenders-collector.module';
 
 @Module({
   imports: [
-    DeepSeekModule,
+    LlmModule,
     DbCopyCronModule,
     AwardTenderModule,
     TedSearchModule,
     TendersModule,
     TendersCronModule,
+    BuyerModule,
+    TedOpenTendersCollectorModule,
   ],
   controllers: [
     AwardTendersTechController,
@@ -33,6 +39,7 @@ import { TendersCronModule } from '@/resources/cron/tenders-cron/tenders-cron.mo
     SitemapTechController,
     TendersTechController,
     CpvAdmController,
+    BuyerTechController,
   ],
   providers: [
     AwardTendersTechService,
@@ -40,6 +47,7 @@ import { TendersCronModule } from '@/resources/cron/tenders-cron/tenders-cron.mo
     CpvTechService,
     SitemapTechService,
     TendersTechService,
+    BuyerTechService,
   ],
 })
 export class TechModule {}

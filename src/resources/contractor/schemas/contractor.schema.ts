@@ -1,10 +1,11 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
-import { AwardTenderDocument } from '@/resources/award-tender/schemas';
+import { AwardTenderModel } from '@/resources/award-tender/schemas';
+import { filterModel } from '@/utils';
 
 export interface Contractor {
   _id?: string;
   name?: string;
-  identifier?: string;
+  identifiers?: string[];
   countries?: string[];
   countrySubs?: string[];
   cities?: string[];
@@ -12,21 +13,68 @@ export interface Contractor {
   size?: string;
   listed?: string;
   internetAddresses?: string[];
-  email?: string;
+  emails?: string[];
   ownerNationalities?: string[];
   euRegistrationNumber?: string;
   cpvCodes: string[];
-  awardTenders?: AwardTenderDocument[];
+
+  stats: {
+    lastAwardWinDate: Date | null;
+    totalAwardAmountEur: number;
+    awardTendersCount: number;
+    awardLotsCount: number;
+  };
+
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-export type ContractorDocument = Contractor & Document;
+const CONTRACTOR_LIST_FIELDS = [
+  'name',
+  'identifiers',
+  'countries',
+  'countrySubs',
+  'cities',
+  'postCodes',
+  'emails',
+  'cpvCodes',
+  'createdAt',
+  'stats',
+] satisfies Array<keyof Contractor>;
 
-export const ContractorSchema = new Schema<ContractorDocument>(
+export type ContractorDocument = Contractor & Document;
+export type ContractorRecord = Contractor & { _id: unknown };
+export type ContractorSerializable = ContractorDocument | ContractorRecord;
+export type ContractorListDto = Pick<
+  Contractor,
+  '_id' | (typeof CONTRACTOR_LIST_FIELDS)[number]
+>;
+export type ContractorDetailDto = Contractor & {
+  awardTenders: ReturnType<typeof AwardTenderModel.serializeList>[];
+};
+
+export interface ContractorModelType extends Model<ContractorDocument> {
+  serializeList(contractor: ContractorSerializable): ContractorListDto;
+  serializeDetail(contractor: ContractorSerializable): ContractorDetailDto;
+}
+
+const ContractorStatsSchema = new Schema<Contractor['stats']>(
+  {
+    lastAwardWinDate: { type: Date },
+    totalAwardAmountEur: { type: Number },
+    awardTendersCount: { type: Number },
+    awardLotsCount: { type: Number },
+  },
+  { _id: false },
+);
+
+export const ContractorSchema = new Schema<
+  ContractorDocument,
+  ContractorModelType
+>(
   {
     name: { type: String, trim: true },
-    identifier: { type: String, trim: true },
+    identifiers: { type: [String], trim: true },
 
     countries: { type: [String], default: [] },
 
@@ -41,7 +89,7 @@ export const ContractorSchema = new Schema<ContractorDocument>(
 
     internetAddresses: { type: [String], default: [] },
 
-    email: { type: String, trim: true, lowercase: true },
+    emails: { type: [String], trim: true, lowercase: true },
 
     ownerNationalities: { type: [String], default: [] },
 
@@ -49,10 +97,8 @@ export const ContractorSchema = new Schema<ContractorDocument>(
 
     cpvCodes: { type: [String], default: [] },
 
-    awardTenders: {
-      type: [Schema.Types.ObjectId],
-      ref: 'AwardTender',
-      default: [],
+    stats: {
+      type: ContractorStatsSchema,
     },
   },
   {
@@ -61,11 +107,28 @@ export const ContractorSchema = new Schema<ContractorDocument>(
   },
 );
 
-ContractorSchema.index({ identifier: 1 });
-ContractorSchema.index({ email: 1 });
+ContractorSchema.index({ identifiers: 1 });
+ContractorSchema.index({ emails: 1 });
 ContractorSchema.index({ name: 1 });
 ContractorSchema.index({ euRegistrationNumber: 1 });
 
-export const ContractorModel: Model<ContractorDocument> =
-  (mongoose.models.Contractor as Model<ContractorDocument> | undefined) ??
-  mongoose.model<ContractorDocument>('Contractor', ContractorSchema);
+ContractorSchema.statics.serializeList = function (
+  contractor: ContractorSerializable,
+): ContractorListDto {
+  return filterModel(contractor, {
+    includeFields: CONTRACTOR_LIST_FIELDS,
+  }) as ContractorListDto;
+};
+
+ContractorSchema.statics.serializeDetail = function (
+  contractor: ContractorSerializable,
+): ContractorDetailDto {
+  return filterModel(contractor) as ContractorDetailDto;
+};
+
+export const ContractorModel: ContractorModelType =
+  (mongoose.models.Contractor as ContractorModelType | undefined) ??
+  mongoose.model<ContractorDocument, ContractorModelType>(
+    'Contractor',
+    ContractorSchema,
+  );

@@ -1,8 +1,43 @@
-- FE - чекер с доками и отсылать на повторный анализ
-- FE - генерация дип анализа на другом языке
+- FE - /contractors|buyers/{country}
+- FE - /buyers/[id] - Canonical/OpenGraph/JSON-LD
+- FE - /buyers/[id] - После FAQ
+Добавить блок
+Related buyers
+Например
+Other healthcare buyers in Norway
+...
+или
+Similar public buyers
+...
+Это даст внутреннюю перелинковку.
+- FE - /buyers/[id] - Еще один блок
+  Related procurement categories
+Medical equipment
+Healthcare
+Laboratory equipment
+...
+Ссылки на страницы отраслей.
+- FE - 12. GEO
+- FE - Canonical/OpenGraph/JSON-LD
+- FE - /buyers/[id] - Что еще можно сделать в будущем
+Есть одна вещь, которая может дать сильный SEO-эффект.
+Сделать внизу страницы блок:
+Related Buyers
+Other healthcare buyers in Norway
+•
+Hospital A
+•
+Hospital B
+•
+Regional Health Authority
+•
+University Hospital
+...
+Это одновременно:
 
-- BE - указывать источник причины
-- BE - vat price from freemium
+усиливает внутреннюю перелинковку;
+увеличивает глубину просмотра;
+помогает поисковикам и AI лучше понимать связи между страницами.
 
 buyerProfile: https://ch-giorgi.sudest-marchespublics.com
 пробовать доставать portalUrl для deep analysis
@@ -16,55 +51,3 @@ Missing:
 - operating countries
 - typical contract size
 Это мотивирует заполнить профиль и улучшает matching.
-
-TenderRequirementsModule
-Для checklist:
-mandatory requirements
-required documents
-eligibility criteria
-award criteria
-submission instructions
-
-BuyerIntelligenceModule
-Позже, но очень ценно:
-buyer profile
-past tenders
-past winners
-average contract value
-common CPVs
-
-TenderWishlist → Opportunity Pipeline / Saved Opportunities
-TenderDeepAnalysis → Company Fit Analysis / Bid-No-Bid Analysis
-CompanyFilter → Company Capability Profile
-CompanyProfileDocuments → Evidence Library / Company Documents
-TenderMatching → Opportunity Matching
-TenderMatchNotifications → Opportunity Alerts
-TenderAnalysis → Tender Summary
-
-Показывай бейджи:
-Standard Tender
-DPS
-Framework
-Qualification System
-Award Notice
-Market Consultation
-Long-running Opportunity
-Это решает проблему старых публикаций с дедлайнами до 2029 и похожих случаев.
-
-
-### History
-1. Similar contracts history
-Когда пользователь смотрит тендер, ты показываешь:
-“Похожие контракты за последние N лет”
-Пользователь сразу видит:
-“Окей, похожие тендеры обычно выигрывают компании X, Y, Z. Средний контракт — 300–600k EUR. Покупатель уже закупал это раньше.”
-Это очень полезно для bid/no-bid решения.
-
-2. Competitor profiles
-Ты можешь автоматически строить карточку компании-конкурента из публичных award notices.
-Это не должно выглядеть как LinkedIn/CRM. Это именно public procurement footprint:
-“Эта компания часто выигрывает IT support contracts в Германии и Австрии, особенно у municipal buyers, средний размер контракта — около 450k EUR.”
-
-3. Buyer intelligence
-Иногда пользователю важнее не конкурент, а заказчик.
-“Этот заказчик закупает такие услуги почти каждый год. Последний контракт был 11 месяцев назад. Есть вероятность повторной закупки.”

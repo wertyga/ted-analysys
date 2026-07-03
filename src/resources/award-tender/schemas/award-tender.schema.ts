@@ -5,16 +5,27 @@ import {
   TenderDocumentsLinks,
   TenderLot,
 } from '@/resources/tenders/schemas';
-import { filterModel } from '@/utils';
-import { ContractorDocument } from '@/resources/contractor/schemas';
+import { filterModel, isPopulatedRecord } from '@/utils';
+import {
+  ContractorDocument,
+  ContractorModel,
+} from '@/resources/contractor/schemas';
+import {
+  BuyerDocument,
+  BuyerModel,
+  BuyerSerializable,
+} from '@/resources/buyer/schemas';
+import { TMongoId } from '@/types';
+import { getFilter } from 'next/dist/build/webpack/loaders/css-loader/src/utils';
 
 export type AwardTenderLot = TenderLot & {
-  resultLotIdentifier: string;
+  resultLotIdentifier?: string;
   awardValue?: {
     amount: MoneyValue;
     currency: string | null;
   };
   awardValueEur?: MoneyValue;
+  winner?: string | ContractorDocument;
 };
 
 export interface AwardTender {
@@ -27,11 +38,7 @@ export interface AwardTender {
   title?: string;
   titleProc?: string;
   description?: string;
-  buyerName?: string;
-  buyerIdentifier?: string;
-  buyerCountry?: string;
-  buyerCity?: string;
-  buyerMainActivities?: string[];
+
   publicationDate?: Date;
   dispatchDate?: Date;
   submissionDeadline?: Date;
@@ -68,14 +75,69 @@ export interface AwardTender {
   links: TenderDocumentsLinks;
   createdAt?: Date;
   updatedAt?: Date;
+
+  nonLeadBuyers: (TMongoId | BuyerDocument)[];
+  leadBuyers: (TMongoId | BuyerDocument)[];
 }
 
 export type AwardTenderDocument = AwardTender & Document;
 export type AwardTenderRecord = AwardTender & { _id: unknown };
 export type AwardTenderSerializable = AwardTenderDocument | AwardTenderRecord;
+export type AwardTenderDetailDto = Omit<AwardTender, 'links'>;
+export type AwardTenderListDto = Pick<
+  AwardTender,
+  | '_id'
+  | 'id'
+  | 'noticeType'
+  | 'noticeSubtype'
+  | 'procedureType'
+  | 'title'
+  | 'titleProc'
+  | 'cpvCodes'
+  | 'nonLeadBuyers'
+  | 'leadBuyers'
+  | 'publicationDate'
+  | 'submissionDeadline'
+  | 'plannedEndDate'
+  | 'contractNature'
+  | 'estimatedValue'
+  | 'awardValue'
+  | 'estimatedValueEur'
+  | 'awardValueEur'
+  | 'awardDecisionDates'
+  | 'selectionStatuses'
+  | 'isFrameworkAgreement'
+  | 'placeOfPerformanceCountries'
+  | 'placeOfPerformanceCities'
+  | 'lots'
+  | 'winners'
+  | 'createdAt'
+  | 'updatedAt'
+>;
+export type ContractorAwardLotListDto = Pick<
+  AwardTenderLot,
+  | 'identifier'
+  | 'title'
+  | 'mainClassification'
+  | 'additionalClassifications'
+  | 'contractNature'
+  | 'estimatedValueEur'
+  | 'awardValueEur'
+  | 'awardValue'
+  | 'isFrameworkAgreement'
+  | 'isDps'
+  | 'placeOfPerformanceCountry'
+  | 'placeOfPerformanceSubdivision'
+  | 'placeOfPerformanceCity'
+  | 'awardCriteria'
+>;
 
 export interface AwardTenderModelType extends Model<AwardTenderDocument> {
-  toDetailDto(tender: AwardTenderSerializable): Partial<AwardTender>;
+  serializeList(tender: AwardTenderSerializable): AwardTenderListDto;
+  serializeDetail(tender: AwardTenderSerializable): AwardTenderDetailDto;
+  serializeContractorAwardLotList(
+    tender: AwardTenderLot,
+  ): ContractorAwardLotListDto;
 }
 
 const AwardTenderLotValueSchema = new Schema(
@@ -89,7 +151,6 @@ const AwardTenderLotValueSchema = new Schema(
 const AwardTenderLotSchema = new Schema<AwardTenderLot>(
   {
     identifier: String,
-    resultLotIdentifier: String,
     title: String,
     description: String,
     mainClassification: { type: [String], default: [] },
@@ -121,6 +182,11 @@ const AwardTenderLotSchema = new Schema<AwardTenderLot>(
     awardCriteria: { type: Schema.Types.Mixed },
     selectionCriteria: { type: Schema.Types.Mixed },
     selectionCriteriaSource: String,
+
+    winner: {
+      type: Schema.Types.ObjectId,
+      ref: 'Contractor',
+    },
   },
   { _id: false, strict: false },
 );
@@ -135,13 +201,6 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
     title: String,
     titleProc: String,
     description: String,
-    buyerName: String,
-    buyerIdentifier: String,
-    buyerCountry: { type: String },
-    buyerCity: String,
-    buyerMainActivities: {
-      type: [String],
-    },
     selectionStatuses: { type: [String], default: [] },
     publicationDate: { type: Date },
     dispatchDate: Date,
@@ -183,6 +242,19 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
       ref: 'Contractor',
       default: [],
     },
+    nonLeadBuyers: {
+      type: [Schema.Types.ObjectId],
+      ref: 'Buyer',
+      index: true,
+      default: [],
+    },
+    leadBuyers: {
+      type: [Schema.Types.ObjectId],
+      ref: 'Buyer',
+      index: true,
+      default: [],
+    },
+
     links: Schema.Types.Mixed,
   },
   {
@@ -193,19 +265,119 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
 
 AwardTenderSchema.index({
   cpvCodes: 1,
-  buyerCountry: 1,
   contractNature: 1,
   publicationDate: -1,
 });
+AwardTenderSchema.index({ winners: 1 });
+AwardTenderSchema.index({ 'lots.winner': 1 });
 AwardTenderSchema.index({ 'winners.identifier': 1 });
 AwardTenderSchema.index({ 'winners.name': 1 });
 
-AwardTenderSchema.statics.toDetailDto = function (
-  tender: AwardTenderSerializable,
-) {
-  return filterModel(tender, {
-    excludeFields: ['links', 'cpvCodes'],
+AwardTenderSchema.statics.serializeContractorAwardLotList = function (
+  lot: AwardTenderLot,
+): ContractorAwardLotListDto {
+  return filterModel(lot, {
+    includeFields: [
+      'identifier',
+      'title',
+      'mainClassification',
+      'additionalClassifications',
+      'contractNature',
+      'estimatedValue',
+      'estimatedValueEur',
+      'awardValueEur',
+      'awardValue',
+      'isFrameworkAgreement',
+      'isDps',
+      'placeOfPerformanceCity',
+      'placeOfPerformanceCountry',
+      'placeOfPerformanceSubdivision',
+      'awardCriteria',
+      'winner',
+    ],
   });
+};
+
+function serializeAwardTenderRelations<T extends Partial<AwardTender>>(
+  tender: T,
+): T {
+  return {
+    ...tender,
+    nonLeadBuyers:
+      tender.nonLeadBuyers?.map((b) =>
+        BuyerModel.serializeList(b as BuyerSerializable),
+      ) ?? [],
+    leadBuyers:
+      tender.leadBuyers?.map((b) =>
+        BuyerModel.serializeList(b as BuyerSerializable),
+      ) ?? [],
+    winners: Array.isArray(tender.winners)
+      ? tender.winners.map((winner) =>
+          isPopulatedRecord(winner)
+            ? filterModel(winner as ContractorDocument)
+            : winner,
+        )
+      : tender.winners,
+  };
+}
+
+AwardTenderSchema.statics.serializeList = function (
+  tender: AwardTenderSerializable,
+): AwardTenderListDto {
+  const { winners, lots, ...serializedAwardTender } = filterModel(tender, {
+    includeFields: [
+      'id',
+      'noticeType',
+      'noticeSubtype',
+      'procedureType',
+      'title',
+      'titleProc',
+      'nonLeadBuyers',
+      'leadBuyers',
+      'publicationDate',
+      'submissionDeadline',
+      'plannedEndDate',
+      'contractNature',
+      'estimatedValue',
+      'awardValue',
+      'estimatedValueEur',
+      'awardValueEur',
+      'awardDecisionDates',
+      'selectionStatuses',
+      'isFrameworkAgreement',
+      'placeOfPerformanceCountries',
+      'placeOfPerformanceCities',
+      'lots',
+      'winners',
+      'createdAt',
+      'updatedAt',
+      'cpvCodes',
+    ],
+  });
+
+  return {
+    ...serializedAwardTender,
+    lots: lots.map(AwardTenderModel.serializeContractorAwardLotList),
+    nonLeadBuyers:
+      serializedAwardTender.nonLeadBuyers?.map((buyer) =>
+        BuyerModel.serializeList(buyer as BuyerSerializable),
+      ) ?? [],
+    leadBuyers:
+      serializedAwardTender.leadBuyers?.map((buyer) =>
+        BuyerModel.serializeList(buyer as BuyerSerializable),
+      ) ?? [],
+    winners: winners.map(ContractorModel.serializeList),
+  };
+};
+
+AwardTenderSchema.statics.serializeDetail = function (
+  tender: AwardTenderSerializable,
+): AwardTenderDetailDto {
+  return serializeAwardTenderRelations(
+    filterModel(tender, {
+      excludeFields: ['links'],
+    }),
+  ) as AwardTenderDetailDto;
 };
 
 export const AwardTenderModel: AwardTenderModelType =

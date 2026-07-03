@@ -61,6 +61,7 @@ async function bootstrap() {
   const adminOutDir = join(process.cwd(), 'admin', 'out');
   const adminIndexPath = join(adminOutDir, 'index.html');
   const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('query parser', 'extended');
 
   expressApp.use(
     '/sitemaps',

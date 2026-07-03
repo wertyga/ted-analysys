@@ -2,9 +2,10 @@ import mongoose, { Document, Model, Schema } from 'mongoose';
 import { filterModel } from '@/utils';
 import {
   TenderDetailDto,
-  TenderDto,
   TenderListDto,
 } from '@/resources/tenders/dto/tender.dto';
+import { BuyerDocument, BuyerModel } from '@/resources/buyer/schemas';
+import { TMongoId } from '@/types';
 
 export type TenderDocumentsLinks = Record<
   'xml' | 'pdf' | 'pdfs' | 'html' | 'htmlDirect',
@@ -19,7 +20,7 @@ export interface TenderDuration {
 }
 
 export interface TenderLot {
-  identifier?: string;
+  identifier: string;
   title?: string;
   description?: string;
   mainClassification?: string[];
@@ -73,7 +74,7 @@ export interface TenderShortTitle {
 }
 
 export interface Tender {
-  _id: string;
+  _id: mongoose.Types.ObjectId;
   /** Local canonical id. For TED tenders this is the publication number. */
   id: string;
   /** TED notice-type: notice kind such as contract notice, award notice, or planning notice. */
@@ -103,22 +104,6 @@ export interface Tender {
   noticeLanguage?: string;
   /** TED submission-language: languages allowed for tender submission. */
   submissionLanguages?: string[];
-  /** TED buyer-name: contracting buyer name. */
-  buyerName?: string;
-  /** TED buyer-identifier: buyer national or registry identifier. */
-  buyerIdentifier?: string;
-  /** TED buyer-country: country of the buyer, not necessarily place of performance. */
-  buyerCountry?: string;
-  /** TED buyer-city: buyer city. */
-  buyerCity?: string;
-  /** TED main-activity: buyer main activities. */
-  buyerMainActivities?: string[];
-  /** TED buyer-email: buyer contact email. */
-  buyerEmail?: string;
-  /** TED buyer-internet-address: buyer website. */
-  buyerInternetAddress?: string;
-  /** TED buyer-profile: buyer procurement profile URL. */
-  buyerProfile?: string;
   /** TED publication-date: date when the notice was published on TED. */
   publicationDate?: Date;
   /** TED dispatch-date: date when the notice was dispatched for publication. */
@@ -156,7 +141,7 @@ export interface Tender {
   /** TED place-of-performance-subdiv-* fields: subdivisions where the contract is performed. */
   placeOfPerformanceSubdivisions?: string[];
   /** TED lot-level fields grouped by lot index. */
-  lots?: TenderLot[];
+  lots: TenderLot[];
   /** TED document-url-lot: procurement document URLs. */
   documentUrls?: string[];
   /** TED submission-url-lot: URLs where tenders/submissions are filed. */
@@ -175,6 +160,9 @@ export interface Tender {
   sourceHash: string;
   createdAt?: Date;
   updatedAt?: Date;
+
+  nonLeadBuyers: (TMongoId | BuyerDocument)[];
+  leadBuyers: (TMongoId | BuyerDocument)[];
 }
 
 export type TenderDocument = Tender & Document;
@@ -185,6 +173,73 @@ export interface TenderModelType extends Model<TenderDocument> {
   serializeDetail(tender: TenderSerializable): TenderDetailDto;
   serializeList(tender: TenderSerializable): TenderListDto;
 }
+
+export const TenderLotValueSchema = new Schema(
+  {
+    amount: { type: Number, default: null },
+    currency: { type: String, default: null },
+  },
+  { _id: false },
+);
+
+export const TenderDurationSchema = new Schema<TenderDuration>(
+  {
+    value: { type: Number, default: null },
+    unit: { type: String, default: null },
+  },
+  { _id: false },
+);
+
+const TenderAwardCriteriaSchema = new Schema(
+  {
+    type: { type: String, default: null },
+    description: { type: String, default: null },
+    weight: { type: Number, default: null },
+    weightCode: { type: String, default: null },
+  },
+  { _id: false },
+);
+
+const TenderSelectionCriteriaSchema = new Schema(
+  {
+    name: { type: String, default: null },
+    description: { type: String, default: null },
+  },
+  { _id: false },
+);
+
+export const TenderLotSchema = new Schema<TenderLot>(
+  {
+    identifier: String,
+    title: String,
+    description: String,
+    mainClassification: { type: [String], default: [] },
+    additionalClassifications: { type: [String], default: [] },
+    contractNature: String,
+    plannedStartDate: Date,
+    plannedEndDate: Date,
+    estimatedValue: { type: TenderLotValueSchema },
+    frameworkMaximumValue: { type: TenderLotValueSchema },
+    isFrameworkAgreement: Boolean,
+    isDps: Boolean,
+    isSME: Boolean,
+    isEuFunded: Boolean,
+    duration: { type: TenderDurationSchema },
+    deadlineReceiptTender: Date,
+    questionsDeadline: Date,
+    documentUrls: { type: [String], default: [] },
+    submissionUrls: { type: [String], default: [] },
+    electronicSubmission: String,
+    placeOfPerformanceCountry: String,
+    placeOfPerformanceSubdivision: String,
+    placeOfPerformanceCity: String,
+    awardCriteria: { type: TenderAwardCriteriaSchema },
+    selectionCriteria: { type: TenderSelectionCriteriaSchema },
+    selectionCriteriaSource: String,
+    estimatedValueEur: { type: Number, default: null },
+  },
+  { _id: false },
+);
 
 const TenderSchema = new Schema<TenderDocument, TenderModelType>(
   {
@@ -211,19 +266,20 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
     noticeLanguage: String,
     submissionLanguages: {
       type: [String],
-      default: undefined,
+      default: [],
     },
-    buyerName: String,
-    buyerIdentifier: String,
-    buyerCountry: String,
-    buyerCity: String,
-    buyerMainActivities: {
-      type: [String],
-      default: undefined,
+    nonLeadBuyers: {
+      type: [Schema.Types.ObjectId],
+      ref: 'Buyer',
+      index: true,
+      default: [],
     },
-    buyerEmail: String,
-    buyerInternetAddress: String,
-    buyerProfile: String,
+    leadBuyers: {
+      type: [Schema.Types.ObjectId],
+      ref: 'Buyer',
+      index: true,
+      default: [],
+    },
     publicationDate: Date,
     dispatchDate: Date,
     submissionDeadline: Date,
@@ -257,7 +313,7 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
     placeOfPerformanceCountries: { type: [String], default: [] },
     placeOfPerformanceCities: { type: [String], default: [] },
     placeOfPerformanceSubdivisions: { type: [String], default: [] },
-    lots: { type: [Schema.Types.Mixed], default: [] },
+    lots: { type: [TenderLotSchema], default: [] },
     documentUrls: { type: [String], default: [] },
     submissionUrls: { type: [String], default: [] },
     euFundLot: {
@@ -280,7 +336,6 @@ TenderSchema.index(
   {
     cpvCodes: 1,
     noticeType: 1,
-    buyerCountry: 1,
     publicationDate: -1,
     _id: -1,
   },
@@ -300,37 +355,33 @@ TenderSchema.index(
 TenderSchema.index(
   {
     noticeType: 1,
-    buyerCountry: 1,
     publicationDate: -1,
     _id: -1,
   },
   { name: 'idx_notice_country_pubdate' },
 );
 
-function serializeTender(tender: TenderSerializable): TenderDto {
+function serializeTender(tender: TenderSerializable): Tender {
   return filterModel(tender as TenderDocument, {
     excludeFields: ['sourceHash'],
-  }) as TenderDto;
+  }) as Tender;
 }
 
 TenderSchema.statics.serializeDetail = function (
   tender: TenderSerializable,
-): TenderDetailDto {
+): Partial<Tender> {
   return serializeTender(tender);
 };
 
 TenderSchema.statics.serializeList = function (
   tender: TenderSerializable,
-): TenderListDto {
+): Omit<TenderListDto, 'generalAnalysis' | '_id'> & { _id: any } {
   const {
     links,
     noticeVersion,
     titleProc,
-    buyerIdentifier,
-    buyerCity,
-    buyerEmail,
-    buyerInternetAddress,
-    buyerProfile,
+    nonLeadBuyers,
+    leadBuyers,
     dispatchDate,
     deadlineReceiptTender,
     duration,
@@ -342,7 +393,11 @@ TenderSchema.statics.serializeList = function (
     ...rest
   } = serializeTender(tender);
 
-  return rest;
+  return {
+    ...rest,
+    nonLeadBuyers: nonLeadBuyers.map(BuyerModel.serializeList),
+    leadBuyers: leadBuyers.map(BuyerModel.serializeList),
+  };
 };
 
 export const TenderModel: TenderModelType =

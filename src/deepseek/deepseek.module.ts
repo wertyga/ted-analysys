@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
-import { DeepSeekAnalysisService } from './deepseek-analysis.service';
+import { LlmModule } from '@/llm/llm.module';
+import { LlmAnalysisService } from '@/llm/llm-analysis.service';
 
 @Module({
-  providers: [DeepSeekAnalysisService],
-  exports: [DeepSeekAnalysisService],
+  imports: [LlmModule],
+  exports: [LlmAnalysisService],
 })
 export class DeepSeekModule {}
+

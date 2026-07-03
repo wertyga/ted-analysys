@@ -8,7 +8,7 @@ import {
   TenderMatchDecision,
   HardMatchStatus,
 } from './tender-match.types';
-import fs from 'node:fs';
+
 import { TENDER_MATCHING_CONFIG } from '@/config/tender-matching.config';
 
 export function normalizeCpv(cpv: string): string {
@@ -19,7 +19,7 @@ export function buildTenderText(tender: TenderForMatching): string {
   return [
     tender.title,
     tender.description,
-    tender.buyerName,
+    tender.buyers.map((b) => b.name),
     ...(tender.cpvCodes ?? []),
     ...(tender.lotTitles ?? []),
     ...(tender.lotDescriptions ?? []),
@@ -107,7 +107,7 @@ export function matchCountry(
   filter: CompanyTenderFilterForMatching,
 ): RuleMatchResult {
   const tenderCountry = normalizeCountry(
-    tender.placeOfPerformanceCountry ?? tender.country ?? tender.buyerCountry,
+    tender.placeOfPerformanceCountry ?? tender.country,
   );
   const excludedCountries = filter.excludedCountries.map(normalizeCountry);
   const targetCountries = filter.targetCountries.map(normalizeCountry);

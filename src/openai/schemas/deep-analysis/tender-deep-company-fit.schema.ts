@@ -14,6 +14,7 @@ export const DEEP_COMPANY_FIT_LLM_JSON_SCHEMA = {
     'finalRecommendation',
     'bidNoBidDecision',
     'opportunityAnalysis',
+    'buyerSelectionAssessment',
   ],
   properties: {
     executiveSummary: {
@@ -461,6 +462,131 @@ export const DEEP_COMPANY_FIT_LLM_JSON_SCHEMA = {
           enum: ['low', 'medium', 'high', 'unknown'],
           description:
             'Estimated competition level based only on provided tender context. Use unknown if not enough information.',
+        },
+      },
+    },
+
+    buyerSelectionAssessment: {
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'probabilityScore',
+        'probabilityLevel',
+        'summary',
+        'buyerBehaviorSummary',
+        'idealSupplierProfile',
+        'companyAlignmentWithBuyer',
+        'competitivePosition',
+        'winDrivers',
+        'lossDrivers',
+        'recommendationsToIncreaseWinProbability',
+        'buyerSignalsUsed',
+        'dataLimitations',
+      ],
+      properties: {
+        probabilityScore: {
+          type: 'number',
+          minimum: 0,
+          maximum: 100,
+          description:
+            'Estimated probability from 0 to 100 that the buyer would select this company if all formal tender requirements are satisfied and a compliant bid is submitted. This is a cautious analytical estimate, not a prediction guarantee.',
+        },
+        probabilityLevel: {
+          type: 'string',
+          enum: ['low', 'medium', 'high', 'unknown'],
+          description:
+            'Qualitative probability level. Use unknown when buyer intelligence or competition evidence is insufficient.',
+        },
+        summary: {
+          type: 'string',
+          description:
+            'Localized short summary of buyer-selection likelihood for this company.',
+        },
+        buyerBehaviorSummary: {
+          type: 'string',
+          description:
+            'Localized summary of relevant buyer behavior from buyer intelligence. Historical context only; do not claim certainty or unfair preference.',
+        },
+        idealSupplierProfile: {
+          type: 'array',
+          maxItems: 5,
+          items: { type: 'string' },
+          description:
+            'Localized traits of suppliers that appear aligned with the buyer history and tender patterns. Maximum 5 items.',
+        },
+        companyAlignmentWithBuyer: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['matches', 'mismatches'],
+          properties: {
+            matches: {
+              type: 'array',
+              maxItems: 5,
+              items: { type: 'string' },
+              description:
+                'Localized ways this company appears aligned with buyer-side signals. Maximum 5 items.',
+            },
+            mismatches: {
+              type: 'array',
+              maxItems: 5,
+              items: { type: 'string' },
+              description:
+                'Localized ways this company may not align with buyer-side signals or where alignment is unknown. Maximum 5 items.',
+            },
+          },
+        },
+        competitivePosition: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['level', 'explanation'],
+          properties: {
+            level: {
+              type: 'string',
+              enum: ['strong', 'average', 'weak', 'unknown'],
+              description:
+                'Estimated competitive position based on buyer intelligence, company fit, and tender context.',
+            },
+            explanation: {
+              type: 'string',
+              description:
+                'Localized explanation of competitive position. Use cautious language and do not claim certainty.',
+            },
+          },
+        },
+        winDrivers: {
+          type: 'array',
+          maxItems: 5,
+          items: { type: 'string' },
+          description:
+            'Localized factors that may increase win probability if the bid is compliant. Maximum 5 items.',
+        },
+        lossDrivers: {
+          type: 'array',
+          maxItems: 5,
+          items: { type: 'string' },
+          description:
+            'Localized factors that may reduce win probability. Maximum 5 items.',
+        },
+        recommendationsToIncreaseWinProbability: {
+          type: 'array',
+          maxItems: 5,
+          items: { type: 'string' },
+          description:
+            'Localized practical recommendations to improve bid positioning. Maximum 5 items.',
+        },
+        buyerSignalsUsed: {
+          type: 'array',
+          maxItems: 5,
+          items: { type: 'string' },
+          description:
+            'Localized buyer intelligence signals used, such as repeat-supplier pattern, local supplier pattern, value pattern, or data limitations. Maximum 5 items.',
+        },
+        dataLimitations: {
+          type: 'array',
+          maxItems: 5,
+          items: { type: 'string' },
+          description:
+            'Localized limitations that materially reduce confidence in the buyer-selection assessment. Maximum 5 items.',
         },
       },
     },

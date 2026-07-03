@@ -28,11 +28,13 @@ import {
   TenderNormalizerService,
 } from '@/resources/tender-normalizer/tender-normalizer.service';
 import {
+  devLog,
   extractPublicationNumberFromNotice,
+  getMongoRelationObjectIdArray,
   isRecord,
   isTedNotice,
+  tenderPopulateFields,
 } from '@/utils';
-import { tenderCpvPopulateFields } from '@/resources/tenders/utils/tender.utils';
 import { SortOrder, Types } from 'mongoose';
 import {
   TenderDeepAnalysisDocument,
@@ -44,25 +46,10 @@ import {
 } from '@/resources/tender-wishlist/schemas';
 import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rates/currency-exchange-rates.service';
 import { CurrencySign } from '@/resources/codelist';
-import { DeepSeekAnalysisService } from '@/deepseek/deepseek-analysis.service';
+import { LlmAnalysisService } from '@/llm/llm-analysis.service';
 import { TENDER_COMPETITION_SEARCH_FIELDS } from '@/config/ted-search.config';
-
-export interface GatherActiveTendersResult {
-  completed?: boolean;
-  totalCount?: number;
-  pagesFetched: number;
-  noticesFetched: number;
-  tendersSkipped: number;
-  tendersSaved: number;
-  resumeIterationNextToken?: string;
-  errorMessage?: string;
-}
-
-export interface MigrateTenderDateFieldsResult {
-  scanned: number;
-  updated: number;
-  skipped: number;
-}
+import { BuyerService } from '@/resources/buyer/buyer.service';
+import { TMongoId } from '@/types';
 
 export interface SaveNewTedTendersResult {
   saved: number;
@@ -76,12 +63,10 @@ export type TenderDocumentWithGeneralAnalysis = TenderDocument & {
 };
 
 const SHORT_TITLE_GENERATION_BATCH_SIZE = 20;
-const OPTIONAL_TENDER_UNSET_FIELDS = [
+export const OPTIONAL_TENDER_UNSET_FIELDS = [
   'noticeSubtype',
   'noticeVersion',
   'description',
-  'buyerInternetAddress',
-  'buyerProfile',
   'deadlineReceiptTender',
   'questionsDeadline',
   'plannedStartDate',
@@ -90,6 +75,23 @@ const OPTIONAL_TENDER_UNSET_FIELDS = [
   'electronicSubmission',
   'isSmeSuitable',
   'euFundLot',
+  'buyerName',
+  'buyerIdentifier',
+  'buyerCountry',
+  'buyerCity',
+  'buyerMainActivities',
+  'buyerEmail',
+  'buyerInternetAddress',
+  'buyerProfile',
+  'classificationCpv',
+  'publicationNumber',
+  'titleLot',
+  'descriptionLot',
+  'mainClassificationLot',
+  'additionalClassificationLot',
+  'buyerAuthorityMainActivities',
+  'buyerEntityMainActivities',
+  'buyerLegalTypes',
 ] as const;
 
 @Injectable()
@@ -101,13 +103,19 @@ export class TendersService {
     private readonly tedSearchService: TedSearchService,
     private readonly tenderNormalizer: TenderNormalizerService,
     private readonly currencyExchangeRatesService: CurrencyExchangeRatesService,
-    private readonly deepSeekAnalysisService: DeepSeekAnalysisService,
+    private readonly llmAnalysisService: LlmAnalysisService,
     @Inject(forwardRef(() => TenderGeneralAnalysisService))
     private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
+    @Inject(forwardRef(() => BuyerService))
+    private readonly buyerService: BuyerService,
   ) {}
 
-  async upsertTender(notice: TedNotice): Promise<TenderDocument | undefined> {
+  async upsertTender(
+    notice: TedNotice,
+    buyers: { leadIds: TMongoId[]; nonLeadIds: TMongoId[] },
+  ): Promise<TenderDocument | undefined> {
     const normalizedTender = this.tenderNormalizer.normalizeTedNotice(notice);
+
     if (!normalizedTender.id) {
       return;
     }
@@ -117,9 +125,11 @@ export class TendersService {
       this.getLotsWithEurValues(normalizedTender.lots),
     ]);
 
-    const sourceHash = this.buildTenderSourceHash(normalizedTender);
+    const sourceHash = this.buildTenderSourceHash(notice);
     const tenderSet = this.omitUndefinedFields({
       ...normalizedTender,
+      nonLeadBuyers: buyers.nonLeadIds,
+      leadBuyers: buyers.leadIds,
       lots: lotsWithEur,
       estimatedValueEur,
     });
@@ -137,6 +147,7 @@ export class TendersService {
       { returnDocument: 'after', upsert: true, strict: false },
     );
 
+    await tenderDoc.populate(tenderPopulateFields);
     return tenderDoc;
   }
 
@@ -206,30 +217,10 @@ export class TendersService {
     return estimatedValueEur === null ? null : Math.round(estimatedValueEur);
   }
 
-  async upsertMultipleTenders(notices: TedNotice[]): Promise<TenderDocument[]> {
-    const tenders: TenderDocument[] = (await Promise.all(
-      notices.map((notice) => {
-        return this.upsertTender(notice);
-      }),
-    ).then((documents) => documents.filter(Boolean))) as TenderDocument[];
-
-    return tenders;
-  }
-
   async saveNewTedTenders(
     notices: TedNotice[],
   ): Promise<SaveNewTedTendersResult> {
-    const noticesByPublicationNumber = new Map<string, TedNotice>();
-
-    for (const notice of notices) {
-      const publicationNumber = extractPublicationNumberFromNotice(notice);
-
-      if (publicationNumber) {
-        noticesByPublicationNumber.set(publicationNumber, notice);
-      }
-    }
-
-    if (noticesByPublicationNumber.size === 0) {
+    if (!notices.length) {
       return {
         saved: 0,
         updated: 0,
@@ -238,59 +229,57 @@ export class TendersService {
       };
     }
 
-    const publicationNumbers = Array.from(noticesByPublicationNumber.keys());
-    const existingTenders = await TenderModel.find({
-      id: { $in: publicationNumbers },
-    })
-      .select('id noticeVersion sourceHash title shortTitle')
-      .exec();
-
-    const existingTendersByPublicationNumber = new Map(
-      existingTenders.map((tender) => [tender.id, tender] as const),
-    );
     let saved = 0;
     let updated = 0;
-    let skipped = notices.length - noticesByPublicationNumber.size;
+    let skipped = 0;
     const changedTenders: TenderDocument[] = [];
     const tendersForShortTitle: TenderDocument[] = [];
+    const buyerIdsToRefresh = new Set<string>();
 
-    for (const [publicationNumber, notice] of noticesByPublicationNumber) {
-      const existingTender =
-        existingTendersByPublicationNumber.get(publicationNumber);
-
-      const shouldUpdateExistingTender = this.shouldUpdateTenderFromTedNotice(
+    const updateBuyersAndTender = async (notice: TedNotice) => {
+      const publicationNumber = extractPublicationNumberFromNotice(notice);
+      const existingTender = publicationNumber
+        ? await TenderModel.findOne({ id: publicationNumber })
+            .select('sourceHash')
+            .exec()
+        : null;
+      const shouldTrackChangedTender = this.shouldUpdateTenderFromTedNotice(
         existingTender,
         notice,
       );
-
-      if (existingTender && !shouldUpdateExistingTender) {
-        if (!this.hasCompleteShortTitle(existingTender.shortTitle)) {
-          tendersForShortTitle.push(existingTender);
-        }
-
-        skipped += 1;
-        continue;
-      }
-
-      const savedTender = await this.upsertTender(notice);
+      const buyers =
+        await this.buyerService.upsertPureBuyersFromTEDNotice(notice);
+      const savedTender = await this.upsertTender(notice, buyers);
 
       if (savedTender) {
-        if (!this.hasCompleteShortTitle(savedTender.shortTitle)) {
-          tendersForShortTitle.push(savedTender);
+        if (shouldTrackChangedTender) {
+          changedTenders.push(savedTender);
         }
 
-        changedTenders.push(savedTender);
+        [...buyers.leadIds, ...buyers.nonLeadIds].forEach((buyerId) =>
+          buyerIdsToRefresh.add(buyerId.toString()),
+        );
 
-        if (existingTender) {
-          updated += 1;
-        } else {
+        if (!this.hasCompleteShortTitle(savedTender.shortTitle)) {
+          tendersForShortTitle.push(savedTender);
           saved += 1;
         }
       } else {
         skipped += 1;
       }
+    };
+
+    for (const notice of notices) {
+      await updateBuyersAndTender(notice);
     }
 
+    devLog('Refreshing Buyers Meta...');
+
+    await this.buyerService.refreshBuyersTenderMeta(
+      Array.from(buyerIdsToRefresh),
+    );
+
+    devLog('Filling Short Title...');
     await this.fillMissingShortTitles(tendersForShortTitle);
 
     return { saved, updated, skipped, changedTenders };
@@ -319,7 +308,7 @@ export class TendersService {
 
       try {
         const generated =
-          await this.deepSeekAnalysisService.generateTenderShortTitles(
+          await this.llmAnalysisService.generateTenderShortTitles(
             batch.map((tender) => ({
               id: tender.id,
               title: tender.title ?? '',
@@ -394,10 +383,7 @@ export class TendersService {
       return true;
     }
 
-    const normalizedTenderDto =
-      this.tenderNormalizer.normalizeTedNotice(notice);
-
-    const sourceHash = this.buildTenderSourceHash(normalizedTenderDto);
+    const sourceHash = this.buildTenderSourceHash(notice);
 
     return tender.sourceHash !== sourceHash;
   }
@@ -427,7 +413,7 @@ export class TendersService {
       { strict: false },
     );
 
-    return localTender.populate(tenderCpvPopulateFields);
+    return localTender;
   }
 
   async getNormalizedTenderWithBaseAnalysis(tedTender: any) {
@@ -443,7 +429,7 @@ export class TendersService {
     return tedTender;
   }
 
-  async fineLocalTenders(
+  async findLocalTenders(
     tenderQuery: Record<string, unknown>,
     options: {
       sort?: Record<string, SortOrder>;
@@ -455,7 +441,7 @@ export class TendersService {
       .sort(options.sort ?? {})
       .skip(options.skip ?? 0)
       .limit(options.limit ?? 0)
-      .populate(tenderCpvPopulateFields);
+      .populate(tenderPopulateFields);
   }
 
   async findMultipleLocalTendersWithBaseAnalysis(
@@ -467,7 +453,7 @@ export class TendersService {
     } = {},
     withoutBaseAnalysisGenerating?: boolean,
   ): Promise<TenderDocumentWithGeneralAnalysis[]> {
-    const localTenders = await this.fineLocalTenders(tenderQuery, options);
+    const localTenders = await this.findLocalTenders(tenderQuery, options);
 
     let generalAnalyses: TenderGeneralAnalysisDocument[] = [];
 
@@ -564,7 +550,9 @@ export class TendersService {
     }
 
     let savedTender: TenderDocument | null | undefined =
-      await TenderModel.findOne({ id: publicationNumber }).exec();
+      await TenderModel.findOne({ id: publicationNumber })
+        .populate(tenderPopulateFields)
+        .exec();
 
     const shouldUpsertTender = this.shouldUpdateTenderFromTedNotice(
       savedTender,
@@ -572,7 +560,10 @@ export class TendersService {
     );
 
     if (shouldUpsertTender) {
-      savedTender = await this.upsertTender(notice);
+      const buyers =
+        await this.buyerService.upsertPureBuyersFromTEDNotice(notice);
+
+      savedTender = await this.upsertTender(notice, buyers);
     }
 
     if (!savedTender) {
@@ -615,9 +606,7 @@ export class TendersService {
 
     return TenderModel.findOne({
       id: publicationNumber,
-    })
-      .populate(tenderCpvPopulateFields)
-      .exec();
+    }).populate(tenderPopulateFields);
   }
 
   toWholeTenderListDto(
@@ -700,9 +689,9 @@ export class TendersService {
     });
   }
 
-  buildTenderSourceHash(normalizedTender: NormalizedTenderDto): string {
+  buildTenderSourceHash(notice: TedNotice): string {
     return createHash('sha256')
-      .update(JSON.stringify(normalizedTender))
+      .update((notice['notice-version'] ?? 1).toString())
       .digest('hex');
   }
 
@@ -717,17 +706,7 @@ export class TendersService {
   private buildTenderUnset(
     normalizedTender: NormalizedTenderDto,
   ): Record<string, ''> {
-    const unset: Record<string, ''> = {
-      classificationCpv: '',
-      publicationNumber: '',
-      titleLot: '',
-      descriptionLot: '',
-      mainClassificationLot: '',
-      additionalClassificationLot: '',
-      buyerAuthorityMainActivities: '',
-      buyerEntityMainActivities: '',
-      buyerLegalTypes: '',
-    };
+    const unset: Record<string, ''> = {};
 
     for (const field of OPTIONAL_TENDER_UNSET_FIELDS) {
       if (normalizedTender[field] === undefined) {

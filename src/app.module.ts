@@ -1,9 +1,10 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { CacheModule } from '@nestjs/cache-manager';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { DeepSeekModule } from './deepseek/deepseek.module';
+import { LlmModule } from './llm/llm.module';
 import { CpvModule } from './resources/cpv/cpv.module';
 import { TedSearchModule } from './resources/ted-search/ted-search.module';
 import { TenderGeneralAnalysisModule } from './resources/tender-analysis/tender-general-analysis.module';
@@ -26,9 +27,15 @@ import { AwardTenderModule } from './resources/award-tender/award-tender.module'
 import { TechModule } from './resources/tech/tech.module';
 import { CronModule } from './resources/cron/cron.module';
 import { TenderNormalizerModule } from '@/resources/tender-normalizer/tender-normalizer.module';
+import { BuyerIntelligenceModule } from '@/resources/buyer-intelligence';
+import { BuyerModule } from '@/resources/buyer/buyer.module';
 
 @Module({
   imports: [
+    CacheModule.register({
+      isGlobal: true,
+      ttl: 10 * 60 * 1000,
+    }),
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     CronModule,
@@ -38,7 +45,7 @@ import { TenderNormalizerModule } from '@/resources/tender-normalizer/tender-nor
     TendersModule,
     TenderGeneralAnalysisModule,
     TenderDeepAnalysisModule,
-    DeepSeekModule,
+    LlmModule,
     AuthModule,
     UsersModule,
     CodelistModule,
@@ -53,6 +60,8 @@ import { TenderNormalizerModule } from '@/resources/tender-normalizer/tender-nor
     AwardTenderModule,
     TechModule,
     TenderNormalizerModule,
+    BuyerIntelligenceModule,
+    BuyerModule,
   ],
   controllers: [AppController],
   providers: [AppService],

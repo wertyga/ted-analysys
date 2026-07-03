@@ -1,14 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import {
   TenderDeepAnalysisResult,
+  TenderAnalysisTenderDto,
+  TenderDeepBuyerIntelligenceInput,
   TenderDeepCompanyFitAnalysisInput,
 } from '@/types';
 import { TenderDocument } from '../tenders/schemas';
 import { CompanyTenderFilterDocument } from '@/resources/company-filter/company-filter.schema';
 import { TenderGeneralAnalysisDocument } from '../tender-analysis/schemas';
+import { TenderGeneralAnalysisBuilder } from '@/resources/tender-analysis/tender-general-analysis.builder';
 
 @Injectable()
 export class TenderDeepAnalysisBuilder {
+  constructor(
+    private readonly generalAnalysisBuilder: TenderGeneralAnalysisBuilder,
+  ) {}
+
   buildCompanyAnalysisDto(company: any, companyDocumentEvidence: any): any {
     return {
       companyName: company.companyName,
@@ -27,11 +34,13 @@ export class TenderDeepAnalysisBuilder {
       companyDocumentEvidence,
     };
   }
+
   buildInput(params: {
     tender: TenderDocument;
     generalAnalysis: TenderGeneralAnalysisDocument;
     company: any;
     companyAnalysis: CompanyTenderFilterDocument;
+    buyerIntelligence: TenderDeepBuyerIntelligenceInput[];
     documentMetadata: any[];
     documentTextSnippets: any[];
     outputLanguage: string;
@@ -54,15 +63,64 @@ export class TenderDeepAnalysisBuilder {
       tenderValueEur: params.tender.estimatedValueEur || null,
       isExpired: deadline ? deadline.getTime() < now.getTime() : false,
     } as any;
+
     return {
-      tender: params.tender as any,
+      tender: this.buildTenderInput(params.tender),
       generalAnalysis: params.generalAnalysis,
       company: params.company,
       companyAnalysis: params.companyAnalysis,
+      buyerIntelligence: params.buyerIntelligence,
       derived,
       documentMetadata: params.documentMetadata,
       documentTextSnippets: params.documentTextSnippets,
       outputLanguage: params.outputLanguage,
+    };
+  }
+
+  private buildTenderInput(tender: TenderDocument): TenderAnalysisTenderDto {
+    return {
+      id: tender.id,
+      noticeType: tender.noticeType,
+      noticeSubtype: tender.noticeSubtype,
+      noticeVersion: tender.noticeVersion,
+      procedureType: tender.procedureType,
+      title: tender.title,
+      titleProc: tender.titleProc,
+      description: tender.description,
+      lots: tender.lots ?? [],
+      estimatedValue: tender.estimatedValue,
+      noticeLanguage: tender.noticeLanguage,
+      submissionLanguages: tender.submissionLanguages,
+      leadBuyers: tender.leadBuyers.flatMap((buyer) =>
+        this.generalAnalysisBuilder.buildBuyerInput(buyer),
+      ),
+      nonLeadBuyers: tender.nonLeadBuyers.flatMap((buyer) =>
+        this.generalAnalysisBuilder.buildBuyerInput(buyer),
+      ),
+      publicationDate: tender.publicationDate,
+      dispatchDate: tender.dispatchDate,
+      submissionDeadline: tender.submissionDeadline,
+      questionsDeadline: tender.questionsDeadline,
+      plannedStartDate: tender.plannedStartDate,
+      plannedEndDate: tender.plannedEndDate,
+      duration: tender.duration,
+      contractNature: tender.contractNature,
+      legalBasis: tender.legalBasis,
+      isDps: tender.isDps,
+      isFrameworkAgreement: tender.isFrameworkAgreement,
+      isSmeSuitable: tender.isSmeSuitable,
+      electronicSubmission: tender.electronicSubmission,
+      cpvCodes: this.generalAnalysisBuilder.resolveCpvCodesForPrompt(
+        tender.cpvCodes ?? [],
+      ),
+      placeOfPerformanceCountries: tender.placeOfPerformanceCountries,
+      placeOfPerformanceCities: tender.placeOfPerformanceCities,
+      documentUrls: tender.documentUrls,
+      submissionUrls: tender.submissionUrls,
+      euFundLot: tender.euFundLot,
+      selectionCriteria: tender.selectionCriteria,
+      awardCriteria: tender.awardCriteria,
+      links: tender.links,
     };
   }
 

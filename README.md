@@ -200,9 +200,10 @@ Shared helpers live in `src/utils`.
 
 ## Model Configuration
 
-- `DEEPSEEK_GENERAL_ANALYSIS_MODEL`: model for general tender analysis.
-- `DEEPSEEK_DEEP_ANALYSIS_MODEL`: model for company-specific deep analysis. Falls back to `DEEPSEEK_GENERAL_ANALYSIS_MODEL` when unset.
-- `OPENAI_GENERAL_ANALYSIS_MODEL` and `OPENAI_DEEP_ANALYSIS_MODEL` follow the same split for the OpenAI provider.
+- `LLM_PROVIDER`: `deepseek` by default, or `openai`.
+- `LLM_API_KEY`: shared API key override. Otherwise use `DEEPSEEK_API_KEY` or `OPENAI_API_KEY`.
+- `LLM_BASE_URL`: optional shared base URL override. DeepSeek defaults to `https://api.deepseek.com`; OpenAI uses the SDK default.
+- `LLM_GENERAL_ANALYSIS_MODEL` and `LLM_DEEP_ANALYSIS_MODEL`: required model names.
 
 ## Data Notes
 

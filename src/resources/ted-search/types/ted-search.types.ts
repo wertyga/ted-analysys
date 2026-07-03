@@ -17,7 +17,6 @@ export enum TedSortOrder {
 export enum TedTenderSortColumn {
   PUBLICATION_DATE = 'publication-date',
   DEADLINE = 'deadline',
-  BUYER_COUNTRY = 'buyer-country',
   BUDGET = 'total-value',
 }
 

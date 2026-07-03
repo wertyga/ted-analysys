@@ -40,7 +40,7 @@ type AwardTenderCpvProjection = {
 export class ContractorsTechService {
   async compressContractors() {
     const contractors = await ContractorModel.find({
-      email: { $exists: true, $ne: null },
+      'emails.0': { $exists: true },
     });
 
     const awardTenders = await AwardTenderModel.find({})
@@ -65,18 +65,13 @@ export class ContractorsTechService {
         contractorIds,
       );
 
-      const awardTenderIds = contractorAwardTenders
-        .map((tender) => this.toIdString(tender._id))
-        .filter(Boolean);
-
       await ContractorModel.findByIdAndUpdate(canonicalContractor._id, {
         $set: {
           ...this.buildCompressedContractor(
             contractors,
             contractorAwardTenders,
           ),
-          email,
-          awardTenders: awardTenderIds,
+          emails: [email],
         },
       });
 
@@ -94,6 +89,24 @@ export class ContractorsTechService {
                   { $setDifference: ['$winners', duplicateIds] },
                   [canonicalContractor._id],
                 ],
+              },
+              lots: {
+                $map: {
+                  input: '$lots',
+                  as: 'lot',
+                  in: {
+                    $cond: [
+                      { $in: ['$$lot.winner', duplicateIds] },
+                      {
+                        $mergeObjects: [
+                          '$$lot',
+                          { winner: canonicalContractor._id },
+                        ],
+                      },
+                      '$$lot',
+                    ],
+                  },
+                },
               },
             },
           },
@@ -209,9 +222,9 @@ export class ContractorsTechService {
   ): Promise<ContractorCsvRow[]> {
     const contractors = await ContractorModel.find({}).then((contractors) => {
       const contractorByEmail = contractors
-        .filter((contractor) => !!contractor.email)
+        .filter((contractor) => !!this.getContractorEmail(contractor))
         .reduce<Record<string, ContractorDocument>>((acc, contractor) => {
-          const email = this.normalizeEmail(contractor.email);
+          const email = this.getContractorEmail(contractor);
 
           if (!email || excludeEmails.has(email)) {
             return acc;
@@ -228,7 +241,7 @@ export class ContractorsTechService {
     });
 
     return Object.values(contractors).map((contractor) => ({
-      email: contractor.email,
+      email: this.getContractorEmail(contractor),
       name: contractor.name,
       country: contractor.countries?.[0],
       cpv: contractor.cpvCodes,
@@ -330,6 +343,10 @@ export class ContractorsTechService {
     return email?.trim().toLowerCase() ?? '';
   }
 
+  private getContractorEmail(contractor: ContractorDocument) {
+    return this.normalizeEmail(contractor.emails?.[0]);
+  }
+
   private normalizeCoupon(coupon?: string) {
     return coupon?.trim().toUpperCase() ?? '';
   }
@@ -340,7 +357,7 @@ export class ContractorsTechService {
     const contractorByEmail = contractors.reduce<
       Record<string, ContractorDocument[]>
     >((acc, contractor) => {
-      const email = this.normalizeEmail(contractor.email);
+      const email = this.getContractorEmail(contractor);
 
       if (!email) {
         return acc;
@@ -372,7 +389,7 @@ export class ContractorsTechService {
 
     return {
       name: this.firstContractorValue(contractors, 'name'),
-      identifier: this.firstContractorValue(contractors, 'identifier'),
+      identifiers: this.firstContractorValue(contractors, 'identifiers'),
       countries,
       countrySubs,
       cities,

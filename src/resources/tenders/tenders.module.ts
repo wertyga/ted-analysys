@@ -7,8 +7,9 @@ import { TendersService } from './tenders.service';
 import { TenderWishlistModule } from '@/resources/tender-wishlist/tender-wishlist.module';
 import { CurrencyExchangeRatesModule } from '@/resources/currency-exchange-rates/currency-exchange-rates.module';
 import { TariffModule } from '@/resources/tariff';
-import { DeepSeekModule } from '@/deepseek/deepseek.module';
+import { LlmModule } from '@/llm/llm.module';
 import { TenderNormalizerModule } from '@/resources/tender-normalizer/tender-normalizer.module';
+import { BuyerModule } from '@/resources/buyer/buyer.module';
 
 @Module({
   imports: [
@@ -16,9 +17,10 @@ import { TenderNormalizerModule } from '@/resources/tender-normalizer/tender-nor
     forwardRef(() => TenderGeneralAnalysisModule),
     forwardRef(() => TenderWishlistModule),
     CurrencyExchangeRatesModule,
-    DeepSeekModule,
+    LlmModule,
     TariffModule,
     TenderNormalizerModule,
+    forwardRef(() => BuyerModule),
   ],
   controllers: [TendersAdmController, TendersController],
   providers: [TendersService],

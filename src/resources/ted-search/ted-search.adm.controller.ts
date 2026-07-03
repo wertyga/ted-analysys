@@ -5,7 +5,6 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiServiceUnavailableResponse,
-  ApiTags,
 } from '@nestjs/swagger';
 import { TedTenderSearchRequestDto } from './dto/ted-tender-search-request.dto';
 import { TedSearchService } from './ted-search.service';
@@ -13,6 +12,8 @@ import { TedSearchResponse } from './types/ted-search.types';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { AdminAccessGuard } from '@/guards';
+import { getEngValueOrFirst } from '@/utils';
+import { extractLotWinnersFromXml } from '@/resources/award-tender/utils';
 import fs from 'node:fs';
 
 @Controller('/ted/adm')
@@ -41,21 +42,21 @@ export class TedSearchAdminController {
         body.noticeTypes !== null ? TENDER_COMPETITION_NOTICE_TYPES : undefined,
     });
 
-    const tendersWithBaseAnalysis =
-      await this.tendersService.upsertIfNeededMultipleTendersWithGeneralAnalysis(
-        noticeData.notices ?? [],
-      );
-
-    const listTenders = tendersWithBaseAnalysis.map((tba) => {
-      return this.tendersService.toWholeTenderListDto(tba);
-    });
-
-    if (req.user) {
-      await this.tendersService.fillUpTenderListByDeepAnalysisAndWishListStatus(
-        listTenders,
-        req.user._id.toString(),
-      );
-    }
+    // const tendersWithBaseAnalysis =
+    //   await this.tendersService.upsertIfNeededMultipleTendersWithGeneralAnalysis(
+    //     noticeData.notices ?? [],
+    //   );
+    //
+    // const listTenders = tendersWithBaseAnalysis.map((tba) => {
+    //   return this.tendersService.toWholeTenderListDto(tba);
+    // });
+    //
+    // if (req.user) {
+    //   await this.tendersService.fillUpTenderListByDeepAnalysisAndWishListStatus(
+    //     listTenders,
+    //     req.user._id.toString(),
+    //   );
+    // }
 
     return noticeData;
   }

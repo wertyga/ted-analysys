@@ -7,6 +7,7 @@ import {
 } from '@/utils';
 import { TenderDocument } from '@/resources/tenders/schemas';
 import { TenderForMatching } from './tender-match.types';
+import { BuyerDocument } from '@/resources/buyer/schemas';
 
 export function mapTenderForMatching(
   tender: TenderDocument,
@@ -19,7 +20,7 @@ export function mapTenderForMatching(
     description: readString(tender.description),
     cpvCodes: readStringArray(tender.cpvCodes),
     country: null,
-    buyerCountry: readString(tender.buyerCountry),
+    buyers: tender.leadBuyers as BuyerDocument[],
     placeOfPerformanceCountry:
       readStringArray(tender.placeOfPerformanceCountries)[0] ?? null,
     estimatedValue: estimatedValue.amount,
@@ -36,7 +37,6 @@ export function mapTenderForMatching(
         ? [readString(tender.noticeLanguage) as string]
         : []),
     ],
-    buyerName: readString(tender.buyerName),
     lotTitles: readStringArray(tender.lots?.map((lot) => lot.title)),
     lotDescriptions: readStringArray(
       tender.lots?.map((lot) => lot.description),

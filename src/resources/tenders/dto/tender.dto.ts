@@ -1,23 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TenderGeneralAnalysisDetailDto } from '../../tender-analysis/dto/tender-general-analysis.dto';
-import { TenderLot } from '@/resources/tenders/schemas';
-
-export class TenderCpvDto {
-  @ApiProperty({ example: '72000000' })
-  code!: string;
-
-  @ApiPropertyOptional({
-    example:
-      'IT services: consulting, software development, Internet and support',
-  })
-  name?: string;
-
-  @ApiPropertyOptional({ example: '72000000' })
-  parentCode?: string;
-
-  @ApiPropertyOptional({ example: 2 })
-  level?: number;
-}
+import { Tender, TenderLot } from '@/resources/tenders/schemas';
+import * as schemas from '@/resources/buyer/schemas';
+import { BuyerListDto } from '@/resources/buyer/schemas';
 
 export class TenderEstimatedValueDto {
   @ApiPropertyOptional({ example: 1250000 })
@@ -242,54 +227,14 @@ export class TenderDto {
   submissionLanguages?: string[];
 
   @ApiPropertyOptional({
-    example: 'City of Helsinki',
-    description: 'TED buyer-name: contracting buyer name.',
+    description: 'Buyer obj',
   })
-  buyerName?: string;
+  nonLeadBuyers: schemas.BuyerDocument[];
 
   @ApiPropertyOptional({
-    example: '1234567-8',
-    description: 'TED buyer-identifier: buyer national or registry identifier.',
+    description: 'Buyer obj',
   })
-  buyerIdentifier?: string;
-
-  @ApiPropertyOptional({
-    example: 'FIN',
-    description:
-      'TED buyer-country: country of the buyer, not necessarily place of performance.',
-  })
-  buyerCountry?: string;
-
-  @ApiPropertyOptional({
-    example: 'Helsinki',
-    description: 'TED buyer-city: buyer city.',
-  })
-  buyerCity?: string;
-
-  @ApiPropertyOptional({
-    type: [String],
-    example: ['education'],
-    description: 'TED main-activity: buyer main activities.',
-  })
-  buyerMainActivities?: string[];
-
-  @ApiPropertyOptional({
-    example: 'procurement@example.com',
-    description: 'TED buyer-email: buyer contact email.',
-  })
-  buyerEmail?: string;
-
-  @ApiPropertyOptional({
-    example: 'https://example.com',
-    description: 'TED buyer-internet-address: buyer website.',
-  })
-  buyerInternetAddress?: string;
-
-  @ApiPropertyOptional({
-    example: 'https://example.com/buyer-profile',
-    description: 'TED buyer-profile: buyer procurement profile URL.',
-  })
-  buyerProfile?: string;
+  leadBuyers: schemas.BuyerDocument[];
 
   @ApiPropertyOptional({
     example: '2023-12-13Z',
@@ -489,11 +434,6 @@ export type TenderListDto = Omit<
   | 'links'
   | 'noticeVersion'
   | 'titleProc'
-  | 'buyerIdentifier'
-  | 'buyerCity'
-  | 'buyerEmail'
-  | 'buyerInternetAddress'
-  | 'buyerProfile'
   | 'dispatchDate'
   | 'deadlineReceiptTender'
   | 'duration'
@@ -502,4 +442,6 @@ export type TenderListDto = Omit<
   | 'submissionUrls'
   | 'selectionCriteria'
   | 'awardCriteria'
->;
+  | 'nonLeadBuyers'
+  | 'leadBuyers'
+> & { nonLeadBuyers: BuyerListDto[]; leadBuyers: BuyerListDto[] };
