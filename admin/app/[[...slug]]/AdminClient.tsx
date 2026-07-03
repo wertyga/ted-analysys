@@ -79,6 +79,8 @@ type GatherAllCompetitionTendersStatus = {
   isRunning: boolean;
 };
 
+type TechJobResult = Record<string, unknown>;
+
 const tokenStorageKey = 'ted-admin-token';
 
 class ApiRequestError extends Error {
@@ -171,6 +173,12 @@ export default function AdminApp() {
     useState(false);
   const [collectAwardBuyersLoading, setCollectAwardBuyersLoading] =
     useState(false);
+  const [gatherAllCompetitionLoading, setGatherAllCompetitionLoading] =
+    useState(false);
+  const [awardTendersRefreshLoading, setAwardTendersRefreshLoading] =
+    useState(false);
+  const [awardTendersRefreshResult, setAwardTendersRefreshResult] =
+    useState<TechJobResult | null>(null);
   const [gatherAllStatus, setGatherAllStatus] =
     useState<GatherAllCompetitionTendersStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -498,6 +506,7 @@ export default function AdminApp() {
     setShortTitlesResult(null);
     setDbCopyResult(null);
     setGatherAllStatus(null);
+    setAwardTendersRefreshResult(null);
   }
 
   async function generateSitemap(event: FormEvent<HTMLFormElement>) {
@@ -672,6 +681,73 @@ export default function AdminApp() {
     }
   }
 
+  async function gatherAllCompetitionTenders() {
+    const confirmed = window.confirm(
+      'Start full competition tender gathering from TED? This can take a long time.',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setGatherAllCompetitionLoading(true);
+    setMessage('');
+
+    try {
+      await request('/adm/tech/tenders/gather-all-competition', {
+        method: 'POST',
+        token,
+      });
+
+      setMessage('Full competition tender gathering started.');
+      await loadGatherAllStatus(token);
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Failed to start full competition tender gathering',
+      );
+    } finally {
+      setGatherAllCompetitionLoading(false);
+    }
+  }
+
+  async function refreshAwardTendersHistory() {
+    const confirmed = window.confirm(
+      'Refresh award tenders from TED result notices? This can take a long time.',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setAwardTendersRefreshLoading(true);
+    setAwardTendersRefreshResult(null);
+    setMessage('');
+
+    try {
+      const result = await request<TechJobResult>(
+        '/adm/tech/award-tenders/refresh',
+        {
+          method: 'POST',
+          body: JSON.stringify({}),
+          token,
+        },
+      );
+
+      setAwardTendersRefreshResult(result ?? {});
+      setMessage('Award tender refresh finished.');
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Failed to refresh award tenders',
+      );
+    } finally {
+      setAwardTendersRefreshLoading(false);
+    }
+  }
+
   return (
     <main className="shell">
       <aside className="sidebar">
@@ -829,6 +905,80 @@ export default function AdminApp() {
                       <Tag>UNKNOWN</Tag>
                     )}
                   </div>
+                </section>
+
+                <section className="panel panelWide">
+                  <div className="panelHeader">
+                    <div>
+                      <h2>Tender history refresh</h2>
+                      <p>
+                        Run TED history jobs for competition tenders and award
+                        result notices.
+                      </p>
+                    </div>
+                    <div className="buttonGroup">
+                      <button
+                        disabled={
+                          gatherAllCompetitionLoading ||
+                          Boolean(gatherAllStatus?.isRunning)
+                        }
+                        onClick={gatherAllCompetitionTenders}
+                        type="button"
+                      >
+                        {gatherAllCompetitionLoading ||
+                        gatherAllStatus?.isRunning
+                          ? 'Gathering competition...'
+                          : 'Gather all competition'}
+                      </button>
+                      <button
+                        className="secondaryButton"
+                        disabled={awardTendersRefreshLoading}
+                        onClick={refreshAwardTendersHistory}
+                        type="button"
+                      >
+                        {awardTendersRefreshLoading
+                          ? 'Refreshing awards...'
+                          : 'Refresh award tenders'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="statusList">
+                    <div>
+                      <span>Competition gathering</span>
+                      <Tag
+                        color={
+                          gatherAllCompetitionLoading ||
+                          gatherAllStatus?.isRunning
+                            ? 'processing'
+                            : 'default'
+                        }
+                      >
+                        {gatherAllCompetitionLoading ||
+                        gatherAllStatus?.isRunning
+                          ? 'RUNNING'
+                          : 'IDLE'}
+                      </Tag>
+                    </div>
+                    <div>
+                      <span>Award tender refresh</span>
+                      <Tag
+                        color={
+                          awardTendersRefreshLoading
+                            ? 'processing'
+                            : 'default'
+                        }
+                      >
+                        {awardTendersRefreshLoading ? 'RUNNING' : 'IDLE'}
+                      </Tag>
+                    </div>
+                  </div>
+
+                  {awardTendersRefreshResult ? (
+                    <pre className="jsonResult">
+                      {JSON.stringify(awardTendersRefreshResult, null, 2)}
+                    </pre>
+                  ) : null}
                 </section>
 
                 <section className="panel panelWide">

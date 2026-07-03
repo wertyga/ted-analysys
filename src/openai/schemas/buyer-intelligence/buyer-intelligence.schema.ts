@@ -8,6 +8,7 @@ export const BUYER_INTELLIGENCE_LLM_JSON_SCHEMA = {
     'supplierLandscape',
     'historicalTrends',
     'dataLimitations',
+    'buyerDecisionSignals',
   ],
   properties: {
     summary: {
@@ -95,6 +96,49 @@ export const BUYER_INTELLIGENCE_LLM_JSON_SCHEMA = {
       items: { type: 'string' },
       description:
         'Only limitations that materially reduce confidence. Avoid obvious limitations already visible from UI statistics. Do not mention disagreement between recent examples and backend signals.',
+    },
+
+    buyerDecisionSignals: {
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'idealSupplierProfile',
+        'supplierPatternSignals',
+        'competitionSignals',
+        'dataConfidence',
+      ],
+      properties: {
+        idealSupplierProfile: {
+          type: 'array',
+          minItems: 0,
+          maxItems: 5,
+          items: { type: 'string' },
+          description:
+            'Traits of suppliers that appear well aligned with this buyer history and tender patterns. Do not evaluate any specific company.',
+        },
+        supplierPatternSignals: {
+          type: 'array',
+          minItems: 0,
+          maxItems: 5,
+          items: { type: 'string' },
+          description:
+            'Historical supplier-side signals such as repeat suppliers, domestic suppliers, supplier concentration, or supplier diversity.',
+        },
+        competitionSignals: {
+          type: 'array',
+          minItems: 0,
+          maxItems: 5,
+          items: { type: 'string' },
+          description:
+            'Buyer-history signals that may affect market competitiveness. Do not estimate win probability.',
+        },
+        dataConfidence: {
+          type: 'string',
+          enum: ['low', 'medium', 'high'],
+          description:
+            'Confidence level based on depth and consistency of available buyer history.',
+        },
+      },
     },
   },
 } as const;

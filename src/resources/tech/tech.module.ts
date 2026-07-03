@@ -19,6 +19,7 @@ import { TendersCronModule } from '@/resources/cron/tenders-cron/tenders-cron.mo
 import { BuyerTechService } from '@/resources/tech/buyer/buyer.tech.service';
 import { BuyerModule } from '@/resources/buyer/buyer.module';
 import { BuyerTechController } from '@/resources/tech/buyer/buyer.tech.controller';
+import { TedOpenTendersCollectorModule } from '@/resources/ted-open-tenders-collector/ted-open-tenders-collector.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { BuyerTechController } from '@/resources/tech/buyer/buyer.tech.controlle
     TendersModule,
     TendersCronModule,
     BuyerModule,
+    TedOpenTendersCollectorModule,
   ],
   controllers: [
     AwardTendersTechController,

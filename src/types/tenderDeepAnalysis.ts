@@ -157,11 +157,21 @@ export interface TenderDeepAnalysisResult {
     probabilityScore: number;
     probabilityLevel: 'low' | 'medium' | 'high' | 'unknown';
     summary: string;
-    rationale: string;
-    positiveFactors: string[];
-    negativeFactors: string[];
-    assumptions: string[];
+    buyerBehaviorSummary: string;
+    idealSupplierProfile: string[];
+    companyAlignmentWithBuyer: {
+      matches: string[];
+      mismatches: string[];
+    };
+    competitivePosition: {
+      level: 'strong' | 'average' | 'weak' | 'unknown';
+      explanation: string;
+    };
+    winDrivers: string[];
+    lossDrivers: string[];
+    recommendationsToIncreaseWinProbability: string[];
     buyerSignalsUsed: string[];
+    dataLimitations: string[];
   };
 }
 
@@ -376,4 +386,10 @@ export interface TenderDeepBuyerIntelligenceInput {
   };
   historicalTrends?: string[];
   dataLimitations?: string[];
+  buyerDecisionSignals?: {
+    idealSupplierProfile?: string[];
+    supplierPatternSignals?: string[];
+    competitionSignals?: string[];
+    dataConfidence?: 'low' | 'medium' | 'high';
+  };
 }

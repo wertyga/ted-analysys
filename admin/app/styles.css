@@ -297,6 +297,19 @@ h2 {
   font-weight: 700;
 }
 
+.jsonResult {
+  background: #101828;
+  border-radius: 8px;
+  color: #e6edf7;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 16px 0 0;
+  max-height: 360px;
+  overflow: auto;
+  padding: 14px;
+  white-space: pre-wrap;
+}
+
 .table {
   border: 1px solid var(--line);
   border-radius: 8px;

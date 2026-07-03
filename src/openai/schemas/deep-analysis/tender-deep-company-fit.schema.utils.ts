@@ -226,11 +226,25 @@ export const TENDER_DEEP_COMPANY_FIT_LLM_RESPONSE_SCHEMA = z
         probabilityScore: scoreSchema,
         probabilityLevel: z.enum(['low', 'medium', 'high', 'unknown']),
         summary: z.string(),
-        rationale: z.string(),
-        positiveFactors: z.array(z.string()).max(5),
-        negativeFactors: z.array(z.string()).max(5),
-        assumptions: z.array(z.string()).max(5),
+        buyerBehaviorSummary: z.string(),
+        idealSupplierProfile: z.array(z.string()).max(5),
+        companyAlignmentWithBuyer: z
+          .object({
+            matches: z.array(z.string()).max(5),
+            mismatches: z.array(z.string()).max(5),
+          })
+          .strict(),
+        competitivePosition: z
+          .object({
+            level: z.enum(['strong', 'average', 'weak', 'unknown']),
+            explanation: z.string(),
+          })
+          .strict(),
+        winDrivers: z.array(z.string()).max(5),
+        lossDrivers: z.array(z.string()).max(5),
+        recommendationsToIncreaseWinProbability: z.array(z.string()).max(5),
         buyerSignalsUsed: z.array(z.string()).max(5),
+        dataLimitations: z.array(z.string()).max(5),
       })
       .strict(),
   })
@@ -257,6 +271,7 @@ const DEEP_COMPANY_FIT_ENUM_DEFAULTS: Record<string, string> = {
   'bidNoBidDecision.decision': 'bid_if_profile_completed',
   'opportunityAnalysis.likelyCompetitionLevel': 'unknown',
   'buyerSelectionAssessment.probabilityLevel': 'unknown',
+  'buyerSelectionAssessment.competitivePosition.level': 'unknown',
 };
 
 /**

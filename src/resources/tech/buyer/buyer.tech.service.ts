@@ -3,7 +3,6 @@ import _chunk from 'lodash/chunk';
 import { TenderModel } from '@/resources/tenders/schemas';
 import { BuyerNormalizer } from '@/resources/buyer/buyer.normalizer';
 import { Injectable } from '@nestjs/common';
-import { TedSearchService } from '@/resources/ted-search/ted-search.service';
 import { BuyerService } from '@/resources/buyer/buyer.service';
 import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
 import { TedOpenTendersCollectorService } from '@/resources/ted-open-tenders-collector/ted-open-tenders-collector.service';
@@ -16,20 +15,13 @@ import { AWARD_HISTORY_FIELDS } from '@/config/award-tender.config';
 @Injectable()
 export class BuyerTechService {
   normalizer = new BuyerNormalizer();
-  collector: TedOpenTendersCollectorService;
 
   constructor(
-    private tedSearchService: TedSearchService,
-    private buyerService: BuyerService,
+    private collector: TedOpenTendersCollectorService,
     private tendersService: TendersService,
     private awardTenderService: AwardTenderService,
-  ) {
-    this.collector = new TedOpenTendersCollectorService(
-      this.tedSearchService,
-      this.tendersService,
-      this.awardTenderService,
-    );
-  }
+    private buyerService: BuyerService,
+  ) {}
 
   async collectBuyersFromTenderAndUnsetTenderFields(notice: TedNotice) {
     const tender = await TenderModel.findOne({
@@ -40,7 +32,11 @@ export class BuyerTechService {
       return;
     }
 
-    return await this.tendersService.upsertTender(notice);
+    const buyers = await this.buyerService.upsertPureBuyersFromTEDNotice(
+      notice,
+    );
+
+    return await this.tendersService.upsertTender(notice, buyers);
   }
 
   async collectBuyersFromTenderAllAndUnsetTenderFields() {

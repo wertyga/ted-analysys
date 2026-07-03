@@ -560,6 +560,10 @@ export class BuyerIntelligenceService {
       ? value.supplierLandscape
       : {};
 
+    const buyerDecisionSignals = isRecord(value.buyerDecisionSignals)
+      ? value.buyerDecisionSignals
+      : {};
+
     return {
       summary: getString(value, 'summary'),
 
@@ -580,7 +584,27 @@ export class BuyerIntelligenceService {
 
       historicalTrends: getNormalizedStringArray(value.historicalTrends),
       dataLimitations: getNormalizedStringArray(value.dataLimitations),
+      buyerDecisionSignals: {
+        idealSupplierProfile: getNormalizedStringArray(
+          buyerDecisionSignals.idealSupplierProfile,
+        ),
+        supplierPatternSignals: getNormalizedStringArray(
+          buyerDecisionSignals.supplierPatternSignals,
+        ),
+        competitionSignals: getNormalizedStringArray(
+          buyerDecisionSignals.competitionSignals,
+        ),
+        dataConfidence: this.getBuyerDecisionSignalsDataConfidence(
+          buyerDecisionSignals.dataConfidence,
+        ),
+      },
     };
+  }
+
+  private getBuyerDecisionSignalsDataConfidence(
+    value: unknown,
+  ): 'low' | 'medium' | 'high' {
+    return value === 'medium' || value === 'high' ? value : 'low';
   }
 
   private getBuyerIntelSourceHash(buyerVersion: number) {

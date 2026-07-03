@@ -472,35 +472,56 @@ export class BuyerService {
       ),
     };
 
-    existingBuyer.set({
-      name: getLastExisting(existingBuyer.name, normalizedBuyer.name),
-      identifier: getLastExisting(
-        ...existingBuyer.identifiers,
-        ...normalizedBuyer.identifiers,
-      ),
-      contact,
-      address,
-      legalTypes: this.mergeCodeNameOptions(
-        existingBuyer.legalTypes,
-        getLegalTypes(normalizedBuyer.legalTypes),
-      ),
-      mainActivities: this.mergeCodeNameOptions(
-        existingBuyer.mainActivities,
-        getMainActivities(normalizedBuyer.mainActivities),
-      ),
-      profiles: getUniqArray(existingBuyer.profiles, normalizedBuyer.profiles),
-      gateways: getUniqArray(existingBuyer.gateways, normalizedBuyer.gateways),
-      websites: getUniqArray(existingBuyer.websites, normalizedBuyer.websites),
-      cpvCodes: normalizedBuyer.isLead
-        ? getUniqArray(existingBuyer.cpvCodes, normalizedBuyer.cpvCodes)
-        : existingBuyer.cpvCodes,
-      countries: getUniqArray(
-        existingBuyer.countries,
-        normalizedBuyer.countries,
-      ),
-    });
+    return BuyerModel.findByIdAndUpdate(
+      existingBuyer._id,
+      {
+        $set: {
+          name: getLastExisting(existingBuyer.name, normalizedBuyer.name),
+          identifiers: Array.from(
+            new Set([
+              ...(existingBuyer.identifiers ?? []),
+              ...normalizedBuyer.identifiers,
+            ]),
+          ),
+          contact,
+          address,
+          legalTypes: this.mergeCodeNameOptions(
+            existingBuyer.legalTypes,
+            getLegalTypes(normalizedBuyer.legalTypes),
+          ),
+          mainActivities: this.mergeCodeNameOptions(
+            existingBuyer.mainActivities,
+            getMainActivities(normalizedBuyer.mainActivities),
+          ),
+          profiles: getUniqArray(
+            existingBuyer.profiles,
+            normalizedBuyer.profiles,
+          ),
+          gateways: getUniqArray(
+            existingBuyer.gateways,
+            normalizedBuyer.gateways,
+          ),
+          websites: getUniqArray(
+            existingBuyer.websites,
+            normalizedBuyer.websites,
+          ),
+          cpvCodes: normalizedBuyer.isLead
+            ? getUniqArray(existingBuyer.cpvCodes, normalizedBuyer.cpvCodes)
+            : existingBuyer.cpvCodes,
+          countries: getUniqArray(
+            existingBuyer.countries,
+            normalizedBuyer.countries,
+          ),
+        },
+      },
+      { returnDocument: 'after' },
+    ).then((buyer) => {
+      if (!buyer) {
+        throw new Error(`Buyer ${existingBuyer._id} disappeared during update`);
+      }
 
-    return existingBuyer.save();
+      return buyer;
+    });
   }
 
   async getBuyerDetails(buyerId: string) {

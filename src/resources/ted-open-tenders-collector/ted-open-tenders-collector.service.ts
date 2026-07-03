@@ -1,3 +1,4 @@
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { TedSearchService } from '@/resources/ted-search/ted-search.service';
 import {
   buildTedTenderSearchQuery,
@@ -28,7 +29,6 @@ import { TED_OPEN_TENDERS_COLLECTOR_CONFIG } from '@/config/ted-open-tenders-col
 import { AWARD_HISTORY_FIELDS } from '@/config/award-tender.config';
 import { AwardTenderDocument } from '@/resources/award-tender/schemas';
 import { TENDER_COMPETITION_SEARCH_FIELDS } from '@/config/ted-search.config';
-import fs from 'node:fs';
 
 export interface TedOpenTendersCollectorOptions<
   TChangedTender = TenderDocument,
@@ -67,11 +67,15 @@ interface TedIterationCollectorParams {
   saveNotices: (notices: TedNotice[]) => Promise<TedNoticeBatchSaveResult>;
 }
 
+@Injectable()
 export class TedOpenTendersCollectorService {
   constructor(
+    @Inject(forwardRef(() => TedSearchService))
     private readonly tedSearchService: TedSearchService,
+    @Inject(forwardRef(() => TendersService))
     private readonly tendersService: TendersService,
-    private readonly awardTenderService?: AwardTenderService,
+    @Inject(forwardRef(() => AwardTenderService))
+    private readonly awardTenderService: AwardTenderService,
   ) {}
 
   async collectAnyTendersFromTed(
@@ -163,7 +167,7 @@ export class TedOpenTendersCollectorService {
       saveNotices: async (notices) => {
         try {
           const saveResult =
-            await this.awardTenderService!.saveResultTedTenders(notices, {
+            await this.awardTenderService.saveResultTedTenders(notices, {
               updateExisting: options.updateExisting,
             });
 

@@ -30,6 +30,12 @@ export type BuyerIntelligence = {
 
   historicalTrends: string[];
   dataLimitations: string[];
+  buyerDecisionSignals: {
+    idealSupplierProfile: string[];
+    supplierPatternSignals: string[];
+    competitionSignals: string[];
+    dataConfidence: 'low' | 'medium' | 'high';
+  };
 
   errorMessage?: string;
 
@@ -108,6 +114,16 @@ export const BuyerIntelligenceSchema = new Schema<
 
     historicalTrends: { type: [String], default: [] },
     dataLimitations: { type: [String], default: [] },
+    buyerDecisionSignals: {
+      idealSupplierProfile: { type: [String], default: [] },
+      supplierPatternSignals: { type: [String], default: [] },
+      competitionSignals: { type: [String], default: [] },
+      dataConfidence: {
+        type: String,
+        enum: ['low', 'medium', 'high'],
+        default: 'low',
+      },
+    },
     errorMessage: { type: String },
 
     sourceHash: { type: String },

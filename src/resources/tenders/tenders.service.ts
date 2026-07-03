@@ -28,7 +28,9 @@ import {
   TenderNormalizerService,
 } from '@/resources/tender-normalizer/tender-normalizer.service';
 import {
+  devLog,
   extractPublicationNumberFromNotice,
+  getMongoRelationObjectIdArray,
   isRecord,
   isTedNotice,
   tenderPopulateFields,
@@ -108,21 +110,22 @@ export class TendersService {
     private readonly buyerService: BuyerService,
   ) {}
 
-  async upsertTender(notice: TedNotice): Promise<TenderDocument | undefined> {
+  async upsertTender(
+    notice: TedNotice,
+    buyers: { leadIds: TMongoId[]; nonLeadIds: TMongoId[] },
+  ): Promise<TenderDocument | undefined> {
     const normalizedTender = this.tenderNormalizer.normalizeTedNotice(notice);
 
     if (!normalizedTender.id) {
       return;
     }
 
-    const [estimatedValueEur, lotsWithEur, buyers] = await Promise.all([
+    const [estimatedValueEur, lotsWithEur] = await Promise.all([
       this.calculateEstimatedValueEur(normalizedTender),
       this.getLotsWithEurValues(normalizedTender.lots),
-      this.buyerService.upsertPureBuyersFromTEDNotice(notice),
     ]);
 
     const sourceHash = this.buildTenderSourceHash(notice);
-    const buyersIds = [...buyers.leadIds, ...buyers.nonLeadIds];
     const tenderSet = this.omitUndefinedFields({
       ...normalizedTender,
       nonLeadBuyers: buyers.nonLeadIds,
@@ -144,10 +147,7 @@ export class TendersService {
       { returnDocument: 'after', upsert: true, strict: false },
     );
 
-    await this.buyerService.refreshBuyersTenderMeta(buyersIds);
-
     await tenderDoc.populate(tenderPopulateFields);
-
     return tenderDoc;
   }
 
@@ -217,30 +217,10 @@ export class TendersService {
     return estimatedValueEur === null ? null : Math.round(estimatedValueEur);
   }
 
-  async upsertMultipleTenders(notices: TedNotice[]): Promise<TenderDocument[]> {
-    const tenders: TenderDocument[] = (await Promise.all(
-      notices.map((notice) => {
-        return this.upsertTender(notice);
-      }),
-    ).then((documents) => documents.filter(Boolean))) as TenderDocument[];
-
-    return tenders;
-  }
-
   async saveNewTedTenders(
     notices: TedNotice[],
   ): Promise<SaveNewTedTendersResult> {
-    const noticesByPublicationNumber = new Map<string, TedNotice>();
-
-    for (const notice of notices) {
-      const publicationNumber = extractPublicationNumberFromNotice(notice);
-
-      if (publicationNumber) {
-        noticesByPublicationNumber.set(publicationNumber, notice);
-      }
-    }
-
-    if (noticesByPublicationNumber.size === 0) {
+    if (!notices.length) {
       return {
         saved: 0,
         updated: 0,
@@ -249,59 +229,41 @@ export class TendersService {
       };
     }
 
-    const publicationNumbers = Array.from(noticesByPublicationNumber.keys());
-    const existingTenders = await TenderModel.find({
-      id: { $in: publicationNumbers },
-    })
-      .select('id noticeVersion sourceHash title shortTitle')
-      .exec();
-
-    const existingTendersByPublicationNumber = new Map(
-      existingTenders.map((tender) => [tender.id, tender] as const),
-    );
     let saved = 0;
     let updated = 0;
-    let skipped = notices.length - noticesByPublicationNumber.size;
+    let skipped = 0;
     const changedTenders: TenderDocument[] = [];
     const tendersForShortTitle: TenderDocument[] = [];
+    const buyerIdsToRefresh = new Set<string>();
 
-    for (const [publicationNumber, notice] of noticesByPublicationNumber) {
-      const existingTender =
-        existingTendersByPublicationNumber.get(publicationNumber);
-
-      const shouldUpdateExistingTender = this.shouldUpdateTenderFromTedNotice(
-        existingTender,
-        notice,
-      );
-
-      if (existingTender && !shouldUpdateExistingTender) {
-        if (!this.hasCompleteShortTitle(existingTender.shortTitle)) {
-          tendersForShortTitle.push(existingTender);
-        }
-
-        skipped += 1;
-        continue;
-      }
-
-      const savedTender = await this.upsertTender(notice);
+    const updateBuyersAndTender = async (notice: TedNotice) => {
+      const buyers =
+        await this.buyerService.upsertPureBuyersFromTEDNotice(notice);
+      const savedTender = await this.upsertTender(notice, buyers);
 
       if (savedTender) {
+        [...buyers.leadIds, ...buyers.nonLeadIds].forEach((buyerId) =>
+          buyerIdsToRefresh.add(buyerId.toString()),
+        );
+
         if (!this.hasCompleteShortTitle(savedTender.shortTitle)) {
           tendersForShortTitle.push(savedTender);
-        }
-
-        changedTenders.push(savedTender);
-
-        if (existingTender) {
-          updated += 1;
-        } else {
           saved += 1;
         }
       } else {
         skipped += 1;
       }
-    }
+    };
 
+    await Promise.all(notices.map(updateBuyersAndTender));
+
+    devLog('Refreshing Buyers Meta...');
+
+    await this.buyerService.refreshBuyersTenderMeta(
+      Array.from(buyerIdsToRefresh),
+    );
+
+    devLog('Filling Short Title...');
     await this.fillMissingShortTitles(tendersForShortTitle);
 
     return { saved, updated, skipped, changedTenders };
@@ -582,7 +544,10 @@ export class TendersService {
     );
 
     if (shouldUpsertTender) {
-      savedTender = await this.upsertTender(notice);
+      const buyers =
+        await this.buyerService.upsertPureBuyersFromTEDNotice(notice);
+
+      savedTender = await this.upsertTender(notice, buyers);
     }
 
     if (!savedTender) {
@@ -736,5 +701,3 @@ export class TendersService {
     return unset;
   }
 }
-
-

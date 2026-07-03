@@ -23,6 +23,11 @@ export class TendersTechController {
     return this.tendersCronService.getAllCompetitionTendersStatus();
   }
 
+  @Post('/gather-all-competition')
+  collectAllCompetitionTenders() {
+    return this.tendersCronService.gatherAllCompetitionTenders();
+  }
+
   @ApiDefaultResponse({
     description: 'Generated missing AI short titles for tenders.',
   })

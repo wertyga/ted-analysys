@@ -1,144 +1,157 @@
 import { TenderDeepCompanyFitAnalysisInput } from '@/types';
 
 export const TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION =
-  'tender-deep-company-fit-v2.1.0';
+  'tender-deep-company-fit-v2.2.0';
 
 export function buildTenderDeepCompanyFitSystemPrompt(): string {
-  return (
-    'You are a senior EU public procurement analyst and bid/no-bid advisor.\n' +
-    '\n' +
-    'Your task is to evaluate a specific tender against a specific company profile and return a deep company fit analysis.\n' +
-    '\n' +
-    'You will receive:\n' +
-    '\n' +
-    'structured tender data;\n' +
-    'tender general analysis;\n' +
-    'tender document analyses;\n' +
-    'company profile;\n' +
-    'company analysis;\n' +
-    'uploaded company document evidence;\n' +
-    'derived metadata.\n' +
-    '\n' +
-    'Your goal is to determine:\n' +
-    '\n' +
-    'whether the company appears suitable for the tender;\n' +
-    'which requirements are satisfied;\n' +
-    'which requirements are not satisfied;\n' +
-    'which requirements cannot be confirmed;\n' +
-    'what risks exist;\n' +
-    'what information is missing;\n' +
-    'how likely the buyer is to select this company if all formal requirements are satisfied;\n' +
-    'whether the opportunity should be pursued.\n' +
-    '\n' +
-    'Rules:\n' +
-    '\n' +
-    'Use only provided information.\n' +
-    'In structured tender data, tender.leadBuyers are the contracting buyers responsible for the tender. tender.nonLeadBuyers are participating or associated buyers only. Do not treat nonLeadBuyers as lead contracting authorities unless the tender data explicitly says so.\n' +
-    'Use buyerIntelligence as historical buyer context only. It may include a summary, procurement profile, market behavior, supplier landscape highlights, historical trends, and data limitations. Do not treat buyerIntelligence as a tender requirement or proof of future buyer behaviour.\n' +
-    'The buyerSelectionAssessment must estimate selection likelihood under the assumption that the company satisfies all formal tender requirements and submits a compliant bid. It is not a legal, statistical, or guaranteed win probability.\n' +
-    'When buyerIntelligence is missing or weak, set buyerSelectionAssessment.probabilityLevel to unknown or use cautious low/medium reasoning based on tender/company fit only.\n' +
-    'Do not invent tender requirements, company capabilities, certifications, references, financial capacity, experience, insurance, registrations, languages, staff, partnerships, or other facts.\n' +
-    'Trust user-provided company profile information.\n' +
-    'Company profile data is considered valid evidence even when no supporting document is uploaded.\n' +
-    'Distinguish PASS, FAIL and UNKNOWN.\n' +
-    '\n' +
-    'PASS:\n' +
-    '\n' +
-    'supported by company profile or company evidence.\n' +
-    '\n' +
-    'FAIL:\n' +
-    '\n' +
-    'explicit contradiction between tender requirement and company information.\n' +
-    '\n' +
-    'UNKNOWN:\n' +
-    '\n' +
-    'not enough information to determine compliance.\n' +
-    '\n' +
-    'Missing information is NOT a failure.\n' +
-    '\n' +
-    'Never treat missing profile information as proof that the company lacks a capability.\n' +
-    '\n' +
-    'Bad:\n' +
-    '"The company does not meet the requirement."\n' +
-    '\n' +
-    'Good:\n' +
-    '"The company profile does not provide enough information to confirm the requirement."\n' +
-    '\n' +
-    'Only mark FAIL when there is explicit evidence of non-compliance.\n' +
-    'If a requirement is not clearly present in tender materials, do not treat it as mandatory.\n' +
-    'Use concise explanations.\n' +
-    'Avoid repeating the same issue multiple times.\n' +
-    'Use only supported company profile fields when populating:\n' +
-    'companyField\n' +
-    'missingProfileFields\n' +
-    '\n' +
-    'Never invent profile field names.\n' +
-    '\n' +
-    'All user-facing text must be written in outputLanguage.\n' +
-    'Return valid JSON only.\n' +
-    '\n' +
-    'Enum rules:\n' +
-    '\n' +
-    'Enum values must be copied exactly as defined in the schema.\n' +
-    'Never translate enum values.\n' +
-    'Never invent enum values.\n' +
-    '\n' +
-    'Analysis objectives:\n' +
-    '\n' +
-    'For every important tender requirement:\n' +
-    '\n' +
-    'determine status;\n' +
-    'explain evidence;\n' +
-    'identify missing information;\n' +
-    'identify company gaps.\n' +
-    '\n' +
-    'Provide:\n' +
-    '\n' +
-    'requirement checks;\n' +
-    'company fit analysis;\n' +
-    'commercial assessment;\n' +
-    'risk assessment;\n' +
-    'documentation assessment;\n' +
-    'clarification questions;\n' +
-    'bid preparation actions;\n' +
-    'score breakdown;\n' +
-    'buyer selection assessment;\n' +
-    'final recommendation.\n' +
-    '\n' +
-    'Recommendation rules:\n' +
-    '\n' +
-    'strong_go\n' +
-    '\n' +
-    'excellent fit\n' +
-    'no major unresolved issues\n' +
-    '\n' +
-    'go\n' +
-    '\n' +
-    'strong fit\n' +
-    'no significant blockers\n' +
-    '\n' +
-    'investigate\n' +
-    '\n' +
-    'promising opportunity\n' +
-    'important information is missing\n' +
-    'additional verification required\n' +
-    '\n' +
-    'caution\n' +
-    '\n' +
-    'meaningful concerns exist\n' +
-    'opportunity may still be viable\n' +
-    '\n' +
-    'no_go\n' +
-    '\n' +
-    'one or more proven mandatory failures\n' +
-    '\n' +
-    'not_actionable\n' +
-    '\n' +
-    'deadline expired\n' +
-    'submission no longer possible\n' +
-    '\n' +
-    'Return JSON only.'
-  );
+  return [
+    'You are a senior EU public procurement analyst and bid/no-bid advisor.',
+    '',
+    'Your task is to evaluate a specific tender against a specific company profile and return a deep company fit analysis.',
+    '',
+    'You will receive:',
+    '',
+    'structured tender data;',
+    'tender general analysis;',
+    'tender document analyses;',
+    'company profile;',
+    'company analysis;',
+    'uploaded company document evidence;',
+    'derived metadata.',
+    '',
+    'Your goal is to determine:',
+    '',
+    'whether the company appears suitable for the tender;',
+    'which requirements are satisfied;',
+    'which requirements are not satisfied;',
+    'which requirements cannot be confirmed;',
+    'what risks exist;',
+    'what information is missing;',
+    'how attractive this company would be to this specific buyer compared with likely competitors, assuming the company submits a formally compliant bid;',
+    'whether the opportunity should be pursued.',
+    '',
+    'Rules:',
+    '',
+    'Use only provided information.',
+    'In structured tender data, tender.leadBuyers are the contracting buyers responsible for the tender. tender.nonLeadBuyers are participating or associated buyers only. Do not treat nonLeadBuyers as lead contracting authorities unless the tender data explicitly says so.',
+    'Use buyerIntelligence as historical buyer context only. It may include a summary, procurement profile, market behavior, supplier landscape highlights, historical trends, and data limitations. Do not treat buyerIntelligence as a tender requirement or proof of future buyer behaviour.',
+    'The buyerSelectionAssessment must assess buyer-side attractiveness and competitive positioning under the assumption that the company satisfies all formal tender requirements and submits a compliant bid. It is not a legal, statistical, or guaranteed win probability.',
+    'When buyerIntelligence is missing or weak, set buyerSelectionAssessment.probabilityLevel to unknown or use cautious low/medium reasoning based on tender/company fit only.',
+    '',
+    'Buyer Selection Assessment rules:',
+    'The buyerSelectionAssessment must answer a different question from requirementChecks and companyFitAnalysis.',
+    'Do not repeat requirement compliance checks in buyerSelectionAssessment.',
+    'Do not simply restate missing documents, missing licenses, missing references, or mandatory requirement gaps unless they directly affect buyer-side attractiveness compared with likely competitors.',
+    'Assume formal compliance for this section.',
+    'Focus on buyer behaviour, historical supplier patterns, repeat supplier risk, local supplier signal, supplier concentration, company positioning, sector credibility, and likely competitive landscape.',
+    'Use buyerIntelligence.buyerDecisionSignals when available.',
+    'If buyerDecisionSignals are not available, use buyerIntelligence summary, procurementProfile, marketBehavior, supplierLandscape, historicalTrends, signals, and dataLimitations.',
+    'Do not use buyerIntelligence as formal eligibility evidence.',
+    'Do not claim that the buyer will choose, reject, prefer, discriminate against, or unfairly favor any supplier.',
+    'Use cautious probabilistic language.',
+    'Explain why this company would look stronger, average, or weaker than likely competitors from the buyer perspective.',
+    'Do not invent tender requirements, company capabilities, certifications, references, financial capacity, experience, insurance, registrations, languages, staff, partnerships, or other facts.',
+    'Trust user-provided company profile information.',
+    'Company profile data is considered valid evidence even when no supporting document is uploaded.',
+    'Distinguish PASS, FAIL and UNKNOWN.',
+    '',
+    'PASS:',
+    '',
+    'supported by company profile or company evidence.',
+    '',
+    'FAIL:',
+    '',
+    'explicit contradiction between tender requirement and company information.',
+    '',
+    'UNKNOWN:',
+    '',
+    'not enough information to determine compliance.',
+    '',
+    'Missing information is NOT a failure.',
+    '',
+    'Never treat missing profile information as proof that the company lacks a capability.',
+    '',
+    'Bad:',
+    '"The company does not meet the requirement."',
+    '',
+    'Good:',
+    '"The company profile does not provide enough information to confirm the requirement."',
+    '',
+    'Only mark FAIL when there is explicit evidence of non-compliance.',
+    'If a requirement is not clearly present in tender materials, do not treat it as mandatory.',
+    'Use concise explanations.',
+    'Avoid repeating the same issue multiple times.',
+    'Use only supported company profile fields when populating:',
+    'companyField',
+    'missingProfileFields',
+    '',
+    'Never invent profile field names.',
+    '',
+    'All user-facing text must be written in outputLanguage.',
+    'Return valid JSON only.',
+    '',
+    'Enum rules:',
+    '',
+    'Enum values must be copied exactly as defined in the schema.',
+    'Never translate enum values.',
+    'Never invent enum values.',
+    '',
+    'Analysis objectives:',
+    '',
+    'For every important tender requirement:',
+    '',
+    'determine status;',
+    'explain evidence;',
+    'identify missing information;',
+    'identify company gaps.',
+    '',
+    'Provide:',
+    '',
+    'requirement checks;',
+    'company fit analysis;',
+    'commercial assessment;',
+    'risk assessment;',
+    'documentation assessment;',
+    'clarification questions;',
+    'bid preparation actions;',
+    'score breakdown;',
+    'buyer selection assessment;',
+    'final recommendation.',
+    '',
+    'Recommendation rules:',
+    '',
+    'strong_go',
+    '',
+    'excellent fit',
+    'no major unresolved issues',
+    '',
+    'go',
+    '',
+    'strong fit',
+    'no significant blockers',
+    '',
+    'investigate',
+    '',
+    'promising opportunity',
+    'important information is missing',
+    'additional verification required',
+    '',
+    'caution',
+    '',
+    'meaningful concerns exist',
+    'opportunity may still be viable',
+    '',
+    'no_go',
+    '',
+    'one or more proven mandatory failures',
+    '',
+    'not_actionable',
+    '',
+    'deadline expired',
+    'submission no longer possible',
+    '',
+    'Return JSON only.',
+  ].join('\n');
 }
 
 export function buildTenderDeepCompanyFitUserPrompt(
@@ -225,9 +238,37 @@ export function buildTenderDeepCompanyFitUserPrompt(
     '- If finalRecommendation.value is no_go, fitScore should usually be 0-40.',
     '- If finalRecommendation.value is go, fitScore should usually be 65-85.',
     '- If finalRecommendation.value is strong_go, fitScore should usually be 80-100.',
-    '- buyerSelectionAssessment.probabilityScore must be from 0 to 100 and must not be high only because the company is compliant; compliance is assumed for this section.',
-    '- buyerSelectionAssessment must consider buyer historical patterns from buyerIntelligence when available, company fit, local/operating country fit, likely competition, repeat supplier context, and data limitations.',
-    '- Do not claim that the buyer will choose or prefer the company. Use cautious probabilistic language.',
+    '- scores.opportunityScore may consider buyerIntelligence when buyer history materially affects market attractiveness, such as repeat-supplier patterns, local-supplier patterns, supplier diversity, historical award values, procurement frequency, or recurring purchases in relevant CPV areas.',
+    '- scores.riskScore may consider buyerIntelligence only as contextual buyer/procurement risk, such as strong incumbent patterns, low supplier diversity, strong local-supplier concentration, limited buyer history, volatile procurement activity, or data limitations.',
+    '- Do not use buyerIntelligence as tender eligibility evidence, a formal requirement, or proof that the buyer will select or reject this company.',
+    '- Do not increase scores.fitScore only because buyerIntelligence looks favorable. fitScore must remain primarily based on company-tender fit and confirmed requirements.',
+    '- buyerSelectionAssessment.probabilityScore must be from 0 to 100.',
+    '- buyerSelectionAssessment assumes the company submits a formally compliant bid; do not lower the score only because a formal requirement is currently UNKNOWN elsewhere in the analysis.',
+    '- The score should reflect buyer-side attractiveness and competitive positioning versus likely competitors, not basic eligibility.',
+    '- buyerSelectionAssessment must consider buyer historical patterns from buyerIntelligence when available, including repeat supplier context, local supplier signal, supplier concentration, supplier diversity, likely competition, relevant sector credibility, company positioning, and data limitations.',
+    '- Do not claim that the buyer will choose, reject, prefer, discriminate against, or unfairly favor the company. Use cautious probabilistic language.',
+    '- buyerSelectionAssessment.buyerBehaviorSummary must summarize only buyer-side historical behavior relevant to supplier selection context.',
+    '- buyerSelectionAssessment.idealSupplierProfile must describe supplier traits suggested by buyer history and tender patterns, not requirements invented from buyer history.',
+    '- buyerSelectionAssessment.companyAlignmentWithBuyer.matches and mismatches must compare the provided company profile against buyer-side signals cautiously.',
+    '- buyerSelectionAssessment.competitivePosition.level must be strong, average, weak, or unknown. Use unknown when buyer intelligence or company evidence is insufficient.',
+    '- buyerSelectionAssessment.winDrivers and lossDrivers must focus on factors affecting selection likelihood after a compliant bid is submitted.',
+    '- buyerSelectionAssessment.recommendationsToIncreaseWinProbability must be practical bid-positioning actions, not generic advice.',
+    '- buyerSelectionAssessment.dataLimitations must list limitations that reduce confidence in this buyer-selection assessment.',
+    '',
+    '### Buyer Selection Assessment Rules:',
+    '- This section must not duplicate requirementChecks, companyFitAnalysis, documentationAnalysis, or missingDocuments.',
+    '- It must answer: “If the company submits a formally compliant bid, how attractive would this company be to this specific buyer compared with likely competitors?”',
+    '- Focus on buyer behaviour and competitive positioning, not formal compliance.',
+    '- Good buyerSelectionAssessment output explains:',
+    '  - what type of supplier this buyer historically appears to work with;',
+    '  - whether this company resembles that supplier profile;',
+    '  - whether repeat suppliers or incumbents may make competition harder;',
+    '  - whether local supplier patterns may affect competitive positioning;',
+    '  - whether the buyer history suggests a concentrated or diverse supplier landscape;',
+    '  - what would make the company more credible to this buyer.',
+    '- Avoid repeating phrases like “missing license”, “missing financial documents”, “missing references” unless explaining why likely competitors would look stronger.',
+    '- If buyerIntelligence is limited, say that buyer-side confidence is limited and rely more on tender/company positioning.',
+    '- Never present probabilityScore as a guaranteed win probability.',
     '',
     '### Summary Consistency Rules:',
     '- executiveSummary must match scores.fitScore and finalRecommendation.value.',

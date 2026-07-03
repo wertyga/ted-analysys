@@ -42,6 +42,7 @@ import { BuyerIntelligenceModel } from '@/resources/buyer-intelligence/schemas';
 import { TenderGeneralAnalysisStatus } from '@/resources/tender-analysis/schemas';
 import { TenderDeepBuyerIntelligenceInput } from '@/types';
 import { BuyerIntelligenceService } from '@/resources/buyer-intelligence';
+import { BuyerDocument } from '@/resources/buyer/schemas';
 @Injectable()
 export class TenderDeepAnalysisService {
   private readonly deepCompanyFitAnalysisQueue = new QueueAsyncConcurrency(
@@ -103,6 +104,7 @@ export class TenderDeepAnalysisService {
         company,
         companyDocumentEvidence,
       );
+      console.log(tender);
       const buyerIntelligence =
         await this.getBuyerIntelligenceInputForTender(tender);
       const tenderDocumentsInput =
@@ -400,8 +402,10 @@ export class TenderDeepAnalysisService {
   private async getBuyerIntelligenceInputForTender(
     tender: Pick<TenderDocument, 'leadBuyers'>,
   ): Promise<TenderDeepBuyerIntelligenceInput[]> {
-    const buyerIds = getMongoRelationObjectIdArray(tender.leadBuyers ?? []);
-
+    const buyerIds = tender.leadBuyers.map((b: BuyerDocument) =>
+      b._id.toString(),
+    );
+    console.log({ buyerIds });
     if (!buyerIds.length) {
       return [];
     }
@@ -411,6 +415,8 @@ export class TenderDeepAnalysisService {
         this.buyerIntelligenceService.getFinishedBuyerIntelligence({ buyerId }),
       ),
     );
+
+    console.log({ records });
 
     return records.map((record) => {
       const buyer = record.buyer as { _id?: unknown; name?: string } | string;
@@ -428,6 +434,7 @@ export class TenderDeepAnalysisService {
         supplierLandscape: record.supplierLandscape,
         historicalTrends: record.historicalTrends,
         dataLimitations: record.dataLimitations,
+        buyerDecisionSignals: record.buyerDecisionSignals,
       };
     });
   }
@@ -534,5 +541,3 @@ export class TenderDeepAnalysisService {
     };
   }
 }
-
-

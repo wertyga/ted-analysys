@@ -1,4 +1,4 @@
-export const BUYER_INTELLIGENCE_PROMPT_VERSION = 'buyer-intelligence-v2';
+export const BUYER_INTELLIGENCE_PROMPT_VERSION = 'buyer-intelligence-v3';
 
 export const BUYER_INTELLIGENCE_PAYLOAD_FIELDS_PROMPT = [
   'buyer:',
@@ -188,4 +188,14 @@ export const BUYER_INTELLIGENCE_PROMPT = [
   '  - Explain only limitations that materially reduce confidence.',
   '  - Do not mention backend signal disagreement.',
   '  - Maximum 3 items.',
+  '',
+  '- buyerDecisionSignals:',
+  '  - Return an object with exactly: idealSupplierProfile, supplierPatternSignals, competitionSignals, dataConfidence.',
+  '  - Describe historical buyer-side signals that may matter to bidders.',
+  '  - Do not evaluate any specific company.',
+  '  - Do not estimate win probability.',
+  '  - idealSupplierProfile: 0 to 5 concise traits of suppliers that appear well aligned with this buyer history and tender patterns.',
+  '  - supplierPatternSignals: 0 to 5 concise observations about repeat suppliers, domestic suppliers, supplier concentration, or supplier diversity.',
+  '  - competitionSignals: 0 to 5 concise observations about likely market competitiveness based only on buyer history and procurement categories.',
+  '  - dataConfidence: low, medium, or high based on depth and consistency of available buyer history.',
 ].join('\n');
