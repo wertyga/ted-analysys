@@ -52,7 +52,7 @@ export class AwardTenderNormalizer {
     const noticeWinners = this.normalizeWinnersNotice(notice);
     const noticeLots = this.normalizeAwardLotsNotice(notice);
     const xmlLots = await extractLotWinnersFromXml(notice.links);
-    console.log({ xmlLots });
+
     const lots: NormalizedAwardTenderLot[] = noticeLots.map((l) => {
       const xmlLot = xmlLots.find(
         (xl) => xl.lotId === l.identifier || xl.lotId === l.resultLotIdentifier,
@@ -172,7 +172,7 @@ export class AwardTenderNormalizer {
     return {
       ...current,
       ...next,
-      name: next.name ?? current.name,
+      name: next.name || current.name,
       identifiers: this.compactUniq([
         ...(current.identifiers ?? []),
         ...(next.identifiers ?? []),

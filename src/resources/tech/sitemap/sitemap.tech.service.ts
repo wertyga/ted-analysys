@@ -17,6 +17,8 @@ import {
   relative,
 } from 'path';
 import { TenderModel } from '@/resources/tenders/schemas';
+import { BuyerModel } from '@/resources/buyer/schemas';
+import { ContractorModel } from '@/resources/contractor/schemas';
 
 type SitemapTender = {
   id?: string;
@@ -45,7 +47,17 @@ export class SitemapTechService {
     );
     const industryUrls = this.buildCpvIndustrySitemapUrls(domain, locales);
     const countryUrls = this.buildCountrySitemapUrls(domain, locales);
-    const urls = [...tenderUrls, ...industryUrls, ...countryUrls];
+
+    const buyersUrls = await this.buildBuyersSitemap(domain, locales);
+    const contractorsUrls = await this.buildContractorsSitemap(domain, locales);
+
+    const urls = [
+      ...tenderUrls,
+      ...industryUrls,
+      ...countryUrls,
+      ...buyersUrls,
+      ...contractorsUrls,
+    ];
     const sitemapFiles = this.buildSitemapFiles(
       outputPath,
       urls,
@@ -80,6 +92,8 @@ export class SitemapTechService {
       tendersCount: tenders.length,
       industriesCount: CPV_INDUSTRY_SLUGS.length,
       countriesCount: COUNTRY_SLUGS.length,
+      buyers: buyersUrls.length,
+      contractors: contractorsUrls.length,
       urlsCount: urls.length,
       sitemapFilesCount: sitemapFiles.length,
       maxUrlsPerFile,
@@ -141,6 +155,42 @@ export class SitemapTechService {
       loc: `${domain}/${locale}/tenders/${encodeURIComponent(tenderId)}`,
       lastmod: tender.updatedAt?.toISOString(),
     }));
+  }
+
+  private async buildBuyersSitemap(domain: string, locales: string[]) {
+    const buyers = await BuyerModel.find({}).select('_id updatedAt');
+
+    const buyersUrls = locales.flatMap((locale) => {
+      return buyers.map((buyer) => {
+        return {
+          loc: `${domain}/${locale}/buyers/${encodeURIComponent(buyer._id.toString())}`,
+          lastmod: buyer.updatedAt?.toISOString(),
+        };
+      });
+    });
+    const listUrls = locales.map((locale) => ({
+      loc: `${domain}/${locale}/buyers`,
+    }));
+
+    return [...listUrls, ...buyersUrls];
+  }
+
+  private async buildContractorsSitemap(domain: string, locales: string[]) {
+    const buyers = await ContractorModel.find({}).select('_id updatedAt');
+
+    const contractorsUrls = locales.flatMap((locale) => {
+      return buyers.map((buyer) => {
+        return {
+          loc: `${domain}/${locale}/contractors/${encodeURIComponent(buyer._id.toString())}`,
+          lastmod: buyer.updatedAt?.toISOString(),
+        };
+      });
+    });
+    const listUrls = locales.map((locale) => ({
+      loc: `${domain}/${locale}/contractors`,
+    }));
+
+    return [...listUrls, ...contractorsUrls];
   }
 
   private buildCpvIndustrySitemapUrls(domain: string, locales: string[]) {

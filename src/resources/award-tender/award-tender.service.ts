@@ -271,7 +271,7 @@ export class AwardTenderService {
             (tender?.winners ?? []).map((winner) => winner.toString()),
           )
       : [];
-    fs.writeFileSync('lots.json', JSON.stringify(lots, null, 2));
+
     const [lotsWithEur, tenderEstimatedValueEur, tenderAwardValueEur] =
       await Promise.all([
         this.getLotsWithEurValues(lots, publicationDate),
@@ -287,14 +287,14 @@ export class AwardTenderService {
         ),
       ]);
     const lotAwardValue = this.getAwardValueFallbackFromLots(lotsWithEur);
-    console.log({ lotAwardValue, awardValue, lotsWithEur });
+
     const awardValueWithFallback = {
       amount: awardValue.amount ?? lotAwardValue.amount,
       currency: awardValue.currency ?? lotAwardValue.currency,
     };
     const awardValueEurWithFallback =
       tenderAwardValueEur ?? this.getAwardValueEurFallbackFromLots(lotsWithEur);
-    console.log({ awardValueEurWithFallback });
+
     const insertPayload = {
       ...normalizedTender,
       awardValue: awardValueWithFallback,

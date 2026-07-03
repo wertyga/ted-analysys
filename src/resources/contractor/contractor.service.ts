@@ -17,6 +17,7 @@ import { ContractorListRequestDto } from './dto/contractor-list-request.dto';
 import { ContractorSearchRequestDto } from './dto/contractor-search-request.dto';
 import {
   AwardTenderDocument,
+  AwardTenderLot,
   AwardTenderModel,
 } from '@/resources/award-tender/schemas';
 
@@ -151,36 +152,15 @@ export class ContractorService {
     );
   }
 
-  private async serializeListWithAwardSummary(
-    contractors: ContractorSerializable[],
-  ): Promise<ContractorListDto[]> {
-    const serializedContractors = contractors.map((contractor) =>
-      ContractorModel.serializeList(contractor),
-    );
-    const contractorIds = serializedContractors.flatMap((contractor) =>
-      contractor._id ? [contractor._id.toString()] : [],
-    );
-    const statsByContractorId =
-      await this.getContractorAwardSummaryByIds(contractorIds);
-
-    return serializedContractors.map((contractor) => ({
-      ...contractor,
-      awardTendersCount:
-        statsByContractorId.get(contractor._id?.toString() ?? '')
-          ?.awardTendersCount ?? 0,
-      totalAwardedValueEur:
-        statsByContractorId.get(contractor._id?.toString() ?? '')
-          ?.totalAwardedValueEur ?? 0,
-    }));
-  }
-
   async searchContractors({
     cpvCodes,
     countries,
     page,
     limit,
   }: ContractorListRequestDto) {
-    const query: QueryFilter<ContractorDocument> = {};
+    const query: QueryFilter<ContractorDocument> = {
+      name: { $exists: true, $ne: '' },
+    };
 
     if (cpvCodes?.length) {
       query.cpvCodes = { $in: cpvCodes };
@@ -193,16 +173,15 @@ export class ContractorService {
     const pagination = getPaginationMeta({ page, limit });
     const [contractors, totalCount] = await Promise.all([
       ContractorModel.find(query)
-        .sort({ name: 1 })
+        .sort({ 'stats.totalAwardAmountEur': -1 })
         .skip(pagination.skip)
-        .limit(pagination.limit)
-        .exec(),
+        .limit(pagination.limit),
       ContractorModel.countDocuments(query),
     ]);
 
     return {
       totalCount,
-      contractors: await this.serializeListWithAwardSummary(contractors),
+      contractors: contractors.map(ContractorModel.serializeList),
     };
   }
 
@@ -237,7 +216,7 @@ export class ContractorService {
 
     const [contractors, totalCount] = await Promise.all([
       ContractorModel.find(query)
-        .sort({ name: 1 })
+        .sort({ 'stats.totalAwardAmountEur': -1 })
         .skip(pagination.skip)
         .limit(pagination.limit)
         .exec(),
@@ -246,11 +225,14 @@ export class ContractorService {
 
     return {
       totalCount,
-      contractors: await this.serializeListWithAwardSummary(contractors),
+      contractors: contractors.map(ContractorModel.serializeList),
     };
   }
 
-  async getContractorById(id: string) {
+  async getContractorById(id: string): Promise<{
+    contractor: ContractorDocument;
+    awardTenders: AwardTenderDocument[];
+  }> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid contractor id');
     }
@@ -261,27 +243,14 @@ export class ContractorService {
       throw new NotFoundException('Contractor not found');
     }
 
-    const [awardTenders, statsByContractorId] = await Promise.all([
-      AwardTenderModel.find({
-        winners: new Types.ObjectId(id),
-      })
-        .sort({ publicationDate: -1, _id: -1 })
-        .populate('buyer')
-        .populate('winners')
-        .exec(),
-      this.getContractorAwardSummaryByIds([id]),
-    ]);
-    const stats = statsByContractorId.get(id) ?? {
-      awardTendersCount: 0,
-      totalAwardedValueEur: 0,
-    };
+    const { awardTenders } = await this.getContractorAwardTenders(id, {
+      page: 1,
+      limit: 1000,
+    });
 
     return {
-      ...ContractorModel.serializeDetail(contractor),
-      awardTenders: awardTenders.map((awardTender) =>
-        AwardTenderModel.serializeList(awardTender),
-      ),
-      ...stats,
+      contractor,
+      awardTenders,
     };
   }
 
@@ -289,18 +258,6 @@ export class ContractorService {
     id: string,
     pagination: { page?: number; limit?: number } = {},
   ) {
-    if (!Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('Invalid contractor id');
-    }
-
-    const contractorExists = await ContractorModel.exists({
-      _id: new Types.ObjectId(id),
-    } as never);
-
-    if (!contractorExists) {
-      throw new NotFoundException('Contractor not found');
-    }
-
     const query = {
       winners: new Types.ObjectId(id),
     };
@@ -310,59 +267,67 @@ export class ContractorService {
         .sort({ publicationDate: -1, _id: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('buyer')
+        .populate('leadBuyers')
         .populate('winners')
+        .select('-nonLeadBuyers')
         .exec(),
       AwardTenderModel.countDocuments(query),
     ]);
 
     return {
       totalCount,
-      awardTenders: awardTenders.map((awardTender) =>
-        AwardTenderModel.serializeList(awardTender),
-      ),
+      awardTenders,
     };
   }
 
   async getContractorStats() {
-    const [
-      totalCount,
-      withEmailCount,
-      withAwardTendersCount,
-      byCountries,
-      byCpvCodes,
-    ] = await Promise.all([
+    const [contractorsCount, awardLotsStats, countries] = await Promise.all([
       ContractorModel.countDocuments({}),
-      ContractorModel.countDocuments({ 'emails.0': { $exists: true } }),
-      AwardTenderModel.distinct('lots.winner', {
-        'lots.winner': { $exists: true, $ne: null },
-      }).then((winnerIds) => winnerIds.length),
-      ContractorModel.aggregate<{ value: string; count: number }>([
-        { $unwind: '$countries' },
-        { $match: { countries: { $type: 'string', $ne: '' } } },
-        { $group: { _id: '$countries', count: { $sum: 1 } } },
-        { $sort: { count: -1, _id: 1 } },
-        { $limit: 20 },
-        { $project: { _id: 0, value: '$_id', count: 1 } },
-      ]),
-      ContractorModel.aggregate<{ value: string; count: number }>([
-        { $unwind: '$cpvCodes' },
-        { $match: { cpvCodes: { $type: 'string', $ne: '' } } },
-        { $group: { _id: '$cpvCodes', count: { $sum: 1 } } },
-        { $sort: { count: -1, _id: 1 } },
-        { $limit: 20 },
-        { $project: { _id: 0, value: '$_id', count: 1 } },
-      ]),
+      AwardTenderModel.aggregate<{
+        totalAwardAmountEur: number;
+        awardLotsCount: number;
+      }>([
+        { $match: { 'lots.winner': { $exists: true, $ne: null } } },
+        { $unwind: '$lots' },
+        { $match: { 'lots.winner': { $exists: true, $ne: null } } },
+        {
+          $group: {
+            _id: null,
+            awardLotsCount: { $sum: 1 },
+            totalAwardAmountEur: {
+              $sum: {
+                $cond: [
+                  {
+                    $in: [
+                      { $type: '$lots.awardValueEur' },
+                      ['double', 'int', 'long', 'decimal'],
+                    ],
+                  },
+                  '$lots.awardValueEur',
+                  0,
+                ],
+              },
+            },
+          },
+        },
+        { $project: { _id: 0, totalAwardAmountEur: 1, awardLotsCount: 1 } },
+      ]).then(
+        ([stats]) =>
+          stats ?? {
+            totalAwardAmountEur: 0,
+            awardLotsCount: 0,
+          },
+      ),
+      ContractorModel.distinct('countries', {
+        countries: { $type: 'string', $ne: '' },
+      }),
     ]);
 
     return {
-      totalCount,
-      withEmailCount,
-      withoutEmailCount: totalCount - withEmailCount,
-      withAwardTendersCount,
-      withoutAwardTendersCount: totalCount - withAwardTendersCount,
-      byCountries,
-      byCpvCodes,
+      contractorsCount,
+      totalAwardAmountEur: awardLotsStats.totalAwardAmountEur,
+      awardLotsCount: awardLotsStats.awardLotsCount,
+      countriesCount: countries.length,
     };
   }
 
@@ -389,6 +354,7 @@ export class ContractorService {
       const emails = (winner.emails ?? [])
         .map((email) => normalizeEmail(email))
         .filter(Boolean);
+
       const normalized = {
         ...winner,
         emails,

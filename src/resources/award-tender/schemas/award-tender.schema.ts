@@ -16,6 +16,7 @@ import {
   BuyerSerializable,
 } from '@/resources/buyer/schemas';
 import { TMongoId } from '@/types';
+import { getFilter } from 'next/dist/build/webpack/loaders/css-loader/src/utils';
 
 export type AwardTenderLot = TenderLot & {
   resultLotIdentifier?: string;
@@ -113,10 +114,30 @@ export type AwardTenderListDto = Pick<
   | 'createdAt'
   | 'updatedAt'
 >;
+export type ContractorAwardLotListDto = Pick<
+  AwardTenderLot,
+  | 'identifier'
+  | 'title'
+  | 'mainClassification'
+  | 'additionalClassifications'
+  | 'contractNature'
+  | 'estimatedValueEur'
+  | 'awardValueEur'
+  | 'awardValue'
+  | 'isFrameworkAgreement'
+  | 'isDps'
+  | 'placeOfPerformanceCountry'
+  | 'placeOfPerformanceSubdivision'
+  | 'placeOfPerformanceCity'
+  | 'awardCriteria'
+>;
 
 export interface AwardTenderModelType extends Model<AwardTenderDocument> {
   serializeList(tender: AwardTenderSerializable): AwardTenderListDto;
   serializeDetail(tender: AwardTenderSerializable): AwardTenderDetailDto;
+  serializeContractorAwardLotList(
+    tender: AwardTenderLot,
+  ): ContractorAwardLotListDto;
 }
 
 const AwardTenderLotValueSchema = new Schema(
@@ -252,6 +273,31 @@ AwardTenderSchema.index({ 'lots.winner': 1 });
 AwardTenderSchema.index({ 'winners.identifier': 1 });
 AwardTenderSchema.index({ 'winners.name': 1 });
 
+AwardTenderSchema.statics.serializeContractorAwardLotList = function (
+  lot: AwardTenderLot,
+): ContractorAwardLotListDto {
+  return filterModel(lot, {
+    includeFields: [
+      'identifier',
+      'title',
+      'mainClassification',
+      'additionalClassifications',
+      'contractNature',
+      'estimatedValue',
+      'estimatedValueEur',
+      'awardValueEur',
+      'awardValue',
+      'isFrameworkAgreement',
+      'isDps',
+      'placeOfPerformanceCity',
+      'placeOfPerformanceCountry',
+      'placeOfPerformanceSubdivision',
+      'awardCriteria',
+      'winner',
+    ],
+  });
+};
+
 function serializeAwardTenderRelations<T extends Partial<AwardTender>>(
   tender: T,
 ): T {
@@ -278,7 +324,7 @@ function serializeAwardTenderRelations<T extends Partial<AwardTender>>(
 AwardTenderSchema.statics.serializeList = function (
   tender: AwardTenderSerializable,
 ): AwardTenderListDto {
-  const { winners, ...serializedAwardTender } = filterModel(tender, {
+  const { winners, lots, ...serializedAwardTender } = filterModel(tender, {
     includeFields: [
       'id',
       'noticeType',
@@ -311,6 +357,7 @@ AwardTenderSchema.statics.serializeList = function (
 
   return {
     ...serializedAwardTender,
+    lots: lots.map(AwardTenderModel.serializeContractorAwardLotList),
     nonLeadBuyers:
       serializedAwardTender.nonLeadBuyers?.map((buyer) =>
         BuyerModel.serializeList(buyer as BuyerSerializable),

@@ -1,4 +1,4 @@
-import mongoose, { QueryFilter, Types } from 'mongoose';
+import mongoose, { QueryFilter, SortOrder, Types } from 'mongoose';
 import {
   BadRequestException,
   forwardRef,
@@ -38,7 +38,10 @@ import {
 } from './buyer-utils';
 import { ContractorModel } from '@/resources/contractor/schemas';
 import { getLegalTypes, getMainActivities } from '@/resources/codelist';
-import { BuyerListRequestDto } from './dto/buyer-list-request.dto';
+import {
+  BuyerListRequestDto,
+  BuyerListSortOrder,
+} from './dto/buyer-list-request.dto';
 import { AwardTenderService } from '@/resources/award-tender/award-tender.service';
 
 type BuyerTenderMeta = {
@@ -68,6 +71,8 @@ export class BuyerService {
     q,
     countries,
     cpvCodes,
+    sortBy,
+    sortOrder,
     page,
     limit,
   }: BuyerListRequestDto) {
@@ -97,9 +102,16 @@ export class BuyerService {
     }
 
     const pagination = getPaginationMeta({ page, limit });
+    const sort: Record<string, SortOrder> = sortBy
+      ? {
+          [sortBy]: sortOrder === BuyerListSortOrder.ASC ? 1 : -1,
+          name: 1,
+          _id: 1,
+        }
+      : { name: 1, _id: 1 };
     const [buyers, totalCount] = await Promise.all([
       BuyerModel.find(query)
-        .sort({ name: 1, _id: 1 })
+        .sort(sort)
         .skip(pagination.skip)
         .limit(pagination.limit),
       BuyerModel.countDocuments(query),

@@ -9,6 +9,17 @@ import { ContractorService } from './contractor.service';
 import { ContractorListRequestDto } from './dto/contractor-list-request.dto';
 import { ContractorSearchRequestDto } from './dto/contractor-search-request.dto';
 import { ContractorAwardTendersRequestDto } from './dto/contractor-award-tenders-request.dto';
+import {
+  ContractorDetailDto,
+  ContractorDocument,
+  ContractorModel,
+} from '@/resources/contractor/schemas';
+import {
+  AwardTenderDocument,
+  AwardTenderListDto,
+  AwardTenderLot,
+  AwardTenderModel,
+} from '@/resources/award-tender/schemas';
 
 @ApiTags('contractors')
 @Controller('contractors')
@@ -55,7 +66,25 @@ export class ContractorController {
   @Get(':id')
   @ApiOperation({ summary: 'Get contractor details' })
   @ApiOkResponse({ description: 'Contractor details.' })
-  getContractorById(@Param('id') id: string) {
-    return this.contractorService.getContractorById(id);
+  async getContractorById(@Param('id') id: string): Promise<{
+    contractor: ContractorDetailDto;
+    awardTendersWithWonLots: Omit<AwardTenderListDto, 'winners'>[];
+  }> {
+    const { contractor, awardTenders } =
+      await this.contractorService.getContractorById(id);
+
+    return {
+      contractor: ContractorModel.serializeDetail(contractor),
+      awardTendersWithWonLots: awardTenders
+        .map(AwardTenderModel.serializeList)
+        .map(({ winners, ...at }) => {
+          return {
+            ...at,
+            lots: at.lots.filter((l) => {
+              return (l.winner as string).toString() === id;
+            }),
+          };
+        }),
+    };
   }
 }
