@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  GeneralTenderAnalysisCpvInput,
   GeneralTenderAnalysisBuyerInput,
   GeneralTenderAnalysisInput,
 } from '@/openai/dto/openai-analysis.dto';
@@ -7,10 +8,13 @@ import { TenderDocument, TenderLot } from '../tenders/schemas';
 import { isRecord } from '@/utils';
 import { DocumentExtractor } from '@/document-extractor';
 import { Buyer, BuyerDocument } from '@/resources/buyer/schemas';
+import { CpvService } from '@/resources/cpv/cpv.service';
 
 @Injectable()
 export class TenderGeneralAnalysisBuilder {
   private readonly documentExtractor = new DocumentExtractor();
+
+  constructor(private readonly cpvService: CpvService) {}
 
   async buildAnalysisInput(
     tender: TenderDocument,
@@ -55,8 +59,10 @@ export class TenderGeneralAnalysisBuilder {
           : undefined,
         contractNature: tender.contractNature ?? null,
         legalBasis: tender.legalBasis ?? null,
-        cpvCodes: this.extractCpvCodes(tender),
-        mainCpv: this.extractCpvCodeList(tender.mainClassificationProc),
+        cpvCodes: this.resolveCpvCodesForPrompt(this.extractCpvCodes(tender)),
+        mainCpv: this.resolveCpvCodesForPrompt(
+          this.extractCpvCodeList(tender.mainClassificationProc),
+        ),
         estimatedValue: tender.estimatedValue
           ? {
               amount: tender.estimatedValue.amount,
@@ -183,5 +189,31 @@ export class TenderGeneralAnalysisBuilder {
     }
 
     return typeof cpv.code === 'string' ? cpv.code : null;
+  }
+
+  resolveCpvCodesForPrompt(codes: string[]): GeneralTenderAnalysisCpvInput[] {
+    const normalizedCodes = Array.from(
+      new Set(codes.map((code) => this.normalizeCpvCode(code)).filter(Boolean)),
+    );
+    const rawCodesByCode = new Map(
+      this.cpvService.resolveRawCodes(normalizedCodes).map((cpv) => [
+        cpv.code,
+        cpv,
+      ]),
+    );
+
+    return normalizedCodes.map((code) => {
+      const rawCode = rawCodesByCode.get(code);
+
+      return {
+        code,
+        ...(rawCode?.name ? { name: rawCode.name } : {}),
+        ...(rawCode?.shortTitle ? { shortTitle: rawCode.shortTitle } : {}),
+      };
+    });
+  }
+
+  private normalizeCpvCode(code: string): string {
+    return code.replace(/\D/g, '').slice(0, 8);
   }
 }

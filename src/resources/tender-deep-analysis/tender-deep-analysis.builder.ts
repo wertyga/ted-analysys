@@ -12,7 +12,9 @@ import { TenderGeneralAnalysisBuilder } from '@/resources/tender-analysis/tender
 
 @Injectable()
 export class TenderDeepAnalysisBuilder {
-  private readonly generalAnalysisBuilder = new TenderGeneralAnalysisBuilder();
+  constructor(
+    private readonly generalAnalysisBuilder: TenderGeneralAnalysisBuilder,
+  ) {}
 
   buildCompanyAnalysisDto(company: any, companyDocumentEvidence: any): any {
     return {
@@ -108,7 +110,9 @@ export class TenderDeepAnalysisBuilder {
       isFrameworkAgreement: tender.isFrameworkAgreement,
       isSmeSuitable: tender.isSmeSuitable,
       electronicSubmission: tender.electronicSubmission,
-      cpvCodes: tender.cpvCodes,
+      cpvCodes: this.generalAnalysisBuilder.resolveCpvCodesForPrompt(
+        tender.cpvCodes ?? [],
+      ),
       placeOfPerformanceCountries: tender.placeOfPerformanceCountries,
       placeOfPerformanceCities: tender.placeOfPerformanceCities,
       documentUrls: tender.documentUrls,

@@ -6,6 +6,7 @@ import { TenderGeneralAnalysisController } from './tender-general-analysis.contr
 import { TenderGeneralAnalysisService } from './tender-general-analysis.service';
 import { TariffModule } from '@/resources/tariff';
 import { TenderNormalizerModule } from '@/resources/tender-normalizer/tender-normalizer.module';
+import { CpvModule } from '@/resources/cpv/cpv.module';
 
 @Module({
   imports: [
@@ -13,9 +14,10 @@ import { TenderNormalizerModule } from '@/resources/tender-normalizer/tender-nor
     forwardRef(() => TendersModule),
     TariffModule,
     TenderNormalizerModule,
+    CpvModule,
   ],
   controllers: [TenderGeneralAnalysisController],
   providers: [TenderGeneralAnalysisService, TenderGeneralAnalysisBuilder],
-  exports: [TenderGeneralAnalysisService],
+  exports: [TenderGeneralAnalysisService, TenderGeneralAnalysisBuilder],
 })
 export class TenderGeneralAnalysisModule {}

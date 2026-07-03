@@ -38,6 +38,12 @@ export type DocumentInputAnalysis = {
   extractedText: string;
 };
 
+export type GeneralTenderAnalysisCpvInput = {
+  code: string;
+  name?: string;
+  shortTitle?: string;
+};
+
 export interface GeneralTenderAnalysisInput {
   outputLanguage?: AnalysisOutputLanguage;
   tender: {
@@ -66,8 +72,8 @@ export interface GeneralTenderAnalysisInput {
     };
     contractNature?: string | null;
     legalBasis?: string | null;
-    cpvCodes?: string[];
-    mainCpv?: string[];
+    cpvCodes?: GeneralTenderAnalysisCpvInput[];
+    mainCpv?: GeneralTenderAnalysisCpvInput[];
     estimatedValue?: {
       amount: number | null;
       currency: string | null;

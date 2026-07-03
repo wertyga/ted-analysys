@@ -312,7 +312,7 @@ export interface TenderAnalysisTenderDto {
   isFrameworkAgreement?: boolean;
   isSmeSuitable?: boolean;
   electronicSubmission?: string;
-  cpvCodes?: string[];
+  cpvCodes?: CpvAnalysisRef[];
   placeOfPerformanceCountries?: string[];
   placeOfPerformanceCities?: string[];
   documentUrls?: string[];
