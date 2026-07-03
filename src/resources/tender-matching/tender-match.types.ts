@@ -109,6 +109,13 @@ export interface TenderCompanyMatchResult {
 }
 
 export type CompanyTenderFitAiPayload = {
+  hardMatch: {
+    score: number;
+    decision: TenderMatchDecision;
+    reasons: string[];
+    risks: string[];
+    keywordHits: string[];
+  };
   company: {
     name?: string;
     summary?: string;
@@ -133,7 +140,10 @@ export type CompanyTenderFitAiPayload = {
     id: string;
     title: string;
     description?: string;
-    cpvCodes: string[];
+    cpvCodes: {
+      code: string;
+      label?: string;
+    }[];
     buyers: BuyerDocument[];
     placeOfPerformanceCountries: string[];
     estimatedValue: {
@@ -157,13 +167,6 @@ export type CompanyTenderFitAiPayload = {
       type?: string | null;
       weight?: number | null;
     }[];
-  };
-  hardMatch: {
-    score: number;
-    decision: string;
-    reasons: string[];
-    risks: string[];
-    keywordHits: string[];
   };
 };
 

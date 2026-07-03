@@ -429,6 +429,10 @@ export class TenderMatchNotificationsService {
   }
 
   private getMatchBadgeClass(decision?: AiFitDecision | null): string {
+    if (decision === AiFitDecision.STRONG_FIT) {
+      return 'badge-strong';
+    }
+
     if (decision === AiFitDecision.GOOD_FIT) {
       return 'badge-good';
     }

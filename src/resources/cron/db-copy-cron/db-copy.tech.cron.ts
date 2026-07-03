@@ -29,9 +29,9 @@ export class DbCopyTechCron {
 
   constructor(private readonly cronTaskQueueService: CronTaskQueueService) {}
 
-  @Cron(CRON_CONFIG.databaseCopy.toCdn, {
-    timeZone: CRON_CONFIG.timeZone,
-  })
+  // @Cron(CRON_CONFIG.databaseCopy.toCdn, {
+  //   timeZone: CRON_CONFIG.timeZone,
+  // })
   async copyDatabaseDumpToCdnCron() {
     await this.cronTaskQueueService.runExclusive(
       'copyDatabaseDumpToCdnCron',

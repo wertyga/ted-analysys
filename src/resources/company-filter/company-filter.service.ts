@@ -357,14 +357,15 @@ export class CompanyFilterService {
       return;
     }
 
-    this.tenderMatchingService
-      .rematchActiveCompetitionTendersAfterCompanyProfileUpdated(updatedFilter)
-      .catch((error: unknown) =>
-        logger.info('TENDER_MATCHING_PROFILE_UPDATE_FAILED', {
-          companyId: String(populatedUser._id),
-          error: getSafeErrorMessage(error),
-        }),
-      );
+    // TODO: Do not do it for now
+    // this.tenderMatchingService
+    //   .rematchActiveCompetitionTendersAfterCompanyProfileUpdated(updatedFilter)
+    //   .catch((error: unknown) =>
+    //     logger.info('TENDER_MATCHING_PROFILE_UPDATE_FAILED', {
+    //       companyId: String(populatedUser._id),
+    //       error: getSafeErrorMessage(error),
+    //     }),
+    //   );
   }
 
   private buildUserPrompt(payload: CompanyTenderFilterAiPayload): string {

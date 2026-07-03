@@ -42,6 +42,8 @@ import { UserModel } from '@/resources/user/user.schema';
 import { TariffService } from '@/resources/tariff';
 import { TENDER_MATCHING_CONFIG } from '@/config/tender-matching.config';
 import { BuyerDocument } from '@/resources/buyer/schemas';
+import { buildCompanyTenderFitUserPrompt } from './tender-matching.prompt';
+import { CpvService } from '@/resources/cpv/cpv.service';
 
 @Injectable()
 export class TenderMatchingService {
@@ -57,6 +59,7 @@ export class TenderMatchingService {
   constructor(
     private readonly llmAnalysisService: LlmAnalysisService,
     private readonly tariffService: TariffService,
+    private readonly cpvService: CpvService,
   ) {
     this.companyProfileRematches = new DebouncedAsyncLatestQueueByKey({
       delayMs: TENDER_MATCHING_CONFIG.companyProfileRematch.debounceMs,
@@ -176,9 +179,7 @@ export class TenderMatchingService {
     tender: TenderDocument,
     source: TenderMatchSource,
   ): Promise<TenderCompanyMatchDocument[]> {
-    const companyFilters = await CompanyTenderFilterModel.find({
-      confirmedByUser: true,
-    }).exec();
+    const companyFilters = await CompanyTenderFilterModel.find({});
 
     return this.matchTenderWithFilters(tender, companyFilters, source);
   }
@@ -363,35 +364,10 @@ export class TenderMatchingService {
     const response =
       await this.llmAnalysisService.createGeneralJsonResponse(
         COMPANY_TENDER_FIT_SYSTEM_PROMPT,
-        this.buildCompanyTenderFitUserPrompt(payload),
+        buildCompanyTenderFitUserPrompt(payload),
       );
 
     return this.validateCompanyTenderFitAiResult(response);
-  }
-
-  private buildCompanyTenderFitUserPrompt(
-    payload: CompanyTenderFitAiPayload,
-  ): string {
-    return [
-      'Evaluate whether this hard-matched tender should be sent to the user by email.',
-      '',
-      'Input:',
-      JSON.stringify(payload, null, 2),
-      '',
-      'Return JSON with this exact structure:',
-      JSON.stringify(
-        {
-          score: 75,
-          decision: 'good_fit',
-          summary: 'string',
-          reasons: ['string'],
-          risks: ['string'],
-          recommendedAction: 'review',
-        },
-        null,
-        2,
-      ),
-    ].join('\n');
   }
 
   private validateCompanyTenderFitAiResult(
@@ -429,7 +405,19 @@ export class TenderMatchingService {
     match: TenderCompanyMatchDocument,
   ): Promise<CompanyTenderFitAiPayload> {
     const companyName = await this.getCompanyName(filter.user);
+    const cpvLabelsByCode = await this.resolveCpvCodeLabels([
+      ...(tender.cpvCodes ?? []),
+      ...(filter.cpvCodes ?? []).map((cpvCode) => cpvCode.code),
+    ]);
+
     return {
+      hardMatch: {
+        score: match.hardMatchScore,
+        decision: match.decision,
+        reasons: match.reasons ?? [],
+        risks: match.risks ?? [],
+        keywordHits: match.keywordHits ?? [],
+      },
       company: {
         name: companyName,
         summary: filter.summary,
@@ -441,12 +429,16 @@ export class TenderMatchingService {
         minBudget: filter.minBudget ?? null,
         maxBudget: filter.maxBudget ?? null,
         currency: filter.currency ?? null,
-        cpvCodes: (filter.cpvCodes ?? []).map((cpvCode) => ({
-          code: cpvCode.code,
-          label: cpvCode.label,
-          source: cpvCode.source,
-          matchLevel: cpvCode.matchLevel,
-        })),
+        cpvCodes: (filter.cpvCodes ?? []).map((cpvCode) => {
+          const code = this.normalizeCpvCode(cpvCode.code);
+
+          return {
+            code: cpvCode.code,
+            label: cpvCode.label || cpvLabelsByCode.get(code),
+            source: cpvCode.source,
+            matchLevel: cpvCode.matchLevel,
+          };
+        }),
         optionalKeywords: filter.optionalKeywords ?? [],
         requiredKeywords: filter.requiredKeywords ?? [],
       },
@@ -454,7 +446,14 @@ export class TenderMatchingService {
         id: tender.id,
         title: tender.title ?? '',
         description: tender.description,
-        cpvCodes: tender.cpvCodes ?? [],
+        cpvCodes: (tender.cpvCodes ?? []).map((code) => {
+          const normalizedCode = this.normalizeCpvCode(code);
+
+          return {
+            code,
+            label: cpvLabelsByCode.get(normalizedCode),
+          };
+        }),
         buyers: tender.leadBuyers as BuyerDocument[],
         placeOfPerformanceCountries: tender.placeOfPerformanceCountries ?? [],
         estimatedValue: {
@@ -473,13 +472,6 @@ export class TenderMatchingService {
         selectionCriteria: this.mapSelectionCriteria(tender.selectionCriteria),
         awardCriteria: this.mapAwardCriteria(tender.awardCriteria),
       },
-      hardMatch: {
-        score: match.hardMatchScore,
-        decision: match.decision,
-        reasons: match.reasons,
-        risks: match.risks,
-        keywordHits: match.keywordHits,
-      },
     };
   }
 
@@ -492,6 +484,40 @@ export class TenderMatchingService {
       .exec();
 
     return readString(company?.companyName);
+  }
+
+  private async resolveCpvCodeLabels(
+    codes: string[],
+  ): Promise<Map<string, string>> {
+    const normalizedCodes = Array.from(
+      new Set(codes.map((code) => this.normalizeCpvCode(code)).filter(Boolean)),
+    );
+    const labelsByCode = new Map<string, string>();
+
+    if (normalizedCodes.length === 0) {
+      return labelsByCode;
+    }
+
+    const dbCategories = await this.cpvService.resolveCpvCodeIds(
+      normalizedCodes,
+      true,
+    );
+
+    for (const category of dbCategories) {
+      labelsByCode.set(category.code, category.name);
+    }
+
+    for (const rawCode of this.cpvService.resolveRawCodes(normalizedCodes)) {
+      if (!labelsByCode.has(rawCode.code)) {
+        labelsByCode.set(rawCode.code, rawCode.name);
+      }
+    }
+
+    return labelsByCode;
+  }
+
+  private normalizeCpvCode(code: string | null | undefined): string {
+    return readString(code)?.replace(/\D/g, '').slice(0, 8) ?? '';
   }
 
   private async isTenderMatchingEnabled(
@@ -614,5 +640,3 @@ function getAiFitDecision(score: number): AiFitDecision {
   if (score >= 50) return AiFitDecision.MAYBE;
   return AiFitDecision.REJECT;
 }
-
-

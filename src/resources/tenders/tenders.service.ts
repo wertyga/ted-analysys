@@ -237,11 +237,25 @@ export class TendersService {
     const buyerIdsToRefresh = new Set<string>();
 
     const updateBuyersAndTender = async (notice: TedNotice) => {
+      const publicationNumber = extractPublicationNumberFromNotice(notice);
+      const existingTender = publicationNumber
+        ? await TenderModel.findOne({ id: publicationNumber })
+            .select('sourceHash')
+            .exec()
+        : null;
+      const shouldTrackChangedTender = this.shouldUpdateTenderFromTedNotice(
+        existingTender,
+        notice,
+      );
       const buyers =
         await this.buyerService.upsertPureBuyersFromTEDNotice(notice);
       const savedTender = await this.upsertTender(notice, buyers);
 
       if (savedTender) {
+        if (shouldTrackChangedTender) {
+          changedTenders.push(savedTender);
+        }
+
         [...buyers.leadIds, ...buyers.nonLeadIds].forEach((buyerId) =>
           buyerIdsToRefresh.add(buyerId.toString()),
         );
@@ -255,7 +269,9 @@ export class TendersService {
       }
     };
 
-    await Promise.all(notices.map(updateBuyersAndTender));
+    for (const notice of notices) {
+      await updateBuyersAndTender(notice);
+    }
 
     devLog('Refreshing Buyers Meta...');
 
