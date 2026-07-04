@@ -156,6 +156,10 @@ type SyncIndexesStatus = {
     model: string;
     message: string;
   }>;
+  droppedConflictingIndexes: Array<{
+    model: string;
+    index: string;
+  }>;
 };
 
 type TechJobResult = Record<string, unknown>;
@@ -1464,7 +1468,22 @@ export default function AdminApp() {
                           <dt>Errors</dt>
                           <dd>{syncIndexesStatus.errors.length}</dd>
                         </div>
+                        <div>
+                          <dt>Rebuilt</dt>
+                          <dd>
+                            {syncIndexesStatus.droppedConflictingIndexes.length}
+                          </dd>
+                        </div>
                       </dl>
+                      {syncIndexesStatus.droppedConflictingIndexes.length ? (
+                        <div className="resultNote">
+                          Rebuilt conflicting indexes:{' '}
+                          {syncIndexesStatus.droppedConflictingIndexes
+                            .slice(-6)
+                            .map((item) => `${item.model}.${item.index}`)
+                            .join(', ')}
+                        </div>
+                      ) : null}
                       {syncIndexesStatus.errors.length ? (
                         <div className="errorList">
                           {syncIndexesStatus.errors.slice(0, 8).map((error) => (

@@ -339,16 +339,6 @@ TenderSchema.index(
     publicationDate: -1,
     _id: -1,
   },
-  { name: 'idx_cpv_notice_country_pubdate' },
-);
-
-TenderSchema.index(
-  {
-    cpvCodes: 1,
-    noticeType: 1,
-    publicationDate: -1,
-    _id: -1,
-  },
   { name: 'idx_cpv_notice_pubdate' },
 );
 
