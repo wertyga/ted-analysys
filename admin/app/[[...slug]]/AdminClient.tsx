@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { Table, Tag } from 'antd';
+import { Progress, Table, Tag } from 'antd';
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
 import { usePathname } from 'next/navigation';
 
@@ -144,6 +144,20 @@ type AwardTendersRefreshStatus = {
   totalNoticeCount?: number;
 };
 
+type SyncIndexesStatus = {
+  isRunning: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  lastError: string | null;
+  totalModels: number;
+  processedModels: number;
+  currentModel: string | null;
+  errors: Array<{
+    model: string;
+    message: string;
+  }>;
+};
+
 type TechJobResult = Record<string, unknown>;
 
 type CronTask = {
@@ -279,6 +293,9 @@ export default function AdminApp() {
   const [shortTitlesLoading, setShortTitlesLoading] = useState(false);
   const [dbCopyResult, setDbCopyResult] = useState<DbCopyResult | null>(null);
   const [dbCopyLoading, setDbCopyLoading] = useState(false);
+  const [syncIndexesLoading, setSyncIndexesLoading] = useState(false);
+  const [syncIndexesStatus, setSyncIndexesStatus] =
+    useState<SyncIndexesStatus | null>(null);
   const [collectTenderBuyersLoading, setCollectTenderBuyersLoading] =
     useState(false);
   const [collectTenderBuyersResult, setCollectTenderBuyersResult] =
@@ -361,6 +378,7 @@ export default function AdminApp() {
 
     void loadGatherAllStatus(token);
     void loadAwardTendersRefreshStatus(token);
+    void loadSyncIndexesStatus(token);
     void loadRecentCompetitionTendersCronStatus(token);
     void loadRecentAwardTendersCronStatus(token);
     void loadCollectTenderBuyersStatus(token);
@@ -368,6 +386,7 @@ export default function AdminApp() {
     const interval = window.setInterval(() => {
       void loadGatherAllStatus(token);
       void loadAwardTendersRefreshStatus(token);
+      void loadSyncIndexesStatus(token);
       void loadRecentCompetitionTendersCronStatus(token);
       void loadRecentAwardTendersCronStatus(token);
       void loadCollectTenderBuyersStatus(token);
@@ -526,6 +545,20 @@ export default function AdminApp() {
 
       setAwardTendersRefreshResult(status);
       setAwardTendersRefreshLoading(status.isRunning);
+    } catch {
+      // Keep the current status visible if polling fails.
+    }
+  }
+
+  async function loadSyncIndexesStatus(authToken: string) {
+    try {
+      const status = await request<SyncIndexesStatus>(
+        '/adm/tech/sync-indexes/status',
+        { token: authToken },
+      );
+
+      setSyncIndexesStatus(status);
+      setSyncIndexesLoading(status.isRunning);
     } catch {
       // Keep the current status visible if polling fails.
     }
@@ -767,6 +800,39 @@ export default function AdminApp() {
       );
     } finally {
       setDbCopyLoading(false);
+    }
+  }
+
+  async function syncMongoIndexes() {
+    const confirmed = window.confirm(
+      'Create missing MongoDB indexes now? This can take a long time on large collections.',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setSyncIndexesLoading(true);
+    setMessage('');
+
+    try {
+      const status = await request<SyncIndexesStatus>(
+        '/adm/tech/sync-indexes',
+        {
+          method: 'POST',
+          token,
+        },
+      );
+
+      setSyncIndexesStatus(status);
+      setSyncIndexesLoading(status.isRunning);
+      setMessage('Mongo index synchronization started.');
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Failed to start Mongo index synchronization',
+      );
     }
   }
 
@@ -1210,6 +1276,76 @@ export default function AdminApp() {
                     <pre className="jsonResult">
                       {JSON.stringify(cronRunResult, null, 2)}
                     </pre>
+                  ) : null}
+                </section>
+
+                <section className="panel panelWide">
+                  <div className="panelHeader">
+                    <div>
+                      <h2>Mongo indexes</h2>
+                      <p>Create missing indexes declared in Mongoose schemas.</p>
+                    </div>
+                    <button
+                      disabled={syncIndexesLoading || syncIndexesStatus?.isRunning}
+                      onClick={syncMongoIndexes}
+                      type="button"
+                    >
+                      {syncIndexesLoading || syncIndexesStatus?.isRunning
+                        ? 'Syncing indexes...'
+                        : 'Sync indexes'}
+                    </button>
+                  </div>
+
+                  {syncIndexesStatus ? (
+                    <>
+                      <Progress
+                        percent={
+                          syncIndexesStatus.totalModels > 0
+                            ? Math.round(
+                                (syncIndexesStatus.processedModels /
+                                  syncIndexesStatus.totalModels) *
+                                  100,
+                              )
+                            : 0
+                        }
+                        status={
+                          syncIndexesStatus.errors.length ||
+                          syncIndexesStatus.lastError
+                            ? 'exception'
+                            : syncIndexesStatus.isRunning
+                              ? 'active'
+                              : 'success'
+                        }
+                      />
+                      <dl className="stats">
+                        <div>
+                          <dt>Models</dt>
+                          <dd>
+                            {syncIndexesStatus.processedModels}/
+                            {syncIndexesStatus.totalModels}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Current model</dt>
+                          <dd className="smallStat">
+                            {syncIndexesStatus.currentModel ?? '-'}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Errors</dt>
+                          <dd>{syncIndexesStatus.errors.length}</dd>
+                        </div>
+                      </dl>
+                      {syncIndexesStatus.errors.length ? (
+                        <div className="errorList">
+                          {syncIndexesStatus.errors.slice(0, 8).map((error) => (
+                            <div key={`${error.model}-${error.message}`}>
+                              <strong>{error.model}</strong>: {error.message}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </>
                   ) : null}
                 </section>
 

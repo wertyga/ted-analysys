@@ -98,6 +98,7 @@ export const TenderDeepAnalysisSchema: Schema<
 );
 
 TenderDeepAnalysisSchema.index({ status: 1, updatedAt: 1 });
+TenderDeepAnalysisSchema.index({ company: 1, tenderId: 1 });
 
 TenderDeepAnalysisSchema.statics.serializeDetail = function serializeDetail(
   analysis?: TenderDeepAnalysisDocument | null,

@@ -20,6 +20,8 @@ import { BuyerTechService } from '@/resources/tech/buyer/buyer.tech.service';
 import { BuyerModule } from '@/resources/buyer/buyer.module';
 import { BuyerTechController } from '@/resources/tech/buyer/buyer.tech.controller';
 import { TedOpenTendersCollectorModule } from '@/resources/ted-open-tenders-collector/ted-open-tenders-collector.module';
+import { IndexesTechController } from '@/resources/tech/indexes/indexes.tech.controller';
+import { IndexesTechService } from '@/resources/tech/indexes/indexes.tech.service';
 
 @Module({
   imports: [
@@ -40,6 +42,7 @@ import { TedOpenTendersCollectorModule } from '@/resources/ted-open-tenders-coll
     TendersTechController,
     CpvAdmController,
     BuyerTechController,
+    IndexesTechController,
   ],
   providers: [
     AwardTendersTechService,
@@ -48,6 +51,7 @@ import { TedOpenTendersCollectorModule } from '@/resources/ted-open-tenders-coll
     SitemapTechService,
     TendersTechService,
     BuyerTechService,
+    IndexesTechService,
   ],
 })
 export class TechModule {}

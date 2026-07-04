@@ -8,7 +8,6 @@ import { TendersService } from '@/resources/tenders/tenders.service';
 import { TenderListDto } from '@/resources/tenders/dto/tender.dto';
 import { TariffService } from '@/resources/tariff';
 import { UserDocument } from '@/resources/user/user.types';
-import fs from 'node:fs';
 
 @ApiTags('ted')
 @Controller('ted')
@@ -27,25 +26,13 @@ export class TedSearchController {
     @Req() req,
     @Body() body: TedTenderSearchRequestDto,
   ): Promise<TedSearchResponse> {
-    let start = Date.now();
     const searchBody = await this.applySearchTariffRules(req.user, body);
-
-    fs.appendFileSync(
-      'applySearchTariffRules.txt',
-      `${(Date.now() - start) / 1000} s.`,
-    );
-    start = Date.now();
     const noticeData = await this.tedSearchService.searchLocalTenders({
       ...searchBody,
       withoutBaseAnalysisGenerating:
         !!req.isBot || body.withoutBaseAnalysisGenerating,
       noticeTypes: searchBody.noticeTypes ?? TENDER_COMPETITION_NOTICE_TYPES,
     });
-    fs.appendFileSync(
-      'searchLocalTenders.txt',
-      `${(Date.now() - start) / 1000} s.`,
-    );
-    start = Date.now();
     const localTenders = (noticeData.notices ?? []) as TenderListDto[];
 
     if (req.user) {
@@ -54,10 +41,7 @@ export class TedSearchController {
         req.user._id.toString(),
       );
     }
-    fs.appendFileSync(
-      'fillUpTenderListByDeepAnalysisAndWishListStatus.txt',
-      `${(Date.now() - start) / 1000} s.`,
-    );
+
     return {
       ...noticeData,
       notices: localTenders,

@@ -361,6 +361,64 @@ TenderSchema.index(
   { name: 'idx_notice_country_pubdate' },
 );
 
+TenderSchema.index(
+  {
+    placeOfPerformanceCountries: 1,
+    noticeType: 1,
+    publicationDate: -1,
+    _id: -1,
+  },
+  { name: 'idx_country_notice_pubdate' },
+);
+
+TenderSchema.index(
+  {
+    submissionLanguages: 1,
+    noticeType: 1,
+    publicationDate: -1,
+    _id: -1,
+  },
+  { name: 'idx_language_notice_pubdate' },
+);
+
+TenderSchema.index(
+  {
+    procedureType: 1,
+    noticeType: 1,
+    publicationDate: -1,
+    _id: -1,
+  },
+  { name: 'idx_procedure_notice_pubdate' },
+);
+
+TenderSchema.index(
+  {
+    contractNature: 1,
+    noticeType: 1,
+    publicationDate: -1,
+    _id: -1,
+  },
+  { name: 'idx_contract_nature_notice_pubdate' },
+);
+
+TenderSchema.index(
+  {
+    noticeType: 1,
+    submissionDeadline: 1,
+    _id: -1,
+  },
+  { name: 'idx_notice_deadline' },
+);
+
+TenderSchema.index(
+  {
+    noticeType: 1,
+    'estimatedValue.amount': -1,
+    _id: -1,
+  },
+  { name: 'idx_notice_budget' },
+);
+
 function serializeTender(tender: TenderSerializable): Tender {
   return filterModel(tender as TenderDocument, {
     excludeFields: ['sourceHash'],
