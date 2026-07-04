@@ -105,17 +105,22 @@ export class TendersCronService {
   // @Cron(CRON_CONFIG.tenders.allCompetitionTenders, {
   //   timeZone: CRON_CONFIG.timeZone,
   // })
-  startGatherAllCompetitionTenders(forceUpdate?: boolean): AllCompetitionTendersStatus {
+  startGatherAllCompetitionTenders(options: {
+    forceUpdate?: boolean;
+    pageLimit?: number;
+  } = {}): AllCompetitionTendersStatus {
     if (this.isGatheringAllCompetitionTenders) {
       return this.getAllCompetitionTendersStatus();
     }
 
-    void this.gatherAllCompetitionTenders(forceUpdate);
+    void this.gatherAllCompetitionTenders(options);
 
     return this.getAllCompetitionTendersStatus();
   }
 
-  async gatherAllCompetitionTenders(forceUpdate?: boolean): Promise<void> {
+  async gatherAllCompetitionTenders(
+    optionsOrForceUpdate?: boolean | { forceUpdate?: boolean; pageLimit?: number },
+  ): Promise<void> {
     if (this.isGatheringAllCompetitionTenders) {
       this.logger.warn(
         'All competition TED tender gather is already running, skipping',
@@ -130,13 +135,18 @@ export class TendersCronService {
       startedAt: new Date(),
     };
     const status = this.allCompetitionTendersStatus;
+    const options =
+      typeof optionsOrForceUpdate === 'boolean'
+        ? { forceUpdate: optionsOrForceUpdate }
+        : (optionsOrForceUpdate ?? {});
+    const pageLimit = options.pageLimit ? Number(options.pageLimit) : 70;
 
     try {
       const result =
         await this.tedOpenTendersCollectorService.collectOpenTendersFromTed({
-        pageLimit: 70,
+        pageLimit,
         maxPages: 100_000,
-        updateExisting: forceUpdate,
+        updateExisting: options.forceUpdate,
         onProgress: (progress) => {
           status.pagesFetched = progress.pagesFetched;
           status.noticesFetched = progress.noticesFetched;

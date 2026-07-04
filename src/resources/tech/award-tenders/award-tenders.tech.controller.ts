@@ -17,7 +17,12 @@ export class AwardTendersTechController {
   })
   @Post('/refresh')
   refreshAwardTendersHistory(@Body() body: any) {
-    return this.awardTendersTechService.startRefreshAwardTendersHistory(body);
+    const { pageLimit, ...filters } = body ?? {};
+
+    return this.awardTendersTechService.startRefreshAwardTendersHistory(
+      filters,
+      { pageLimit },
+    );
   }
 
   @Get('/refresh/status')

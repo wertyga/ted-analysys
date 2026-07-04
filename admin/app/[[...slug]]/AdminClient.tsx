@@ -304,8 +304,12 @@ export default function AdminApp() {
     useState(false);
   const [collectAwardBuyersResult, setCollectAwardBuyersResult] =
     useState<AwardBuyerCollectionResult | null>(null);
+  const [gatherAllCompetitionPageLimit, setGatherAllCompetitionPageLimit] =
+    useState('70');
   const [gatherAllCompetitionLoading, setGatherAllCompetitionLoading] =
     useState(false);
+  const [awardTendersRefreshPageLimit, setAwardTendersRefreshPageLimit] =
+    useState('50');
   const [awardTendersRefreshLoading, setAwardTendersRefreshLoading] =
     useState(false);
   const [awardTendersRefreshResult, setAwardTendersRefreshResult] =
@@ -975,6 +979,9 @@ export default function AdminApp() {
         '/adm/tech/tenders/gather-all-competition',
         {
           method: 'POST',
+          body: JSON.stringify({
+            pageLimit: Number(gatherAllCompetitionPageLimit) || undefined,
+          }),
           token,
         },
       );
@@ -1009,7 +1016,9 @@ export default function AdminApp() {
         '/adm/tech/award-tenders/refresh',
         {
           method: 'POST',
-          body: JSON.stringify({}),
+          body: JSON.stringify({
+            pageLimit: Number(awardTendersRefreshPageLimit) || undefined,
+          }),
           token,
         },
       );
@@ -1056,6 +1065,43 @@ export default function AdminApp() {
         ...current,
         [task.id]: false,
       }));
+    }
+  }
+
+  async function downloadTenderShortTitles() {
+    setMessage('');
+
+    try {
+      const response = await fetch(
+        getApiUrl('/adm/tech/tenders/short-titles/export'),
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `tender-short-titles-${new Date()
+        .toISOString()
+        .slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Failed to download tender short titles',
+      );
     }
   }
 
@@ -1359,6 +1405,17 @@ export default function AdminApp() {
                       </p>
                     </div>
                     <div className="buttonGroup">
+                      <label>
+                        Competition page limit
+                        <input
+                          min="1"
+                          onChange={(event) =>
+                            setGatherAllCompetitionPageLimit(event.target.value)
+                          }
+                          type="number"
+                          value={gatherAllCompetitionPageLimit}
+                        />
+                      </label>
                       <button
                         disabled={
                           gatherAllCompetitionLoading ||
@@ -1372,6 +1429,17 @@ export default function AdminApp() {
                           ? 'Gathering competition...'
                           : 'Gather all competition'}
                       </button>
+                      <label>
+                        Awards page limit
+                        <input
+                          min="1"
+                          onChange={(event) =>
+                            setAwardTendersRefreshPageLimit(event.target.value)
+                          }
+                          type="number"
+                          value={awardTendersRefreshPageLimit}
+                        />
+                      </label>
                       <button
                         className="secondaryButton"
                         disabled={awardTendersRefreshLoading}
@@ -1700,6 +1768,13 @@ export default function AdminApp() {
                         FR, PL, and RU.
                       </p>
                     </div>
+                    <button
+                      className="secondaryButton"
+                      onClick={downloadTenderShortTitles}
+                      type="button"
+                    >
+                      Download JSON
+                    </button>
                   </div>
 
                   <form

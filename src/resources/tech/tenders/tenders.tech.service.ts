@@ -6,6 +6,23 @@ import { TenderModel } from '@/resources/tenders/schemas';
 export class TendersTechService {
   constructor(private readonly llmAnalysisService: LlmAnalysisService) {}
 
+  async getTenderShortTitlesByTenderId() {
+    const tenders = await TenderModel.find({
+      shortTitle: { $exists: true, $ne: null },
+    })
+      .select('id shortTitle')
+      .sort({ id: 1 })
+      .lean();
+
+    return tenders.reduce<Record<string, unknown>>((acc, tender) => {
+      if (tender.id && tender.shortTitle) {
+        acc[tender.id] = tender.shortTitle;
+      }
+
+      return acc;
+    }, {});
+  }
+
   async generateMissingTenderShortTitles(options: {
     limit?: number;
     batchSize?: number;

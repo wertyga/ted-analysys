@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiDefaultResponse, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { AdminAccessGuard } from '@/guards';
 import { TendersTechService } from './tenders.tech.service';
 import { GenerateTenderShortTitlesRequestDto } from './tenders.tech.dto';
@@ -24,8 +25,11 @@ export class TendersTechController {
   }
 
   @Post('/gather-all-competition')
-  collectAllCompetitionTenders() {
-    return this.tendersCronService.startGatherAllCompetitionTenders(true);
+  collectAllCompetitionTenders(@Body() body: { pageLimit?: number }) {
+    return this.tendersCronService.startGatherAllCompetitionTenders({
+      forceUpdate: true,
+      pageLimit: body?.pageLimit,
+    });
   }
 
   @ApiDefaultResponse({
@@ -39,5 +43,22 @@ export class TendersTechController {
       limit: body.limit,
       batchSize: body.batchSize,
     });
+  }
+
+  @ApiDefaultResponse({
+    description: 'Downloaded tender short titles JSON.',
+  })
+  @Get('/short-titles/export')
+  async exportTenderShortTitles(@Res() res: Response) {
+    const data = await this.tendersTechService.getTenderShortTitlesByTenderId();
+    const date = new Date().toISOString().slice(0, 10);
+
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="tender-short-titles-${date}.json"`,
+    );
+
+    return res.send(JSON.stringify(data, null, 2));
   }
 }

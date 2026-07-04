@@ -36,18 +36,20 @@ export class AwardTendersTechService {
 
   startRefreshAwardTendersHistory(
     filters?: TedTenderSearchFilters,
+    options: { pageLimit?: number } = {},
   ): AwardTendersRefreshStatus {
     if (this.refreshStatus.isRunning) {
       return this.getRefreshAwardTendersHistoryStatus();
     }
 
-    void this.refreshAwardTendersHistory(filters);
+    void this.refreshAwardTendersHistory(filters, options);
 
     return this.getRefreshAwardTendersHistoryStatus();
   }
 
   async refreshAwardTendersHistory(
     filters?: TedTenderSearchFilters,
+    options: { pageLimit?: number } = {},
   ): Promise<AwardTendersRefreshStatus> {
     if (this.refreshStatus.isRunning) {
       return this.getRefreshAwardTendersHistoryStatus();
@@ -59,12 +61,14 @@ export class AwardTendersTechService {
       startedAt: new Date(),
     };
     const status = this.refreshStatus;
+    const pageLimit = options.pageLimit ? Number(options.pageLimit) : 50;
 
     try {
       const result =
         await this.tedOpenTendersCollectorService.collectResultTendersFromTed(
           { lookbackYears: AWARD_TENDER_CONFIG.historyYearsBack, filters },
           {
+            pageLimit,
             updateExisting: true,
             onProgress: (progress) => {
               status.pagesFetched = progress.pagesFetched;
@@ -78,7 +82,8 @@ export class AwardTendersTechService {
       status.noticesFetched = result.noticesFetched;
       status.totalNoticeCount = result.totalNoticeCount;
     } catch (error) {
-      status.lastError = error instanceof Error ? error.message : 'Unknown error';
+      status.lastError =
+        error instanceof Error ? error.message : 'Unknown error';
     } finally {
       status.isRunning = false;
       status.finishedAt = new Date();
