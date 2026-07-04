@@ -32,9 +32,8 @@ export class BuyerTechService {
       return;
     }
 
-    const buyers = await this.buyerService.upsertPureBuyersFromTEDNotice(
-      notice,
-    );
+    const buyers =
+      await this.buyerService.upsertPureBuyersFromTEDNotice(notice);
 
     return await this.tendersService.upsertTender(notice, buyers);
   }
@@ -53,7 +52,7 @@ export class BuyerTechService {
         },
         TENDER_COMPETITION_SEARCH_FIELDS,
         {
-          pageLimit: 80,
+          pageLimit: 70,
           maxPages: 100_000,
         },
         async (noticies: TedNotice[]) => {

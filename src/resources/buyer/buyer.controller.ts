@@ -38,7 +38,6 @@ export class BuyerController {
   @ApiQuery({ type: BuyerListRequestDto })
   @ApiOkResponse({ description: 'Buyer list.' })
   getBuyers(@Query() query: BuyerListRequestDto) {
-    console.log({ query });
     return this.buyerService.getBuyers(query);
   }
 

@@ -10,9 +10,21 @@ import { existsSync } from 'fs';
 import { mkdir, writeFile } from 'fs/promises';
 import { basename, dirname, isAbsolute, join, normalize, relative } from 'path';
 import { TenderModel } from '@/resources/tenders/schemas';
+import { BuyerModel } from '@/resources/buyer/schemas';
+import { ContractorModel } from '@/resources/contractor/schemas';
 
 type SitemapTender = {
   id?: string;
+  updatedAt?: Date;
+};
+
+type SitemapBuyer = {
+  _id?: unknown;
+  updatedAt?: Date;
+};
+
+type SitemapContractor = {
+  _id?: unknown;
   updatedAt?: Date;
 };
 
@@ -65,6 +77,22 @@ export class SitemapTechService {
     });
     sitemapFiles.push(...tenderResult.files);
 
+    const buyersResult = await this.writeBuyerSitemapFiles({
+      domain,
+      locales,
+      outputDir,
+      maxUrlsPerFile,
+    });
+    sitemapFiles.push(...buyersResult.files);
+
+    const contractorsResult = await this.writeContractorSitemapFiles({
+      domain,
+      locales,
+      outputDir,
+      maxUrlsPerFile,
+    });
+    sitemapFiles.push(...contractorsResult.files);
+
     const industryResult = await this.writeSitemapEntityFiles({
       domain,
       outputDir,
@@ -106,6 +134,8 @@ export class SitemapTechService {
     const urlsCount =
       staticResult.count +
       tenderResult.count +
+      buyersResult.count +
+      contractorsResult.count +
       industryResult.count +
       countryResult.count +
       countryIndustryResult.count;
@@ -115,6 +145,8 @@ export class SitemapTechService {
       downloadUrl: '/adm/tech/sitemap/download',
       staticCount: staticResult.count,
       tendersCount: tenderResult.count,
+      buyersCount: buyersResult.count,
+      contractorsCount: contractorsResult.count,
       industriesCount: industryResult.count,
       countriesCount: countryResult.count,
       countryIndustriesCount: countryIndustryResult.count,
@@ -224,6 +256,158 @@ export class SitemapTechService {
 
     return {
       count: urls.length,
+      files,
+    };
+  }
+
+  private async writeBuyerSitemapFiles(options: {
+    domain: string;
+    locales: string[];
+    outputDir: string;
+    maxUrlsPerFile: number;
+  }) {
+    const { domain, locales, outputDir, maxUrlsPerFile } = options;
+
+    const files: WrittenSitemapFile[] = [];
+    let buffer: SitemapUrl[] = [];
+    let totalCount = 0;
+
+    const flush = async () => {
+      if (!buffer.length) return;
+
+      const fileIndex = files.length;
+      const outputPath = join(outputDir, `buyers-${fileIndex}.xml`);
+      const chunk = buffer;
+
+      buffer = [];
+
+      await writeFile(outputPath, this.buildSitemapXml(chunk), 'utf8');
+
+      files.push({
+        filename: basename(outputPath),
+        outputPath,
+        loc: this.buildPublicSitemapUrl(domain, outputPath),
+        count: chunk.length,
+      });
+    };
+
+    for (const locale of locales) {
+      buffer.push({
+        loc: `${domain}/${locale}/buyers`,
+        priority: 0.8,
+      });
+      totalCount++;
+
+      if (buffer.length >= maxUrlsPerFile) {
+        await flush();
+      }
+    }
+
+    const cursor = BuyerModel.find({})
+      .select('_id updatedAt')
+      .lean<SitemapBuyer>()
+      .cursor();
+
+    for await (const buyer of cursor) {
+      const buyerId = buyer._id ? String(buyer._id) : '';
+
+      if (!buyerId) continue;
+
+      for (const locale of locales) {
+        buffer.push({
+          loc: `${domain}/${locale}/buyers/${encodeURIComponent(buyerId)}`,
+          lastmod: buyer.updatedAt?.toISOString(),
+        });
+
+        totalCount++;
+
+        if (buffer.length >= maxUrlsPerFile) {
+          await flush();
+        }
+      }
+    }
+
+    await flush();
+
+    return {
+      count: totalCount,
+      files,
+    };
+  }
+
+  private async writeContractorSitemapFiles(options: {
+    domain: string;
+    locales: string[];
+    outputDir: string;
+    maxUrlsPerFile: number;
+  }) {
+    const { domain, locales, outputDir, maxUrlsPerFile } = options;
+
+    const files: WrittenSitemapFile[] = [];
+    let buffer: SitemapUrl[] = [];
+    let totalCount = 0;
+
+    const flush = async () => {
+      if (!buffer.length) return;
+
+      const fileIndex = files.length;
+      const outputPath = join(outputDir, `contractors-${fileIndex}.xml`);
+      const chunk = buffer;
+
+      buffer = [];
+
+      await writeFile(outputPath, this.buildSitemapXml(chunk), 'utf8');
+
+      files.push({
+        filename: basename(outputPath),
+        outputPath,
+        loc: this.buildPublicSitemapUrl(domain, outputPath),
+        count: chunk.length,
+      });
+    };
+
+    for (const locale of locales) {
+      buffer.push({
+        loc: `${domain}/${locale}/contractors`,
+        priority: 0.8,
+      });
+      totalCount++;
+
+      if (buffer.length >= maxUrlsPerFile) {
+        await flush();
+      }
+    }
+
+    const cursor = ContractorModel.find({})
+      .select('_id updatedAt')
+      .lean<SitemapContractor>()
+      .cursor();
+
+    for await (const contractor of cursor) {
+      const contractorId = contractor._id ? String(contractor._id) : '';
+
+      if (!contractorId) continue;
+
+      for (const locale of locales) {
+        buffer.push({
+          loc: `${domain}/${locale}/contractors/${encodeURIComponent(
+            contractorId,
+          )}`,
+          lastmod: contractor.updatedAt?.toISOString(),
+        });
+
+        totalCount++;
+
+        if (buffer.length >= maxUrlsPerFile) {
+          await flush();
+        }
+      }
+    }
+
+    await flush();
+
+    return {
+      count: totalCount,
       files,
     };
   }
