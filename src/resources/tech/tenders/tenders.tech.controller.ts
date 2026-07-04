@@ -25,7 +25,7 @@ export class TendersTechController {
 
   @Post('/gather-all-competition')
   collectAllCompetitionTenders() {
-    return this.tendersCronService.gatherAllCompetitionTenders();
+    return this.tendersCronService.gatherAllCompetitionTenders(true);
   }
 
   @ApiDefaultResponse({

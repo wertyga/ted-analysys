@@ -253,7 +253,9 @@ export class TenderDeepAnalysisService {
         language: params.language,
       });
     }
+
     devLog(`listByCompany: ${JSON.stringify(query)}`);
+
     const [deepAnalyses, totalDeepAnalysis, companyAnalysis] =
       await Promise.all([
         TenderDeepAnalysisModel.find(query)

@@ -81,7 +81,52 @@ type GatherAllCompetitionTendersStatus = {
 
 type TechJobResult = Record<string, unknown>;
 
+type CronTask = {
+  id: string;
+  title: string;
+  description: string;
+};
+
+type CronRunResult = {
+  id: string;
+  status: string;
+  result: unknown;
+};
+
 const tokenStorageKey = 'ted-admin-token';
+
+const cronTasks: CronTask[] = [
+  {
+    id: 'gather-recent-competition-tenders',
+    title: 'Gather recent competition tenders',
+    description: 'Collect recent competition tenders and run matching.',
+  },
+  {
+    id: 'gather-recent-award-tenders',
+    title: 'Gather recent award tenders',
+    description: 'Collect recent TED result notices.',
+  },
+  {
+    id: 'sync-latest-rates',
+    title: 'Sync latest exchange rates',
+    description: 'Update currency exchange rates.',
+  },
+  {
+    id: 'send-daily-reports',
+    title: 'Send daily reports',
+    description: 'Send daily tender match notifications.',
+  },
+  {
+    id: 'send-weekly-reports',
+    title: 'Send weekly reports',
+    description: 'Send weekly tender match notifications.',
+  },
+  {
+    id: 'copy-database-dump-to-cdn',
+    title: 'Copy database dump to CDN',
+    description: 'Create and upload a database dump.',
+  },
+];
 
 class ApiRequestError extends Error {
   constructor(
@@ -179,6 +224,12 @@ export default function AdminApp() {
     useState(false);
   const [awardTendersRefreshResult, setAwardTendersRefreshResult] =
     useState<TechJobResult | null>(null);
+  const [cronTaskLoadingById, setCronTaskLoadingById] = useState<
+    Record<string, boolean>
+  >({});
+  const [cronRunResult, setCronRunResult] = useState<CronRunResult | null>(
+    null,
+  );
   const [gatherAllStatus, setGatherAllStatus] =
     useState<GatherAllCompetitionTendersStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -748,6 +799,39 @@ export default function AdminApp() {
     }
   }
 
+  async function runCronTask(task: CronTask) {
+    const confirmed = window.confirm(
+      `Run cron task "${task.title}" now? This can take a long time.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setCronTaskLoadingById((current) => ({ ...current, [task.id]: true }));
+    setCronRunResult(null);
+    setMessage('');
+
+    try {
+      const result = await request<CronRunResult>(`/adm/cron/${task.id}`, {
+        method: 'POST',
+        token,
+      });
+
+      setCronRunResult(result);
+      setMessage(`Cron task "${task.title}" finished.`);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : 'Failed to run cron task',
+      );
+    } finally {
+      setCronTaskLoadingById((current) => ({
+        ...current,
+        [task.id]: false,
+      }));
+    }
+  }
+
   return (
     <main className="shell">
       <aside className="sidebar">
@@ -905,6 +989,44 @@ export default function AdminApp() {
                       <Tag>UNKNOWN</Tag>
                     )}
                   </div>
+                </section>
+
+                <section className="panel panelWide">
+                  <div className="panelHeader">
+                    <div>
+                      <h2>Cron jobs</h2>
+                      <p>Run scheduled jobs manually from the admin panel.</p>
+                    </div>
+                  </div>
+
+                  <div className="statusList">
+                    {cronTasks.map((task) => {
+                      const isRunning = Boolean(cronTaskLoadingById[task.id]);
+
+                      return (
+                        <div key={task.id}>
+                          <span>
+                            <strong>{task.title}</strong>
+                            <small>{task.description}</small>
+                          </span>
+                          <button
+                            className="secondaryButton"
+                            disabled={isRunning}
+                            onClick={() => runCronTask(task)}
+                            type="button"
+                          >
+                            {isRunning ? 'Running...' : 'Run'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {cronRunResult ? (
+                    <pre className="jsonResult">
+                      {JSON.stringify(cronRunResult, null, 2)}
+                    </pre>
+                  ) : null}
                 </section>
 
                 <section className="panel panelWide">

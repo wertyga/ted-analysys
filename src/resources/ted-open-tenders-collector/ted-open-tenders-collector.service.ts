@@ -43,9 +43,6 @@ export interface TedOpenTendersCollectorOptions<
 export interface TedOpenTendersCollectorResult {
   pagesFetched: number;
   noticesFetched: number;
-  saved: number;
-  updated: number;
-  skipped: number;
   totalNoticeCount?: number;
   resumeIterationNextToken?: string;
 }
@@ -64,7 +61,7 @@ interface TedIterationCollectorParams {
     TedOpenTendersCollectorOptions,
     'pageLimit' | 'maxPages' | 'iterationNextToken'
   >;
-  saveNotices: (notices: TedNotice[]) => Promise<TedNoticeBatchSaveResult>;
+  saveNotices: (notices: TedNotice[]) => Promise<void>;
 }
 
 @Injectable()
@@ -98,18 +95,18 @@ export class TedOpenTendersCollectorService {
 
   async collectOpenTendersFromTed(
     options: TedOpenTendersCollectorOptions = {},
-  ): Promise<TedOpenTendersCollectorResult> {
+  ): Promise<void> {
     const query = buildTedTenderSearchQuery({
       noticeTypes: TENDER_COMPETITION_NOTICE_TYPES,
       submissionDeadlineFrom: getTedDate(),
     });
 
-    return this.collectCompetitionTendersFromTed(query, options);
+    await this.collectCompetitionTendersFromTed(query, options);
   }
 
   async collectRecentCompetitionTendersFromTed(
     options: TedOpenTendersCollectorOptions = {},
-  ): Promise<TedOpenTendersCollectorResult> {
+  ): Promise<void> {
     const publicationDateFrom = new Date();
 
     publicationDateFrom.setDate(
@@ -124,7 +121,7 @@ export class TedOpenTendersCollectorService {
       submissionDeadlineRange: TedDeadlineRange.ANY_OPEN,
     });
 
-    return this.collectCompetitionTendersFromTed(query, options);
+    await this.collectCompetitionTendersFromTed(query, options);
   }
 
   async collectResultTendersFromTed(
@@ -166,27 +163,18 @@ export class TedOpenTendersCollectorService {
       options,
       saveNotices: async (notices) => {
         try {
-          const saveResult =
-            await this.awardTenderService.saveResultTedTenders(notices, {
+          const saveResult = await this.awardTenderService.saveResultTedTenders(
+            notices,
+            {
               updateExisting: options.updateExisting,
-            });
+            },
+          );
 
           if (saveResult.changedTenders.length > 0) {
             await options.onChangedTenders?.(saveResult.changedTenders);
           }
-
-          return {
-            saved: saveResult.saved,
-            updated: saveResult.updated,
-            skipped: saveResult.skipped,
-          };
         } catch (e) {
           console.log({ e });
-          return {
-            saved: 0,
-            updated: 0,
-            skipped: 0,
-          };
         }
       },
     });
@@ -195,20 +183,21 @@ export class TedOpenTendersCollectorService {
   private async collectCompetitionTendersFromTed(
     query: string,
     options: TedOpenTendersCollectorOptions,
-  ): Promise<TedOpenTendersCollectorResult> {
-    return this.collectTedNoticesByIteration({
+  ): Promise<void> {
+    await this.collectTedNoticesByIteration({
       query,
       scope: TedScope.ACTIVE,
       fields: TENDER_COMPETITION_SEARCH_FIELDS,
       options,
       saveNotices: async (notices) => {
-        const saveResult = await this.tendersService.saveNewTedTenders(notices);
+        const saveResult = await this.tendersService.saveNewTedTenders(
+          notices,
+          !!options.updateExisting,
+        );
 
         if (saveResult.changedTenders.length > 0) {
           await options.onChangedTenders?.(saveResult.changedTenders);
         }
-
-        return saveResult;
       },
     });
   }
@@ -227,9 +216,6 @@ export class TedOpenTendersCollectorService {
     let iterationNextToken = options.iterationNextToken?.trim() || undefined;
     let pagesFetched = 0;
     let noticesFetched = 0;
-    let saved = 0;
-    let updated = 0;
-    let skipped = 0;
     let totalNoticeCount: number | undefined;
 
     while (pagesFetched < maxPages) {
@@ -255,10 +241,7 @@ export class TedOpenTendersCollectorService {
         break;
       }
 
-      const saveResult = await saveNotices(notices);
-      saved += saveResult.saved;
-      updated += saveResult.updated ?? 0;
-      skipped += saveResult.skipped ?? 0;
+      await saveNotices(notices);
 
       if (!iterationNextToken) {
         break;
@@ -268,9 +251,6 @@ export class TedOpenTendersCollectorService {
     return {
       pagesFetched,
       noticesFetched,
-      saved,
-      updated,
-      skipped,
       totalNoticeCount,
       resumeIterationNextToken: iterationNextToken,
     };

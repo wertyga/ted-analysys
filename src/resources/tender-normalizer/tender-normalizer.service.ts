@@ -16,6 +16,7 @@ import {
   getStringValue,
   getUniqArray,
   parseNoticeDateTime,
+  getEngValueOrFirstString,
 } from '@/utils';
 import { MoneyValue, TenderLot } from '@/resources/tenders/schemas';
 import { TedContractNature } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
@@ -97,8 +98,8 @@ export class TenderNormalizerService {
   normalizeTenderLotsNotice(notice: TedNotice): NormalizedTenderLot[] {
     const data = {
       identifiers: getArrayValue('identifier-lot', notice),
-      titles: getEngValueOrFirst('title-lot', notice),
-      descriptions: getEngValueOrFirst('description-lot', notice),
+      titles: getEngValueOrFirstString('title-lot', notice),
+      descriptions: getEngValueOrFirstString('description-lot', notice),
       mainClassifications: getArrayValue('main-classification-lot', notice),
       additionalClassifications: getArrayValue(
         'additional-classification-lot',
@@ -163,15 +164,15 @@ export class TenderNormalizerService {
         'award-criterion-number-lot',
         notice,
       ),
-      awardCriterionDescriptions: getEngValueOrFirst(
+      awardCriterionDescriptions: getEngValueOrFirstString(
         'award-criterion-description-lot',
         notice,
       ),
-      selectionCriterionNames: getArrayValue(
+      selectionCriterionNames: getEngValueOrFirstString(
         'selection-criterion-name-lot',
         notice,
       ),
-      selectionCriterionDescriptions: getArrayValue(
+      selectionCriterionDescriptions: getEngValueOrFirstString(
         'selection-criterion-description-lot',
         notice,
       ),

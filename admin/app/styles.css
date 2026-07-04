@@ -294,7 +294,15 @@ h2 {
 
 .statusList span {
   color: var(--muted);
+  display: grid;
+  gap: 4px;
   font-weight: 700;
+}
+
+.statusList small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .jsonResult {

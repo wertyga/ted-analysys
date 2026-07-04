@@ -11,13 +11,10 @@ import { ContractorSearchRequestDto } from './dto/contractor-search-request.dto'
 import { ContractorAwardTendersRequestDto } from './dto/contractor-award-tenders-request.dto';
 import {
   ContractorDetailDto,
-  ContractorDocument,
   ContractorModel,
 } from '@/resources/contractor/schemas';
 import {
-  AwardTenderDocument,
   AwardTenderListDto,
-  AwardTenderLot,
   AwardTenderModel,
 } from '@/resources/award-tender/schemas';
 
@@ -81,7 +78,7 @@ export class ContractorController {
           return {
             ...at,
             lots: at.lots.filter((l) => {
-              return (l.winner as string).toString() === id;
+              return l.winner?.toString() === id;
             }),
           };
         }),

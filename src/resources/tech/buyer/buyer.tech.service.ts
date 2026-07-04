@@ -67,12 +67,6 @@ export class BuyerTechService {
               errors += 1;
             }
           }
-
-          return {
-            saved: noticies.length - errors,
-            updated: noticies.length - errors,
-            skipped: errors,
-          };
         },
       );
     }
@@ -93,7 +87,7 @@ export class BuyerTechService {
   async collectBuyersFromAwardTenderAll() {
     const awardTenders = await AwardTenderModel.find({}).select('id').lean();
 
-    const chunkedIds = _chunk(awardTenders, 100);
+    const chunkedIds = _chunk(awardTenders, 50);
 
     for (let i = 0; i < chunkedIds.length; i++) {
       const chunk = chunkedIds[i];
@@ -120,12 +114,6 @@ export class BuyerTechService {
               errors += 1;
             }
           }
-
-          return {
-            saved: noticies.length - errors,
-            updated: noticies.length - errors,
-            skipped: errors,
-          };
         },
       );
     }

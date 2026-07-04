@@ -8,9 +8,6 @@ import { AppModule } from './app.module';
 import mongooseConnect from './mongoose/mongoose';
 import { HttpErrorLoggingFilter } from '@/http-logger/HTTPLogger';
 import { isSearchBot } from '@/utils/bots';
-import { logger } from '@/utils';
-import fs from 'node:fs';
-import { CpvCategoryModel } from '@/resources/cpv/schemas';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });

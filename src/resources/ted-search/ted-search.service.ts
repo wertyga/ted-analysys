@@ -76,7 +76,7 @@ export class TedSearchService {
     const sort = this.sorting.buildLocalTenderSort(filters);
 
     devLog(
-      () => `Local Search request: ${JSON.stringify(query)}`,
+      `Local Search request: ${JSON.stringify(query)}`,
       TedSearchService.name,
     );
 
@@ -109,7 +109,7 @@ export class TedSearchService {
     for (let attempt = 0; attempt <= this.retryDelaysMs.length; attempt += 1) {
       try {
         devLog(
-          () => `TED Search request: ${JSON.stringify(payload)}`,
+          `TED Search request: ${JSON.stringify(payload)}`,
           TedSearchService.name,
         );
 

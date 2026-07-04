@@ -4,13 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { logger, normalizeEmail } from '@/utils';
-import {
-  Contractor,
-  ContractorDocument,
-  ContractorListDto,
-  ContractorModel,
-  ContractorSerializable,
-} from './schemas';
+import { Contractor, ContractorDocument, ContractorModel } from './schemas';
 import { QueryFilter, Types } from 'mongoose';
 import { getPaginationMeta } from '@/utils';
 import { ContractorListRequestDto } from './dto/contractor-list-request.dto';

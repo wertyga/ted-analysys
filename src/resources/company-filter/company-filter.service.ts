@@ -20,7 +20,6 @@ import {
   DebouncedAsyncLatestQueueByKey,
   isPopulatedRecord,
   isRecord,
-  logger,
   sleep,
 } from '@/utils';
 import {
@@ -296,11 +295,10 @@ export class CompanyFilterService {
   private async analyzeCompanyProfile(
     payload: CompanyTenderFilterAiPayload,
   ): Promise<CompanyTenderFilterAiResult> {
-    const response =
-      await this.llmAnalysisService.createGeneralJsonResponse(
-        COMPANY_TENDER_FILTER_SYSTEM_PROMPT,
-        this.buildUserPrompt(payload),
-      );
+    const response = await this.llmAnalysisService.createGeneralJsonResponse(
+      COMPANY_TENDER_FILTER_SYSTEM_PROMPT,
+      this.buildUserPrompt(payload),
+    );
 
     return this.validateAiResult(response, payload);
   }
@@ -641,5 +639,3 @@ function normalizeCpvForHash(values: unknown): unknown[] {
     };
   });
 }
-
-

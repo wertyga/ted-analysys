@@ -30,7 +30,6 @@ import {
 import {
   devLog,
   extractPublicationNumberFromNotice,
-  getMongoRelationObjectIdArray,
   isRecord,
   isTedNotice,
   tenderPopulateFields,
@@ -219,34 +218,32 @@ export class TendersService {
 
   async saveNewTedTenders(
     notices: TedNotice[],
-  ): Promise<SaveNewTedTendersResult> {
+    forceUpdate?: boolean,
+  ): Promise<{ changedTenders: TenderDocument[] }> {
     if (!notices.length) {
       return {
-        saved: 0,
-        updated: 0,
-        skipped: notices.length,
         changedTenders: [],
       };
     }
 
-    let saved = 0;
-    let updated = 0;
-    let skipped = 0;
     const changedTenders: TenderDocument[] = [];
     const tendersForShortTitle: TenderDocument[] = [];
     const buyerIdsToRefresh = new Set<string>();
 
     const updateBuyersAndTender = async (notice: TedNotice) => {
       const publicationNumber = extractPublicationNumberFromNotice(notice);
-      const existingTender = publicationNumber
-        ? await TenderModel.findOne({ id: publicationNumber })
-            .select('sourceHash')
-            .exec()
-        : null;
+      const existingTender =
+        publicationNumber && !forceUpdate
+          ? await TenderModel.findOne({ id: publicationNumber })
+              .select('sourceHash')
+              .exec()
+          : null;
+
       const shouldTrackChangedTender = this.shouldUpdateTenderFromTedNotice(
         existingTender,
         notice,
       );
+
       const buyers =
         await this.buyerService.upsertPureBuyersFromTEDNotice(notice);
       const savedTender = await this.upsertTender(notice, buyers);
@@ -262,10 +259,7 @@ export class TendersService {
 
         if (!this.hasCompleteShortTitle(savedTender.shortTitle)) {
           tendersForShortTitle.push(savedTender);
-          saved += 1;
         }
-      } else {
-        skipped += 1;
       }
     };
 
@@ -282,7 +276,7 @@ export class TendersService {
     devLog('Filling Short Title...');
     await this.fillMissingShortTitles(tendersForShortTitle);
 
-    return { saved, updated, skipped, changedTenders };
+    return { changedTenders };
   }
 
   private async fillMissingShortTitles(

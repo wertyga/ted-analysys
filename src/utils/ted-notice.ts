@@ -94,6 +94,10 @@ export const getEngValueOrFirstString = (field: string, notice: TedNotice) => {
     return value;
   }
 
+  if (typeof value === 'object') {
+    return getEngValueOrFirst(field, notice);
+  }
+
   return value;
 };
 

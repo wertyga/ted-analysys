@@ -5,5 +5,6 @@ import { TenderMatchCronService } from './tender-match-cron.service';
 @Module({
   imports: [TenderMatchNotificationsModule],
   providers: [TenderMatchCronService],
+  exports: [TenderMatchCronService],
 })
 export class TenderMatchCronModule {}

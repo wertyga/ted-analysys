@@ -33,7 +33,7 @@ export class TendersCronService {
   // @Cron(CRON_CONFIG.tenders.allCompetitionTenders, {
   //   timeZone: CRON_CONFIG.timeZone,
   // })
-  async gatherAllCompetitionTenders(): Promise<void> {
+  async gatherAllCompetitionTenders(forceUpdate?: boolean): Promise<void> {
     if (this.isGatheringAllCompetitionTenders) {
       this.logger.warn(
         'All competition TED tender gather is already running, skipping',
@@ -47,6 +47,7 @@ export class TendersCronService {
       await this.tedOpenTendersCollectorService.collectOpenTendersFromTed({
         pageLimit: 70,
         maxPages: 100_000,
+        updateExisting: forceUpdate,
       });
     } catch (e: unknown) {
       const error = e instanceof Error ? e.message : 'unknown error';
@@ -79,21 +80,21 @@ export class TendersCronService {
     try {
       let matchesSaved = 0;
 
-      const result =
-        await this.tedOpenTendersCollectorService.collectRecentCompetitionTendersFromTed({
-        onChangedTenders: async (tenders) => {
-          const matches = await this.matchChangedTenders(tenders);
+      await this.tedOpenTendersCollectorService.collectRecentCompetitionTendersFromTed(
+        {
+          onChangedTenders: async (tenders) => {
+            const matches = await this.matchChangedTenders(tenders);
 
-          matchesSaved += matches.length;
+            matchesSaved += matches.length;
+          },
         },
-      });
+      );
       const logResult = {
-        ...result,
         matchesSaved,
       };
 
       devLog(
-        `Recent TED tender gather completed: pages=${logResult.pagesFetched} fetched=${logResult.noticesFetched} saved=${logResult.saved} updated=${logResult.updated} skipped=${logResult.skipped} matches=${logResult.matchesSaved}`,
+        `Recent TED tender gather completed: matches=${logResult.matchesSaved}`,
         TendersCronService.name,
       );
 
@@ -133,15 +134,15 @@ export class TendersCronService {
     try {
       const result =
         await this.tedOpenTendersCollectorService.collectResultTendersFromTed(
-        {
-          lookbackDays:
-            TED_OPEN_TENDERS_COLLECTOR_CONFIG.recentResult.lookbackDays,
-        },
-        {},
-      );
+          {
+            lookbackDays:
+              TED_OPEN_TENDERS_COLLECTOR_CONFIG.recentResult.lookbackDays,
+          },
+          {},
+        );
 
       devLog(
-        `Recent TED award tender gather completed: pages=${result.pagesFetched} fetched=${result.noticesFetched} saved=${result.saved} updated=${result.updated} skipped=${result.skipped}`,
+        `Recent TED award tender gather completed: pages=${result.pagesFetched} fetched=${result.noticesFetched} `,
         TendersCronService.name,
       );
 
