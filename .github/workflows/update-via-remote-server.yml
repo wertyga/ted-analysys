@@ -30,6 +30,6 @@ jobs:
         host: ${{ secrets.SSH_IP }}
         username: ${{ secrets.SSH_USER }}
         password: ${{ secrets.SSH_PASSWORD }}
-        script: pm2 restart ted-analysys:3002
+        script: pm2 restart ted-analysys-BE:3002
 
 
