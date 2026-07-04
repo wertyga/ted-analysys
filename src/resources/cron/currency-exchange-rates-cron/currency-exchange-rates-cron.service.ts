@@ -12,6 +12,7 @@ export class CurrencyExchangeRatesCronService {
   ) {}
 
   @Cron(CRON_CONFIG.currencyExchangeRates.syncLatestRates, {
+    name: 'sync-latest-rates',
     timeZone: CRON_CONFIG.timeZone,
   })
   async syncLatestRatesCron(): Promise<void> {

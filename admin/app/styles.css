@@ -164,6 +164,43 @@ h2 {
   color: var(--primary);
 }
 
+.shell button.secondaryButton:not(.ant-btn):not(.ant-pagination-item-link) {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: inherit;
+}
+
+.shell button.secondaryButton:not(.ant-btn):not(.ant-pagination-item-link):hover {
+  background: rgba(20, 89, 217, 0.08);
+  color: var(--primary);
+}
+
+.shell button.successButton:not(.ant-btn):not(.ant-pagination-item-link),
+.successButton {
+  background: #e8f7ee;
+  border-color: #8fd4a8;
+  color: #0f7a3a;
+}
+
+.shell button.successButton:not(.ant-btn):not(.ant-pagination-item-link):hover,
+.successButton:hover {
+  background: #d7f0e0;
+  color: #0a612e;
+}
+
+.shell button.dangerButton:not(.ant-btn):not(.ant-pagination-item-link),
+.dangerButton {
+  background: #fff1f1;
+  border-color: #ffb3b3;
+  color: #b42318;
+}
+
+.shell button.dangerButton:not(.ant-btn):not(.ant-pagination-item-link):hover,
+.dangerButton:hover {
+  background: #ffe0e0;
+  color: #8f1d14;
+}
+
 .sidebar .secondaryButton {
   border-color: rgba(255, 255, 255, 0.22);
   color: #ffffff;

@@ -29,6 +29,7 @@ import { CronModule } from './resources/cron/cron.module';
 import { TenderNormalizerModule } from '@/resources/tender-normalizer/tender-normalizer.module';
 import { BuyerIntelligenceModule } from '@/resources/buyer-intelligence';
 import { BuyerModule } from '@/resources/buyer/buyer.module';
+import { SettingsModule } from '@/resources/settings/settings.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { BuyerModule } from '@/resources/buyer/buyer.module';
     TenderNormalizerModule,
     BuyerIntelligenceModule,
     BuyerModule,
+    SettingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

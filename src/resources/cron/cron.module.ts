@@ -5,6 +5,8 @@ import { DbCopyCronModule } from './db-copy-cron/db-copy-cron.module';
 import { TenderMatchCronModule } from './tender-match-cron/tender-match-cron.module';
 import { TendersCronModule } from './tenders-cron/tenders-cron.module';
 import { CronController } from './cron.controller';
+import { SettingsModule } from '@/resources/settings/settings.module';
+import { CronSettingsService } from './cron-settings.service';
 
 @Module({
   imports: [
@@ -13,8 +15,10 @@ import { CronController } from './cron.controller';
     CurrencyExchangeRatesCronModule,
     TenderMatchCronModule,
     DbCopyCronModule,
+    SettingsModule,
   ],
   controllers: [CronController],
+  providers: [CronSettingsService],
   exports: [DbCopyCronModule],
 })
 export class CronModule {}

@@ -12,6 +12,7 @@ export class TenderMatchCronService {
   ) {}
 
   @Cron(CRON_CONFIG.tenderMatchNotifications.daily, {
+    name: 'send-daily-reports',
     timeZone: CRON_CONFIG.timeZone,
   })
   async sendDailyReportsCron(): Promise<void> {
@@ -21,6 +22,7 @@ export class TenderMatchCronService {
   }
 
   @Cron(CRON_CONFIG.tenderMatchNotifications.weekly, {
+    name: 'send-weekly-reports',
     timeZone: CRON_CONFIG.timeZone,
   })
   async sendWeeklyReportsCron(): Promise<void> {

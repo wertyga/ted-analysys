@@ -10,6 +10,10 @@ import { HttpErrorLoggingFilter } from '@/http-logger/HTTPLogger';
 import { isSearchBot } from '@/utils/bots';
 
 async function bootstrap() {
+  await mongooseConnect(async () => {
+    console.log(`Connected to ${process.env.DB_NAME} database`);
+  });
+
   const app = await NestFactory.create(AppModule, { rawBody: true });
   const port = process.env.PORT ?? 3000;
   const corsOrigin = process.env.CORS_ORIGIN?.split(',')
@@ -84,17 +88,6 @@ async function bootstrap() {
     console.log(`Server ran on :${port}`);
     console.log(`Swagger docs: http://localhost:${port}/swagger`);
     console.log(`Admin app: http://localhost:${port}/admin`);
-
-    mongooseConnect(async () => {
-      console.log(`Connected to ${process.env.DB_NAME} database`);
-
-      function toSlug(name: string): string {
-        return name
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-+|-+$/g, '');
-      }
-    });
   });
 }
 

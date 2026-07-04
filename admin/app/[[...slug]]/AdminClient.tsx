@@ -164,6 +164,12 @@ type CronTask = {
   id: string;
   title: string;
   description: string;
+  scheduled?: boolean;
+  schedule?: {
+    enabled: boolean;
+    persistedEnabled?: boolean;
+    nextRunAt: string | null;
+  } | null;
 };
 
 type CronRunResult = {
@@ -174,7 +180,7 @@ type CronRunResult = {
 
 const tokenStorageKey = 'ted-admin-token';
 
-const cronTasks: CronTask[] = [
+const defaultCronTasks: CronTask[] = [
   {
     id: 'gather-recent-competition-tenders',
     title: 'Gather recent competition tenders',
@@ -317,6 +323,7 @@ export default function AdminApp() {
   const [cronTaskLoadingById, setCronTaskLoadingById] = useState<
     Record<string, boolean>
   >({});
+  const [cronTasks, setCronTasks] = useState<CronTask[]>(defaultCronTasks);
   const [cronRunResult, setCronRunResult] = useState<CronRunResult | null>(
     null,
   );
@@ -383,6 +390,7 @@ export default function AdminApp() {
     void loadGatherAllStatus(token);
     void loadAwardTendersRefreshStatus(token);
     void loadSyncIndexesStatus(token);
+    void loadCronTasks(token);
     void loadRecentCompetitionTendersCronStatus(token);
     void loadRecentAwardTendersCronStatus(token);
     void loadCollectTenderBuyersStatus(token);
@@ -391,6 +399,7 @@ export default function AdminApp() {
       void loadGatherAllStatus(token);
       void loadAwardTendersRefreshStatus(token);
       void loadSyncIndexesStatus(token);
+      void loadCronTasks(token);
       void loadRecentCompetitionTendersCronStatus(token);
       void loadRecentAwardTendersCronStatus(token);
       void loadCollectTenderBuyersStatus(token);
@@ -565,6 +574,20 @@ export default function AdminApp() {
       setSyncIndexesLoading(status.isRunning);
     } catch {
       // Keep the current status visible if polling fails.
+    }
+  }
+
+  async function loadCronTasks(authToken: string) {
+    try {
+      const response = await request<{ tasks?: CronTask[] }>('/adm/cron', {
+        token: authToken,
+      });
+
+      if (response.tasks?.length) {
+        setCronTasks(response.tasks);
+      }
+    } catch {
+      // Keep the fallback/static cron task list if polling fails.
     }
   }
 
@@ -1068,6 +1091,36 @@ export default function AdminApp() {
     }
   }
 
+  async function toggleCronTask(task: CronTask) {
+    if (!task.scheduled || !task.schedule) {
+      return;
+    }
+
+    const action = task.schedule.enabled ? 'disable' : 'enable';
+    setCronTaskLoadingById((current) => ({ ...current, [task.id]: true }));
+    setMessage('');
+
+    try {
+      await request(`/adm/cron/${task.id}/${action}`, {
+        method: 'POST',
+        token,
+      });
+      await loadCronTasks(token);
+      setMessage(`Cron task "${task.title}" ${action}d.`);
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : `Failed to ${action} cron task`,
+      );
+    } finally {
+      setCronTaskLoadingById((current) => ({
+        ...current,
+        [task.id]: false,
+      }));
+    }
+  }
+
   async function downloadTenderShortTitles() {
     setMessage('');
 
@@ -1304,15 +1357,45 @@ export default function AdminApp() {
                                 {recentAwardTendersCronStatus.pagesFetched}
                               </small>
                             ) : null}
+                            {task.scheduled && task.schedule ? (
+                              <small>
+                                Schedule:{' '}
+                                {task.schedule.enabled ? 'enabled' : 'disabled'}
+                                {task.schedule.persistedEnabled !== undefined
+                                  ? ' (saved)'
+                                  : ''}
+                                {task.schedule.nextRunAt
+                                  ? `, next ${new Date(
+                                      task.schedule.nextRunAt,
+                                    ).toLocaleString()}`
+                                  : ''}
+                              </small>
+                            ) : null}
                           </span>
-                          <button
-                            className="secondaryButton"
-                            disabled={isRunning}
-                            onClick={() => runCronTask(task)}
-                            type="button"
-                          >
-                            {isRunning ? 'Running...' : 'Run'}
-                          </button>
+                          <div className="buttonGroup">
+                            {task.scheduled && task.schedule ? (
+                              <button
+                                className={
+                                  task.schedule.enabled
+                                    ? 'secondaryButton dangerButton'
+                                    : 'secondaryButton successButton'
+                                }
+                                disabled={isRunning}
+                                onClick={() => toggleCronTask(task)}
+                                type="button"
+                              >
+                                {task.schedule.enabled ? 'Disable' : 'Enable'}
+                              </button>
+                            ) : null}
+                            <button
+                              className="secondaryButton"
+                              disabled={isRunning}
+                              onClick={() => runCronTask(task)}
+                              type="button"
+                            >
+                              {isRunning ? 'Running...' : 'Run'}
+                            </button>
+                          </div>
                         </div>
                       );
                     })}

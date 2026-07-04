@@ -170,6 +170,7 @@ export class TendersCronService {
   }
 
   @Cron(CRON_CONFIG.tenders.recentTenders, {
+    name: 'gather-recent-competition-tenders',
     timeZone: CRON_CONFIG.timeZone,
   })
   async gatherRecentCompetitionTenders(): Promise<void> {
@@ -243,6 +244,7 @@ export class TendersCronService {
   }
 
   @Cron(CRON_CONFIG.tenders.recentAwardTenders, {
+    name: 'gather-recent-award-tenders',
     timeZone: CRON_CONFIG.timeZone,
   })
   async gatherRecentAwardTenders(): Promise<void> {

@@ -3,7 +3,7 @@ import mongoose, { ConnectOptions } from 'mongoose';
 const mongooseProps: ConnectOptions = {};
 mongoose.set('strictQuery', false);
 
-const mongooseConnect = async (callback = () => {}) => {
+const mongooseConnect = async (callback: () => void | Promise<void> = () => {}) => {
   try {
     await mongoose.connect(
       `mongodb://127.0.0.1/${process.env.DB_NAME}`,
@@ -11,9 +11,10 @@ const mongooseConnect = async (callback = () => {}) => {
     );
 
     console.log('-- Mongoose connect -- ' + 'DB: ' + process.env.DB_NAME);
-    callback();
+    await callback();
   } catch (e) {
     console.error(e.message);
+    throw e;
   }
 };
 
