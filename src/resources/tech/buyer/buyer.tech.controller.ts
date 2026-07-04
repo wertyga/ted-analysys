@@ -1,4 +1,4 @@
-import { Controller, Post, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { AdminAccessGuard } from '@/guards';
 import { BuyerTechService } from '@/resources/tech/buyer/buyer.tech.service';
 
@@ -9,11 +9,21 @@ export class BuyerTechController {
 
   @Post('/collect')
   async collectBuyersFromTenders() {
-    return this.buyerTechService.collectBuyersFromTenderAllAndUnsetTenderFields();
+    return this.buyerTechService.startCollectBuyersFromTenderAllAndUnsetTenderFields();
+  }
+
+  @Get('/collect/status')
+  async getCollectBuyersFromTendersStatus() {
+    return this.buyerTechService.getCollectBuyersFromTendersStatus();
   }
 
   @Post('/collect-awards')
   async collectBuyersFromAwardTenders() {
-    return this.buyerTechService.collectBuyersFromAwardTenderAll();
+    return this.buyerTechService.startCollectBuyersFromAwardTenderAll();
+  }
+
+  @Get('/collect-awards/status')
+  async getCollectBuyersFromAwardTendersStatus() {
+    return this.buyerTechService.getCollectBuyersFromAwardTendersStatus();
   }
 }

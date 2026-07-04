@@ -75,8 +75,73 @@ type DbCopyResult = {
   deletedCount: number;
 };
 
+type BuyerCollectionResult = {
+  isRunning: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  lastError: string | null;
+  totalTenders: number;
+  processedTenders: number;
+  noticesFetched: number;
+  processedNotices: number;
+  updatedTenders: number;
+  errors: number;
+  failedChunks: number;
+};
+
+type AwardBuyerCollectionResult = {
+  isRunning: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  lastError: string | null;
+  totalAwardTenders: number;
+  processedAwardTenders: number;
+  noticesFetched: number;
+  processedNotices: number;
+  updatedAwardTenders: number;
+  errors: number;
+  failedChunks: number;
+};
+
 type GatherAllCompetitionTendersStatus = {
   isRunning: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  lastError: string | null;
+  pagesFetched: number;
+  noticesFetched: number;
+  totalNoticeCount?: number;
+};
+
+type RecentCompetitionTendersCronStatus = {
+  isRunning: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  lastError: string | null;
+  pagesFetched: number;
+  noticesFetched: number;
+  totalNoticeCount?: number;
+  matchesSaved: number;
+};
+
+type RecentAwardTendersCronStatus = {
+  isRunning: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  lastError: string | null;
+  pagesFetched: number;
+  noticesFetched: number;
+  totalNoticeCount?: number;
+};
+
+type AwardTendersRefreshStatus = {
+  isRunning: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  lastError: string | null;
+  pagesFetched: number;
+  noticesFetched: number;
+  totalNoticeCount?: number;
 };
 
 type TechJobResult = Record<string, unknown>;
@@ -216,14 +281,18 @@ export default function AdminApp() {
   const [dbCopyLoading, setDbCopyLoading] = useState(false);
   const [collectTenderBuyersLoading, setCollectTenderBuyersLoading] =
     useState(false);
+  const [collectTenderBuyersResult, setCollectTenderBuyersResult] =
+    useState<BuyerCollectionResult | null>(null);
   const [collectAwardBuyersLoading, setCollectAwardBuyersLoading] =
     useState(false);
+  const [collectAwardBuyersResult, setCollectAwardBuyersResult] =
+    useState<AwardBuyerCollectionResult | null>(null);
   const [gatherAllCompetitionLoading, setGatherAllCompetitionLoading] =
     useState(false);
   const [awardTendersRefreshLoading, setAwardTendersRefreshLoading] =
     useState(false);
   const [awardTendersRefreshResult, setAwardTendersRefreshResult] =
-    useState<TechJobResult | null>(null);
+    useState<AwardTendersRefreshStatus | null>(null);
   const [cronTaskLoadingById, setCronTaskLoadingById] = useState<
     Record<string, boolean>
   >({});
@@ -232,6 +301,12 @@ export default function AdminApp() {
   );
   const [gatherAllStatus, setGatherAllStatus] =
     useState<GatherAllCompetitionTendersStatus | null>(null);
+  const [
+    recentCompetitionTendersCronStatus,
+    setRecentCompetitionTendersCronStatus,
+  ] = useState<RecentCompetitionTendersCronStatus | null>(null);
+  const [recentAwardTendersCronStatus, setRecentAwardTendersCronStatus] =
+    useState<RecentAwardTendersCronStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -285,10 +360,19 @@ export default function AdminApp() {
     }
 
     void loadGatherAllStatus(token);
-    const interval = window.setInterval(
-      () => void loadGatherAllStatus(token),
-      5000,
-    );
+    void loadAwardTendersRefreshStatus(token);
+    void loadRecentCompetitionTendersCronStatus(token);
+    void loadRecentAwardTendersCronStatus(token);
+    void loadCollectTenderBuyersStatus(token);
+    void loadCollectAwardBuyersStatus(token);
+    const interval = window.setInterval(() => {
+      void loadGatherAllStatus(token);
+      void loadAwardTendersRefreshStatus(token);
+      void loadRecentCompetitionTendersCronStatus(token);
+      void loadRecentAwardTendersCronStatus(token);
+      void loadCollectTenderBuyersStatus(token);
+      void loadCollectAwardBuyersStatus(token);
+    }, 5000);
 
     return () => window.clearInterval(interval);
   }, [activeSection, token]);
@@ -430,6 +514,20 @@ export default function AdminApp() {
       setGatherAllStatus(status);
     } catch {
       setGatherAllStatus(null);
+    }
+  }
+
+  async function loadAwardTendersRefreshStatus(authToken: string) {
+    try {
+      const status = await request<AwardTendersRefreshStatus>(
+        '/adm/tech/award-tenders/refresh/status',
+        { token: authToken },
+      );
+
+      setAwardTendersRefreshResult(status);
+      setAwardTendersRefreshLoading(status.isRunning);
+    } catch {
+      // Keep the current status visible if polling fails.
     }
   }
 
@@ -682,23 +780,81 @@ export default function AdminApp() {
     }
 
     setCollectTenderBuyersLoading(true);
+    setCollectTenderBuyersResult(null);
     setMessage('');
 
     try {
-      await request('/adm/tech/buyers/collect', {
-        method: 'POST',
-        token,
-      });
+      const result = await request<BuyerCollectionResult>(
+        '/adm/tech/buyers/collect',
+        {
+          method: 'POST',
+          token,
+        },
+      );
 
-      setMessage('Tender buyer collection finished.');
+      setCollectTenderBuyersResult(result);
+      setCollectTenderBuyersLoading(result.isRunning);
+      setMessage('Tender buyer collection started.');
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
           : 'Failed to collect buyers from tenders',
       );
-    } finally {
-      setCollectTenderBuyersLoading(false);
+    }
+  }
+
+  async function loadRecentCompetitionTendersCronStatus(authToken: string) {
+    try {
+      const status = await request<RecentCompetitionTendersCronStatus>(
+        '/adm/cron/gather-recent-competition-tenders/status',
+        { token: authToken },
+      );
+
+      setRecentCompetitionTendersCronStatus(status);
+    } catch {
+      // Keep the current status visible if polling fails.
+    }
+  }
+
+  async function loadRecentAwardTendersCronStatus(authToken: string) {
+    try {
+      const status = await request<RecentAwardTendersCronStatus>(
+        '/adm/cron/gather-recent-award-tenders/status',
+        { token: authToken },
+      );
+
+      setRecentAwardTendersCronStatus(status);
+    } catch {
+      // Keep the current status visible if polling fails.
+    }
+  }
+
+  async function loadCollectTenderBuyersStatus(authToken: string) {
+    try {
+      const status = await request<BuyerCollectionResult>(
+        '/adm/tech/buyers/collect/status',
+        { token: authToken },
+      );
+
+      setCollectTenderBuyersResult(status);
+      setCollectTenderBuyersLoading(status.isRunning);
+    } catch {
+      // Keep the current status visible if a polling request fails.
+    }
+  }
+
+  async function loadCollectAwardBuyersStatus(authToken: string) {
+    try {
+      const status = await request<AwardBuyerCollectionResult>(
+        '/adm/tech/buyers/collect-awards/status',
+        { token: authToken },
+      );
+
+      setCollectAwardBuyersResult(status);
+      setCollectAwardBuyersLoading(status.isRunning);
+    } catch {
+      // Keep the current status visible if a polling request fails.
     }
   }
 
@@ -712,23 +868,27 @@ export default function AdminApp() {
     }
 
     setCollectAwardBuyersLoading(true);
+    setCollectAwardBuyersResult(null);
     setMessage('');
 
     try {
-      await request('/adm/tech/buyers/collect-awards', {
-        method: 'POST',
-        token,
-      });
+      const result = await request<AwardBuyerCollectionResult>(
+        '/adm/tech/buyers/collect-awards',
+        {
+          method: 'POST',
+          token,
+        },
+      );
 
-      setMessage('Award tender buyer collection finished.');
+      setCollectAwardBuyersResult(result);
+      setCollectAwardBuyersLoading(result.isRunning);
+      setMessage('Award tender buyer collection started.');
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
           : 'Failed to collect buyers from award tenders',
       );
-    } finally {
-      setCollectAwardBuyersLoading(false);
     }
   }
 
@@ -745,21 +905,23 @@ export default function AdminApp() {
     setMessage('');
 
     try {
-      await request('/adm/tech/tenders/gather-all-competition', {
-        method: 'POST',
-        token,
-      });
+      const status = await request<GatherAllCompetitionTendersStatus>(
+        '/adm/tech/tenders/gather-all-competition',
+        {
+          method: 'POST',
+          token,
+        },
+      );
 
+      setGatherAllStatus(status);
+      setGatherAllCompetitionLoading(status.isRunning);
       setMessage('Full competition tender gathering started.');
-      await loadGatherAllStatus(token);
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
           : 'Failed to start full competition tender gathering',
       );
-    } finally {
-      setGatherAllCompetitionLoading(false);
     }
   }
 
@@ -777,7 +939,7 @@ export default function AdminApp() {
     setMessage('');
 
     try {
-      const result = await request<TechJobResult>(
+      const result = await request<AwardTendersRefreshStatus>(
         '/adm/tech/award-tenders/refresh',
         {
           method: 'POST',
@@ -786,16 +948,15 @@ export default function AdminApp() {
         },
       );
 
-      setAwardTendersRefreshResult(result ?? {});
-      setMessage('Award tender refresh finished.');
+      setAwardTendersRefreshResult(result);
+      setAwardTendersRefreshLoading(result.isRunning);
+      setMessage('Award tender refresh started.');
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
           : 'Failed to refresh award tenders',
       );
-    } finally {
-      setAwardTendersRefreshLoading(false);
     }
   }
 
@@ -1008,6 +1169,29 @@ export default function AdminApp() {
                           <span>
                             <strong>{task.title}</strong>
                             <small>{task.description}</small>
+                            {task.id === 'gather-recent-competition-tenders' &&
+                            recentCompetitionTendersCronStatus ? (
+                              <small>
+                                {recentCompetitionTendersCronStatus.noticesFetched}
+                                /
+                                {recentCompetitionTendersCronStatus.totalNoticeCount ??
+                                  '?'}{' '}
+                                notices, pages{' '}
+                                {recentCompetitionTendersCronStatus.pagesFetched},
+                                matches{' '}
+                                {recentCompetitionTendersCronStatus.matchesSaved}
+                              </small>
+                            ) : null}
+                            {task.id === 'gather-recent-award-tenders' &&
+                            recentAwardTendersCronStatus ? (
+                              <small>
+                                {recentAwardTendersCronStatus.noticesFetched}/
+                                {recentAwardTendersCronStatus.totalNoticeCount ??
+                                  '?'}{' '}
+                                notices, pages{' '}
+                                {recentAwardTendersCronStatus.pagesFetched}
+                              </small>
+                            ) : null}
                           </span>
                           <button
                             className="secondaryButton"
@@ -1086,20 +1270,84 @@ export default function AdminApp() {
                       <span>Award tender refresh</span>
                       <Tag
                         color={
-                          awardTendersRefreshLoading
+                          awardTendersRefreshLoading ||
+                          awardTendersRefreshResult?.isRunning
                             ? 'processing'
                             : 'default'
                         }
                       >
-                        {awardTendersRefreshLoading ? 'RUNNING' : 'IDLE'}
+                        {awardTendersRefreshLoading ||
+                        awardTendersRefreshResult?.isRunning
+                          ? 'RUNNING'
+                          : 'IDLE'}
                       </Tag>
                     </div>
                   </div>
 
+                  {gatherAllStatus ? (
+                    <dl className="stats">
+                      <div>
+                        <dt>Competition notices</dt>
+                        <dd>
+                          {gatherAllStatus.noticesFetched}/
+                          {gatherAllStatus.totalNoticeCount ?? '?'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Competition pages</dt>
+                        <dd>{gatherAllStatus.pagesFetched}</dd>
+                      </div>
+                      <div>
+                        <dt>Competition started</dt>
+                        <dd className="smallStat">
+                          {gatherAllStatus.startedAt
+                            ? new Date(gatherAllStatus.startedAt).toLocaleString()
+                            : '-'}
+                        </dd>
+                      </div>
+                      {gatherAllStatus.lastError ? (
+                        <div>
+                          <dt>Competition error</dt>
+                          <dd className="smallStat">
+                            {gatherAllStatus.lastError}
+                          </dd>
+                        </div>
+                      ) : null}
+                    </dl>
+                  ) : null}
+
                   {awardTendersRefreshResult ? (
-                    <pre className="jsonResult">
-                      {JSON.stringify(awardTendersRefreshResult, null, 2)}
-                    </pre>
+                    <dl className="stats">
+                      <div>
+                        <dt>Award refresh notices</dt>
+                        <dd>
+                          {awardTendersRefreshResult.noticesFetched}/
+                          {awardTendersRefreshResult.totalNoticeCount ?? '?'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Award refresh pages</dt>
+                        <dd>{awardTendersRefreshResult.pagesFetched}</dd>
+                      </div>
+                      <div>
+                        <dt>Award refresh started</dt>
+                        <dd className="smallStat">
+                          {awardTendersRefreshResult.startedAt
+                            ? new Date(
+                                awardTendersRefreshResult.startedAt,
+                              ).toLocaleString()
+                            : '-'}
+                        </dd>
+                      </div>
+                      {awardTendersRefreshResult.lastError ? (
+                        <div>
+                          <dt>Award refresh error</dt>
+                          <dd className="smallStat">
+                            {awardTendersRefreshResult.lastError}
+                          </dd>
+                        </div>
+                      ) : null}
+                    </dl>
                   ) : null}
                 </section>
 
@@ -1140,25 +1388,171 @@ export default function AdminApp() {
                       <span>Tender buyers</span>
                       <Tag
                         color={
-                          collectTenderBuyersLoading ? 'processing' : 'default'
+                          collectTenderBuyersLoading ||
+                          collectTenderBuyersResult?.isRunning
+                            ? 'processing'
+                            : 'default'
                         }
                       >
-                        {collectTenderBuyersLoading ? 'RUNNING' : 'IDLE'}
+                        {collectTenderBuyersLoading ||
+                        collectTenderBuyersResult?.isRunning
+                          ? 'RUNNING'
+                          : 'IDLE'}
                       </Tag>
                     </div>
                     <div>
                       <span>Award tender buyers</span>
                       <Tag
                         color={
-                          collectAwardBuyersLoading
+                          collectAwardBuyersLoading ||
+                          collectAwardBuyersResult?.isRunning
                             ? 'processing'
                             : 'default'
                         }
                       >
-                        {collectAwardBuyersLoading ? 'RUNNING' : 'IDLE'}
+                        {collectAwardBuyersLoading ||
+                        collectAwardBuyersResult?.isRunning
+                          ? 'RUNNING'
+                          : 'IDLE'}
                       </Tag>
                     </div>
                   </div>
+
+                  {collectTenderBuyersResult ? (
+                    <dl className="stats">
+                      <div>
+                        <dt>Status</dt>
+                        <dd>
+                          {collectTenderBuyersResult.isRunning
+                            ? 'Running'
+                            : 'Idle'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Processed tenders</dt>
+                        <dd>
+                          {collectTenderBuyersResult.processedTenders}/
+                          {collectTenderBuyersResult.totalTenders}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>TED notices</dt>
+                        <dd>{collectTenderBuyersResult.noticesFetched}</dd>
+                      </div>
+                      <div>
+                        <dt>Processed notices</dt>
+                        <dd>{collectTenderBuyersResult.processedNotices}</dd>
+                      </div>
+                      <div>
+                        <dt>Updated tenders</dt>
+                        <dd>{collectTenderBuyersResult.updatedTenders}</dd>
+                      </div>
+                      <div>
+                        <dt>Errors</dt>
+                        <dd>{collectTenderBuyersResult.errors}</dd>
+                      </div>
+                      <div>
+                        <dt>Failed chunks</dt>
+                        <dd>{collectTenderBuyersResult.failedChunks}</dd>
+                      </div>
+                      <div>
+                        <dt>Started</dt>
+                        <dd className="smallStat">
+                          {collectTenderBuyersResult.startedAt
+                            ? new Date(
+                                collectTenderBuyersResult.startedAt,
+                              ).toLocaleString()
+                            : '-'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Finished</dt>
+                        <dd className="smallStat">
+                          {collectTenderBuyersResult.finishedAt
+                            ? new Date(
+                                collectTenderBuyersResult.finishedAt,
+                              ).toLocaleString()
+                            : '-'}
+                        </dd>
+                      </div>
+                      {collectTenderBuyersResult.lastError ? (
+                        <div>
+                          <dt>Last error</dt>
+                          <dd className="smallStat">
+                            {collectTenderBuyersResult.lastError}
+                          </dd>
+                        </div>
+                      ) : null}
+                    </dl>
+                  ) : null}
+
+                  {collectAwardBuyersResult ? (
+                    <dl className="stats">
+                      <div>
+                        <dt>Award status</dt>
+                        <dd>
+                          {collectAwardBuyersResult.isRunning
+                            ? 'Running'
+                            : 'Idle'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Processed award tenders</dt>
+                        <dd>
+                          {collectAwardBuyersResult.processedAwardTenders}/
+                          {collectAwardBuyersResult.totalAwardTenders}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Award TED notices</dt>
+                        <dd>{collectAwardBuyersResult.noticesFetched}</dd>
+                      </div>
+                      <div>
+                        <dt>Award processed notices</dt>
+                        <dd>{collectAwardBuyersResult.processedNotices}</dd>
+                      </div>
+                      <div>
+                        <dt>Updated award tenders</dt>
+                        <dd>{collectAwardBuyersResult.updatedAwardTenders}</dd>
+                      </div>
+                      <div>
+                        <dt>Award errors</dt>
+                        <dd>{collectAwardBuyersResult.errors}</dd>
+                      </div>
+                      <div>
+                        <dt>Award failed chunks</dt>
+                        <dd>{collectAwardBuyersResult.failedChunks}</dd>
+                      </div>
+                      <div>
+                        <dt>Award started</dt>
+                        <dd className="smallStat">
+                          {collectAwardBuyersResult.startedAt
+                            ? new Date(
+                                collectAwardBuyersResult.startedAt,
+                              ).toLocaleString()
+                            : '-'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Award finished</dt>
+                        <dd className="smallStat">
+                          {collectAwardBuyersResult.finishedAt
+                            ? new Date(
+                                collectAwardBuyersResult.finishedAt,
+                              ).toLocaleString()
+                            : '-'}
+                        </dd>
+                      </div>
+                      {collectAwardBuyersResult.lastError ? (
+                        <div>
+                          <dt>Award last error</dt>
+                          <dd className="smallStat">
+                            {collectAwardBuyersResult.lastError}
+                          </dd>
+                        </div>
+                      ) : null}
+                    </dl>
+                  ) : null}
                 </section>
 
                 <section className="panel panelWide">

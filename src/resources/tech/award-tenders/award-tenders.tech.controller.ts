@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiDefaultResponse, ApiTags } from '@nestjs/swagger';
 import { AdminAccessGuard } from '@/guards';
 import { AwardTendersTechService } from './award-tenders.tech.service';
@@ -17,6 +17,11 @@ export class AwardTendersTechController {
   })
   @Post('/refresh')
   refreshAwardTendersHistory(@Body() body: any) {
-    return this.awardTendersTechService.refreshAwardTendersHistory(body);
+    return this.awardTendersTechService.startRefreshAwardTendersHistory(body);
+  }
+
+  @Get('/refresh/status')
+  getRefreshAwardTendersHistoryStatus() {
+    return this.awardTendersTechService.getRefreshAwardTendersHistoryStatus();
   }
 }

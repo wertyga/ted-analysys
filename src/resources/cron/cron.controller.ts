@@ -81,6 +81,18 @@ export class CronController {
     };
   }
 
+  @Get('gather-recent-competition-tenders/status')
+  @ApiOkResponse({ description: 'Recent competition tenders cron status.' })
+  getRecentCompetitionTendersStatus() {
+    return this.tendersCronService.getRecentCompetitionTendersStatus();
+  }
+
+  @Get('gather-recent-award-tenders/status')
+  @ApiOkResponse({ description: 'Recent award tenders cron status.' })
+  getRecentAwardTendersStatus() {
+    return this.tendersCronService.getRecentAwardTendersStatus();
+  }
+
   private getTaskDefinitions(): CronTaskDefinition[] {
     return [
       {

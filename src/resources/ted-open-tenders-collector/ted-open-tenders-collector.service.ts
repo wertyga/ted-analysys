@@ -38,6 +38,7 @@ export interface TedOpenTendersCollectorOptions<
   iterationNextToken?: string;
   updateExisting?: boolean;
   onChangedTenders?: (tenders: TChangedTender[]) => Promise<void> | void;
+  onProgress?: (progress: TedOpenTendersCollectorResult) => Promise<void> | void;
 }
 
 export interface TedOpenTendersCollectorResult {
@@ -53,13 +54,18 @@ interface TedNoticeBatchSaveResult {
   skipped?: number;
 }
 
-interface TedIterationCollectorParams {
+interface TedIterationCollectorParams<TChangedTender = TenderDocument> {
   query: string;
   scope: TedScope;
   fields: string[];
   options: Pick<
-    TedOpenTendersCollectorOptions,
-    'pageLimit' | 'maxPages' | 'iterationNextToken'
+    TedOpenTendersCollectorOptions<TChangedTender>,
+    | 'pageLimit'
+    | 'maxPages'
+    | 'iterationNextToken'
+    | 'onProgress'
+    | 'updateExisting'
+    | 'onChangedTenders'
   >;
   saveNotices: (notices: TedNotice[]) => Promise<void>;
 }
@@ -84,7 +90,7 @@ export class TedOpenTendersCollectorService {
     },
     saveNotices: TedIterationCollectorParams['saveNotices'],
   ) {
-    return this.collectTedNoticesByIteration({
+    return this.collectTedNoticesByIteration<TenderDocument>({
       query: buildTedTenderSearchQuery(filters),
       scope: TedScope.ALL,
       fields,
@@ -95,18 +101,18 @@ export class TedOpenTendersCollectorService {
 
   async collectOpenTendersFromTed(
     options: TedOpenTendersCollectorOptions = {},
-  ): Promise<void> {
+  ): Promise<TedOpenTendersCollectorResult> {
     const query = buildTedTenderSearchQuery({
       noticeTypes: TENDER_COMPETITION_NOTICE_TYPES,
       submissionDeadlineFrom: getTedDate(),
     });
 
-    await this.collectCompetitionTendersFromTed(query, options);
+    return this.collectCompetitionTendersFromTed(query, options);
   }
 
   async collectRecentCompetitionTendersFromTed(
     options: TedOpenTendersCollectorOptions = {},
-  ): Promise<void> {
+  ): Promise<TedOpenTendersCollectorResult> {
     const publicationDateFrom = new Date();
 
     publicationDateFrom.setDate(
@@ -121,7 +127,7 @@ export class TedOpenTendersCollectorService {
       submissionDeadlineRange: TedDeadlineRange.ANY_OPEN,
     });
 
-    await this.collectCompetitionTendersFromTed(query, options);
+    return this.collectCompetitionTendersFromTed(query, options);
   }
 
   async collectResultTendersFromTed(
@@ -156,7 +162,7 @@ export class TedOpenTendersCollectorService {
       sortOrder: TedSortOrder.DESC,
     });
 
-    return this.collectTedNoticesByIteration({
+    return this.collectTedNoticesByIteration<AwardTenderDocument>({
       query: querySearch,
       scope: TedScope.ALL,
       fields: AWARD_HISTORY_FIELDS,
@@ -183,8 +189,8 @@ export class TedOpenTendersCollectorService {
   private async collectCompetitionTendersFromTed(
     query: string,
     options: TedOpenTendersCollectorOptions,
-  ): Promise<void> {
-    await this.collectTedNoticesByIteration({
+  ): Promise<TedOpenTendersCollectorResult> {
+    return this.collectTedNoticesByIteration<TenderDocument>({
       query,
       scope: TedScope.ACTIVE,
       fields: TENDER_COMPETITION_SEARCH_FIELDS,
@@ -202,13 +208,13 @@ export class TedOpenTendersCollectorService {
     });
   }
 
-  private async collectTedNoticesByIteration({
+  private async collectTedNoticesByIteration<TChangedTender = TenderDocument>({
     query,
     scope,
     fields,
     options,
     saveNotices,
-  }: TedIterationCollectorParams): Promise<TedOpenTendersCollectorResult> {
+  }: TedIterationCollectorParams<TChangedTender>): Promise<TedOpenTendersCollectorResult> {
     const pageLimit =
       options.pageLimit ?? TED_OPEN_TENDERS_COLLECTOR_CONFIG.defaultPageLimit;
     const maxPages =
@@ -238,10 +244,23 @@ export class TedOpenTendersCollectorService {
       totalNoticeCount = this.extractTotalCount(response) ?? totalNoticeCount;
 
       if (notices.length === 0) {
+        await options.onProgress?.({
+          pagesFetched,
+          noticesFetched,
+          totalNoticeCount,
+          resumeIterationNextToken: iterationNextToken,
+        });
         break;
       }
 
       await saveNotices(notices);
+
+      await options.onProgress?.({
+        pagesFetched,
+        noticesFetched,
+        totalNoticeCount,
+        resumeIterationNextToken: iterationNextToken,
+      });
 
       if (!iterationNextToken) {
         break;
