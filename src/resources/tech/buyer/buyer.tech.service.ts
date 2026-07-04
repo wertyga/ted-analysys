@@ -64,7 +64,6 @@ export class BuyerTechService {
             try {
               await this.collectBuyersFromTenderAndUnsetTenderFields(n);
             } catch (e) {
-              console.log({ e });
               errors += 1;
             }
           }
