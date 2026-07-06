@@ -18,6 +18,7 @@ import { CronSettingsService } from './cron-settings.service';
 type CronTaskId =
   | 'gather-recent-competition-tenders'
   | 'gather-recent-award-tenders'
+  | 'refresh-expired-competition-tender-buyer-meta'
   | 'sync-latest-rates'
   | 'send-daily-reports'
   | 'send-weekly-reports'
@@ -34,6 +35,7 @@ type CronTaskDefinition = {
 const CRON_TASK_IDS: CronTaskId[] = [
   'gather-recent-competition-tenders',
   'gather-recent-award-tenders',
+  'refresh-expired-competition-tender-buyer-meta',
   'sync-latest-rates',
   'send-daily-reports',
   'send-weekly-reports',
@@ -139,6 +141,14 @@ export class CronController {
     return this.tendersCronService.getRecentAwardTendersStatus();
   }
 
+  @Get('refresh-expired-competition-tender-buyer-meta/status')
+  @ApiOkResponse({
+    description: 'Expired competition tender buyer meta refresh status.',
+  })
+  getExpiredCompetitionTenderBuyerMetaStatus() {
+    return this.tendersCronService.getExpiredCompetitionTenderBuyerMetaStatus();
+  }
+
   private getTaskDefinitions(): CronTaskDefinition[] {
     return [
       {
@@ -156,6 +166,15 @@ export class CronController {
           'Collect recent TED result notices and update award tenders.',
         scheduled: true,
         run: () => this.tendersCronService.gatherRecentAwardTenders(),
+      },
+      {
+        id: 'refresh-expired-competition-tender-buyer-meta',
+        title: 'Refresh expired competition tender buyer meta',
+        description:
+          'Refresh buyer metadata for competition tenders whose submission deadline recently passed.',
+        scheduled: true,
+        run: () =>
+          this.tendersCronService.refreshExpiredCompetitionTenderBuyerMeta(),
       },
       {
         id: 'sync-latest-rates',

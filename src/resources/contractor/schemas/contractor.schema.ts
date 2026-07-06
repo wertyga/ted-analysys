@@ -2,6 +2,11 @@ import mongoose, { Document, Model, Schema } from 'mongoose';
 import { AwardTenderModel } from '@/resources/award-tender/schemas';
 import { filterModel } from '@/utils';
 
+export type ContractorCodeName = {
+  code: string;
+  name: string;
+};
+
 export interface Contractor {
   _id?: string;
   name?: string;
@@ -16,6 +21,7 @@ export interface Contractor {
   emails?: string[];
   ownerNationalities?: string[];
   euRegistrationNumber?: string;
+  legalTypes: ContractorCodeName[];
   cpvCodes: string[];
 
   stats: {
@@ -37,6 +43,7 @@ const CONTRACTOR_LIST_FIELDS = [
   'cities',
   'postCodes',
   'emails',
+  'legalTypes',
   'cpvCodes',
   'createdAt',
   'stats',
@@ -68,6 +75,14 @@ const ContractorStatsSchema = new Schema<Contractor['stats']>(
   { _id: false },
 );
 
+const ContractorCodeNameSchema = new Schema<ContractorCodeName>(
+  {
+    code: { type: String, trim: true },
+    name: { type: String, trim: true },
+  },
+  { _id: false },
+);
+
 export const ContractorSchema = new Schema<
   ContractorDocument,
   ContractorModelType
@@ -94,6 +109,8 @@ export const ContractorSchema = new Schema<
     ownerNationalities: { type: [String], default: [] },
 
     euRegistrationNumber: { type: String, trim: true },
+
+    legalTypes: { type: [ContractorCodeNameSchema], default: [] },
 
     cpvCodes: { type: [String], default: [] },
 

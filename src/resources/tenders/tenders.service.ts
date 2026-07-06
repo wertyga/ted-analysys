@@ -6,6 +6,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { createHash } from 'crypto';
+import { readFile } from 'fs/promises';
+import { join } from 'path';
 import { TedSearchService } from '../ted-search/ted-search.service';
 import { TenderGeneralAnalysisDetailDto } from '../tender-analysis/dto/tender-general-analysis.dto';
 import {
@@ -21,7 +23,12 @@ import {
   TenderGeneralAnalysisModel,
 } from '../tender-analysis/schemas';
 import { TenderListDto } from './dto/tender.dto';
-import { TenderDocument, TenderLot, TenderModel } from './schemas';
+import {
+  TenderDocument,
+  TenderLot,
+  TenderModel,
+  TenderShortTitle,
+} from './schemas';
 import {
   NormalizedTenderDto,
   NormalizedTenderLot,
@@ -30,6 +37,8 @@ import {
 import {
   devLog,
   extractPublicationNumberFromNotice,
+  getStringValue,
+  getUniqArray,
   isRecord,
   isTedNotice,
   tenderPopulateFields,
@@ -62,6 +71,11 @@ export type TenderDocumentWithGeneralAnalysis = TenderDocument & {
 };
 
 const SHORT_TITLE_GENERATION_BATCH_SIZE = 20;
+const TENDER_SHORT_TITLES_FILE_PATH = join(
+  process.cwd(),
+  'test-data',
+  'tender-short-titles-2026-07-06.json',
+);
 export const OPTIONAL_TENDER_UNSET_FIELDS = [
   'noticeSubtype',
   'noticeVersion',
@@ -96,6 +110,9 @@ export const OPTIONAL_TENDER_UNSET_FIELDS = [
 @Injectable()
 export class TendersService {
   private readonly logger = new Logger(TendersService.name);
+  private shortTitlesFromFilePromise: Promise<
+    Map<string, TenderShortTitle>
+  > | null = null;
 
   constructor(
     @Inject(forwardRef(() => TedSearchService))
@@ -111,7 +128,7 @@ export class TendersService {
 
   async upsertTender(
     notice: TedNotice,
-    buyers: { leadIds: TMongoId[]; nonLeadIds: TMongoId[] },
+    shortTitle?: TenderShortTitle,
   ): Promise<TenderDocument | undefined> {
     const normalizedTender = this.tenderNormalizer.normalizeTedNotice(notice);
 
@@ -119,10 +136,15 @@ export class TendersService {
       return;
     }
 
-    const [estimatedValueEur, lotsWithEur] = await Promise.all([
-      this.calculateEstimatedValueEur(normalizedTender),
-      this.getLotsWithEurValues(normalizedTender.lots),
-    ]);
+    const [estimatedValueEur, lotsWithEur, buyers, existingTender] =
+      await Promise.all([
+        this.calculateEstimatedValueEur(normalizedTender),
+        this.getLotsWithEurValues(normalizedTender.lots),
+        this.buyerService.upsertPureBuyersFromTEDNotice(notice),
+        TenderModel.findOne({ id: normalizedTender.id }).select(
+          'leadBuyers nonLeadBuyers',
+        ),
+      ]);
 
     const sourceHash = this.buildTenderSourceHash(notice);
     const tenderSet = this.omitUndefinedFields({
@@ -131,6 +153,7 @@ export class TendersService {
       leadBuyers: buyers.leadIds,
       lots: lotsWithEur,
       estimatedValueEur,
+      shortTitle,
     });
     const tenderUnset = this.buildTenderUnset(normalizedTender);
 
@@ -147,6 +170,16 @@ export class TendersService {
     );
 
     await tenderDoc.populate(tenderPopulateFields);
+
+    const buyersIds = [
+      ...buyers.leadIds,
+      ...buyers.nonLeadIds,
+      ...(existingTender?.leadBuyers ?? []),
+      ...(existingTender?.nonLeadBuyers ?? []),
+    ].map((id) => id.toString());
+
+    await this.buyerService.refreshBuyersTenderMeta(buyersIds);
+
     return tenderDoc;
   }
 
@@ -228,50 +261,37 @@ export class TendersService {
 
     const changedTenders: TenderDocument[] = [];
     const tendersForShortTitle: TenderDocument[] = [];
-    const buyerIdsToRefresh = new Set<string>();
+    const shortTitlesFromFile = await this.getShortTitlesFromFile();
 
-    const updateBuyersAndTender = async (notice: TedNotice) => {
-      const publicationNumber = extractPublicationNumberFromNotice(notice);
-      const existingTender =
-        publicationNumber && !forceUpdate
-          ? await TenderModel.findOne({ id: publicationNumber })
-              .select('sourceHash')
-              .exec()
-          : null;
+    for (const notice of notices) {
+      const existingTender = forceUpdate
+        ? null
+        : await TenderModel.findOne({
+            id: getStringValue('publication-number', notice),
+          });
 
       const shouldTrackChangedTender = this.shouldUpdateTenderFromTedNotice(
         existingTender,
         notice,
       );
 
-      const buyers =
-        await this.buyerService.upsertPureBuyersFromTEDNotice(notice);
-      const savedTender = await this.upsertTender(notice, buyers);
-
-      if (savedTender) {
-        if (shouldTrackChangedTender) {
-          changedTenders.push(savedTender);
-        }
-
-        [...buyers.leadIds, ...buyers.nonLeadIds].forEach((buyerId) =>
-          buyerIdsToRefresh.add(buyerId.toString()),
+      if (shouldTrackChangedTender || forceUpdate) {
+        const publicationNumber = getStringValue('publication-number', notice);
+        const savedTender = await this.upsertTender(
+          notice,
+          publicationNumber
+            ? shortTitlesFromFile.get(publicationNumber)
+            : undefined,
         );
+        if (savedTender) {
+          changedTenders.push(savedTender);
 
-        if (!this.hasCompleteShortTitle(savedTender.shortTitle)) {
-          tendersForShortTitle.push(savedTender);
+          if (!this.hasCompleteShortTitle(savedTender.shortTitle)) {
+            tendersForShortTitle.push(savedTender);
+          }
         }
       }
-    };
-
-    for (const notice of notices) {
-      await updateBuyersAndTender(notice);
     }
-
-    devLog('Refreshing Buyers Meta...');
-
-    await this.buyerService.refreshBuyersTenderMeta(
-      Array.from(buyerIdsToRefresh),
-    );
 
     devLog('Filling Short Title...');
     await this.fillMissingShortTitles(tendersForShortTitle);
@@ -341,6 +361,49 @@ export class TendersService {
           }`,
         );
       }
+    }
+  }
+
+  private async getShortTitlesFromFile(): Promise<Map<string, TenderShortTitle>> {
+    if (!this.shortTitlesFromFilePromise) {
+      this.shortTitlesFromFilePromise = this.loadShortTitlesFromFile();
+    }
+
+    return this.shortTitlesFromFilePromise;
+  }
+
+  private async loadShortTitlesFromFile(): Promise<Map<string, TenderShortTitle>> {
+    try {
+      const raw = await readFile(TENDER_SHORT_TITLES_FILE_PATH, 'utf8');
+      const parsed: unknown = JSON.parse(raw);
+
+      if (!isRecord(parsed)) {
+        return new Map();
+      }
+
+      const shortTitles = new Map<string, TenderShortTitle>();
+
+      Object.entries(parsed).forEach(([tenderId, value]) => {
+        if (this.hasCompleteShortTitle(value as TenderShortTitle)) {
+          shortTitles.set(tenderId, value as TenderShortTitle);
+        }
+      });
+
+      devLog(`Loaded ${shortTitles.size} tender short titles from file`);
+
+      return shortTitles;
+    } catch (error: unknown) {
+      if (isRecord(error) && error.code === 'ENOENT') {
+        return new Map();
+      }
+
+      this.logger.warn(
+        `Tender short titles file was not used: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+
+      return new Map();
     }
   }
 
@@ -554,10 +617,7 @@ export class TendersService {
     );
 
     if (shouldUpsertTender) {
-      const buyers =
-        await this.buyerService.upsertPureBuyersFromTEDNotice(notice);
-
-      savedTender = await this.upsertTender(notice, buyers);
+      savedTender = await this.upsertTender(notice);
     }
 
     if (!savedTender) {

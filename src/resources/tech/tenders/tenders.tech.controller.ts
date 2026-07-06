@@ -27,7 +27,7 @@ export class TendersTechController {
   @Post('/gather-all-competition')
   collectAllCompetitionTenders(@Body() body: { pageLimit?: number }) {
     return this.tendersCronService.startGatherAllCompetitionTenders({
-      forceUpdate: true,
+      updateExisting: true,
       pageLimit: body?.pageLimit,
     });
   }

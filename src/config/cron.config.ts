@@ -4,6 +4,7 @@ export const CRON_CONFIG = {
     recentTenders: '0 1 * * *',
     allCompetitionTenders: '0 3 * * 0',
     recentAwardTenders: '0 4 * * *',
+    expiredCompetitionTenderBuyerMeta: '30 0 * * *',
   },
   databaseCopy: {
     toCdn: '0 7 * * *',

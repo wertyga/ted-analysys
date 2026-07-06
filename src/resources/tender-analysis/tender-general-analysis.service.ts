@@ -1,5 +1,4 @@
 import { Injectable, RequestTimeoutException } from '@nestjs/common';
-import mongoose from 'mongoose';
 import {
   TenderGeneralAnalysisDocument,
   TenderGeneralAnalysisModel,
@@ -104,7 +103,6 @@ export class TenderGeneralAnalysisService {
     tender: TenderDocument,
     isForceBaseAnalysis = false,
   ): Promise<TenderGeneralAnalysisDocument> {
-    const tenderObjectId = tender._id as mongoose.Types.ObjectId;
     const sourceHash = this.buildGeneralTenderAnalysisSourceHash(tender);
 
     const existingBaseAnalysis = await TenderGeneralAnalysisModel.findOne({
@@ -139,7 +137,6 @@ export class TenderGeneralAnalysisService {
         {
           $set: {
             status: TenderGeneralAnalysisStatus.PROCESSING,
-            tender: tenderObjectId,
             promptVersion: GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
             sourceHash,
           },

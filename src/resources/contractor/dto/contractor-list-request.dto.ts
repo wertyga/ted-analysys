@@ -1,5 +1,5 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsInt,
@@ -9,12 +9,26 @@ import {
   Min,
 } from 'class-validator';
 
+const toStringArray = ({ value }: { value: unknown }) => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return Array.isArray(value) ? value : [value];
+};
+
 export class ContractorListRequestDto {
+  @ApiProperty({ example: 'software' })
+  @IsString()
+  @IsOptional()
+  q: string;
+
   @ApiPropertyOptional({
     type: [String],
     example: ['72000000', '48000000'],
   })
   @IsOptional()
+  @Transform(toStringArray)
   @IsArray()
   @IsString({ each: true })
   cpvCodes?: string[];
@@ -24,6 +38,7 @@ export class ContractorListRequestDto {
     example: ['POL', 'DEU'],
   })
   @IsOptional()
+  @Transform(toStringArray)
   @IsArray()
   @IsString({ each: true })
   countries?: string[];

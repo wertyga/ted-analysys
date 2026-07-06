@@ -1,4 +1,4 @@
-import { Controller, Post, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiDefaultResponse, ApiTags } from '@nestjs/swagger';
 import { AdminAccessGuard } from '@/guards';
 import { ContractorsTechService } from './contractors.tech.service';
@@ -22,5 +22,21 @@ export class ContractorsTechController {
   @Post('/compress')
   compressContractors() {
     return this.contractorsTechService.compressContractors();
+  }
+
+  @ApiDefaultResponse({
+    description: 'Current contractor stats refresh status.',
+  })
+  @Get('/refresh-stats/status')
+  getRefreshContractorStatsStatus() {
+    return this.contractorsTechService.getRefreshContractorStatsStatus();
+  }
+
+  @ApiDefaultResponse({
+    description: 'Started contractor stats refresh from saved award tenders.',
+  })
+  @Post('/refresh-stats')
+  refreshContractorStats() {
+    return this.contractorsTechService.startRefreshContractorStats();
   }
 }

@@ -1,5 +1,7 @@
+- BE - проверить статик страницы в sitemap
+- 
+- FE - проверить фильтры на /buyers /contractors
 - FE - /contractors|buyers/{country}
-- FE - /buyers/[id] - Canonical/OpenGraph/JSON-LD
 - FE - /buyers/[id] - После FAQ
 Добавить блок
 Related buyers

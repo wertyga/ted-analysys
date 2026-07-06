@@ -1,15 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { TenderDocument } from '@/resources/tenders/schemas';
+import { TenderModel } from '@/resources/tenders/schemas';
 import { devLog, logger } from '@/utils';
 import { TenderCompanyMatchDocument } from '@/resources/tender-matching/schemas/tender-company-match.schema';
 import { TenderMatchingService } from '@/resources/tender-matching/tender-matching.service';
-import { TedOpenTendersCollectorService } from '@/resources/ted-open-tenders-collector/ted-open-tenders-collector.service';
+import {
+  TCollectOptions,
+  TedOpenTendersCollectorService,
+} from '@/resources/ted-open-tenders-collector/ted-open-tenders-collector.service';
 import { TenderMatchSource } from '@/resources/tender-matching/tender-match.types';
 import { TenderMatchNotificationsService } from '@/resources/tender-match-notifications/tender-match-notifications.service';
 import { CRON_CONFIG } from '@/config/cron.config';
 import { CronTaskQueueService } from '@/resources/cron/cron-task-queue/cron-task-queue.service';
 import { TED_OPEN_TENDERS_COLLECTOR_CONFIG } from '@/config/ted-open-tenders-collector.config';
+import { TedPaginationMode } from '@/resources/ted-search/types/ted-search.types';
+import { BuyerService } from '@/resources/buyer/buyer.service';
 
 export type RecentCompetitionTendersStatus = {
   isRunning: boolean;
@@ -42,6 +48,16 @@ export type AllCompetitionTendersStatus = {
   totalNoticeCount?: number;
 };
 
+export type ExpiredCompetitionTenderBuyerMetaStatus = {
+  isRunning: boolean;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+  lastError: string | null;
+  expiredTenders: number;
+  buyerIdsFound: number;
+  buyersUpdated: number;
+};
+
 const emptyRecentCompetitionTendersStatus =
   (): RecentCompetitionTendersStatus => ({
     isRunning: false,
@@ -71,6 +87,17 @@ const emptyAllCompetitionTendersStatus = (): AllCompetitionTendersStatus => ({
   noticesFetched: 0,
 });
 
+const emptyExpiredCompetitionTenderBuyerMetaStatus =
+  (): ExpiredCompetitionTenderBuyerMetaStatus => ({
+    isRunning: false,
+    startedAt: null,
+    finishedAt: null,
+    lastError: null,
+    expiredTenders: 0,
+    buyerIdsFound: 0,
+    buyersUpdated: 0,
+  });
+
 @Injectable()
 export class TendersCronService {
   private readonly logger = new Logger(TendersCronService.name);
@@ -78,16 +105,20 @@ export class TendersCronService {
   private isGatheringRecentTenders = false;
   private isGatheringAllCompetitionTenders = false;
   private isGatheringRecentAwardTenders = false;
+  private isRefreshingExpiredCompetitionTenderBuyerMeta = false;
   private recentCompetitionTendersStatus =
     emptyRecentCompetitionTendersStatus();
   private recentAwardTendersStatus = emptyRecentAwardTendersStatus();
   private allCompetitionTendersStatus = emptyAllCompetitionTendersStatus();
+  private expiredCompetitionTenderBuyerMetaStatus =
+    emptyExpiredCompetitionTenderBuyerMetaStatus();
 
   constructor(
     private readonly tedOpenTendersCollectorService: TedOpenTendersCollectorService,
     private readonly tenderMatchingService: TenderMatchingService,
     private readonly tenderMatchNotificationsService: TenderMatchNotificationsService,
     private readonly cronTaskQueueService: CronTaskQueueService,
+    private readonly buyerService: BuyerService,
   ) {}
 
   getAllCompetitionTendersStatus(): AllCompetitionTendersStatus {
@@ -102,13 +133,16 @@ export class TendersCronService {
     return { ...this.recentAwardTendersStatus };
   }
 
+  getExpiredCompetitionTenderBuyerMetaStatus(): ExpiredCompetitionTenderBuyerMetaStatus {
+    return { ...this.expiredCompetitionTenderBuyerMetaStatus };
+  }
+
   // @Cron(CRON_CONFIG.tenders.allCompetitionTenders, {
   //   timeZone: CRON_CONFIG.timeZone,
   // })
-  startGatherAllCompetitionTenders(options: {
-    forceUpdate?: boolean;
-    pageLimit?: number;
-  } = {}): AllCompetitionTendersStatus {
+  startGatherAllCompetitionTenders(
+    options: TCollectOptions = {},
+  ): AllCompetitionTendersStatus {
     if (this.isGatheringAllCompetitionTenders) {
       return this.getAllCompetitionTendersStatus();
     }
@@ -118,9 +152,7 @@ export class TendersCronService {
     return this.getAllCompetitionTendersStatus();
   }
 
-  async gatherAllCompetitionTenders(
-    optionsOrForceUpdate?: boolean | { forceUpdate?: boolean; pageLimit?: number },
-  ): Promise<void> {
+  async gatherAllCompetitionTenders(options?: TCollectOptions): Promise<void> {
     if (this.isGatheringAllCompetitionTenders) {
       this.logger.warn(
         'All competition TED tender gather is already running, skipping',
@@ -135,24 +167,18 @@ export class TendersCronService {
       startedAt: new Date(),
     };
     const status = this.allCompetitionTendersStatus;
-    const options =
-      typeof optionsOrForceUpdate === 'boolean'
-        ? { forceUpdate: optionsOrForceUpdate }
-        : (optionsOrForceUpdate ?? {});
-    const pageLimit = options.pageLimit ? Number(options.pageLimit) : 70;
 
     try {
       const result =
         await this.tedOpenTendersCollectorService.collectOpenTendersFromTed({
-        pageLimit,
-        maxPages: 100_000,
-        updateExisting: options.forceUpdate,
-        onProgress: (progress) => {
-          status.pagesFetched = progress.pagesFetched;
-          status.noticesFetched = progress.noticesFetched;
-          status.totalNoticeCount = progress.totalNoticeCount;
-        },
-      });
+          paginationMode: TedPaginationMode.PAGE_NUMBER,
+          ...(options ?? {}),
+          onProgress: (progress) => {
+            status.pagesFetched = progress.pagesFetched;
+            status.noticesFetched = progress.noticesFetched;
+            status.totalNoticeCount = progress.totalNoticeCount;
+          },
+        });
       status.pagesFetched = result.pagesFetched;
       status.noticesFetched = result.noticesFetched;
       status.totalNoticeCount = result.totalNoticeCount;
@@ -238,6 +264,86 @@ export class TendersCronService {
       await logger.error('TED_RECENT_COMPETITION_COLLECTED_FAILED', error);
     } finally {
       this.isGatheringRecentTenders = false;
+      status.isRunning = false;
+      status.finishedAt = new Date();
+    }
+  }
+
+  @Cron(CRON_CONFIG.tenders.expiredCompetitionTenderBuyerMeta, {
+    name: 'refresh-expired-competition-tender-buyer-meta',
+    timeZone: CRON_CONFIG.timeZone,
+  })
+  async refreshExpiredCompetitionTenderBuyerMeta(): Promise<void> {
+    await this.cronTaskQueueService.runExclusive(
+      'refreshExpiredCompetitionTenderBuyerMeta',
+      () => this.refreshExpiredCompetitionTenderBuyerMetaUnsafe(),
+    );
+  }
+
+  private async refreshExpiredCompetitionTenderBuyerMetaUnsafe(): Promise<void> {
+    if (this.isRefreshingExpiredCompetitionTenderBuyerMeta) {
+      this.logger.warn(
+        'Expired competition tender buyer meta refresh is already running, skipping',
+      );
+      return;
+    }
+
+    this.isRefreshingExpiredCompetitionTenderBuyerMeta = true;
+    this.expiredCompetitionTenderBuyerMetaStatus = {
+      ...emptyExpiredCompetitionTenderBuyerMetaStatus(),
+      isRunning: true,
+      startedAt: new Date(),
+    };
+    const status = this.expiredCompetitionTenderBuyerMetaStatus;
+    const deadlineTo = new Date();
+    const deadlineFrom = new Date(deadlineTo);
+    deadlineFrom.setDate(deadlineFrom.getDate() - 2);
+
+    try {
+      const expiredTenders = await TenderModel.find({
+        submissionDeadline: {
+          $gte: deadlineFrom,
+          $lt: deadlineTo,
+        },
+      })
+        .select('leadBuyers nonLeadBuyers')
+        .lean();
+      const buyerIds = Array.from(
+        new Set(
+          expiredTenders
+            .flatMap((tender) => [
+              ...(tender.leadBuyers ?? []),
+              ...(tender.nonLeadBuyers ?? []),
+            ])
+            .map((buyerId) => buyerId.toString()),
+        ),
+      );
+
+      status.expiredTenders = expiredTenders.length;
+      status.buyerIdsFound = buyerIds.length;
+
+      const updatedBuyers =
+        await this.buyerService.refreshBuyersTenderMeta(buyerIds);
+      status.buyersUpdated = updatedBuyers.length;
+
+      await logger.info('TED_EXPIRED_COMPETITION_BUYER_META_REFRESHED', {
+        expiredTenders: status.expiredTenders,
+        buyerIdsFound: status.buyerIdsFound,
+        buyersUpdated: status.buyersUpdated,
+      });
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e.message : 'unknown error';
+
+      status.lastError = error;
+      this.logger.error(
+        `Expired competition tender buyer meta refresh failed: ${error}`,
+      );
+      await logger.error(
+        'TED_EXPIRED_COMPETITION_BUYER_META_REFRESH_FAILED',
+        error,
+      );
+    } finally {
+      this.isRefreshingExpiredCompetitionTenderBuyerMeta = false;
       status.isRunning = false;
       status.finishedAt = new Date();
     }

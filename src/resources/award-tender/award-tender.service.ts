@@ -25,7 +25,9 @@ import {
   awardTenderPopulateFields,
   getBooleanArrayValue,
   getPaginationMeta,
+  getStringValue,
   getStringArrayValue,
+  getUniqArray,
 } from '@/utils';
 import { QueryFilter, Types } from 'mongoose';
 import {
@@ -34,6 +36,7 @@ import {
 } from './award-tender.normalizer';
 import { BuyerService } from '@/resources/buyer/buyer.service';
 import fs from 'node:fs';
+import { ContractorDocument } from '@/resources/contractor/schemas';
 
 export interface SaveAwardTedTendersResult {
   saved: number;
@@ -44,6 +47,7 @@ export interface SaveAwardTedTendersResult {
 
 export interface SaveAwardTedTendersOptions {
   updateExisting?: boolean;
+  skipExistingByPublicationNumber?: boolean;
 }
 
 // const LEGACY_AWARD_TENDER_UNSET_FIELDS = [
@@ -246,51 +250,74 @@ export class AwardTenderService {
 
   async upsertAwardTender(
     notice: TedNotice,
-    updateExisting?: boolean,
   ): Promise<AwardTenderDocument | null> {
     const normalizedTender = this.normalizer.normalizeAwardTenderNotice(notice);
-    const {
-      lots: awardLots,
-      winners: winnersNormalized,
-      lotWinners,
-    } = await this.normalizer.normalizeAwardTenderLotsAndWinners(notice);
-    normalizedTender.lots = awardLots;
-
-    const { publicationDate, lots, estimatedValue, awardValue, id } =
-      normalizedTender;
-
-    if (!id) {
+    if (!normalizedTender.id) {
       return null;
     }
 
-    const oldWinnerIds = updateExisting
-      ? await AwardTenderModel.findOne({ id })
-          .select('winners')
-          .lean()
-          .then((tender) =>
-            (tender?.winners ?? []).map((winner) => winner.toString()),
-          )
-      : [];
+    const [
+      { lots: awardLots, winners: winnersNormalized, lotWinners },
+      savedPureBuyers,
+      { winners: oldWinnersIds, buyers: oldBuyersIds },
+    ] = await Promise.all([
+      this.normalizer.normalizeAwardTenderLotsAndWinners(notice),
+      this.buyerService.upsertPureBuyersFromTEDNotice(notice),
+      AwardTenderModel.findOne({ id: normalizedTender.id }).then((t) => {
+        return {
+          winners: t?.winners?.map((w) => w.toString()) ?? [],
+          buyers: [
+            ...(t?.leadBuyers?.map((b) => b.toString()) ?? []),
+            ...(t?.nonLeadBuyers?.map((b) => b.toString()) ?? []),
+          ],
+        };
+      }),
+    ]);
+
+    const winnersDocs: ContractorDocument[] = (await Promise.all(
+      winnersNormalized.map((winner) =>
+        this.contractorService.upsertAwardWinner(winner),
+      ),
+    ).then((ws) => ws.filter(Boolean))) as ContractorDocument[];
+
+    normalizedTender.lots = awardLots.map((l) => {
+      const winner = winnersDocs.find((w) => {
+        return lotWinners.find((lw) => {
+          return (
+            lw.lotIdentifier === l.identifier &&
+            this.normalizer.getWinnerKey(w) === lw.winnerKey
+          );
+        });
+      });
+
+      return {
+        ...l,
+        winner: winner?._id,
+      };
+    });
 
     const [lotsWithEur, tenderEstimatedValueEur, tenderAwardValueEur] =
       await Promise.all([
-        this.getLotsWithEurValues(lots, publicationDate),
-        this.tendersService._calculateEstimatedValueEur(
-          estimatedValue.amount,
-          estimatedValue.currency,
-          publicationDate,
+        this.getLotsWithEurValues(
+          normalizedTender.lots,
+          normalizedTender.publicationDate,
         ),
         this.tendersService._calculateEstimatedValueEur(
-          awardValue.amount,
-          awardValue.currency,
-          publicationDate,
+          normalizedTender.estimatedValue.amount,
+          normalizedTender.estimatedValue.currency,
+          normalizedTender.publicationDate,
+        ),
+        this.tendersService._calculateEstimatedValueEur(
+          normalizedTender.awardValue.amount,
+          normalizedTender.awardValue.currency,
+          normalizedTender.publicationDate,
         ),
       ]);
-    const lotAwardValue = this.getAwardValueFallbackFromLots(lotsWithEur);
 
+    const lotAwardValue = this.getAwardValueFallbackFromLots(lotsWithEur);
     const awardValueWithFallback = {
-      amount: awardValue.amount ?? lotAwardValue.amount,
-      currency: awardValue.currency ?? lotAwardValue.currency,
+      amount: normalizedTender.awardValue.amount ?? lotAwardValue.amount,
+      currency: normalizedTender.awardValue.currency ?? lotAwardValue.currency,
     };
     const awardValueEurWithFallback =
       tenderAwardValueEur ?? this.getAwardValueEurFallbackFromLots(lotsWithEur);
@@ -301,18 +328,18 @@ export class AwardTenderService {
       estimatedValueEur: tenderEstimatedValueEur,
       awardValueEur: awardValueEurWithFallback,
       lots: lotsWithEur,
+      leadBuyers: savedPureBuyers.leadIds,
+      nonLeadBuyers: savedPureBuyers.nonLeadIds,
+      winners: getUniqArray(
+        lotsWithEur.map((l) => l.winner?.toString()),
+      ).filter(Boolean),
+    };
+    const payload = {
+      $set: insertPayload,
+      $unset: this.buildAwardTenderUnset(insertPayload),
     };
 
-    const payload = updateExisting
-      ? {
-          $set: insertPayload,
-          $unset: this.buildAwardTenderUnset(insertPayload),
-        }
-      : {
-          $setOnInsert: insertPayload,
-        };
-
-    const result = await AwardTenderModel.findOneAndUpdate(
+    const awardTender = await AwardTenderModel.findOneAndUpdate(
       {
         id: normalizedTender.id,
       },
@@ -320,80 +347,20 @@ export class AwardTenderService {
       {
         returnDocument: 'after',
         upsert: true,
-        includeResultMetadata: true,
-        strict: false,
       },
     );
 
-    const awardTender = result?.value;
-
-    if (!awardTender) {
-      return null;
-    }
-
-    const savedPureBuyers =
-      await this.buyerService.upsertPureBuyersFromTEDNotice(notice);
-
-    const buyersIds = [
-      ...savedPureBuyers.leadIds,
-      ...savedPureBuyers.nonLeadIds,
-    ];
-
-    awardTender.leadBuyers = savedPureBuyers.leadIds;
-    awardTender.nonLeadBuyers = savedPureBuyers.nonLeadIds;
-
-    const lotWinnerKeys = new Set(
-      lotWinners.map((lotWinner) => lotWinner.winnerKey),
-    );
-    const lotWinnersNormalized = winnersNormalized.filter((winner) => {
-      const winnerKey = this.normalizer.getWinnerKey(winner);
-
-      return winnerKey ? lotWinnerKeys.has(winnerKey) : false;
-    });
-
-    const winnerResults = await Promise.all(
-      lotWinnersNormalized.map((winner) =>
-        this.contractorService.upsertAwardWinner(winner, {
-          awardTenderId: awardTender._id.toString(),
-        }),
-      ),
-    );
-    const winnerDocByKey = new Map(
-      winnerResults.flatMap((winnerDoc, index) => {
-        const winnerKey = this.normalizer.getWinnerKey(
-          lotWinnersNormalized[index],
-        );
-
-        return winnerDoc && winnerKey ? [[winnerKey, winnerDoc]] : [];
-      }),
-    );
-    const lotWinnerByLotIdentifier = new Map(
-      lotWinners.map((lotWinner) => [lotWinner.lotIdentifier, lotWinner]),
-    );
-
-    awardTender.lots = lotsWithEur.map((lot) => {
-      const lotWinner = lotWinnerByLotIdentifier.get(lot.identifier);
-      const winner = lotWinner
-        ? winnerDocByKey.get(lotWinner.winnerKey)?._id
-        : undefined;
-
-      return {
-        ...lot,
-        ...(winner ? { winner } : {}),
-      };
-    });
-
-    awardTender.winners = Array.from(
-      new Set(awardTender.lots.flatMap((lot) => lot.winner?.toString() ?? [])),
-    ).map((winnerId) => new Types.ObjectId(winnerId));
-    await awardTender.save();
-
-    await this.contractorService.refreshContractorsAwardMeta([
-      ...oldWinnerIds,
-      ...awardTender.winners.map((winner) => winner.toString()),
-    ]);
-
-    await this.buyerService.refreshBuyersTenderMeta(buyersIds);
+    // await Promise.all([
+    //   this.contractorService.refreshContractorsAwardMeta([
+    //     ...insertPayload.winners,
+    //     ...oldWinnersIds,
+    //   ]),
+    //   this.buyerService.refreshBuyersTenderMeta([
+    //     ...oldBuyersIds,
+    //     ...savedPureBuyers.leadIds,
+    //     ...savedPureBuyers.nonLeadIds,
+    //   ]),
+    // ]);
 
     return awardTender;
   }
@@ -416,15 +383,18 @@ export class AwardTenderService {
     notices: TedNotice[],
     options: SaveAwardTedTendersOptions = {},
   ): Promise<SaveAwardTedTendersResult> {
-    const awardTenders = await Promise.all(
-      notices.map((notice: TedNotice) => {
-        return this.upsertAwardTender(notice, options.updateExisting);
-      }),
-    );
+    const noticesToSave = options.skipExistingByPublicationNumber
+      ? await this.filterExistingAwardTenderNotices(notices)
+      : notices;
 
-    const changedTenders: AwardTenderDocument[] = awardTenders.filter(
-      Boolean,
-    ) as AwardTenderDocument[];
+    const changedTenders: AwardTenderDocument[] = [];
+
+    for (const notice of noticesToSave) {
+      const awardTender = await this.upsertAwardTender(notice);
+      if (awardTender) {
+        changedTenders.push(awardTender);
+      }
+    }
 
     return {
       saved: changedTenders.length,
@@ -432,5 +402,33 @@ export class AwardTenderService {
       skipped: notices.length - changedTenders.length,
       changedTenders,
     };
+  }
+
+  private async filterExistingAwardTenderNotices(
+    notices: TedNotice[],
+  ): Promise<TedNotice[]> {
+    const publicationNumbers = notices
+      .map((notice) => getStringValue('publication-number', notice))
+      .filter(Boolean);
+
+    if (!publicationNumbers.length) {
+      return [];
+    }
+
+    const existingAwardTenders = await AwardTenderModel.find({
+      id: { $in: publicationNumbers },
+    })
+      .select('id')
+      .lean()
+      .exec();
+    const existingIds = new Set(
+      existingAwardTenders.flatMap((tender) => (tender.id ? [tender.id] : [])),
+    );
+
+    return notices.filter((notice) => {
+      const publicationNumber = getStringValue('publication-number', notice);
+
+      return !!publicationNumber && !existingIds.has(publicationNumber);
+    });
   }
 }

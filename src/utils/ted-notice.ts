@@ -194,22 +194,24 @@ export function parseTenderDate(value: string | undefined): Date | undefined {
   return toValidDate(trimmed);
 }
 
-export function getUniqArray<T>(...params: T[][] | T[]): any[] {
-  const set = new Set();
+export function getUniqArray<T>(
+  ...params: Array<T | T[] | null | undefined>
+): NonNullable<T>[] {
+  const set = new Set<NonNullable<T>>();
 
   params.forEach((param) => {
     if (Array.isArray(param)) {
-      const arr = param.flatMap((el) => el);
-
-      arr.forEach((element: T) => {
-        set.add(element);
+      param.forEach((element) => {
+        if (element) {
+          set.add(element as NonNullable<T>);
+        }
       });
-    } else {
-      set.add(param);
+    } else if (param) {
+      set.add(param as NonNullable<T>);
     }
   });
 
-  return Array.from(set).filter(Boolean);
+  return Array.from(set);
 }
 
 function getComparableValue(value: unknown): string {

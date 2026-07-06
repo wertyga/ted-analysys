@@ -7,6 +7,7 @@ import {
   ContractorModel,
 } from '@/resources/contractor/schemas';
 import { AwardTenderModel } from '@/resources/award-tender/schemas';
+import { ContractorService } from '@/resources/contractor/contractor.service';
 
 type ContractorCsvRow = {
   email?: string;
@@ -36,8 +37,91 @@ type AwardTenderCpvProjection = {
   cpvCodes?: string[];
 };
 
+export type RefreshContractorStatsStatus = {
+  isRunning: boolean;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+  lastError: string | null;
+  totalContractors: number;
+  processedContractors: number;
+  updatedContractors: number;
+  errors: number;
+  failedChunks: number;
+};
+
+const emptyRefreshContractorStatsStatus =
+  (): RefreshContractorStatsStatus => ({
+    isRunning: false,
+    startedAt: null,
+    finishedAt: null,
+    lastError: null,
+    totalContractors: 0,
+    processedContractors: 0,
+    updatedContractors: 0,
+    errors: 0,
+    failedChunks: 0,
+  });
+
 @Injectable()
 export class ContractorsTechService {
+  private refreshContractorStatsStatus = emptyRefreshContractorStatsStatus();
+
+  constructor(private readonly contractorService: ContractorService) {}
+
+  getRefreshContractorStatsStatus(): RefreshContractorStatsStatus {
+    return { ...this.refreshContractorStatsStatus };
+  }
+
+  startRefreshContractorStats(): RefreshContractorStatsStatus {
+    if (this.refreshContractorStatsStatus.isRunning) {
+      return this.getRefreshContractorStatsStatus();
+    }
+
+    void this.refreshContractorStats();
+
+    return this.getRefreshContractorStatsStatus();
+  }
+
+  async refreshContractorStats(): Promise<RefreshContractorStatsStatus> {
+    if (this.refreshContractorStatsStatus.isRunning) {
+      return this.getRefreshContractorStatsStatus();
+    }
+
+    this.refreshContractorStatsStatus = {
+      ...emptyRefreshContractorStatsStatus(),
+      isRunning: true,
+      startedAt: new Date(),
+    };
+    const status = this.refreshContractorStatsStatus;
+
+    try {
+      const contractorIds = await this.getAwardTenderContractorIds();
+      status.totalContractors = contractorIds.length;
+
+      const chunkedIds = this.chunkRows(contractorIds, 100);
+
+      for (const chunk of chunkedIds) {
+        try {
+          await this.contractorService.refreshContractorsAwardMeta(chunk);
+          status.updatedContractors += chunk.length;
+        } catch (error) {
+          status.failedChunks += 1;
+          status.errors += chunk.length;
+        } finally {
+          status.processedContractors += chunk.length;
+        }
+      }
+    } catch (error) {
+      status.lastError =
+        error instanceof Error ? error.message : 'Unknown error';
+    } finally {
+      status.isRunning = false;
+      status.finishedAt = new Date();
+    }
+
+    return this.getRefreshContractorStatsStatus();
+  }
+
   async compressContractors() {
     const contractors = await ContractorModel.find({
       'emails.0': { $exists: true },
@@ -337,6 +421,21 @@ export class ContractorsTechService {
     }
 
     return chunks;
+  }
+
+  private async getAwardTenderContractorIds(): Promise<string[]> {
+    const [winnerIds, lotWinnerIds] = await Promise.all([
+      AwardTenderModel.distinct('winners'),
+      AwardTenderModel.distinct('lots.winner'),
+    ]);
+
+    return Array.from(
+      new Set(
+        [...winnerIds, ...lotWinnerIds]
+          .map((id) => this.toIdString(id))
+          .filter(Boolean),
+      ),
+    );
   }
 
   private normalizeEmail(email?: string) {

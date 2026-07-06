@@ -31,6 +31,10 @@ const emptySyncIndexesStatus = (): SyncIndexesStatus => ({
   droppedConflictingIndexes: [],
 });
 
+const LEGACY_INDEXES_TO_DROP: Record<string, Array<Record<string, 1 | -1>>> = {
+  TenderGeneralAnalysis: [{ tender: 1 }],
+};
+
 @Injectable()
 export class IndexesTechService {
   private status = emptySyncIndexesStatus();
@@ -74,6 +78,7 @@ export class IndexesTechService {
         status.currentModel = modelName;
 
         try {
+          await this.dropLegacyIndexes(modelName, status);
           await this.createIndexesWithConflictRetry(modelName, status);
         } catch (error) {
           status.errors.push({
@@ -109,6 +114,40 @@ export class IndexesTechService {
         fields,
         options,
       );
+    }
+  }
+
+  private async dropLegacyIndexes(
+    modelName: string,
+    status: SyncIndexesStatus,
+  ): Promise<void> {
+    const legacyIndexes = LEGACY_INDEXES_TO_DROP[modelName];
+
+    if (!legacyIndexes?.length) {
+      return;
+    }
+
+    const model = mongoose.model(modelName);
+    const existingIndexes = await model.collection.indexes();
+
+    for (const index of existingIndexes) {
+      if (!index.name || index.name === '_id_') {
+        continue;
+      }
+
+      const shouldDrop = legacyIndexes.some((legacyIndex) =>
+        this.isSameIndexKey(index.key as Record<string, unknown>, legacyIndex),
+      );
+
+      if (!shouldDrop) {
+        continue;
+      }
+
+      await model.collection.dropIndex(index.name);
+      status.droppedConflictingIndexes.push({
+        model: modelName,
+        index: index.name,
+      });
     }
   }
 
@@ -187,5 +226,18 @@ export class IndexesTechService {
     return Object.entries(fields)
       .map(([key, value]) => `${key}_${String(value)}`)
       .join('_');
+  }
+
+  private isSameIndexKey(
+    left: Record<string, unknown>,
+    right: Record<string, unknown>,
+  ): boolean {
+    const leftEntries = Object.entries(left);
+    const rightEntries = Object.entries(right);
+
+    return (
+      leftEntries.length === rightEntries.length &&
+      leftEntries.every(([key, value]) => right[key] === value)
+    );
   }
 }

@@ -26,7 +26,6 @@ export interface TedNotice {
 
 export interface TedSearchResponse {
   notices: TedNotice[];
-  totalCount?: number;
   totalNoticeCount?: number;
   iterationNextToken?: string;
   nextPageToken?: string;

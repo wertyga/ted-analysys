@@ -26,7 +26,9 @@ import fs from 'node:fs';
 export type NormalizedAwardTenderLot = Omit<
   AwardTenderLot,
   'estimatedValueEur' | 'awardValueEur'
->;
+> & {
+  resultLotIdentifier?: string;
+};
 
 type NormalizedAwardTender = Omit<
   AwardTender,
@@ -263,6 +265,11 @@ export class AwardTenderNormalizer {
 
       selectionStatuses: getStringArrayValue('winner-selection-status', notice),
 
+      contractConclusionDates: getDateArrayValue(
+        'contract-conclusion-date',
+        notice,
+      ) as Date[],
+
       publicationDate: getDateValue('publication-date', notice),
       dispatchDate: getDateValue('dispatch-date', notice),
       submissionDeadline: getDateValue('deadline', notice),
@@ -299,10 +306,6 @@ export class AwardTenderNormalizer {
 
       awardDecisionDates: getDateISOStringArrayValue(
         'winner-decision-date',
-        notice,
-      ),
-      contractConclusionDates: getDateArrayValue(
-        'contract-conclusion-date',
         notice,
       ),
     };

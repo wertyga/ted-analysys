@@ -61,6 +61,16 @@ export class BuyerListRequestDto {
   cpvCodes?: string[];
 
   @ApiPropertyOptional({
+    type: [String],
+    example: ['body-pl', 'la'],
+  })
+  @IsOptional()
+  @Transform(toStringArray)
+  @IsArray()
+  @IsString({ each: true })
+  legalTypes?: string[];
+
+  @ApiPropertyOptional({
     enum: BuyerListSortBy,
     example: BuyerListSortBy.TOTAL_AWARDED_VALUE_EUR,
   })

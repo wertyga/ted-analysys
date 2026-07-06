@@ -104,7 +104,7 @@ export class TenderDeepAnalysisService {
         company,
         companyDocumentEvidence,
       );
-      console.log(tender);
+
       const buyerIntelligence =
         await this.getBuyerIntelligenceInputForTender(tender);
       const tenderDocumentsInput =
@@ -407,7 +407,7 @@ export class TenderDeepAnalysisService {
     const buyerIds = tender.leadBuyers.map((b: BuyerDocument) =>
       b._id.toString(),
     );
-    console.log({ buyerIds });
+
     if (!buyerIds.length) {
       return [];
     }
@@ -417,8 +417,6 @@ export class TenderDeepAnalysisService {
         this.buyerIntelligenceService.getFinishedBuyerIntelligence({ buyerId }),
       ),
     );
-
-    console.log({ records });
 
     return records.map((record) => {
       const buyer = record.buyer as { _id?: unknown; name?: string } | string;

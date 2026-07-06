@@ -185,15 +185,15 @@ function buildDateRangePart(
   const toDate = to?.trim();
 
   if (fromDate && toDate) {
-    return `${field} >=${fromDate}<=${toDate}`;
+    return `${field} = (${fromDate} <> ${toDate})`;
   }
 
   if (fromDate) {
-    return `${field} >=${fromDate}`;
+    return `${field} >= ${fromDate}`;
   }
 
   if (toDate) {
-    return `${field} <=${toDate}`;
+    return `${field} <= ${toDate}`;
   }
 
   return undefined;

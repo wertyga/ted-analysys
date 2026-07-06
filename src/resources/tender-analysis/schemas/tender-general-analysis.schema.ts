@@ -44,11 +44,6 @@ export interface TenderGeneralAnalysis {
    */
   tenderId: string;
 
-  /**
-   * Mongo ObjectId reference to Tender document.
-   */
-  tender: mongoose.Types.ObjectId;
-
   status: TenderGeneralAnalysisStatus;
 
   resultJson?: any;
@@ -81,6 +76,10 @@ export type TenderGeneralAnalysisRecord = TenderGeneralAnalysis & {
 export type TenderGeneralAnalysisSerializable =
   | TenderGeneralAnalysisDocument
   | TenderGeneralAnalysisRecord;
+type TenderGeneralAnalysisLegacySerializable =
+  TenderGeneralAnalysisSerializable & {
+    tender?: unknown;
+  };
 
 export interface TenderGeneralAnalysisModelType extends Model<TenderGeneralAnalysisDocument> {
   serializeList(
@@ -112,12 +111,6 @@ const TenderGeneralAnalysisSchema = new Schema<
   {
     tenderId: {
       type: String,
-      required: true,
-    },
-
-    tender: {
-      type: Schema.Types.ObjectId,
-      ref: 'Tender',
       required: true,
     },
 
@@ -185,7 +178,6 @@ const TenderGeneralAnalysisSchema = new Schema<
 
 TenderGeneralAnalysisSchema.add({ model: String } as Record<string, unknown>);
 
-TenderGeneralAnalysisSchema.index({ tender: 1 }, { unique: true });
 TenderGeneralAnalysisSchema.index({ tenderId: 1 }, { unique: true });
 TenderGeneralAnalysisSchema.index({ status: 1, updatedAt: 1 });
 TenderGeneralAnalysisSchema.index({ generalRecommendation: 1 });
@@ -221,8 +213,8 @@ function serializeGeneralAnalysisDetail(
     return null;
   }
 
-  return filterModel(analysis, {
-    excludeFields: ['sourceHash', 'promptVersion', 'model'],
+  return filterModel(analysis as TenderGeneralAnalysisLegacySerializable, {
+    excludeFields: ['sourceHash', 'promptVersion', 'model', 'tender'],
   });
 }
 

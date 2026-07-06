@@ -30,22 +30,29 @@ import { AWARD_HISTORY_FIELDS } from '@/config/award-tender.config';
 import { AwardTenderDocument } from '@/resources/award-tender/schemas';
 import { TENDER_COMPETITION_SEARCH_FIELDS } from '@/config/ted-search.config';
 
-export interface TedOpenTendersCollectorOptions<
-  TChangedTender = TenderDocument,
-> {
-  pageLimit?: number;
-  maxPages?: number;
-  iterationNextToken?: string;
+export type TCollectOptions = {
   updateExisting?: boolean;
-  onChangedTenders?: (tenders: TChangedTender[]) => Promise<void> | void;
-  onProgress?: (progress: TedOpenTendersCollectorResult) => Promise<void> | void;
-}
+  pageLimit?: number;
+  paginationMode?: TedPaginationMode;
+};
+
+export type TedOpenTendersCollectorOptions<TChangedTender = TenderDocument> =
+  TCollectOptions & {
+    maxPages?: number;
+    iterationNextToken?: string;
+    skipExistingByPublicationNumber?: boolean;
+    onChangedTenders?: (tenders: TChangedTender[]) => Promise<void> | void;
+    onProgress?: (
+      progress: TedOpenTendersCollectorResult,
+    ) => Promise<void> | void;
+  };
 
 export interface TedOpenTendersCollectorResult {
   pagesFetched: number;
   noticesFetched: number;
   totalNoticeCount?: number;
   resumeIterationNextToken?: string;
+  stoppedReason?: 'completed' | 'empty-page' | 'max-pages' | 'no-next-token';
 }
 
 interface TedNoticeBatchSaveResult {
@@ -62,9 +69,11 @@ interface TedIterationCollectorParams<TChangedTender = TenderDocument> {
     TedOpenTendersCollectorOptions<TChangedTender>,
     | 'pageLimit'
     | 'maxPages'
+    | 'paginationMode'
     | 'iterationNextToken'
     | 'onProgress'
     | 'updateExisting'
+    | 'skipExistingByPublicationNumber'
     | 'onChangedTenders'
   >;
   saveNotices: (notices: TedNotice[]) => Promise<void>;
@@ -134,29 +143,39 @@ export class TedOpenTendersCollectorService {
     {
       lookbackDays,
       lookbackYears,
+      publicationDateFrom,
+      publicationDateTo,
       filters,
     }: {
       lookbackDays?: number;
       lookbackYears?: number;
+      publicationDateFrom?: string;
+      publicationDateTo?: string;
       filters?: TedTenderSearchFilters;
     } = {},
-    options: TedOpenTendersCollectorOptions<AwardTenderDocument>,
+    options: TedOpenTendersCollectorOptions<AwardTenderDocument> = {},
   ): Promise<TedOpenTendersCollectorResult> {
-    const publicationDateFrom = new Date();
+    const defaultPublicationDateFrom = new Date();
 
     if (lookbackDays) {
-      publicationDateFrom.setDate(publicationDateFrom.getDate() - lookbackDays);
+      defaultPublicationDateFrom.setDate(
+        defaultPublicationDateFrom.getDate() - lookbackDays,
+      );
     } else if (lookbackYears) {
-      publicationDateFrom.setFullYear(
-        publicationDateFrom.getFullYear() - lookbackYears,
+      defaultPublicationDateFrom.setFullYear(
+        defaultPublicationDateFrom.getFullYear() - lookbackYears,
       );
     }
+
+    const queryPublicationDateFrom =
+      publicationDateFrom ?? getTedDate(defaultPublicationDateFrom);
+    const queryPublicationDateTo = publicationDateTo ?? getTedDate();
 
     const querySearch = buildTedTenderSearchQuery({
       ...(filters ?? {}),
       noticeTypes: TENDER_RESULT_NOTICE_TYPES,
-      publicationDateFrom: getTedDate(publicationDateFrom),
-      publicationDateTo: getTedDate(),
+      publicationDateFrom: queryPublicationDateFrom,
+      publicationDateTo: queryPublicationDateTo,
       winnerSelectionStatus: 'selec-w',
       sortColumn: TedTenderSortColumn.PUBLICATION_DATE,
       sortOrder: TedSortOrder.DESC,
@@ -166,13 +185,18 @@ export class TedOpenTendersCollectorService {
       query: querySearch,
       scope: TedScope.ALL,
       fields: AWARD_HISTORY_FIELDS,
-      options,
+      options: {
+        paginationMode: TedPaginationMode.PAGE_NUMBER,
+        ...options,
+      },
       saveNotices: async (notices) => {
         try {
           const saveResult = await this.awardTenderService.saveResultTedTenders(
             notices,
             {
               updateExisting: options.updateExisting,
+              skipExistingByPublicationNumber:
+                options.skipExistingByPublicationNumber,
             },
           );
 
@@ -219,36 +243,49 @@ export class TedOpenTendersCollectorService {
       options.pageLimit ?? TED_OPEN_TENDERS_COLLECTOR_CONFIG.defaultPageLimit;
     const maxPages =
       options.maxPages ?? TED_OPEN_TENDERS_COLLECTOR_CONFIG.defaultMaxPages;
+    const paginationMode =
+      options.paginationMode ?? TedPaginationMode.ITERATION;
     let iterationNextToken = options.iterationNextToken?.trim() || undefined;
+    let page = 1;
     let pagesFetched = 0;
     let noticesFetched = 0;
     let totalNoticeCount: number | undefined;
+    let stoppedReason: TedOpenTendersCollectorResult['stoppedReason'] =
+      'max-pages';
 
     while (pagesFetched < maxPages) {
       const response = await this.tedSearchService.searchNotices({
         query,
         scope,
         limit: pageLimit,
-        page: 1,
-        paginationMode: TedPaginationMode.ITERATION,
+        page,
+        paginationMode,
         onlyLatestVersions: true,
         checkQuerySyntax: false,
-        iterationNextToken,
+        iterationNextToken:
+          paginationMode === TedPaginationMode.ITERATION
+            ? iterationNextToken
+            : undefined,
         fields,
       });
       const notices = this.tendersService.extractNotices(response);
 
-      iterationNextToken = this.extractIterationNextToken(response);
+      iterationNextToken =
+        paginationMode === TedPaginationMode.ITERATION
+          ? this.extractIterationNextToken(response)
+          : undefined;
       pagesFetched += 1;
       noticesFetched += notices.length;
       totalNoticeCount = this.extractTotalCount(response) ?? totalNoticeCount;
 
       if (notices.length === 0) {
+        stoppedReason = 'empty-page';
         await options.onProgress?.({
           pagesFetched,
           noticesFetched,
           totalNoticeCount,
           resumeIterationNextToken: iterationNextToken,
+          stoppedReason,
         });
         break;
       }
@@ -262,9 +299,33 @@ export class TedOpenTendersCollectorService {
         resumeIterationNextToken: iterationNextToken,
       });
 
-      if (!iterationNextToken) {
+      if (
+        paginationMode === TedPaginationMode.PAGE_NUMBER &&
+        totalNoticeCount !== undefined &&
+        noticesFetched >= totalNoticeCount
+      ) {
+        stoppedReason = 'completed';
         break;
       }
+
+      if (paginationMode === TedPaginationMode.PAGE_NUMBER) {
+        page += 1;
+        continue;
+      }
+
+      if (!iterationNextToken) {
+        stoppedReason = 'completed';
+        break;
+      }
+    }
+
+    if (
+      paginationMode === TedPaginationMode.ITERATION &&
+      stoppedReason === 'completed' &&
+      totalNoticeCount !== undefined &&
+      noticesFetched < totalNoticeCount
+    ) {
+      stoppedReason = 'no-next-token';
     }
 
     return {
@@ -272,6 +333,7 @@ export class TedOpenTendersCollectorService {
       noticesFetched,
       totalNoticeCount,
       resumeIterationNextToken: iterationNextToken,
+      stoppedReason,
     };
   }
 

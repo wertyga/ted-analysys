@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { logger, normalizeEmail } from '@/utils';
+import { getLatestDate, logger, normalizeEmail } from '@/utils';
 import { Contractor, ContractorDocument, ContractorModel } from './schemas';
 import { QueryFilter, Types } from 'mongoose';
 import { getPaginationMeta } from '@/utils';
@@ -25,27 +25,18 @@ type ContractorAwardMeta = {
   cpvCodes: string[];
 };
 
+type ContractorMeta = {
+  countries: Array<{ country: string; count: number }>;
+  cpvCodes: Array<{ cpvCode: string; count: number }>;
+  legalTypes: Array<{ code: string; name: string; count: number }>;
+};
+
 export type WinnerNormalized = Partial<
   Omit<Contractor, '_id' | 'createdAt' | 'updatedAt' | 'stats' | 'cpvCodes'>
 >;
 
 @Injectable()
 export class ContractorService {
-  private async getContractorAwardSummaryByIds(contractorIds: string[]) {
-    const metaByContractorId =
-      await this.getContractorAwardMetaByIds(contractorIds);
-
-    return new Map(
-      Array.from(metaByContractorId.entries()).map(([contractorId, meta]) => [
-        contractorId,
-        {
-          awardTendersCount: meta.stats.awardTendersCount,
-          totalAwardedValueEur: meta.stats.totalAwardAmountEur,
-        },
-      ]),
-    );
-  }
-
   private async getContractorAwardMetaByIds(
     contractorIds: string[],
   ): Promise<Map<string, ContractorAwardMeta>> {
@@ -71,11 +62,9 @@ export class ContractorService {
       }
     >();
 
-    const awardTenderFilter: QueryFilter<AwardTenderDocument> = {
-      'lots.winner': { $in: winnerIds } as never,
-    };
-
-    const awardTenders = await AwardTenderModel.find(awardTenderFilter)
+    const awardTenders = await AwardTenderModel.find({
+      winners: { $in: winnerIds },
+    })
       .select('_id publicationDate lots')
       .lean();
 
@@ -97,22 +86,14 @@ export class ContractorService {
           cpvCodes: new Set<string>(),
         };
 
-        const publicationDate = awardTender.publicationDate ?? null;
+        const times = [
+          ...(awardTender.contractConclusionDates ?? []),
+          current.lastAwardWinDate,
+          awardTender.publicationDate,
+        ].filter(Boolean) as Date[];
 
-        if (
-          publicationDate &&
-          (!current.lastAwardWinDate ||
-            publicationDate.getTime() > current.lastAwardWinDate.getTime())
-        ) {
-          current.lastAwardWinDate = publicationDate;
-        }
-
-        if (
-          typeof lot.awardValueEur === 'number' &&
-          Number.isFinite(lot.awardValueEur)
-        ) {
-          current.totalAwardAmountEur += lot.awardValueEur;
-        }
+        current.lastAwardWinDate = getLatestDate(times);
+        current.totalAwardAmountEur += lot.awardValueEur ?? 0;
 
         current.awardTenderIds.add(awardTenderId);
         current.awardLotsCount += 1;
@@ -131,30 +112,48 @@ export class ContractorService {
     }
 
     return new Map(
-      Array.from(metaAccumulator.entries()).map(([contractorId, meta]) => [
-        contractorId,
-        {
-          cpvCodes: Array.from(meta.cpvCodes),
-          stats: {
-            lastAwardWinDate: meta.lastAwardWinDate,
-            totalAwardAmountEur: meta.totalAwardAmountEur,
-            awardTendersCount: meta.awardTenderIds.size,
-            awardLotsCount: meta.awardLotsCount,
+      Array.from(metaAccumulator.entries()).map(([contractorId, meta]) => {
+        return [
+          contractorId,
+          {
+            cpvCodes: Array.from(meta.cpvCodes),
+            stats: {
+              lastAwardWinDate: meta.lastAwardWinDate,
+              totalAwardAmountEur: meta.totalAwardAmountEur,
+              awardTendersCount: meta.awardTenderIds.size,
+              awardLotsCount: meta.awardLotsCount,
+            },
           },
-        },
-      ]),
+        ];
+      }),
     );
   }
 
   async searchContractors({
     cpvCodes,
     countries,
+    q,
     page,
     limit,
   }: ContractorListRequestDto) {
     const query: QueryFilter<ContractorDocument> = {
       name: { $exists: true, $ne: '' },
     };
+
+    const trimmedQuery = q?.trim();
+    if (trimmedQuery) {
+      const searchPattern = new RegExp(this.escapeRegExp(trimmedQuery), 'i');
+      query.$or = [
+        { name: searchPattern },
+        { identifiers: searchPattern },
+        { emails: searchPattern },
+        { countries: searchPattern },
+        { countrySubs: searchPattern },
+        { cities: searchPattern },
+        { postCodes: searchPattern },
+        { internetAddresses: searchPattern },
+      ];
+    }
 
     if (cpvCodes?.length) {
       query.cpvCodes = { $in: cpvCodes };
@@ -325,24 +324,90 @@ export class ContractorService {
     };
   }
 
-  async upsertListAwardWinners(
-    winners: WinnerNormalized[],
-    options: {
-      awardTenderId: string;
-      cpvCodes?: string[];
-    },
-  ): Promise<ContractorDocument[]> {
-    return Promise.all(
-      winners.map((t) => this.upsertAwardWinner(t, options)),
-    ).then((ws) => ws.filter(Boolean) as ContractorDocument[]);
+  async getContractorMeta(): Promise<ContractorMeta> {
+    const [countries, cpvCodes, legalTypes] = await Promise.all([
+      ContractorModel.aggregate<{ country: string; count: number }>([
+        { $unwind: '$countries' },
+        {
+          $match: {
+            countries: { $type: 'string', $ne: '' },
+          },
+        },
+        {
+          $group: {
+            _id: '$countries',
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+        {
+          $project: {
+            _id: 0,
+            country: '$_id',
+            count: 1,
+          },
+        },
+      ]),
+      ContractorModel.aggregate<{ cpvCode: string; count: number }>([
+        { $unwind: '$cpvCodes' },
+        {
+          $match: {
+            cpvCodes: { $type: 'string', $ne: '' },
+          },
+        },
+        {
+          $group: {
+            _id: '$cpvCodes',
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { count: -1, _id: 1 } },
+        {
+          $project: {
+            _id: 0,
+            cpvCode: '$_id',
+            count: 1,
+          },
+        },
+      ]),
+      ContractorModel.aggregate<{ code: string; name: string; count: number }>([
+        { $unwind: '$legalTypes' },
+        {
+          $match: {
+            'legalTypes.code': { $type: 'string', $ne: '' },
+            'legalTypes.name': { $type: 'string', $ne: '' },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              code: '$legalTypes.code',
+              name: '$legalTypes.name',
+            },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { count: -1, '_id.code': 1 } },
+        {
+          $project: {
+            _id: 0,
+            code: '$_id.code',
+            name: '$_id.name',
+            count: 1,
+          },
+        },
+      ]),
+    ]);
+
+    return {
+      countries,
+      cpvCodes,
+      legalTypes,
+    };
   }
 
   async upsertAwardWinner(
     winner: WinnerNormalized,
-    _options: {
-      awardTenderId?: string;
-      cpvCodes?: string[];
-    },
   ): Promise<ContractorDocument | null> {
     try {
       const emails = (winner.emails ?? [])

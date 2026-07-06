@@ -75,6 +75,7 @@ export class BuyerService {
     sortOrder,
     page,
     limit,
+    legalTypes,
   }: BuyerListRequestDto) {
     const query: QueryFilter<BuyerDocument> = {};
 
@@ -84,6 +85,10 @@ export class BuyerService {
 
     if (cpvCodes?.length) {
       query.cpvCodes = { $in: cpvCodes };
+    }
+
+    if (legalTypes?.length) {
+      query['legalTypes.code'] = { $in: legalTypes };
     }
 
     const trimmedQuery = q?.trim();
@@ -204,7 +209,7 @@ export class BuyerService {
     };
   }
 
-  private mergeCodeNameOptions(
+  mergeCodeNameOptions(
     ...options: Array<Array<BuyerCodeName | string> | null | undefined>
   ): BuyerCodeName[] {
     return Array.from(
@@ -256,15 +261,20 @@ export class BuyerService {
     const tenderSelectFields =
       'publicationDate estimatedValueEur cpvCodes placeOfPerformanceCountries nonLeadBuyers leadBuyers';
     const awardTenderSelectFields = `${tenderSelectFields} awardValueEur lots winners`;
+    const activeTenderFilter = {
+      submissionDeadline: { $gte: new Date() },
+    };
 
     const [nonLeadTenders, leadTenders, nonLeadAwardTenders, leadAwardTenders] =
       await Promise.all([
         TenderModel.find({
+          ...activeTenderFilter,
           nonLeadBuyers: buyer._id,
         })
           .select(tenderSelectFields)
           .lean(),
         TenderModel.find({
+          ...activeTenderFilter,
           leadBuyers: buyer._id,
         })
           .select(tenderSelectFields)
@@ -326,8 +336,12 @@ export class BuyerService {
   async refreshBuyersTenderMeta(
     buyersIds: TMongoId[],
   ): Promise<BuyerDocument[]> {
+    const uniqueIds = Array.from(new Set(buyersIds)).filter((id) =>
+      Types.ObjectId.isValid(id),
+    );
+
     const buyers = await BuyerModel.find({
-      _id: { $in: buyersIds as any },
+      _id: { $in: uniqueIds as any },
     }).select('address.country intelligence');
 
     if (!buyers.length) {

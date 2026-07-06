@@ -22,6 +22,7 @@ import { BuyerTechController } from '@/resources/tech/buyer/buyer.tech.controlle
 import { TedOpenTendersCollectorModule } from '@/resources/ted-open-tenders-collector/ted-open-tenders-collector.module';
 import { IndexesTechController } from '@/resources/tech/indexes/indexes.tech.controller';
 import { IndexesTechService } from '@/resources/tech/indexes/indexes.tech.service';
+import { ContractorModule } from '@/resources/contractor/contractor.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { IndexesTechService } from '@/resources/tech/indexes/indexes.tech.servic
     TendersModule,
     TendersCronModule,
     BuyerModule,
+    ContractorModule,
     TedOpenTendersCollectorModule,
   ],
   controllers: [

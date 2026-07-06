@@ -3,7 +3,7 @@ import { FRAMEWORK_FIELDS } from '@/config/ted-search.config';
 
 export const AWARD_TENDER_CONFIG = {
   historyYearsBack: 3,
-  awardTenderSearchLimit: 1,
+  historyChunkDays: 1,
   awardSearchCacheTtlMs: 7 * 24 * 60 * 60 * 1000,
 };
 

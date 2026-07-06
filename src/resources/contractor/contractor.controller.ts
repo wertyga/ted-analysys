@@ -1,4 +1,5 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseInterceptors } from '@nestjs/common';
+import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
 import {
   ApiOkResponse,
   ApiOperation,
@@ -31,19 +32,20 @@ export class ContractorController {
     return this.contractorService.searchContractors(query);
   }
 
-  @Get('search')
-  @ApiOperation({ summary: 'Search contractors by text query' })
-  @ApiQuery({ type: ContractorSearchRequestDto })
-  @ApiOkResponse({ description: 'Contractor search result.' })
-  searchContractorsByQuery(@Query() query: ContractorSearchRequestDto) {
-    return this.contractorService.searchContractorsByQuery(query);
-  }
-
   @Get('stats')
   @ApiOperation({ summary: 'Get contractor collection stats' })
   @ApiOkResponse({ description: 'Contractor stats.' })
   getContractorStats() {
     return this.contractorService.getContractorStats();
+  }
+
+  @Get('meta')
+  @UseInterceptors(CacheInterceptor)
+  @CacheTTL(10 * 60 * 1000)
+  @ApiOperation({ summary: 'Get contractor filter metadata' })
+  @ApiOkResponse({ description: 'Contractor metadata.' })
+  getContractorMeta() {
+    return this.contractorService.getContractorMeta();
   }
 
   @Get(':id/award-tenders')
@@ -72,16 +74,19 @@ export class ContractorController {
 
     return {
       contractor: ContractorModel.serializeDetail(contractor),
-      awardTendersWithWonLots: awardTenders
-        .map(AwardTenderModel.serializeList)
-        .map(({ winners, ...at }) => {
-          return {
-            ...at,
-            lots: at.lots.filter((l) => {
+      awardTendersWithWonLots: awardTenders.map((at) => {
+        const listTender = AwardTenderModel.serializeList(at);
+        return {
+          ...listTender,
+          lots: listTender.lots
+            .map((_, i) => {
+              return at.lots[i];
+            })
+            .filter((l) => {
               return l.winner?.toString() === id;
             }),
-          };
-        }),
+        };
+      }),
     };
   }
 }

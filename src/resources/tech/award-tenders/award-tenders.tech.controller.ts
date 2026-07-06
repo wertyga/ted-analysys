@@ -17,11 +17,16 @@ export class AwardTendersTechController {
   })
   @Post('/refresh')
   refreshAwardTendersHistory(@Body() body: any) {
-    const { pageLimit, ...filters } = body ?? {};
+    const {
+      pageLimit,
+      paginationMode,
+      skipExistingByPublicationNumber,
+      ...filters
+    } = body ?? {};
 
     return this.awardTendersTechService.startRefreshAwardTendersHistory(
       filters,
-      { pageLimit },
+      { pageLimit, paginationMode, skipExistingByPublicationNumber },
     );
   }
 

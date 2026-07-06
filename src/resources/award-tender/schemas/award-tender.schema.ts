@@ -19,7 +19,7 @@ import { TMongoId } from '@/types';
 import { getFilter } from 'next/dist/build/webpack/loaders/css-loader/src/utils';
 
 export type AwardTenderLot = TenderLot & {
-  resultLotIdentifier?: string;
+  // resultLotIdentifier?: string;
   awardValue?: {
     amount: MoneyValue;
     currency: string | null;
@@ -67,11 +67,13 @@ export interface AwardTender {
   placeOfPerformanceCities: string[];
   placeOfPerformanceSubdivisions: string[];
 
+  contractConclusionDates: Date[];
+
   lots: AwardTenderLot[];
 
   selectionCriteriaSources: string[];
 
-  winners: Array<mongoose.Types.ObjectId | ContractorDocument>;
+  winners: Array<mongoose.Types.ObjectId | ContractorDocument | string>;
   links: TenderDocumentsLinks;
   createdAt?: Date;
   updatedAt?: Date;
@@ -202,8 +204,12 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
     titleProc: String,
     description: String,
     selectionStatuses: { type: [String], default: [] },
+
     publicationDate: { type: Date },
     dispatchDate: Date,
+    awardDecisionDates: { type: [Date], default: [] },
+    contractConclusionDates: { type: [Date], default: [] },
+
     submissionDeadline: { type: Date },
     plannedEndDate: { type: Date },
     contractNature: {
@@ -226,7 +232,7 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
     },
     estimatedValueEur: { type: Number, default: null },
     awardValueEur: { type: Number, default: null },
-    awardDecisionDates: { type: [String], default: [] },
+
     placeOfPerformanceCitiesProc: { type: [String], default: [] },
     placeOfPerformanceCountriesProc: { type: [String], default: [] },
     placeOfPerformanceCountries: { type: [String], default: [] },

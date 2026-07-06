@@ -1,7 +1,10 @@
 import _chunk from 'lodash/chunk';
 
 import { TenderModel } from '@/resources/tenders/schemas';
-import { BuyerNormalizer } from '@/resources/buyer/buyer.normalizer';
+import {
+  BuyerNormalized,
+  BuyerNormalizer,
+} from '@/resources/buyer/buyer.normalizer';
 import { Injectable } from '@nestjs/common';
 import { BuyerService } from '@/resources/buyer/buyer.service';
 import { TedNotice } from '@/resources/ted-search/types/ted-search.types';
@@ -11,6 +14,9 @@ import { AwardTenderService } from '@/resources/award-tender/award-tender.servic
 import { TENDER_COMPETITION_SEARCH_FIELDS } from '@/config/ted-search.config';
 import { AwardTenderModel } from '@/resources/award-tender/schemas';
 import { AWARD_HISTORY_FIELDS } from '@/config/award-tender.config';
+import { Buyer, BuyerDocument } from '@/resources/buyer/schemas';
+import { getLegalTypes, getMainActivities } from '@/resources/codelist';
+import { getUniqArray } from '@/utils';
 
 export type CollectBuyersFromTendersResult = {
   isRunning: boolean;
@@ -40,19 +46,23 @@ export type CollectBuyersFromAwardTendersResult = {
   failedChunks: number;
 };
 
-const emptyCollectBuyersFromTendersStatus = (): CollectBuyersFromTendersResult => ({
-  isRunning: false,
-  startedAt: null,
-  finishedAt: null,
-  lastError: null,
-  totalTenders: 0,
-  processedTenders: 0,
-  noticesFetched: 0,
-  processedNotices: 0,
-  updatedTenders: 0,
-  errors: 0,
-  failedChunks: 0,
-});
+const getLastExisting = (...values: Array<string | null | undefined>) =>
+  values.findLast((value) => value?.trim()) ?? '';
+
+const emptyCollectBuyersFromTendersStatus =
+  (): CollectBuyersFromTendersResult => ({
+    isRunning: false,
+    startedAt: null,
+    finishedAt: null,
+    lastError: null,
+    totalTenders: 0,
+    processedTenders: 0,
+    noticesFetched: 0,
+    processedNotices: 0,
+    updatedTenders: 0,
+    errors: 0,
+    failedChunks: 0,
+  });
 
 const emptyCollectBuyersFromAwardTendersStatus =
   (): CollectBuyersFromAwardTendersResult => ({
@@ -93,10 +103,78 @@ export class BuyerTechService {
       return;
     }
 
-    const buyers =
-      await this.buyerService.upsertPureBuyersFromTEDNotice(notice);
+    return await this.tendersService.upsertTender(notice);
+  }
 
-    return await this.tendersService.upsertTender(notice, buyers);
+  upsertBuyersFromListOfTEDNotices(
+    notices: TedNotice[],
+  ): Omit<
+    Buyer,
+    | 'stats'
+    | '_id'
+    | 'createdAt'
+    | 'updatedAt'
+    | 'statsVersion'
+    | 'intelligence'
+  >[] {
+    const buyersByKey = new Map<string, BuyerNormalized[]>();
+    notices
+      .flatMap((notice) => this.normalizer.normalizeBuyersFromTEDNotice(notice))
+      .forEach((b) => {
+        const key = b.name.trim();
+        buyersByKey.set(key, [...(buyersByKey.get(key) ?? []), b]);
+      });
+
+    return Array.from(buyersByKey.values()).map((buyers) => {
+      const address = {
+        street: getLastExisting(...buyers.map((b) => b.address?.street)),
+        postCode: getLastExisting(...buyers.map((b) => b.address?.postCode)),
+        city: getLastExisting(...buyers.map((b) => b.address?.city)),
+        country: getLastExisting(...buyers.map((b) => b.address?.country)),
+        countrySub: getLastExisting(
+          ...buyers.map((b) => b.address?.countrySub),
+        ),
+      };
+
+      const contact: BuyerDocument['contact'] = {
+        contactPoint: getLastExisting(
+          ...buyers.map((b) => b.contact?.contactPoint),
+        ),
+        person: getLastExisting(...buyers.map((b) => b.contact?.person)),
+        email: getLastExisting(...buyers.map((b) => b.contact?.email)),
+        phone: getLastExisting(...buyers.map((b) => b.contact?.phone)),
+        fax: getLastExisting(...buyers.map((b) => b.contact?.fax)),
+        website: getLastExisting(...buyers.map((b) => b.contact?.website)),
+        gateway: getLastExisting(...buyers.map((b) => b.contact?.gateway)),
+      };
+
+      return {
+        name: getLastExisting(...buyers.map((b) => b.name)),
+        identifiers: Array.from(
+          new Set([...buyers.flatMap((b) => b.identifiers ?? [])]),
+        ),
+        contact,
+        address,
+        legalTypes: this.buyerService.mergeCodeNameOptions(
+          ...buyers.map((b) => getLegalTypes(b.legalTypes)),
+        ),
+        mainActivities: this.buyerService.mergeCodeNameOptions(
+          ...buyers.map((b) => getLegalTypes(b.mainActivities)),
+        ),
+        profiles: getUniqArray(...buyers.map((b) => b.profiles)),
+        gateways: getUniqArray(...buyers.map((b) => b.gateways)),
+        websites: getUniqArray(...buyers.map((b) => b.websites)),
+        cpvCodes: getUniqArray(
+          buyers.flatMap((b) => {
+            if (b.isLead) {
+              return b.cpvCodes;
+            }
+            return [];
+          }),
+        ),
+        countries: getUniqArray(...buyers.map((b) => b.countries)),
+      };
+    });
   }
 
   getCollectBuyersFromTendersStatus(): CollectBuyersFromTendersResult {
@@ -124,51 +202,21 @@ export class BuyerTechService {
       startedAt: new Date(),
     };
     const result = this.collectBuyersFromTendersStatus;
-    const tenders = await TenderModel.find({}).select('id').lean();
+    const buyerIds = await this.getAllTenderBuyerIds();
 
-    result.totalTenders = tenders.length;
+    result.totalTenders = buyerIds.length;
 
     try {
-      const chunkedIds = _chunk(tenders, 100);
+      const chunkedIds = _chunk(buyerIds, 100);
 
       for (let i = 0; i < chunkedIds.length; i++) {
         const chunk = chunkedIds[i];
 
         try {
-          const collectResult = await this.collector.collectAnyTendersFromTed(
-            {
-              publicationNumber: chunk.map((t) => t.id),
-            },
-            TENDER_COMPETITION_SEARCH_FIELDS,
-            {
-              pageLimit: 70,
-              maxPages: 100_000,
-            },
-            async (noticies: TedNotice[]) => {
-              result.noticesFetched += noticies.length;
+          const updatedBuyers =
+            await this.buyerService.refreshBuyersTenderMeta(chunk);
 
-              for (let i = 0; i < noticies.length; i++) {
-                const n = noticies[i];
-
-                try {
-                  const tender =
-                    await this.collectBuyersFromTenderAndUnsetTenderFields(n);
-
-                  result.processedNotices += 1;
-
-                  if (tender) {
-                    result.updatedTenders += 1;
-                  }
-                } catch (e) {
-                  result.errors += 1;
-                }
-              }
-            },
-          );
-
-          if (result.noticesFetched === 0) {
-            result.noticesFetched += collectResult.noticesFetched;
-          }
+          result.updatedTenders += updatedBuyers.length;
         } catch (e) {
           result.failedChunks += 1;
           result.errors += chunk.length;
@@ -223,50 +271,21 @@ export class BuyerTechService {
       startedAt: new Date(),
     };
     const result = this.collectBuyersFromAwardTendersStatus;
-    const awardTenders = await AwardTenderModel.find({}).select('id').lean();
+    const buyerIds = await this.getAwardTenderBuyerIds();
 
-    result.totalAwardTenders = awardTenders.length;
+    result.totalAwardTenders = buyerIds.length;
 
     try {
-      const chunkedIds = _chunk(awardTenders, 50);
+      const chunkedIds = _chunk(buyerIds, 100);
 
       for (let i = 0; i < chunkedIds.length; i++) {
         const chunk = chunkedIds[i];
 
         try {
-          const collectResult = await this.collector.collectAnyTendersFromTed(
-            {
-              publicationNumber: chunk.map((t) => t.id),
-            },
-            AWARD_HISTORY_FIELDS,
-            {
-              pageLimit: 50,
-              maxPages: 100_000,
-            },
-            async (noticies: TedNotice[]) => {
-              result.noticesFetched += noticies.length;
+          const updatedBuyers =
+            await this.buyerService.refreshBuyersTenderMeta(chunk);
 
-              for (let i = 0; i < noticies.length; i++) {
-                const n = noticies[i];
-
-                try {
-                  const awardTender = await this.collectBuyersFromAwardTender(n);
-
-                  result.processedNotices += 1;
-
-                  if (awardTender) {
-                    result.updatedAwardTenders += 1;
-                  }
-                } catch (e) {
-                  result.errors += 1;
-                }
-              }
-            },
-          );
-
-          if (result.noticesFetched === 0) {
-            result.noticesFetched += collectResult.noticesFetched;
-          }
+          result.updatedAwardTenders += updatedBuyers.length;
         } catch (e) {
           result.failedChunks += 1;
           result.errors += chunk.length;
@@ -282,5 +301,36 @@ export class BuyerTechService {
     }
 
     return this.getCollectBuyersFromAwardTendersStatus();
+  }
+
+  private async getTenderBuyerIds(): Promise<string[]> {
+    const [leadBuyerIds, nonLeadBuyerIds] = await Promise.all([
+      TenderModel.distinct('leadBuyers'),
+      TenderModel.distinct('nonLeadBuyers'),
+    ]);
+
+    return getUniqArray([...leadBuyerIds, ...nonLeadBuyerIds]).map((id) =>
+      id.toString(),
+    );
+  }
+
+  private async getAllTenderBuyerIds(): Promise<string[]> {
+    const [tenderBuyerIds, awardTenderBuyerIds] = await Promise.all([
+      this.getTenderBuyerIds(),
+      this.getAwardTenderBuyerIds(),
+    ]);
+
+    return getUniqArray([...tenderBuyerIds, ...awardTenderBuyerIds]);
+  }
+
+  private async getAwardTenderBuyerIds(): Promise<string[]> {
+    const [leadBuyerIds, nonLeadBuyerIds] = await Promise.all([
+      AwardTenderModel.distinct('leadBuyers'),
+      AwardTenderModel.distinct('nonLeadBuyers'),
+    ]);
+
+    return getUniqArray([...leadBuyerIds, ...nonLeadBuyerIds]).map((id) =>
+      id.toString(),
+    );
   }
 }
