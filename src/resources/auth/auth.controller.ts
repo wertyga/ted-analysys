@@ -64,7 +64,7 @@ export class AuthController {
     @Body() data: OauthSignInDto,
     @Headers(FREE_USE_COUPON_HEADER) couponCode?: string,
   ) {
-    const user = await this.authService.oauthSignIn(data);
+    const { user, isNewUser } = await this.authService.oauthSignIn(data);
 
     if (couponCode) {
       await this.couponService.redeemFreeUseCouponForUser(user, couponCode);
@@ -74,6 +74,7 @@ export class AuthController {
       user: UserModel.serializeUser(user, undefined, {
         excludeFields: AUTH_EXCLUDE_FIELDS,
       }),
+      isNewUser,
     };
   }
 

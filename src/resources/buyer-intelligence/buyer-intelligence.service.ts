@@ -242,7 +242,10 @@ export class BuyerIntelligenceService {
     const [buyer, recentTenders, recentAwardTenders, tendersLast12Months] =
       await Promise.all([
         BuyerModel.findById(params.buyerId).lean(),
-        TenderModel.find({ leadBuyers: params.buyerId })
+        TenderModel.find({
+          leadBuyers: params.buyerId,
+          submissionDeadline: { $gte: new Date() },
+        })
           .sort({ publicationDate: -1, _id: -1 })
           .limit(recentTendersLimit)
           .lean(),

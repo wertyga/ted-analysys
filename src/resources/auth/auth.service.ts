@@ -169,6 +169,8 @@ export class AuthService {
   async oauthSignIn({ email }: OauthSignInDto) {
     const token = generateToken(email);
 
+    const existsUser = await UserModel.findOne({ email });
+
     const user = await UserModel.findOneAndUpdate(
       { email },
       {
@@ -185,6 +187,9 @@ export class AuthService {
       { upsert: true, returnDocument: 'after' },
     );
 
-    return user;
+    return {
+      user,
+      isNewUser: !existsUser,
+    };
   }
 }

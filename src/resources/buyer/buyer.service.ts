@@ -545,6 +545,7 @@ export class BuyerService {
   async getRecentTenders(buyerId: string) {
     const tenders = await TenderModel.find({
       $or: [{ leadBuyers: buyerId }, { nonLeadBuyers: buyerId }],
+      submissionDeadline: { $gte: new Date() },
     })
       .sort({ publicationDate: -1, _id: -1 })
       .limit(BUYER_RECENT_TENDERS_LIMIT)
