@@ -50,7 +50,7 @@ type BuyerTenderMeta = {
   statsVersion: number;
 };
 
-const BUYER_RECENT_TENDERS_LIMIT = 10;
+const BUYER_RECENT_TENDERS_LIMIT = 10000;
 
 type BuyerMeta = {
   countries: Array<{ country: string; count: number }>;
