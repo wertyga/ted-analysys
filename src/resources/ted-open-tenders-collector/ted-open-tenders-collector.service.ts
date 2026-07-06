@@ -19,7 +19,7 @@ import {
 import { getTedDate } from '@/resources/ted-search/utils';
 import {
   TENDER_COMPETITION_NOTICE_TYPES,
-  TENDER_RESULT_NOTICE_TYPES,
+  TED_AWARD_TENDER_NOTICE_TYPES,
 } from '@/resources/ted-search/utils/niticies';
 import { TenderDocument } from '@/resources/tenders/schemas';
 import { TendersService } from '@/resources/tenders/tenders.service';
@@ -52,7 +52,12 @@ export interface TedOpenTendersCollectorResult {
   noticesFetched: number;
   totalNoticeCount?: number;
   resumeIterationNextToken?: string;
-  stoppedReason?: 'completed' | 'empty-page' | 'max-pages' | 'no-next-token';
+  stoppedReason?:
+    | 'completed'
+    | 'empty-page'
+    | 'max-pages'
+    | 'no-next-token'
+    | 'search-window-limit';
 }
 
 interface TedNoticeBatchSaveResult {
@@ -173,7 +178,7 @@ export class TedOpenTendersCollectorService {
 
     const querySearch = buildTedTenderSearchQuery({
       ...(filters ?? {}),
-      noticeTypes: TENDER_RESULT_NOTICE_TYPES,
+      noticeTypes: TED_AWARD_TENDER_NOTICE_TYPES,
       publicationDateFrom: queryPublicationDateFrom,
       publicationDateTo: queryPublicationDateTo,
       winnerSelectionStatus: 'selec-w',
@@ -254,6 +259,22 @@ export class TedOpenTendersCollectorService {
       'max-pages';
 
     while (pagesFetched < maxPages) {
+      if (
+        paginationMode === TedPaginationMode.PAGE_NUMBER &&
+        page * pageLimit >
+          TED_OPEN_TENDERS_COLLECTOR_CONFIG.maxPageNumberResultWindow
+      ) {
+        stoppedReason = 'search-window-limit';
+        await options.onProgress?.({
+          pagesFetched,
+          noticesFetched,
+          totalNoticeCount,
+          resumeIterationNextToken: iterationNextToken,
+          stoppedReason,
+        });
+        break;
+      }
+
       const response = await this.tedSearchService.searchNotices({
         query,
         scope,

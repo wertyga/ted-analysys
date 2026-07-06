@@ -171,8 +171,8 @@ export class TendersCronService {
     try {
       const result =
         await this.tedOpenTendersCollectorService.collectOpenTendersFromTed({
-          paginationMode: TedPaginationMode.PAGE_NUMBER,
           ...(options ?? {}),
+          paginationMode: options?.paginationMode ?? TedPaginationMode.ITERATION,
           onProgress: (progress) => {
             status.pagesFetched = progress.pagesFetched;
             status.noticesFetched = progress.noticesFetched;

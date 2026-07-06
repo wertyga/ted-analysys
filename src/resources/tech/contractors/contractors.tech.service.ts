@@ -49,18 +49,17 @@ export type RefreshContractorStatsStatus = {
   failedChunks: number;
 };
 
-const emptyRefreshContractorStatsStatus =
-  (): RefreshContractorStatsStatus => ({
-    isRunning: false,
-    startedAt: null,
-    finishedAt: null,
-    lastError: null,
-    totalContractors: 0,
-    processedContractors: 0,
-    updatedContractors: 0,
-    errors: 0,
-    failedChunks: 0,
-  });
+const emptyRefreshContractorStatsStatus = (): RefreshContractorStatsStatus => ({
+  isRunning: false,
+  startedAt: null,
+  finishedAt: null,
+  lastError: null,
+  totalContractors: 0,
+  processedContractors: 0,
+  updatedContractors: 0,
+  errors: 0,
+  failedChunks: 0,
+});
 
 @Injectable()
 export class ContractorsTechService {
@@ -421,6 +420,36 @@ export class ContractorsTechService {
     }
 
     return chunks;
+  }
+
+  private async deleteUnused() {
+    const [allContractorIds, tenderWinnerIds, lotWinnerIds] = await Promise.all(
+      [
+        ContractorModel.find({}).select('_id').lean(),
+        AwardTenderModel.distinct('winners'),
+        AwardTenderModel.distinct('lots.winner'),
+      ],
+    );
+
+    const usedIds = new Set(
+      [...tenderWinnerIds, ...lotWinnerIds]
+        .filter(Boolean)
+        .map((id) => id.toString()),
+    );
+
+    const unusedIds = allContractorIds
+      .map((contractor) => contractor._id.toString())
+      .filter((id) => !usedIds.has(id));
+
+    await ContractorModel.updateMany(
+      { _id: { $in: unusedIds as any } },
+      {
+        $unset: {
+          cpvCodes: '',
+          stats: '',
+        },
+      },
+    );
   }
 
   private async getAwardTenderContractorIds(): Promise<string[]> {

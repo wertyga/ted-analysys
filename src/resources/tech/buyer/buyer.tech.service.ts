@@ -14,7 +14,7 @@ import { AwardTenderService } from '@/resources/award-tender/award-tender.servic
 import { TENDER_COMPETITION_SEARCH_FIELDS } from '@/config/ted-search.config';
 import { AwardTenderModel } from '@/resources/award-tender/schemas';
 import { AWARD_HISTORY_FIELDS } from '@/config/award-tender.config';
-import { Buyer, BuyerDocument } from '@/resources/buyer/schemas';
+import { Buyer, BuyerDocument, BuyerModel } from '@/resources/buyer/schemas';
 import { getLegalTypes, getMainActivities } from '@/resources/codelist';
 import { getUniqArray } from '@/utils';
 
@@ -304,14 +304,14 @@ export class BuyerTechService {
   }
 
   private async getTenderBuyerIds(): Promise<string[]> {
-    const [leadBuyerIds, nonLeadBuyerIds] = await Promise.all([
-      TenderModel.distinct('leadBuyers'),
-      TenderModel.distinct('nonLeadBuyers'),
-    ]);
-
-    return getUniqArray([...leadBuyerIds, ...nonLeadBuyerIds]).map((id) =>
-      id.toString(),
-    );
+    // const [leadBuyerIds, nonLeadBuyerIds] = await Promise.all([
+    //   TenderModel.find({}).select('leadBuyers nonLeadBuyers'),
+    //   TenderModel.distinct('nonLeadBuyers'),
+    // ]);
+    const bb = await TenderModel.find({}).select('leadBuyers nonLeadBuyers');
+    return getUniqArray(
+      bb.flatMap((b) => [...b.leadBuyers, b.nonLeadBuyers]),
+    ).map((id) => id.toString());
   }
 
   private async getAllTenderBuyerIds(): Promise<string[]> {
@@ -324,13 +324,17 @@ export class BuyerTechService {
   }
 
   private async getAwardTenderBuyerIds(): Promise<string[]> {
-    const [leadBuyerIds, nonLeadBuyerIds] = await Promise.all([
-      AwardTenderModel.distinct('leadBuyers'),
-      AwardTenderModel.distinct('nonLeadBuyers'),
-    ]);
+    // const [leadBuyerIds, nonLeadBuyerIds] = await Promise.all([
+    //   AwardTenderModel.distinct('leadBuyers'),
+    //   AwardTenderModel.distinct('nonLeadBuyers'),
+    // ]);
+    // console.log(await BuyerModel.countDocuments({}));
+    const bb = await BuyerModel.find({}).select('_id');
 
-    return getUniqArray([...leadBuyerIds, ...nonLeadBuyerIds]).map((id) =>
-      id.toString(),
-    );
+    return bb.map((b) => b._id.toString());
+
+    // return getUniqArray(
+    //   bb.flatMap((b) => [...b.leadBuyers, b.nonLeadBuyers]),
+    // ).map((id) => id.toString());
   }
 }

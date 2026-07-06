@@ -147,14 +147,14 @@ export class TendersService {
       ]);
 
     const sourceHash = this.buildTenderSourceHash(notice);
-    const tenderSet = this.omitUndefinedFields({
+    const tenderSet = {
       ...normalizedTender,
       nonLeadBuyers: buyers.nonLeadIds,
       leadBuyers: buyers.leadIds,
       lots: lotsWithEur,
       estimatedValueEur,
       shortTitle,
-    });
+    };
     const tenderUnset = this.buildTenderUnset(normalizedTender);
 
     const tenderDoc = await TenderModel.findOneAndUpdate(
@@ -171,14 +171,14 @@ export class TendersService {
 
     await tenderDoc.populate(tenderPopulateFields);
 
-    const buyersIds = [
-      ...buyers.leadIds,
-      ...buyers.nonLeadIds,
-      ...(existingTender?.leadBuyers ?? []),
-      ...(existingTender?.nonLeadBuyers ?? []),
-    ].map((id) => id.toString());
-
-    await this.buyerService.refreshBuyersTenderMeta(buyersIds);
+    // const buyersIds = [
+    //   ...buyers.leadIds,
+    //   ...buyers.nonLeadIds,
+    //   ...(existingTender?.leadBuyers ?? []),
+    //   ...(existingTender?.nonLeadBuyers ?? []),
+    // ].map((id) => id.toString());
+    //
+    // await this.buyerService.refreshBuyersTenderMeta(buyersIds);
 
     return tenderDoc;
   }
@@ -364,7 +364,9 @@ export class TendersService {
     }
   }
 
-  private async getShortTitlesFromFile(): Promise<Map<string, TenderShortTitle>> {
+  private async getShortTitlesFromFile(): Promise<
+    Map<string, TenderShortTitle>
+  > {
     if (!this.shortTitlesFromFilePromise) {
       this.shortTitlesFromFilePromise = this.loadShortTitlesFromFile();
     }
@@ -372,7 +374,9 @@ export class TendersService {
     return this.shortTitlesFromFilePromise;
   }
 
-  private async loadShortTitlesFromFile(): Promise<Map<string, TenderShortTitle>> {
+  private async loadShortTitlesFromFile(): Promise<
+    Map<string, TenderShortTitle>
+  > {
     try {
       const raw = await readFile(TENDER_SHORT_TITLES_FILE_PATH, 'utf8');
       const parsed: unknown = JSON.parse(raw);

@@ -453,23 +453,36 @@ export class ContractorService {
       awardLotsCount: 0,
     };
 
-    await ContractorModel.bulkWrite(
+    await Promise.all(
       uniqueIds.map((contractorId) => {
         const meta = metaByContractorId.get(contractorId);
 
-        return {
-          updateOne: {
-            filter: { _id: contractorId as never },
-            update: {
-              $set: {
-                cpvCodes: meta?.cpvCodes ?? [],
-                stats: meta?.stats ?? emptyStats,
-              },
-            },
+        return ContractorModel.findByIdAndUpdate(contractorId, {
+          $set: {
+            cpvCodes: meta?.cpvCodes ?? [],
+            stats: meta?.stats ?? emptyStats,
           },
-        };
+        });
       }),
     );
+
+    // await ContractorModel.bulkWrite(
+    //   uniqueIds.map((contractorId) => {
+    //     const meta = metaByContractorId.get(contractorId);
+    //
+    //     return {
+    //       updateOne: {
+    //         filter: { _id: contractorId as never },
+    //         update: {
+    //           $set: {
+    //             cpvCodes: meta?.cpvCodes ?? [],
+    //             stats: meta?.stats ?? emptyStats,
+    //           },
+    //         },
+    //       },
+    //     };
+    //   }),
+    // );
   }
 
   private buildWinnerIdentityFilter(

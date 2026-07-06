@@ -1511,10 +1511,9 @@ export default function AdminApp() {
                 <section className="panel panelWide">
                   <div className="panelHeader">
                     <div>
-                      <h2>Tender history refresh</h2>
+                      <h2>Competition tender gathering</h2>
                       <p>
-                        Run TED history jobs for competition tenders and award
-                        result notices.
+                        Collect open competition tenders from TED.
                       </p>
                     </div>
                     <div className="buttonGroup">
@@ -1542,6 +1541,68 @@ export default function AdminApp() {
                           ? 'Gathering competition...'
                           : 'Gather all competition'}
                       </button>
+                    </div>
+                  </div>
+
+                  <div className="statusList">
+                    <div>
+                      <span>Competition gathering</span>
+                      <Tag
+                        color={
+                          gatherAllCompetitionLoading ||
+                          gatherAllStatus?.isRunning
+                            ? 'processing'
+                            : 'default'
+                        }
+                      >
+                        {gatherAllCompetitionLoading ||
+                        gatherAllStatus?.isRunning
+                          ? 'RUNNING'
+                          : 'IDLE'}
+                      </Tag>
+                    </div>
+                  </div>
+
+                  {gatherAllStatus ? (
+                    <dl className="stats">
+                      <div>
+                        <dt>Competition notices</dt>
+                        <dd>
+                          {gatherAllStatus.noticesFetched}/
+                          {gatherAllStatus.totalNoticeCount ?? '?'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Competition pages</dt>
+                        <dd>{gatherAllStatus.pagesFetched}</dd>
+                      </div>
+                      <div>
+                        <dt>Competition started</dt>
+                        <dd className="smallStat">
+                          {gatherAllStatus.startedAt
+                            ? new Date(gatherAllStatus.startedAt).toLocaleString()
+                            : '-'}
+                        </dd>
+                      </div>
+                      {gatherAllStatus.lastError ? (
+                        <div>
+                          <dt>Competition error</dt>
+                          <dd className="smallStat">
+                            {gatherAllStatus.lastError}
+                          </dd>
+                        </div>
+                      ) : null}
+                    </dl>
+                  ) : null}
+                </section>
+
+                <section className="panel panelWide">
+                  <div className="panelHeader">
+                    <div>
+                      <h2>Award tender refresh</h2>
+                      <p>Collect award result notices from TED history.</p>
+                    </div>
+                    <div className="buttonGroup">
                       <label>
                         Awards page limit
                         <input
@@ -1580,22 +1641,6 @@ export default function AdminApp() {
 
                   <div className="statusList">
                     <div>
-                      <span>Competition gathering</span>
-                      <Tag
-                        color={
-                          gatherAllCompetitionLoading ||
-                          gatherAllStatus?.isRunning
-                            ? 'processing'
-                            : 'default'
-                        }
-                      >
-                        {gatherAllCompetitionLoading ||
-                        gatherAllStatus?.isRunning
-                          ? 'RUNNING'
-                          : 'IDLE'}
-                      </Tag>
-                    </div>
-                    <div>
                       <span>Award tender refresh</span>
                       <Tag
                         color={
@@ -1612,38 +1657,6 @@ export default function AdminApp() {
                       </Tag>
                     </div>
                   </div>
-
-                  {gatherAllStatus ? (
-                    <dl className="stats">
-                      <div>
-                        <dt>Competition notices</dt>
-                        <dd>
-                          {gatherAllStatus.noticesFetched}/
-                          {gatherAllStatus.totalNoticeCount ?? '?'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Competition pages</dt>
-                        <dd>{gatherAllStatus.pagesFetched}</dd>
-                      </div>
-                      <div>
-                        <dt>Competition started</dt>
-                        <dd className="smallStat">
-                          {gatherAllStatus.startedAt
-                            ? new Date(gatherAllStatus.startedAt).toLocaleString()
-                            : '-'}
-                        </dd>
-                      </div>
-                      {gatherAllStatus.lastError ? (
-                        <div>
-                          <dt>Competition error</dt>
-                          <dd className="smallStat">
-                            {gatherAllStatus.lastError}
-                          </dd>
-                        </div>
-                      ) : null}
-                    </dl>
-                  ) : null}
 
                   {awardTendersRefreshResult ? (
                     <dl className="stats">
