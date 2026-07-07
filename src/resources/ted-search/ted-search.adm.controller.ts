@@ -40,10 +40,6 @@ export class TedSearchAdminController {
     try {
       const noticeData = await this.tedSearchService.searchTenders({
         ...body,
-        noticeTypes:
-          body.noticeTypes !== null
-            ? TENDER_COMPETITION_NOTICE_TYPES
-            : undefined,
       });
 
       // this.tendersService.upsertTender(noticeData.notices[0]);

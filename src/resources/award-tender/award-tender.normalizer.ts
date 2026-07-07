@@ -23,6 +23,8 @@ import {
 } from '@/resources/award-tender/utils';
 import fs from 'node:fs';
 
+const MAX_REASONABLE_AWARD_VALUE = 1_000_000_000_000;
+
 export type NormalizedAwardTenderLot = Omit<
   AwardTenderLot,
   'estimatedValueEur' | 'awardValueEur'
@@ -115,7 +117,9 @@ export class AwardTenderNormalizer {
     if (
       !xmlLot ||
       xmlLot.awardValue === null ||
-      Number.isNaN(xmlLot.awardValue)
+      !Number.isFinite(xmlLot.awardValue) ||
+      xmlLot.awardValue < 0 ||
+      xmlLot.awardValue > MAX_REASONABLE_AWARD_VALUE
     ) {
       return null;
     }

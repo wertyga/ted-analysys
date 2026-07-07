@@ -65,6 +65,34 @@ export class TedSearchService {
     });
   }
 
+  async searchTendersForPureList(filters: TedTenderSearchRequestDto) {
+    const { limit, skip } = getPaginationMeta({
+      page: filters.page,
+      limit: filters.limit,
+    });
+    const sort = this.sorting.buildLocalTenderSort(filters);
+
+    const query = await this.filters.buildLocalTenderQuery(filters);
+
+    const [localTenders, count] = await Promise.all([
+      this.tendersService.findLocalTenders(
+        query,
+        {
+          sort,
+          skip,
+          limit,
+        },
+        false,
+      ),
+      TenderModel.countDocuments(query),
+    ]);
+
+    return {
+      tenders: localTenders.map(TenderModel.serializeList),
+      count: count,
+    };
+  }
+
   async searchLocalTenders(
     filters: TedTenderSearchRequestDto,
   ): Promise<TedSearchResponse> {

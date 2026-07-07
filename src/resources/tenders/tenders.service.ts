@@ -477,19 +477,6 @@ export class TendersService {
     return localTender;
   }
 
-  async getNormalizedTenderWithBaseAnalysis(tedTender: any) {
-    tedTender._id = new Types.ObjectId().toHexString();
-    const generalAnalysis =
-      await this.tenderGeneralAnalysisService.ensureAnalysisForTender(
-        tedTender as any,
-      );
-
-    tedTender.generalAnalysis =
-      TenderGeneralAnalysisModel.serializeDetail(generalAnalysis);
-
-    return tedTender;
-  }
-
   async findLocalTenders(
     tenderQuery: Record<string, unknown>,
     options: {
@@ -517,7 +504,7 @@ export class TendersService {
     const localTenders = await this.findLocalTenders(tenderQuery, options);
 
     let generalAnalyses: TenderGeneralAnalysisDocument[] = [];
-    console.log({ withoutBaseAnalysisGenerating });
+
     if (withoutBaseAnalysisGenerating) {
       generalAnalyses = await TenderGeneralAnalysisModel.find({
         tenderId: { $in: localTenders.map((t) => t.id) },

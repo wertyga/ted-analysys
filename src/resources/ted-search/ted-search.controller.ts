@@ -1,9 +1,8 @@
-import { Body, Controller, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req } from '@nestjs/common';
 import { ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { TedTenderSearchRequestDto } from './dto/ted-tender-search-request.dto';
 import { TedSearchService } from './ted-search.service';
 import { TedSearchResponse } from './types/ted-search.types';
-import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { TenderListDto } from '@/resources/tenders/dto/tender.dto';
 import { TariffService } from '@/resources/tariff';
@@ -18,6 +17,22 @@ export class TedSearchController {
     private readonly tariffService: TariffService,
   ) {}
 
+  @Get('/search-pure')
+  @ApiOperation({ summary: 'Search local tenders by structured filters' })
+  @ApiBody({ type: TedTenderSearchRequestDto })
+  @ApiOkResponse({ description: 'Local tenders search response' })
+  async searchLocalPureTenders(
+    @Body() body: TedTenderSearchRequestDto,
+  ): Promise<TedSearchResponse> {
+    const { tenders, count } =
+      await this.tedSearchService.searchTendersForPureList(body);
+
+    return {
+      notices: tenders,
+      totalNoticeCount: count,
+    };
+  }
+
   @Post('/search')
   @ApiOperation({ summary: 'Search local tenders by structured filters' })
   @ApiBody({ type: TedTenderSearchRequestDto })
@@ -31,7 +46,6 @@ export class TedSearchController {
       ...searchBody,
       withoutBaseAnalysisGenerating:
         !!req.isBot || body.withoutBaseAnalysisGenerating,
-      noticeTypes: searchBody.noticeTypes ?? TENDER_COMPETITION_NOTICE_TYPES,
     });
     const localTenders = (noticeData.notices ?? []) as TenderListDto[];
 
