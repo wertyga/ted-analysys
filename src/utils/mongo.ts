@@ -23,22 +23,23 @@ export const getLimitsCursor = (
   return cursor.skip(Number(offset)).limit(Number(limit));
 };
 
-export const getPaginationMeta = ({
-  page,
-  limit,
-  defaultPage = 1,
-  defaultLimit = 20,
-  maxLimit = 100,
-}: {
+export type TPaginationType = {
   page?: number | null;
   limit?: number | null;
   defaultPage?: number;
   defaultLimit?: number;
   maxLimit?: number;
-}) => {
+};
+export const getPaginationMeta = ({
+  page,
+  limit,
+  defaultPage = 1,
+  defaultLimit = 20,
+  maxLimit,
+}: TPaginationType) => {
   const normalizedPage = Math.max(1, page ?? defaultPage);
   const normalizedLimit = Math.min(
-    maxLimit,
+    maxLimit ?? limit ?? defaultLimit,
     Math.max(1, limit ?? defaultLimit),
   );
 

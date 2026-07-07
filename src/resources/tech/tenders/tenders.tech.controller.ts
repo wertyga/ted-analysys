@@ -3,7 +3,10 @@ import { ApiBearerAuth, ApiDefaultResponse, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { AdminAccessGuard } from '@/guards';
 import { TendersTechService } from './tenders.tech.service';
-import { GenerateTenderShortTitlesRequestDto } from './tenders.tech.dto';
+import {
+  GenerateTenderGeneralAnalysesRequestDto,
+  GenerateTenderShortTitlesRequestDto,
+} from './tenders.tech.dto';
 import { TendersCronService } from '@/resources/cron/tenders-cron/tenders-cron.service';
 
 @ApiTags('Admin Tech Tenders')
@@ -43,6 +46,28 @@ export class TendersTechController {
       limit: body.limit,
       batchSize: body.batchSize,
     });
+  }
+
+  @ApiDefaultResponse({
+    description:
+      'Queued missing or stale tender general analyses for generation.',
+  })
+  @Post('/general-analysis')
+  generateMissingOrStaleTenderGeneralAnalyses(
+    @Body() body: GenerateTenderGeneralAnalysesRequestDto,
+  ) {
+    return this.tendersTechService.generateMissingOrStaleTenderGeneralAnalyses({
+      limit: body.limit,
+      batchSize: body.batchSize,
+    });
+  }
+
+  @ApiDefaultResponse({
+    description: 'Current tender general analysis queue and database status.',
+  })
+  @Get('/general-analysis/status')
+  getTenderGeneralAnalysisStatus() {
+    return this.tendersTechService.getTenderGeneralAnalysisStatus();
   }
 
   @ApiDefaultResponse({

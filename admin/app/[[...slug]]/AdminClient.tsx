@@ -69,6 +69,34 @@ type ShortTitlesResult = {
   }>;
 };
 
+type GeneralAnalysesResult = {
+  scannedCount: number;
+  matchedCount: number;
+  enqueuedCount: number;
+  skippedCount: number;
+  limit: number;
+  batchSize: number;
+  errors: Array<{
+    id: string;
+    message: string;
+  }>;
+};
+
+type GeneralAnalysisStatus = {
+  totalTenders: number;
+  totalAnalyses: number;
+  doneCount: number;
+  processingCount: number;
+  pendingCount: number;
+  failedCount: number;
+  queue: {
+    running: number;
+    pending: number;
+    size: number;
+    concurrency: number;
+  };
+};
+
 type DbCopyResult = {
   filename: string;
   url: string;
@@ -315,6 +343,14 @@ export default function AdminApp() {
   const [shortTitlesResult, setShortTitlesResult] =
     useState<ShortTitlesResult | null>(null);
   const [shortTitlesLoading, setShortTitlesLoading] = useState(false);
+  const [generalAnalysesLimit, setGeneralAnalysesLimit] = useState('100');
+  const [generalAnalysesBatchSize, setGeneralAnalysesBatchSize] =
+    useState('100');
+  const [generalAnalysesResult, setGeneralAnalysesResult] =
+    useState<GeneralAnalysesResult | null>(null);
+  const [generalAnalysisStatus, setGeneralAnalysisStatus] =
+    useState<GeneralAnalysisStatus | null>(null);
+  const [generalAnalysesLoading, setGeneralAnalysesLoading] = useState(false);
   const [dbCopyResult, setDbCopyResult] = useState<DbCopyResult | null>(null);
   const [dbCopyLoading, setDbCopyLoading] = useState(false);
   const [syncIndexesLoading, setSyncIndexesLoading] = useState(false);
@@ -418,6 +454,7 @@ export default function AdminApp() {
     void loadRecentAwardTendersCronStatus(token);
     void loadCollectTenderBuyersStatus(token);
     void loadContractorStatsRefreshStatus(token);
+    void loadGeneralAnalysisStatus(token);
     const interval = window.setInterval(() => {
       void loadGatherAllStatus(token);
       void loadAwardTendersRefreshStatus(token);
@@ -427,6 +464,7 @@ export default function AdminApp() {
       void loadRecentAwardTendersCronStatus(token);
       void loadCollectTenderBuyersStatus(token);
       void loadContractorStatsRefreshStatus(token);
+      void loadGeneralAnalysisStatus(token);
     }, 3000);
 
     return () => window.clearInterval(interval);
@@ -736,6 +774,8 @@ export default function AdminApp() {
     setTendersPageSize(20);
     setSitemapResult(null);
     setShortTitlesResult(null);
+    setGeneralAnalysesResult(null);
+    setGeneralAnalysisStatus(null);
     setDbCopyResult(null);
     setGatherAllStatus(null);
     setAwardTendersRefreshResult(null);
@@ -830,6 +870,50 @@ export default function AdminApp() {
       );
     } finally {
       setShortTitlesLoading(false);
+    }
+  }
+
+  async function loadGeneralAnalysisStatus(authToken: string) {
+    try {
+      const status = await request<GeneralAnalysisStatus>(
+        '/adm/tech/tenders/general-analysis/status',
+        { token: authToken },
+      );
+
+      setGeneralAnalysisStatus(status);
+    } catch {
+      // Keep the current status visible if polling fails.
+    }
+  }
+
+  async function generateGeneralAnalyses(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setGeneralAnalysesLoading(true);
+    setMessage('');
+
+    try {
+      const result = await request<GeneralAnalysesResult>(
+        '/adm/tech/tenders/general-analysis',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            limit: Number(generalAnalysesLimit) || undefined,
+            batchSize: Number(generalAnalysesBatchSize) || undefined,
+          }),
+          token,
+        },
+      );
+
+      setGeneralAnalysesResult(result);
+      await loadGeneralAnalysisStatus(token);
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Failed to queue general analyses',
+      );
+    } finally {
+      setGeneralAnalysesLoading(false);
     }
   }
 
@@ -1955,6 +2039,157 @@ export default function AdminApp() {
                           <strong>{error.id}</strong>: {error.message}
                         </div>
                       ))}
+                    </div>
+                  ) : null}
+                </section>
+
+                <section className="panel panelWide">
+                  <div className="panelHeader">
+                    <div>
+                      <h2>Tender general analysis</h2>
+                      <p>
+                        Queue missing or stale general analyses for saved
+                        tenders.
+                      </p>
+                    </div>
+                  </div>
+
+                  <form
+                    className="techForm techFormCompact"
+                    onSubmit={generateGeneralAnalyses}
+                  >
+                    <label>
+                      Limit
+                      <input
+                        max="1000"
+                        min="1"
+                        onChange={(event) =>
+                          setGeneralAnalysesLimit(event.target.value)
+                        }
+                        type="number"
+                        value={generalAnalysesLimit}
+                      />
+                    </label>
+                    <label>
+                      Batch size
+                      <input
+                        max="500"
+                        min="1"
+                        onChange={(event) =>
+                          setGeneralAnalysesBatchSize(event.target.value)
+                        }
+                        type="number"
+                        value={generalAnalysesBatchSize}
+                      />
+                    </label>
+                    <button disabled={generalAnalysesLoading} type="submit">
+                      {generalAnalysesLoading
+                        ? 'Queueing...'
+                        : 'Queue general analyses'}
+                    </button>
+                  </form>
+
+                  {generalAnalysisStatus ? (
+                    <>
+                      <div className="statusList">
+                        <div>
+                          <span>Base analysis queue</span>
+                          <Tag
+                            color={
+                              generalAnalysisStatus.queue.size > 0
+                                ? 'processing'
+                                : 'default'
+                            }
+                          >
+                            {generalAnalysisStatus.queue.size > 0
+                              ? 'RUNNING'
+                              : 'IDLE'}
+                          </Tag>
+                        </div>
+                      </div>
+                      <dl className="stats">
+                        <div>
+                          <dt>Done</dt>
+                          <dd>{generalAnalysisStatus.doneCount}</dd>
+                        </div>
+                        <div>
+                          <dt>In queue</dt>
+                          <dd>{generalAnalysisStatus.queue.size}</dd>
+                        </div>
+                        <div>
+                          <dt>Running</dt>
+                          <dd>{generalAnalysisStatus.queue.running}</dd>
+                        </div>
+                        <div>
+                          <dt>Waiting</dt>
+                          <dd>{generalAnalysisStatus.queue.pending}</dd>
+                        </div>
+                        <div>
+                          <dt>Processing records</dt>
+                          <dd>{generalAnalysisStatus.processingCount}</dd>
+                        </div>
+                        <div>
+                          <dt>Failed</dt>
+                          <dd>{generalAnalysisStatus.failedCount}</dd>
+                        </div>
+                        <div>
+                          <dt>Total analyses</dt>
+                          <dd>{generalAnalysisStatus.totalAnalyses}</dd>
+                        </div>
+                        <div>
+                          <dt>Total tenders</dt>
+                          <dd>{generalAnalysisStatus.totalTenders}</dd>
+                        </div>
+                        <div>
+                          <dt>Concurrency</dt>
+                          <dd>{generalAnalysisStatus.queue.concurrency}</dd>
+                        </div>
+                      </dl>
+                    </>
+                  ) : null}
+
+                  {generalAnalysesResult ? (
+                    <dl className="stats">
+                      <div>
+                        <dt>Scanned</dt>
+                        <dd>{generalAnalysesResult.scannedCount}</dd>
+                      </div>
+                      <div>
+                        <dt>Matched</dt>
+                        <dd>{generalAnalysesResult.matchedCount}</dd>
+                      </div>
+                      <div>
+                        <dt>Queued</dt>
+                        <dd>{generalAnalysesResult.enqueuedCount}</dd>
+                      </div>
+                      <div>
+                        <dt>Skipped</dt>
+                        <dd>{generalAnalysesResult.skippedCount}</dd>
+                      </div>
+                      <div>
+                        <dt>Limit</dt>
+                        <dd>{generalAnalysesResult.limit}</dd>
+                      </div>
+                      <div>
+                        <dt>Batch size</dt>
+                        <dd>{generalAnalysesResult.batchSize}</dd>
+                      </div>
+                      <div>
+                        <dt>Errors</dt>
+                        <dd>{generalAnalysesResult.errors.length}</dd>
+                      </div>
+                    </dl>
+                  ) : null}
+
+                  {generalAnalysesResult?.errors.length ? (
+                    <div className="errorList">
+                      {generalAnalysesResult.errors
+                        .slice(0, 10)
+                        .map((error) => (
+                          <div key={`${error.id}-${error.message}`}>
+                            <strong>{error.id}</strong>: {error.message}
+                          </div>
+                        ))}
                     </div>
                   ) : null}
                 </section>

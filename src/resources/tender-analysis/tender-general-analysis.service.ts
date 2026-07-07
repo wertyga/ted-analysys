@@ -6,7 +6,7 @@ import {
   TenderGeneralAnalysisStatus,
 } from './schemas';
 import { TenderGeneralAnalysisDetailDto } from './dto/tender-general-analysis.dto';
-import { TenderDocument } from '../tenders/schemas';
+import { TenderDocument, TenderModel } from '../tenders/schemas';
 import { TenderGeneralAnalysisBuilder } from './tender-general-analysis.builder';
 import {
   GeneralTenderAnalysisInput,
@@ -28,6 +28,21 @@ export interface TenderAnalysisExecutionResult {
   result: GeneralTenderAnalysisResult;
   promptVersion: string;
   model: string;
+}
+
+export interface TenderGeneralAnalysisQueueStatus {
+  totalTenders: number;
+  totalAnalyses: number;
+  doneCount: number;
+  processingCount: number;
+  pendingCount: number;
+  failedCount: number;
+  queue: {
+    running: number;
+    pending: number;
+    size: number;
+    concurrency: number;
+  };
 }
 
 @Injectable()
@@ -224,6 +239,47 @@ export class TenderGeneralAnalysisService {
     }
 
     return TenderGeneralAnalysisModel.serializeDetail(analysis);
+  }
+
+  async getBaseAnalysisQueueStatus(): Promise<TenderGeneralAnalysisQueueStatus> {
+    const [
+      totalTenders,
+      totalAnalyses,
+      doneCount,
+      processingCount,
+      pendingCount,
+      failedCount,
+    ] = await Promise.all([
+      TenderModel.countDocuments({}).exec(),
+      TenderGeneralAnalysisModel.countDocuments({}).exec(),
+      TenderGeneralAnalysisModel.countDocuments({
+        status: TenderGeneralAnalysisStatus.DONE,
+      }).exec(),
+      TenderGeneralAnalysisModel.countDocuments({
+        status: TenderGeneralAnalysisStatus.PROCESSING,
+      }).exec(),
+      TenderGeneralAnalysisModel.countDocuments({
+        status: TenderGeneralAnalysisStatus.PENDING,
+      }).exec(),
+      TenderGeneralAnalysisModel.countDocuments({
+        status: TenderGeneralAnalysisStatus.FAILED,
+      }).exec(),
+    ]);
+
+    return {
+      totalTenders,
+      totalAnalyses,
+      doneCount,
+      processingCount,
+      pendingCount,
+      failedCount,
+      queue: {
+        running: this.baseAnalysisQueue.running,
+        pending: this.baseAnalysisQueue.pending,
+        size: this.baseAnalysisQueue.size,
+        concurrency: this.baseAnalysisQueue.concurrencyLimit,
+      },
+    };
   }
 
   filterFreeBasicAnalysisFields<T extends { resultJson?: any }>(

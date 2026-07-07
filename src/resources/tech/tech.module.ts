@@ -16,6 +16,7 @@ import { AwardTenderModule } from '@/resources/award-tender/award-tender.module'
 import { TedSearchModule } from '@/resources/ted-search/ted-search.module';
 import { TendersModule } from '@/resources/tenders/tenders.module';
 import { TendersCronModule } from '@/resources/cron/tenders-cron/tenders-cron.module';
+import { TenderGeneralAnalysisModule } from '@/resources/tender-analysis/tender-general-analysis.module';
 import { BuyerTechService } from '@/resources/tech/buyer/buyer.tech.service';
 import { BuyerModule } from '@/resources/buyer/buyer.module';
 import { BuyerTechController } from '@/resources/tech/buyer/buyer.tech.controller';
@@ -31,6 +32,7 @@ import { ContractorModule } from '@/resources/contractor/contractor.module';
     AwardTenderModule,
     TedSearchModule,
     TendersModule,
+    TenderGeneralAnalysisModule,
     TendersCronModule,
     BuyerModule,
     ContractorModule,

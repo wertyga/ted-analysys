@@ -88,6 +88,7 @@ export type AwardTenderSerializable = AwardTenderDocument | AwardTenderRecord;
 export type AwardTenderDetailDto = Omit<AwardTender, 'links'>;
 export type AwardTenderListDto = Pick<
   AwardTender,
+  | 'contractConclusionDates'
   | '_id'
   | 'id'
   | 'noticeType'
@@ -333,6 +334,7 @@ AwardTenderSchema.statics.serializeList = function (
   const { winners, lots, ...serializedAwardTender } = filterModel(tender, {
     includeFields: [
       'id',
+      'contractConclusionDates',
       'noticeType',
       'noticeSubtype',
       'procedureType',

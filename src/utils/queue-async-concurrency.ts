@@ -21,6 +21,10 @@ export class QueueAsyncConcurrency {
     return this.runningCount;
   }
 
+  get concurrencyLimit(): number {
+    return this.concurrency;
+  }
+
   get pending(): number {
     return this.queue.length;
   }

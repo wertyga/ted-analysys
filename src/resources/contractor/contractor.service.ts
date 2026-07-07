@@ -3,7 +3,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { getLatestDate, logger, normalizeEmail } from '@/utils';
+import {
+  getLatestDate,
+  logger,
+  normalizeEmail,
+  TPaginationType,
+} from '@/utils';
 import { Contractor, ContractorDocument, ContractorModel } from './schemas';
 import { QueryFilter, Types } from 'mongoose';
 import { getPaginationMeta } from '@/utils';
@@ -178,50 +183,6 @@ export class ContractorService {
     };
   }
 
-  async searchContractorsByQuery({
-    q,
-    page,
-    limit,
-  }: ContractorSearchRequestDto) {
-    const trimmedQuery = q.trim();
-    const pagination = getPaginationMeta({ page, limit });
-
-    if (!trimmedQuery) {
-      return {
-        totalCount: 0,
-        contractors: [],
-      };
-    }
-
-    const searchPattern = new RegExp(this.escapeRegExp(trimmedQuery), 'i');
-    const query: QueryFilter<ContractorDocument> = {
-      $or: [
-        { name: searchPattern },
-        { identifiers: searchPattern },
-        { emails: searchPattern },
-        { countries: searchPattern },
-        { countrySubs: searchPattern },
-        { cities: searchPattern },
-        { postCodes: searchPattern },
-        { internetAddresses: searchPattern },
-      ],
-    };
-
-    const [contractors, totalCount] = await Promise.all([
-      ContractorModel.find(query)
-        .sort({ 'stats.totalAwardAmountEur': -1 })
-        .skip(pagination.skip)
-        .limit(pagination.limit)
-        .exec(),
-      ContractorModel.countDocuments(query),
-    ]);
-
-    return {
-      totalCount,
-      contractors: contractors.map(ContractorModel.serializeList),
-    };
-  }
-
   async getContractorById(id: string): Promise<{
     contractor: ContractorDocument;
     awardTenders: AwardTenderDocument[];
@@ -238,7 +199,7 @@ export class ContractorService {
 
     const { awardTenders } = await this.getContractorAwardTenders(id, {
       page: 1,
-      limit: 1000,
+      limit: 100,
     });
 
     return {
@@ -249,7 +210,7 @@ export class ContractorService {
 
   async getContractorAwardTenders(
     id: string,
-    pagination: { page?: number; limit?: number } = {},
+    pagination: TPaginationType = {},
   ) {
     const query = {
       winners: new Types.ObjectId(id),
@@ -257,7 +218,7 @@ export class ContractorService {
     const { skip, limit } = getPaginationMeta(pagination);
     const [awardTenders, totalCount] = await Promise.all([
       AwardTenderModel.find(query)
-        .sort({ publicationDate: -1, _id: -1 })
+        .sort({ publicationDate: -1 })
         .skip(skip)
         .limit(limit)
         .populate('leadBuyers')

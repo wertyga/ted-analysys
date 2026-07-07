@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, Max, Min } from 'class-validator';
 
 export class GenerateTenderShortTitlesRequestDto {
   @ApiPropertyOptional({ example: 100 })
@@ -14,4 +14,27 @@ export class GenerateTenderShortTitlesRequestDto {
   @Min(1)
   @Max(100)
   batchSize: number = 10;
+}
+
+export class GenerateTenderGeneralAnalysesRequestDto {
+  @ApiPropertyOptional({
+    description:
+      'Maximum number of missing or stale general analyses to enqueue.',
+    example: 100,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  limit: number = 100;
+
+  @ApiPropertyOptional({
+    description: 'Number of tenders to inspect per database batch.',
+    example: 100,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  batchSize: number = 100;
 }
