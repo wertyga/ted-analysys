@@ -171,14 +171,14 @@ export class TendersService {
 
     await tenderDoc.populate(tenderPopulateFields);
 
-    // const buyersIds = [
-    //   ...buyers.leadIds,
-    //   ...buyers.nonLeadIds,
-    //   ...(existingTender?.leadBuyers ?? []),
-    //   ...(existingTender?.nonLeadBuyers ?? []),
-    // ].map((id) => id.toString());
-    //
-    // await this.buyerService.refreshBuyersTenderMeta(buyersIds);
+    const buyersIds = [
+      ...buyers.leadIds,
+      ...buyers.nonLeadIds,
+      ...(existingTender?.leadBuyers ?? []),
+      ...(existingTender?.nonLeadBuyers ?? []),
+    ].map((id) => id.toString());
+
+    await this.buyerService.refreshBuyersTenderMeta(buyersIds);
 
     return tenderDoc;
   }

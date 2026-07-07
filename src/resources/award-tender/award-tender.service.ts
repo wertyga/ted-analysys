@@ -259,9 +259,19 @@ export class AwardTenderService {
     const [
       { lots: awardLots, winners: winnersNormalized, lotWinners },
       savedPureBuyers,
+      { winners: oldWinnersIds, buyers: oldBuyersIds },
     ] = await Promise.all([
       this.normalizer.normalizeAwardTenderLotsAndWinners(notice),
       this.buyerService.upsertPureBuyersFromTEDNotice(notice),
+      AwardTenderModel.findOne({ id: normalizedTender.id }).then((t) => {
+        return {
+          winners: t?.winners?.map((w) => w.toString()) ?? [],
+          buyers: [
+            ...(t?.leadBuyers?.map((b) => b.toString()) ?? []),
+            ...(t?.nonLeadBuyers?.map((b) => b.toString()) ?? []),
+          ],
+        };
+      }),
     ]);
 
     const winnersDocs: ContractorDocument[] = (await Promise.all(
@@ -339,6 +349,18 @@ export class AwardTenderService {
         upsert: true,
       },
     );
+
+    await Promise.all([
+      this.contractorService.refreshContractorsAwardMeta([
+        ...insertPayload.winners,
+        ...oldWinnersIds,
+      ]),
+      this.buyerService.refreshBuyersTenderMeta([
+        ...oldBuyersIds,
+        ...savedPureBuyers.leadIds,
+        ...savedPureBuyers.nonLeadIds,
+      ]),
+    ]);
 
     return awardTender;
   }
