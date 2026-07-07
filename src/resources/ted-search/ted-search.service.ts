@@ -75,15 +75,11 @@ export class TedSearchService {
     const query = await this.filters.buildLocalTenderQuery(filters);
 
     const [localTenders, count] = await Promise.all([
-      this.tendersService.findLocalTenders(
-        query,
-        {
-          sort,
-          skip,
-          limit,
-        },
-        false,
-      ),
+      this.tendersService.findLocalTenders(query, {
+        sort,
+        skip,
+        limit,
+      }),
       TenderModel.countDocuments(query),
     ]);
 
