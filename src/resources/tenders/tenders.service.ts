@@ -517,11 +517,13 @@ export class TendersService {
     const localTenders = await this.findLocalTenders(tenderQuery, options);
 
     let generalAnalyses: TenderGeneralAnalysisDocument[] = [];
-
+    console.log({ withoutBaseAnalysisGenerating });
     if (withoutBaseAnalysisGenerating) {
       generalAnalyses = await TenderGeneralAnalysisModel.find({
         tenderId: { $in: localTenders.map((t) => t.id) },
-      });
+      })
+        .lean()
+        .exec();
     } else {
       generalAnalyses =
         await this.tenderGeneralAnalysisService.ensureBaseAnalysisForMultipleTenders(

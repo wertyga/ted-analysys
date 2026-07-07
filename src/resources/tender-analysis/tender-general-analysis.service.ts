@@ -200,7 +200,7 @@ export class TenderGeneralAnalysisService {
     tenders: TenderDocument[],
   ): Promise<TenderGeneralAnalysisDocument[]> {
     const results = await Promise.allSettled(
-      tenders.map(async (tender) => {
+      tenders.map((tender) => {
         return this.ensureAnalysisForTender(tender);
       }),
     );
@@ -283,8 +283,7 @@ export class TenderGeneralAnalysisService {
   private async analyzeTenderGeneral(
     input: GeneralTenderAnalysisInput,
   ): Promise<TenderAnalysisExecutionResult> {
-    const result =
-      await this.llmAnalysisService.analyzeTenderGeneral(input);
+    const result = await this.llmAnalysisService.analyzeTenderGeneral(input);
 
     devLog(
       `General tender analysis completed: tender=${input.tender.id}`,
@@ -298,5 +297,3 @@ export class TenderGeneralAnalysisService {
     };
   }
 }
-
-
