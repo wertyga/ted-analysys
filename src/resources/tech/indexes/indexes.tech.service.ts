@@ -3,15 +3,24 @@ import mongoose from 'mongoose';
 
 export type SyncIndexesStatus = {
   isRunning: boolean;
+  mode: 'ensure' | 'rebuild';
   startedAt: Date | null;
   finishedAt: Date | null;
   lastError: string | null;
   totalModels: number;
   processedModels: number;
   currentModel: string | null;
+  indexesChecked: number;
+  indexesCreated: number;
+  indexesAlreadyPresent: number;
+  indexesRebuilt: number;
   errors: Array<{
     model: string;
     message: string;
+  }>;
+  rebuiltIndexes: Array<{
+    model: string;
+    index: string;
   }>;
   droppedConflictingIndexes: Array<{
     model: string;
@@ -21,13 +30,19 @@ export type SyncIndexesStatus = {
 
 const emptySyncIndexesStatus = (): SyncIndexesStatus => ({
   isRunning: false,
+  mode: 'ensure',
   startedAt: null,
   finishedAt: null,
   lastError: null,
   totalModels: 0,
   processedModels: 0,
   currentModel: null,
+  indexesChecked: 0,
+  indexesCreated: 0,
+  indexesAlreadyPresent: 0,
+  indexesRebuilt: 0,
   errors: [],
+  rebuiltIndexes: [],
   droppedConflictingIndexes: [],
 });
 
@@ -43,21 +58,22 @@ export class IndexesTechService {
     return {
       ...this.status,
       errors: [...this.status.errors],
+      rebuiltIndexes: [...this.status.rebuiltIndexes],
       droppedConflictingIndexes: [...this.status.droppedConflictingIndexes],
     };
   }
 
-  startSyncIndexes(): SyncIndexesStatus {
+  startSyncIndexes(forceRebuild = false): SyncIndexesStatus {
     if (this.status.isRunning) {
       return this.getSyncIndexesStatus();
     }
 
-    void this.syncIndexes();
+    void this.syncIndexes(forceRebuild);
 
     return this.getSyncIndexesStatus();
   }
 
-  private async syncIndexes(): Promise<SyncIndexesStatus> {
+  private async syncIndexes(forceRebuild: boolean): Promise<SyncIndexesStatus> {
     if (this.status.isRunning) {
       return this.getSyncIndexesStatus();
     }
@@ -67,6 +83,7 @@ export class IndexesTechService {
     this.status = {
       ...emptySyncIndexesStatus(),
       isRunning: true,
+      mode: forceRebuild ? 'rebuild' : 'ensure',
       startedAt: new Date(),
       totalModels: modelNames.length,
     };
@@ -79,7 +96,11 @@ export class IndexesTechService {
 
         try {
           await this.dropLegacyIndexes(modelName, status);
-          await this.createIndexesWithConflictRetry(modelName, status);
+          await this.createIndexesWithConflictRetry(
+            modelName,
+            status,
+            forceRebuild,
+          );
         } catch (error) {
           status.errors.push({
             model: modelName,
@@ -103,17 +124,41 @@ export class IndexesTechService {
   private async createIndexesWithConflictRetry(
     modelName: string,
     status: SyncIndexesStatus,
+    forceRebuild: boolean,
   ): Promise<void> {
     const model = mongoose.model(modelName);
     const indexes = model.schema.indexes();
 
     for (const [fields, options] of indexes) {
+      status.indexesChecked += 1;
+
+      const existingIndexName = await this.getExistingIndexName(modelName, fields);
+
+      if (forceRebuild && existingIndexName) {
+        await model.collection.dropIndex(existingIndexName);
+        status.indexesRebuilt += 1;
+        status.rebuiltIndexes.push({
+          model: modelName,
+          index: existingIndexName,
+        });
+      }
+
       await this.createIndexWithConflictRetry(
         modelName,
         status,
         fields,
         options,
       );
+
+      if (forceRebuild && existingIndexName) {
+        continue;
+      }
+
+      if (existingIndexName) {
+        status.indexesAlreadyPresent += 1;
+      } else {
+        status.indexesCreated += 1;
+      }
     }
   }
 
@@ -226,6 +271,22 @@ export class IndexesTechService {
     return Object.entries(fields)
       .map(([key, value]) => `${key}_${String(value)}`)
       .join('_');
+  }
+
+  private async getExistingIndexName(
+    modelName: string,
+    fields: Record<string, unknown>,
+  ): Promise<string | null> {
+    const model = mongoose.model(modelName);
+    const existingIndexes = await model.collection.indexes();
+
+    const existingIndex = existingIndexes.find(
+      (index) =>
+        index.name !== '_id_' &&
+        this.isSameIndexKey(index.key as Record<string, unknown>, fields),
+    );
+
+    return existingIndex?.name ?? null;
   }
 
   private isSameIndexKey(

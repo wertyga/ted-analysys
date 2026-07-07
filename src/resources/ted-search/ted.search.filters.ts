@@ -57,10 +57,6 @@ export class TedSearchFilters {
       });
     }
 
-    if (resolvedFilters.noticeTypes?.length) {
-      parts.push({ noticeType: { $in: resolvedFilters.noticeTypes } });
-    }
-
     if (resolvedFilters.procedureType?.length) {
       parts.push({ procedureType: { $in: resolvedFilters.procedureType } });
     }

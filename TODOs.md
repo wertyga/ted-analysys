@@ -1,5 +1,6 @@
 - BE - проверить статик страницы в sitemap
-- 
+- BE - awardValue = lots.awwardValue + ... sum of them
+- FE - Award tenders /contractors/[id] - вместо Procedure - показывать award date
 - FE - проверить фильтры на /buyers /contractors
 - FE - /contractors|buyers/{country}
 - FE - /buyers/[id] - После FAQ

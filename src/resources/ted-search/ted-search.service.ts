@@ -74,7 +74,7 @@ export class TedSearchService {
     });
     const query = await this.filters.buildLocalTenderQuery(filters);
     const sort = this.sorting.buildLocalTenderSort(filters);
-
+    console.log({ query: JSON.stringify(query, null, 2) });
     devLog(
       `Local Search request: ${JSON.stringify(query)}`,
       TedSearchService.name,

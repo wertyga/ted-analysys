@@ -1,4 +1,4 @@
-import { Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiDefaultResponse, ApiTags } from '@nestjs/swagger';
 import { AdminAccessGuard } from '@/guards';
 import { IndexesTechService } from './indexes.tech.service';
@@ -12,8 +12,8 @@ export class IndexesTechController {
 
   @ApiDefaultResponse({ description: 'Started Mongo index synchronization.' })
   @Post()
-  syncIndexes() {
-    return this.indexesTechService.startSyncIndexes();
+  syncIndexes(@Query('force') force?: string) {
+    return this.indexesTechService.startSyncIndexes(force === 'true');
   }
 
   @ApiDefaultResponse({ description: 'Current Mongo index synchronization status.' })

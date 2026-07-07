@@ -151,15 +151,24 @@ type AwardTendersRefreshStatus = {
 
 type SyncIndexesStatus = {
   isRunning: boolean;
+  mode: 'ensure' | 'rebuild';
   startedAt: string | null;
   finishedAt: string | null;
   lastError: string | null;
   totalModels: number;
   processedModels: number;
   currentModel: string | null;
+  indexesChecked: number;
+  indexesCreated: number;
+  indexesAlreadyPresent: number;
+  indexesRebuilt: number;
   errors: Array<{
     model: string;
     message: string;
+  }>;
+  rebuiltIndexes: Array<{
+    model: string;
+    index: string;
   }>;
   droppedConflictingIndexes: Array<{
     model: string;
@@ -311,6 +320,7 @@ export default function AdminApp() {
   const [syncIndexesLoading, setSyncIndexesLoading] = useState(false);
   const [syncIndexesStatus, setSyncIndexesStatus] =
     useState<SyncIndexesStatus | null>(null);
+  const [forceRebuildIndexes, setForceRebuildIndexes] = useState(false);
   const [collectTenderBuyersLoading, setCollectTenderBuyersLoading] =
     useState(false);
   const [collectTenderBuyersResult, setCollectTenderBuyersResult] =
@@ -845,7 +855,9 @@ export default function AdminApp() {
 
   async function syncMongoIndexes() {
     const confirmed = window.confirm(
-      'Create missing MongoDB indexes now? This can take a long time on large collections.',
+      forceRebuildIndexes
+        ? 'Drop and rebuild declared MongoDB indexes now? This can take a long time and can slow production queries while indexes rebuild.'
+        : 'Create missing MongoDB indexes now? Existing indexes will be kept.',
     );
 
     if (!confirmed) {
@@ -857,7 +869,7 @@ export default function AdminApp() {
 
     try {
       const status = await request<SyncIndexesStatus>(
-        '/adm/tech/sync-indexes',
+        `/adm/tech/sync-indexes${forceRebuildIndexes ? '?force=true' : ''}`,
         {
           method: 'POST',
           token,
@@ -866,7 +878,11 @@ export default function AdminApp() {
 
       setSyncIndexesStatus(status);
       setSyncIndexesLoading(status.isRunning);
-      setMessage('Mongo index synchronization started.');
+      setMessage(
+        forceRebuildIndexes
+          ? 'Mongo index rebuild started.'
+          : 'Mongo index synchronization started.',
+      );
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -1427,17 +1443,38 @@ export default function AdminApp() {
                   <div className="panelHeader">
                     <div>
                       <h2>Mongo indexes</h2>
-                      <p>Create missing indexes declared in Mongoose schemas.</p>
+                      <p>
+                        Ensure or rebuild indexes declared in Mongoose schemas.
+                      </p>
                     </div>
-                    <button
-                      disabled={syncIndexesLoading || syncIndexesStatus?.isRunning}
-                      onClick={syncMongoIndexes}
-                      type="button"
-                    >
-                      {syncIndexesLoading || syncIndexesStatus?.isRunning
-                        ? 'Syncing indexes...'
-                        : 'Sync indexes'}
-                    </button>
+                    <div className="buttonGroup">
+                      <label className="checkboxLabel">
+                        <input
+                          checked={forceRebuildIndexes}
+                          disabled={
+                            syncIndexesLoading || syncIndexesStatus?.isRunning
+                          }
+                          onChange={(event) =>
+                            setForceRebuildIndexes(event.target.checked)
+                          }
+                          type="checkbox"
+                        />
+                        Force rebuild
+                      </label>
+                      <button
+                        disabled={
+                          syncIndexesLoading || syncIndexesStatus?.isRunning
+                        }
+                        onClick={syncMongoIndexes}
+                        type="button"
+                      >
+                        {syncIndexesLoading || syncIndexesStatus?.isRunning
+                          ? 'Syncing indexes...'
+                          : forceRebuildIndexes
+                            ? 'Rebuild indexes'
+                            : 'Sync indexes'}
+                      </button>
+                    </div>
                   </div>
 
                   {syncIndexesStatus ? (
@@ -1476,19 +1513,42 @@ export default function AdminApp() {
                           </dd>
                         </div>
                         <div>
+                          <dt>Mode</dt>
+                          <dd>{syncIndexesStatus.mode}</dd>
+                        </div>
+                        <div>
+                          <dt>Indexes</dt>
+                          <dd>{syncIndexesStatus.indexesChecked}</dd>
+                        </div>
+                        <div>
+                          <dt>Existing</dt>
+                          <dd>{syncIndexesStatus.indexesAlreadyPresent}</dd>
+                        </div>
+                        <div>
+                          <dt>Created</dt>
+                          <dd>{syncIndexesStatus.indexesCreated}</dd>
+                        </div>
+                        <div>
                           <dt>Errors</dt>
                           <dd>{syncIndexesStatus.errors.length}</dd>
                         </div>
                         <div>
                           <dt>Rebuilt</dt>
-                          <dd>
-                            {syncIndexesStatus.droppedConflictingIndexes.length}
-                          </dd>
+                          <dd>{syncIndexesStatus.indexesRebuilt}</dd>
                         </div>
                       </dl>
+                      {syncIndexesStatus.rebuiltIndexes.length ? (
+                        <div className="resultNote">
+                          Rebuilt indexes:{' '}
+                          {syncIndexesStatus.rebuiltIndexes
+                            .slice(-6)
+                            .map((item) => `${item.model}.${item.index}`)
+                            .join(', ')}
+                        </div>
+                      ) : null}
                       {syncIndexesStatus.droppedConflictingIndexes.length ? (
                         <div className="resultNote">
-                          Rebuilt conflicting indexes:{' '}
+                          Dropped conflicting indexes:{' '}
                           {syncIndexesStatus.droppedConflictingIndexes
                             .slice(-6)
                             .map((item) => `${item.model}.${item.index}`)
