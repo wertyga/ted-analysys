@@ -1,6 +1,8 @@
 import { BUYER_FIELDS } from '@/config/buyer.config';
 import { FRAMEWORK_FIELDS } from '@/config/ted-search.config';
 
+export const MAX_AWARD_TENDER_FOR_CONTRACTOR_OR_BUYER = 100;
+
 export const AWARD_TENDER_CONFIG = {
   historyYearsBack: 3,
   historyChunkDays: 1,

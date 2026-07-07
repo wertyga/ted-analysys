@@ -19,6 +19,7 @@ import {
   AwardTenderLot,
   AwardTenderModel,
 } from '@/resources/award-tender/schemas';
+import { MAX_AWARD_TENDER_FOR_CONTRACTOR_OR_BUYER } from '@/config/award-tender.config';
 
 type ContractorAwardMeta = {
   stats: {
@@ -179,7 +180,7 @@ export class ContractorService {
 
     return {
       totalCount,
-      contractors: contractors.map(ContractorModel.serializeList),
+      contractors,
     };
   }
 
@@ -199,7 +200,7 @@ export class ContractorService {
 
     const { awardTenders } = await this.getContractorAwardTenders(id, {
       page: 1,
-      limit: 100,
+      limit: MAX_AWARD_TENDER_FOR_CONTRACTOR_OR_BUYER,
     });
 
     return {

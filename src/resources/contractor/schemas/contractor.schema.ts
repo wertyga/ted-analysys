@@ -56,6 +56,7 @@ export type ContractorListDto = Pick<
   Contractor,
   '_id' | (typeof CONTRACTOR_LIST_FIELDS)[number]
 >;
+
 export type ContractorDetailDto = Contractor & {
   awardTenders: ReturnType<typeof AwardTenderModel.serializeList>[];
 };

@@ -232,12 +232,41 @@ export type BuyerListDto = Pick<
   '_id' | (typeof BUYER_LIST_FIELDS)[number]
 >;
 
+export type BuyerPureListDto = {
+  id?: string;
+  name: Buyer['name'];
+  address: Pick<BuyerAddress, 'city' | 'country'>;
+  legalTypes: BuyerCodeName[];
+  mainActivities: BuyerCodeName[];
+  stats: Pick<
+    BuyerStats,
+    | 'tendersCount'
+    | 'awardTendersCount'
+    | 'totalEstimatedValueEur'
+    | 'totalAwardedValueEur'
+  >;
+  updatedAt: Buyer['updatedAt'];
+};
+
+const BUYER_PURE_LIST_FIELDS = [
+  'id',
+  'name',
+  'address',
+  'legalTypes',
+  'mainActivities',
+  'stats',
+  'updatedAt',
+] satisfies Array<Extract<keyof BuyerPureListDto, string>>;
+
 export type BuyerDetailDto = Buyer & {};
 
 export interface BuyerModelType extends Model<BuyerDocument> {
   serializeList(
     buyer: BuyerSerializable | TMongoId | BuyerDocument,
   ): BuyerListDto;
+  serializePureList(
+    buyer: BuyerSerializable | TMongoId | BuyerDocument,
+  ): BuyerPureListDto;
   serializeDetail(
     buyer: BuyerSerializable | TMongoId | BuyerDocument,
   ): BuyerDetailDto;
@@ -378,11 +407,7 @@ BuyerSchema.statics.serializeList = function (
     includeFields: BUYER_LIST_FIELDS,
   });
 
-  if (!serializedBuyer) {
-    return null;
-  }
-
-  if (typeof serializedBuyer === 'string') {
+  if (!serializedBuyer || typeof serializedBuyer === 'string') {
     return serializedBuyer;
   }
 
@@ -401,6 +426,32 @@ BuyerSchema.statics.serializeList = function (
   };
 };
 
+BuyerSchema.statics.serializePureList = function (
+  buyer: BuyerSerializable,
+): BuyerPureListDto {
+  const serializedBuyer = filterModel(
+    buyer as BuyerSerializable & { id?: string },
+    {
+      includeFields: BUYER_PURE_LIST_FIELDS,
+    },
+  );
+
+  return {
+    ...serializedBuyer,
+    address: {
+      city: serializedBuyer.address?.city,
+      country: serializedBuyer.address?.country,
+    },
+    stats: {
+      tendersCount: serializedBuyer.stats?.tendersCount ?? 0,
+      awardTendersCount: serializedBuyer.stats?.awardTendersCount ?? 0,
+      totalEstimatedValueEur:
+        serializedBuyer.stats?.totalEstimatedValueEur ?? 0,
+      totalAwardedValueEur: serializedBuyer.stats?.totalAwardedValueEur ?? 0,
+    },
+  } as BuyerPureListDto;
+};
+
 BuyerSchema.statics.serializeDetail = function (
   buyer: BuyerSerializable,
 ): BuyerDetailDto | null | string {
@@ -408,11 +459,7 @@ BuyerSchema.statics.serializeDetail = function (
     excludeFields: ['statsVersion'],
   });
 
-  if (!serializedBuyer) {
-    return null;
-  }
-
-  if (typeof serializedBuyer === 'string') {
+  if (!serializedBuyer || typeof serializedBuyer === 'string') {
     return serializedBuyer;
   }
 

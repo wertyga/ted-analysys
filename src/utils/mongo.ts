@@ -1,6 +1,6 @@
 import { mongo, Types } from 'mongoose';
 import { PaginationAndSortDto, SortDto } from '@/Dto';
-import { SORT_DIRECTION, SORT_TYPE } from '@/types';
+import { SORT_DIRECTION, SORT_TYPE, TMongoId } from '@/types';
 
 export const getCursorQuery = (data: Record<string, any>) => {
   const result = {};
@@ -90,7 +90,7 @@ export const getLimitAndSortCursor = (
 type StringKeyOf<T> = Extract<keyof T, string>;
 
 export const filterModel = <T extends Record<string, any>>(
-  document: T,
+  document: T | undefined | null | TMongoId,
   {
     excludeFields,
     includeFields,

@@ -19,7 +19,6 @@ import { TMongoId } from '@/types';
 import { getFilter } from 'next/dist/build/webpack/loaders/css-loader/src/utils';
 
 export type AwardTenderLot = TenderLot & {
-  // resultLotIdentifier?: string;
   awardValue?: {
     amount: MoneyValue;
     currency: string | null;
@@ -85,62 +84,131 @@ export interface AwardTender {
 export type AwardTenderDocument = AwardTender & Document;
 export type AwardTenderRecord = AwardTender & { _id: unknown };
 export type AwardTenderSerializable = AwardTenderDocument | AwardTenderRecord;
+
 export type AwardTenderDetailDto = Omit<AwardTender, 'links'>;
-export type AwardTenderListDto = Pick<
-  AwardTender,
-  | 'contractConclusionDates'
+
+export type AwardTenderListDto = Omit<
+  Pick<
+    AwardTender,
+    | 'contractConclusionDates'
+    | '_id'
+    | 'id'
+    | 'title'
+    | 'titleProc'
+    | 'publicationDate'
+    | 'procedureType'
+    | 'contractNature'
+    | 'cpvCodes'
+    | 'awardValue'
+    | 'awardValueEur'
+    | 'awardDecisionDates'
+  >,
+  never
+> & {
+  leadBuyers: AwardTenderListBuyer[];
+  nonLeadBuyers: AwardTenderListBuyer[];
+  winners: AwardTenderListWinner[];
+  lots: AwardTenderListLot[];
+};
+
+const awardTenderListFields = [
+  'id',
+  'title',
+  'titleProc',
+  'publicationDate',
+  'procedureType',
+  'contractNature',
+  'cpvCodes',
+  'awardValue',
+  'awardValueEur',
+  'awardDecisionDates',
+  'contractConclusionDates',
+  'leadBuyers',
+  'nonLeadBuyers',
+  'winners',
+  'lots',
+] satisfies Array<Extract<keyof AwardTenderListDto, string>>;
+
+type AwardTenderListBuyer = Pick<BuyerDocument, '_id' | 'name'> & {
+  id?: string;
+};
+
+type AwardTenderListWinner = Pick<
+  ContractorDocument,
   | '_id'
-  | 'id'
-  | 'noticeType'
-  | 'noticeSubtype'
-  | 'procedureType'
-  | 'title'
-  | 'titleProc'
-  | 'cpvCodes'
-  | 'nonLeadBuyers'
-  | 'leadBuyers'
-  | 'publicationDate'
-  | 'submissionDeadline'
-  | 'plannedEndDate'
-  | 'contractNature'
-  | 'estimatedValue'
-  | 'awardValue'
-  | 'estimatedValueEur'
-  | 'awardValueEur'
-  | 'awardDecisionDates'
-  | 'selectionStatuses'
-  | 'isFrameworkAgreement'
-  | 'placeOfPerformanceCountries'
-  | 'placeOfPerformanceCities'
-  | 'lots'
-  | 'winners'
-  | 'createdAt'
-  | 'updatedAt'
+  | 'name'
+  | 'identifiers'
+  | 'cities'
+  | 'countries'
+  | 'euRegistrationNumber'
 >;
-export type ContractorAwardLotListDto = Pick<
+
+type AwardTenderListLot = Pick<
   AwardTenderLot,
   | 'identifier'
   | 'title'
+  | 'description'
+  | 'contractNature'
   | 'mainClassification'
   | 'additionalClassifications'
-  | 'contractNature'
-  | 'estimatedValueEur'
-  | 'awardValueEur'
   | 'awardValue'
-  | 'isFrameworkAgreement'
-  | 'isDps'
+  | 'awardValueEur'
+  | 'estimatedValue'
+  | 'estimatedValueEur'
   | 'placeOfPerformanceCountry'
   | 'placeOfPerformanceSubdivision'
   | 'placeOfPerformanceCity'
   | 'awardCriteria'
+  | 'selectionCriteria'
+  | 'duration'
+  | 'plannedEndDate'
+  | 'isFrameworkAgreement'
+  | 'isDps'
+  | 'documentUrls'
+  | 'submissionUrls'
+  | 'winner'
 >;
+
+const awardTenderListBuyerFields = ['id', 'name'] satisfies Array<
+  Extract<keyof AwardTenderListBuyer, string>
+>;
+
+const awardTenderListWinnerFields = [
+  'name',
+  'identifiers',
+  'cities',
+  'countries',
+  'euRegistrationNumber',
+] satisfies Array<Extract<keyof AwardTenderListWinner, string>>;
+
+const awardTenderListLotFields = [
+  'identifier',
+  'title',
+  'description',
+  'contractNature',
+  'mainClassification',
+  'additionalClassifications',
+  'awardValue',
+  'awardValueEur',
+  'estimatedValue',
+  'estimatedValueEur',
+  'placeOfPerformanceCountry',
+  'placeOfPerformanceSubdivision',
+  'placeOfPerformanceCity',
+  'awardCriteria',
+  'selectionCriteria',
+  'duration',
+  'plannedEndDate',
+  'isFrameworkAgreement',
+  'isDps',
+  'documentUrls',
+  'submissionUrls',
+  'winner',
+] satisfies Array<Extract<keyof AwardTenderListLot, string>>;
 
 export interface AwardTenderModelType extends Model<AwardTenderDocument> {
   serializeList(tender: AwardTenderSerializable): AwardTenderListDto;
   serializeDetail(tender: AwardTenderSerializable): AwardTenderDetailDto;
-  serializeContractorAwardLotList(
-    tender: AwardTenderLot,
-  ): ContractorAwardLotListDto;
 }
 
 const AwardTenderLotValueSchema = new Schema(
@@ -280,31 +348,6 @@ AwardTenderSchema.index({ 'lots.winner': 1 });
 AwardTenderSchema.index({ 'winners.identifier': 1 });
 AwardTenderSchema.index({ 'winners.name': 1 });
 
-AwardTenderSchema.statics.serializeContractorAwardLotList = function (
-  lot: AwardTenderLot,
-): ContractorAwardLotListDto {
-  return filterModel(lot, {
-    includeFields: [
-      'identifier',
-      'title',
-      'mainClassification',
-      'additionalClassifications',
-      'contractNature',
-      'estimatedValue',
-      'estimatedValueEur',
-      'awardValueEur',
-      'awardValue',
-      'isFrameworkAgreement',
-      'isDps',
-      'placeOfPerformanceCity',
-      'placeOfPerformanceCountry',
-      'placeOfPerformanceSubdivision',
-      'awardCriteria',
-      'winner',
-    ],
-  });
-};
-
 function serializeAwardTenderRelations<T extends Partial<AwardTender>>(
   tender: T,
 ): T {
@@ -328,53 +371,54 @@ function serializeAwardTenderRelations<T extends Partial<AwardTender>>(
   };
 }
 
+function serializeAwardTenderListBuyer(
+  buyer?: TMongoId | BuyerDocument,
+): AwardTenderListBuyer | undefined {
+  return filterModel(buyer, {
+    includeFields: awardTenderListBuyerFields as any,
+  }) as AwardTenderListBuyer;
+}
+
+function serializeAwardTenderListWinner(
+  winner?: TMongoId | ContractorDocument,
+): AwardTenderListWinner | undefined {
+  return filterModel(winner, {
+    includeFields: awardTenderListWinnerFields as any,
+  }) as AwardTenderListWinner;
+}
+
+function serializeAwardTenderListLot(lot: AwardTenderLot): AwardTenderListLot {
+  const serializedLot = filterModel(lot, {
+    includeFields: awardTenderListLotFields,
+  }) as AwardTenderListLot;
+
+  return {
+    ...serializedLot,
+    winner: serializeAwardTenderListWinner(
+      serializedLot.winner,
+    ) as AwardTenderLot['winner'],
+  };
+}
+
 AwardTenderSchema.statics.serializeList = function (
   tender: AwardTenderSerializable,
 ): AwardTenderListDto {
   const { winners, lots, ...serializedAwardTender } = filterModel(tender, {
-    includeFields: [
-      'id',
-      'contractConclusionDates',
-      'noticeType',
-      'noticeSubtype',
-      'procedureType',
-      'title',
-      'titleProc',
-      'nonLeadBuyers',
-      'leadBuyers',
-      'publicationDate',
-      'submissionDeadline',
-      'plannedEndDate',
-      'contractNature',
-      'estimatedValue',
-      'awardValue',
-      'estimatedValueEur',
-      'awardValueEur',
-      'awardDecisionDates',
-      'selectionStatuses',
-      'isFrameworkAgreement',
-      'placeOfPerformanceCountries',
-      'placeOfPerformanceCities',
-      'lots',
-      'winners',
-      'createdAt',
-      'updatedAt',
-      'cpvCodes',
-    ],
+    includeFields: awardTenderListFields,
   });
 
   return {
     ...serializedAwardTender,
-    lots: lots.map(AwardTenderModel.serializeContractorAwardLotList),
+    lots: lots.map(serializeAwardTenderListLot),
     nonLeadBuyers:
-      serializedAwardTender.nonLeadBuyers?.map((buyer) =>
-        BuyerModel.serializeList(buyer as BuyerSerializable),
-      ) ?? [],
+      serializedAwardTender.nonLeadBuyers?.map(serializeAwardTenderListBuyer) ??
+      [],
     leadBuyers:
-      serializedAwardTender.leadBuyers?.map((buyer) =>
-        BuyerModel.serializeList(buyer as BuyerSerializable),
-      ) ?? [],
-    winners: winners.map(ContractorModel.serializeList),
+      serializedAwardTender.leadBuyers?.map(serializeAwardTenderListBuyer) ??
+      [],
+    winners: winners
+      .map(serializeAwardTenderListWinner)
+      .filter((winner): winner is AwardTenderListWinner => Boolean(winner)),
   };
 };
 

@@ -28,8 +28,14 @@ export class ContractorController {
   @ApiOperation({ summary: 'Search contractors by CPV codes and countries' })
   @ApiQuery({ type: ContractorListRequestDto })
   @ApiOkResponse({ description: 'Contractor list.' })
-  searchContractors(@Query() query: ContractorListRequestDto) {
-    return this.contractorService.searchContractors(query);
+  async searchContractors(@Query() query: ContractorListRequestDto) {
+    const { totalCount, contractors } =
+      await this.contractorService.searchContractors(query);
+
+    return {
+      totalCount,
+      contractors: contractors.map(ContractorModel.serializeList),
+    };
   }
 
   @Get('stats')

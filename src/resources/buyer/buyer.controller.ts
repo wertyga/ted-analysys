@@ -37,8 +37,13 @@ export class BuyerController {
   @ApiOperation({ summary: 'Get buyers list' })
   @ApiQuery({ type: BuyerListRequestDto })
   @ApiOkResponse({ description: 'Buyer list.' })
-  getBuyers(@Query() query: BuyerListRequestDto) {
-    return this.buyerService.getBuyers(query);
+  async getBuyers(@Query() query: BuyerListRequestDto) {
+    const { totalCount, buyers } = await this.buyerService.getBuyers(query);
+
+    return {
+      totalCount,
+      buyers: buyers.map(BuyerModel.serializePureList),
+    };
   }
 
   @Get(':id/award-tenders')

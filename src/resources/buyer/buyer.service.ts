@@ -43,6 +43,7 @@ import {
   BuyerListSortOrder,
 } from './dto/buyer-list-request.dto';
 import { AwardTenderService } from '@/resources/award-tender/award-tender.service';
+import { MAX_AWARD_TENDER_FOR_CONTRACTOR_OR_BUYER } from '@/config/award-tender.config';
 
 type BuyerTenderMeta = {
   stats: BuyerStats;
@@ -124,7 +125,7 @@ export class BuyerService {
 
     return {
       totalCount,
-      buyers: buyers.map((buyer) => BuyerModel.serializeList(buyer)),
+      buyers,
     };
   }
 
@@ -547,7 +548,7 @@ export class BuyerService {
       $or: [{ leadBuyers: buyerId }, { nonLeadBuyers: buyerId }],
       submissionDeadline: { $gte: new Date() },
     })
-      .sort({ publicationDate: -1, _id: -1 })
+      .sort({ publicationDate: -1 })
       .limit(BUYER_RECENT_TENDERS_LIMIT)
       .populate(tenderPopulateFields)
       .exec();
@@ -559,8 +560,8 @@ export class BuyerService {
     const awardTenders = await AwardTenderModel.find({
       $or: [{ leadBuyers: buyerId }, { nonLeadBuyers: buyerId }],
     })
-      .sort({ publicationDate: -1, _id: -1 })
-      .limit(BUYER_RECENT_TENDERS_LIMIT)
+      .sort({ publicationDate: -1 })
+      .limit(MAX_AWARD_TENDER_FOR_CONTRACTOR_OR_BUYER)
       .populate(awardTenderPopulateFields)
       .exec();
 
