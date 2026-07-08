@@ -168,7 +168,7 @@ export class ContractorService {
     if (countries?.length) {
       query.countries = { $in: countries };
     }
-
+    console.log({ query });
     const pagination = getPaginationMeta({ page, limit });
     const [contractors, totalCount] = await Promise.all([
       ContractorModel.find(query)
@@ -293,6 +293,7 @@ export class ContractorService {
         {
           $match: {
             countries: { $type: 'string', $ne: '' },
+            name: { $exists: true, $ne: '' },
           },
         },
         {
