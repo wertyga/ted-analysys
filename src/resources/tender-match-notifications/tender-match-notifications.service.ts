@@ -18,7 +18,12 @@ import {
   UserNotificationFrequency,
 } from '@/resources/user/user.types';
 import { UserModel } from '@/resources/user/user.schema';
-import { getSafeErrorMessage, isDuplicateKeyError, logger } from '@/utils';
+import {
+  getSafeErrorMessage,
+  isDuplicateKeyError,
+  logger,
+  tenderPopulateFields,
+} from '@/utils';
 import { TenderMatchNotificationLogModel } from './schemas';
 import { TariffService } from '@/resources/tariff';
 import { TENDER_MATCH_NOTIFICATIONS_CONFIG } from '@/config/tender-match-notifications.config';
@@ -174,7 +179,10 @@ export class TenderMatchNotificationsService {
       ...(sentMatchIds.length > 0 ? { _id: { $nin: sentMatchIds } } : {}),
     })
       .sort({ aiFitScore: -1, updatedAt: -1 })
-      .populate('tender')
+      .populate({
+        path: 'tender',
+        populate: tenderPopulateFields,
+      })
       .exec();
 
     return matches.filter((match) =>

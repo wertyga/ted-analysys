@@ -7,6 +7,7 @@ import { TendersService } from '@/resources/tenders/tenders.service';
 import { TenderListDto } from '@/resources/tenders/dto/tender.dto';
 import { TariffService } from '@/resources/tariff';
 import { UserDocument } from '@/resources/user/user.types';
+import { TenderModel } from '@/resources/tenders/schemas';
 
 @ApiTags('ted')
 @Controller('ted')
@@ -28,7 +29,7 @@ export class TedSearchController {
       await this.tedSearchService.searchTendersForPureList(body);
 
     return {
-      notices: tenders,
+      notices: tenders.map(TenderModel.serializeList),
       totalNoticeCount: count,
     };
   }

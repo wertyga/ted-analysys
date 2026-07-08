@@ -16,6 +16,7 @@ import {
   readStringArray,
   toObjectId,
   toIsoString,
+  tenderPopulateFields,
   // tenderCpvPopulateFields,
 } from '@/utils';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
@@ -109,10 +110,10 @@ export class TenderMatchingService {
         .sort({ aiFitScore: -1, updatedAt: -1 })
         .skip(skip)
         .limit(limit)
-        // .populate({
-        //   path: 'tender',
-        //   populate: tenderCpvPopulateFields,
-        // })
+        .populate({
+          path: 'tender',
+          populate: tenderPopulateFields,
+        })
         .exec(),
       TenderCompanyMatchModel.countDocuments(query).exec(),
     ]);
@@ -361,11 +362,10 @@ export class TenderMatchingService {
   private async analyzeCompanyTenderFit(
     payload: CompanyTenderFitAiPayload,
   ): Promise<CompanyTenderFitAiResult> {
-    const response =
-      await this.llmAnalysisService.createGeneralJsonResponse(
-        COMPANY_TENDER_FIT_SYSTEM_PROMPT,
-        buildCompanyTenderFitUserPrompt(payload),
-      );
+    const response = await this.llmAnalysisService.createGeneralJsonResponse(
+      COMPANY_TENDER_FIT_SYSTEM_PROMPT,
+      buildCompanyTenderFitUserPrompt(payload),
+    );
 
     return this.validateCompanyTenderFitAiResult(response);
   }

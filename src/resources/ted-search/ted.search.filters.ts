@@ -69,6 +69,20 @@ export class TedSearchFilters {
       parts.push({ contractNature: { $in: resolvedFilters.contractNature } });
     }
 
+    if (resolvedFilters.isSmeSuitable !== undefined) {
+      parts.push({ 'lots.isSME': resolvedFilters.isSmeSuitable });
+    }
+
+    if (resolvedFilters.isDps !== undefined) {
+      parts.push({ 'lots.isDps': resolvedFilters.isDps });
+    }
+
+    if (resolvedFilters.isFrameworkAgreement !== undefined) {
+      parts.push({
+        'lots.isFrameworkAgreement': resolvedFilters.isFrameworkAgreement,
+      });
+    }
+
     const contractAwardFilter =
       await this.buildContractAwardFilter(resolvedFilters);
 

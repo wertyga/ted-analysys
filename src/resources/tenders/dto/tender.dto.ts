@@ -77,6 +77,9 @@ export class TenderLotDto {
   isDps?: boolean;
 
   @ApiPropertyOptional({ example: true })
+  isSME?: boolean;
+
+  @ApiPropertyOptional({ example: true })
   isEuFunded?: boolean;
 
   @ApiPropertyOptional({ type: TenderDurationDto })
@@ -306,27 +309,6 @@ export class TenderDto {
   legalBasis?: string;
 
   @ApiPropertyOptional({
-    example: false,
-    description:
-      'Derived from TED dps-usage-lot: whether Dynamic Purchasing System is used.',
-  })
-  isDps?: boolean;
-
-  @ApiPropertyOptional({
-    example: true,
-    description:
-      'Derived from TED framework-agreement-lot: whether this is a framework agreement.',
-  })
-  isFrameworkAgreement?: boolean;
-
-  @ApiPropertyOptional({
-    example: true,
-    description:
-      'Derived from TED sme-lot: SME suitability/relevance indicator when present.',
-  })
-  isSmeSuitable?: boolean;
-
-  @ApiPropertyOptional({
     example: 'required',
     description:
       'TED electronic-submission-lot: electronic submission requirement/availability value.',
@@ -429,6 +411,11 @@ export class TenderDto {
 
 export type TenderDetailDto = Omit<TenderDto, 'cpvCodes'>;
 
+export type TenderListLotDto = Pick<
+  TenderLot,
+  'identifier' | 'isDps' | 'isSME' | 'isFrameworkAgreement'
+>;
+
 export type TenderListDto = Omit<
   TenderDetailDto,
   | 'links'
@@ -444,4 +431,8 @@ export type TenderListDto = Omit<
   | 'awardCriteria'
   | 'nonLeadBuyers'
   | 'leadBuyers'
-> & { nonLeadBuyers: BuyerListDto[]; leadBuyers: BuyerListDto[] };
+> & {
+  lots: TenderListLotDto[];
+  nonLeadBuyers: BuyerListDto[];
+  leadBuyers: BuyerListDto[];
+};

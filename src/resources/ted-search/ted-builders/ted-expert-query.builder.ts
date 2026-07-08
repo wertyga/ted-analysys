@@ -33,7 +33,21 @@ export interface TedTenderSearchFilters {
   contractAwardFrom?: number;
   contractAwardTo?: number;
   winnerSelectionStatus?: string;
+  isSmeSuitable?: boolean;
+  isDps?: boolean;
+  isFrameworkAgreement?: boolean;
 }
+
+const TED_TRUE_VALUES = ['true', '1', 'yes', 'y'];
+const TED_FALSE_VALUES = ['false', '0', 'no', 'n', 'none', 'not-allowed'];
+const TED_SME_TRUE_VALUES = [...TED_TRUE_VALUES, 'sme', 't-sme'];
+const TED_DPS_TRUE_VALUES = [...TED_TRUE_VALUES, 'dps-list', 'dps-nlist'];
+const TED_FRAMEWORK_TRUE_VALUES = [
+  ...TED_TRUE_VALUES,
+  'fa-w-rc',
+  'fa-wo-rc',
+  'fa-mix',
+];
 
 export function buildTedTenderSearchQuery(
   filters: TedTenderSearchFilters,
@@ -54,6 +68,9 @@ export function buildTedTenderSearchQuery(
     contractAwardFrom,
     contractAwardTo,
     publicationNumber,
+    isSmeSuitable,
+    isDps,
+    isFrameworkAgreement,
   } = resolveDeadlineRange(filters);
 
   const parts = [
@@ -69,6 +86,13 @@ export function buildTedTenderSearchQuery(
     buildInPart('winner-selection-status', [
       ...(filters.winnerSelectionStatus ? [filters.winnerSelectionStatus] : []),
     ]),
+    buildBooleanFlagPart('sme-lot', isSmeSuitable, TED_SME_TRUE_VALUES),
+    buildBooleanFlagPart('dps-usage-lot', isDps, TED_DPS_TRUE_VALUES),
+    buildBooleanFlagPart(
+      'framework-agreement-lot',
+      isFrameworkAgreement,
+      TED_FRAMEWORK_TRUE_VALUES,
+    ),
     buildRangePart('total-value', contractAwardFrom, contractAwardTo),
     buildDateRangePart(
       'publication-date',
@@ -136,6 +160,18 @@ function buildCountryInPart(
   }
 
   return `${field} IN (${cleaned.join(' ')})`;
+}
+
+function buildBooleanFlagPart(
+  field: string,
+  value: boolean | undefined,
+  trueValues: string[],
+): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return buildInPart(field, value ? trueValues : TED_FALSE_VALUES);
 }
 
 function buildEqualsPart(

@@ -344,7 +344,6 @@ export class AwardTenderNormalizer {
         ]),
       ),
 
-      isFrameworkAgreement: frameworkData.isFrameworkAgreements,
       lots: awardLots,
 
       placeOfPerformanceCities: getUniqArray(

@@ -2,6 +2,7 @@ import mongoose, { Document, Model, Schema } from 'mongoose';
 import { filterModel } from '@/utils';
 import {
   TenderDetailDto,
+  TenderListLotDto,
   TenderListDto,
 } from '@/resources/tenders/dto/tender.dto';
 import { BuyerDocument, BuyerModel } from '@/resources/buyer/schemas';
@@ -124,12 +125,6 @@ export interface Tender {
   contractNature?: string;
   /** TED legal-basis: legal act or directive/regulation basis for the procedure. */
   legalBasis?: string;
-  /** Derived from TED dps-usage-lot: whether Dynamic Purchasing System is used. */
-  isDps?: boolean;
-  /** Derived from TED framework-agreement-lot: whether this is a framework agreement. */
-  isFrameworkAgreement?: boolean;
-  /** Derived from TED sme-lot: SME suitability/relevance indicator when present. */
-  isSmeSuitable?: boolean;
   /** TED electronic-submission-lot: electronic submission requirement/availability value. */
   electronicSubmission?: string;
   /** TED main-classification-proc CPV codes. */
@@ -293,21 +288,6 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
     },
     contractNature: String,
     legalBasis: String,
-    isDps: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
-    isFrameworkAgreement: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
-    isSmeSuitable: {
-      type: Boolean,
-      default: undefined,
-      index: true,
-    },
     electronicSubmission: String,
     mainClassificationProc: { type: [String], default: [] },
     placeOfPerformanceCountries: { type: [String], default: [] },
@@ -415,6 +395,12 @@ function serializeTender(tender: TenderSerializable): Tender {
   }) as Tender;
 }
 
+function serializeTenderListLot(lot: TenderLot): TenderListLotDto {
+  return filterModel(lot, {
+    includeFields: ['identifier', 'isDps', 'isSME', 'isFrameworkAgreement'],
+  }) as TenderListLotDto;
+}
+
 TenderSchema.statics.serializeDetail = function (
   tender: TenderSerializable,
 ): Partial<Tender> {
@@ -424,25 +410,29 @@ TenderSchema.statics.serializeDetail = function (
 TenderSchema.statics.serializeList = function (
   tender: TenderSerializable,
 ): Omit<TenderListDto, 'generalAnalysis' | '_id'> & { _id: any } {
-  const {
-    links,
-    noticeVersion,
-    titleProc,
-    nonLeadBuyers,
-    leadBuyers,
-    dispatchDate,
-    deadlineReceiptTender,
-    duration,
-    legalBasis,
-    lots,
-    submissionUrls,
-    selectionCriteria,
-    awardCriteria,
-    ...rest
-  } = serializeTender(tender);
+  const listData = filterModel(tender, {
+    excludeFields: [
+      'links',
+      'noticeVersion',
+      'dispatchDate',
+      'deadlineReceiptTender',
+      'duration',
+      'legalBasis',
+      'submissionUrls',
+      'selectionCriteria',
+      'awardCriteria',
+    ],
+  });
+
+  if (!listData || typeof listData !== 'object') {
+    return listData;
+  }
+
+  const { nonLeadBuyers, leadBuyers, lots, ...rest } = listData;
 
   return {
     ...rest,
+    lots: lots.map(serializeTenderListLot),
     nonLeadBuyers: nonLeadBuyers.map(BuyerModel.serializeList),
     leadBuyers: leadBuyers.map(BuyerModel.serializeList),
   };

@@ -101,7 +101,6 @@ export class AwardTenderService {
 
     const query: QueryFilter<AwardTenderDocument> = {
       cpvCodes: { $in: tender.cpvCodes as string[] },
-      // buyer: tender.buyer._id || tender.buyer, // TODO: ??
       contractNature: tender.contractNature,
     };
 

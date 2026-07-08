@@ -150,6 +150,33 @@ export class TedTenderSearchRequestDto implements TedTenderSearchFilters {
   contractNature?: TedContractNature[];
 
   @ApiPropertyOptional({
+    example: true,
+    description: 'Filter tenders by lot-level SME suitability flag.',
+  })
+  @IsOptional()
+  @Transform(toOptionalBoolean)
+  @IsBoolean()
+  isSmeSuitable?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Filter tenders by lot-level Dynamic Purchasing System flag.',
+  })
+  @IsOptional()
+  @Transform(toOptionalBoolean)
+  @IsBoolean()
+  isDps?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Filter tenders by lot-level framework agreement flag.',
+  })
+  @IsOptional()
+  @Transform(toOptionalBoolean)
+  @IsBoolean()
+  isFrameworkAgreement?: boolean;
+
+  @ApiPropertyOptional({
     enum: CurrencySign,
     isArray: true,
     example: [CurrencySign.EUR],
@@ -288,4 +315,28 @@ function normalizeStringCodeInput(value: unknown): unknown {
 
     return item;
   });
+}
+
+function toOptionalBoolean({ value }: { value: unknown }): unknown {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+
+    if (['true', '1', 'yes', 'y'].includes(normalized)) {
+      return true;
+    }
+
+    if (['false', '0', 'no', 'n'].includes(normalized)) {
+      return false;
+    }
+  }
+
+  return value;
 }

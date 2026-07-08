@@ -396,9 +396,6 @@ export class TenderNormalizerService {
         lots.map((l) => l.electronicSubmission),
       ),
 
-      isDps: lots.some((l) => l.isDps),
-      isSmeSuitable: getCommonArrayValue(lots.map((l) => l.isSME)),
-
       mainClassificationProc: data.mainClassificationProc,
 
       documentUrls: getUniqArray(lots.flatMap((l) => l.documentUrls)),
@@ -462,7 +459,6 @@ export class TenderNormalizerService {
         ]),
       ),
 
-      isFrameworkAgreement: frameworkData.isFrameworkAgreements,
       lots,
 
       links: data.links,

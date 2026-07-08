@@ -308,9 +308,6 @@ export interface TenderAnalysisTenderDto {
   };
   contractNature?: string;
   legalBasis?: string;
-  isDps?: boolean;
-  isFrameworkAgreement?: boolean;
-  isSmeSuitable?: boolean;
   electronicSubmission?: string;
   cpvCodes?: CpvAnalysisRef[];
   placeOfPerformanceCountries?: string[];

@@ -76,9 +76,6 @@ export class TenderGeneralAnalysisBuilder {
         documentUrls: tender.documentUrls ?? [],
         submissionUrls: tender.submissionUrls ?? [],
         flags: {
-          isDps: tender.isDps,
-          isFrameworkAgreement: tender.isFrameworkAgreement,
-          isSmeSuitable: tender.isSmeSuitable,
           isEuFunded: tender.euFundLot,
           electronicSubmission: tender.electronicSubmission ?? null,
         },

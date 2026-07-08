@@ -86,7 +86,6 @@ export const OPTIONAL_TENDER_UNSET_FIELDS = [
   'plannedEndDate',
   'duration',
   'electronicSubmission',
-  'isSmeSuitable',
   'euFundLot',
   'buyerName',
   'buyerIdentifier',
@@ -483,9 +482,11 @@ export class TendersService {
       sort?: Record<string, SortOrder>;
       skip?: number;
       limit?: number;
+      select?: string | string[];
     } = {},
   ) {
     return TenderModel.find(tenderQuery)
+      .select(options.select ?? '')
       .sort(options.sort ?? {})
       .skip(options.skip ?? 0)
       .limit(options.limit ?? 0)

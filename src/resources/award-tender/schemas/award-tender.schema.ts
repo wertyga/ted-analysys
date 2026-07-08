@@ -59,7 +59,6 @@ export interface AwardTender {
 
   awardDecisionDates: string[];
   selectionStatuses: string[];
-  isFrameworkAgreement?: boolean;
   placeOfPerformanceCountriesProc: string[];
   placeOfPerformanceCitiesProc: string[];
   placeOfPerformanceCountries: string[];
@@ -164,6 +163,7 @@ type AwardTenderListLot = Pick<
   | 'plannedEndDate'
   | 'isFrameworkAgreement'
   | 'isDps'
+  | 'isSME'
   | 'documentUrls'
   | 'submissionUrls'
   | 'winner'
@@ -201,6 +201,7 @@ const awardTenderListLotFields = [
   'plannedEndDate',
   'isFrameworkAgreement',
   'isDps',
+  'isSME',
   'documentUrls',
   'submissionUrls',
   'winner',
@@ -234,6 +235,7 @@ const AwardTenderLotSchema = new Schema<AwardTenderLot>(
     awardValueEur: { type: Number, default: null, index: true },
     isFrameworkAgreement: Boolean,
     isDps: Boolean,
+    isSME: Boolean,
 
     frameworkMaximumValue: {
       type: AwardTenderLotValueSchema,
@@ -290,7 +292,6 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
       type: [String],
       default: [],
     },
-    isFrameworkAgreement: Boolean,
     estimatedValue: {
       amount: { type: Number, default: null },
       currency: { type: String, default: null },

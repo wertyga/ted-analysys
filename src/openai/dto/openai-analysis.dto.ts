@@ -85,9 +85,6 @@ export interface GeneralTenderAnalysisInput {
     documentUrls?: string[];
     submissionUrls?: string[];
     flags?: {
-      isDps?: boolean;
-      isFrameworkAgreement?: boolean;
-      isSmeSuitable?: boolean;
       isEuFunded?: boolean;
       electronicSubmission?: string | null;
     };

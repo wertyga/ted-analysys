@@ -18,6 +18,43 @@ import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rate
 import { TENDER_COMPETITION_SEARCH_FIELDS } from '@/config/ted-search.config';
 import { AWARD_HISTORY_FIELDS } from '@/config/award-tender.config';
 
+const TENDER_PURE_LIST_SELECT = [
+  '_id',
+  'id',
+  'noticeType',
+  'noticeSubtype',
+  'procedureType',
+  'title',
+  'shortTitle',
+  'description',
+  'estimatedValue',
+  'estimatedValueEur',
+  'noticeLanguage',
+  'submissionLanguages',
+  'publicationDate',
+  'submissionDeadline',
+  'questionsDeadline',
+  'plannedStartDate',
+  'plannedEndDate',
+  'contractNature',
+  'electronicSubmission',
+  'mainClassificationProc',
+  'placeOfPerformanceCountries',
+  'placeOfPerformanceCities',
+  'placeOfPerformanceSubdivisions',
+  'documentUrls',
+  'euFundLot',
+  'cpvCodes',
+  'createdAt',
+  'updatedAt',
+  'nonLeadBuyers',
+  'leadBuyers',
+  'lots.identifier',
+  'lots.isDps',
+  'lots.isSME',
+  'lots.isFrameworkAgreement',
+];
+
 @Injectable()
 export class TedSearchService {
   private readonly logger = new Logger(TedSearchService.name);
@@ -79,12 +116,13 @@ export class TedSearchService {
         sort,
         skip,
         limit,
+        select: TENDER_PURE_LIST_SELECT,
       }),
       TenderModel.countDocuments(query),
     ]);
 
     return {
-      tenders: localTenders.map(TenderModel.serializeList),
+      tenders: localTenders,
       count: count,
     };
   }
@@ -98,6 +136,7 @@ export class TedSearchService {
     });
     const query = await this.filters.buildLocalTenderQuery(filters);
     const sort = this.sorting.buildLocalTenderSort(filters);
+
     devLog(
       `Local Search request: ${JSON.stringify(query)}`,
       TedSearchService.name,

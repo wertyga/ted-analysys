@@ -106,9 +106,6 @@ export class TenderDeepAnalysisBuilder {
       duration: tender.duration,
       contractNature: tender.contractNature,
       legalBasis: tender.legalBasis,
-      isDps: tender.isDps,
-      isFrameworkAgreement: tender.isFrameworkAgreement,
-      isSmeSuitable: tender.isSmeSuitable,
       electronicSubmission: tender.electronicSubmission,
       cpvCodes: this.generalAnalysisBuilder.resolveCpvCodesForPrompt(
         tender.cpvCodes ?? [],

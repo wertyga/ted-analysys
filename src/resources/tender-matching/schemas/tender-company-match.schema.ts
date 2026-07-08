@@ -170,9 +170,7 @@ function serializeMatchList(
 
   return {
     ...rest,
-    tender: isPopulatedRecord(tender)
-      ? TenderModel.serializeList(tender as unknown as TenderSerializable)
-      : tender,
+    tender: TenderModel.serializeList(tender as unknown as TenderSerializable),
   };
 }
 
