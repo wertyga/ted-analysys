@@ -289,16 +289,16 @@ const BuyerAddressSchema = new Schema<BuyerAddress>(
   {
     street: { type: String, default: '' },
     postCode: { type: String, default: '' },
-    city: { type: String, default: '', index: true },
-    country: { type: String, default: '', index: true },
-    countrySub: { type: String, default: '', index: true },
+    city: { type: String, default: '' },
+    country: { type: String, default: '' },
+    countrySub: { type: String, default: '' },
   },
   { _id: false },
 );
 
 const BuyerCodeNameSchema = new Schema<BuyerCodeName>(
   {
-    code: { type: String, required: true, index: true },
+    code: { type: String, required: true },
     name: { type: String, required: true },
   },
   { _id: false },
@@ -399,6 +399,16 @@ export const BuyerSchema = new Schema<BuyerDocument, BuyerModelType>(
   },
   { timestamps: true },
 );
+
+BuyerSchema.index({ 'address.city': 1 });
+BuyerSchema.index({ 'address.country': 1 });
+BuyerSchema.index({ 'address.countrySub': 1 });
+BuyerSchema.index({ 'legalTypes.code': 1 });
+BuyerSchema.index({ 'mainActivities.code': 1 });
+BuyerSchema.index({ 'stats.totalAwardedValueEur': -1, name: 1, _id: 1 });
+BuyerSchema.index({ 'stats.totalEstimatedValueEur': -1, name: 1, _id: 1 });
+BuyerSchema.index({ 'stats.awardTendersCount': -1, name: 1, _id: 1 });
+BuyerSchema.index({ 'stats.tendersCount': -1, name: 1, _id: 1 });
 
 BuyerSchema.statics.serializeList = function (
   buyer: BuyerSerializable,
