@@ -18,28 +18,16 @@ export class CouponService {
       return null;
     }
 
-    const coupon = await this.claimCoupon(user, code);
-
-    if (!coupon) {
-      return null;
-    }
-
-    return this.paymentsService.createFreeCouponEntitlement(user, coupon);
+    return this.paymentsService.createFreeCouponEntitlement(
+      user,
+      await this.createCouponRedemption(user, code),
+    );
   }
 
-  private async claimCoupon(
+  private async createCouponRedemption(
     user: UserDocument,
     code: string,
-  ): Promise<CouponDocument | null> {
-    const coupon = await CouponModel.findOne({
-      code,
-      usedBy: { $exists: true },
-    });
-
-    if (coupon) {
-      return null;
-    }
-
+  ): Promise<CouponDocument> {
     return CouponModel.create({
       code,
       usedBy: user._id,

@@ -14,7 +14,6 @@ const CouponSchema = new Schema<CouponDocument>(
     code: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
       uppercase: true,
     },
