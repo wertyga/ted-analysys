@@ -41,10 +41,6 @@ export class TedSearchFilters {
       parts.push({ cpvCodes: { $in: cpvCodes } });
     }
 
-    // if (resolvedFilters.noticeTypes?.length) {
-    //   parts.push({ noticeType: { $in: resolvedFilters.noticeTypes } });
-    // }
-
     const placeOfPerformance = normalizeTedCountryCodes(
       resolvedFilters.placeOfPerformance,
     );

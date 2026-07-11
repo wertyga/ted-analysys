@@ -24,6 +24,7 @@ const TENDER_PURE_LIST_SELECT = [
   'noticeType',
   'noticeSubtype',
   'procedureType',
+  'sourceHash',
   'title',
   'shortTitle',
   'description',

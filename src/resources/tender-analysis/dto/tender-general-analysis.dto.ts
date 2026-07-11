@@ -25,12 +25,6 @@ export class TenderGeneralAnalysisListDto {
 
   @ApiPropertyOptional()
   updatedAt?: Date;
-
-  @ApiPropertyOptional()
-  model?: string;
-
-  @ApiPropertyOptional()
-  promptVersion?: string;
 }
 
 export class TenderGeneralAnalysisDetailDto extends TenderGeneralAnalysisListDto {

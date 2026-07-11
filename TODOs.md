@@ -1,5 +1,5 @@
 
-- FE - проверить используются ли запросы как - /codelist/countries
+- FE - tenders/[id] - закрывать для free плашками (get pro tariff) блоки, которые скрыты 
 - FE - /contractors|buyers/{country}
 - FE - /buyers/[id] - После FAQ
 Добавить блок

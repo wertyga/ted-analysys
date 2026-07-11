@@ -36,6 +36,7 @@ export class TendersController {
     @Req() req,
   ): Promise<TenderDetailDto> {
     const tba = await this.tendersService.findById(id, !!req.isBot);
+
     const tender = tba.toObject();
 
     const tenderSerialized = TenderModel.serializeDetail(tender);

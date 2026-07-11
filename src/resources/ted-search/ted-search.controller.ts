@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req } from '@nestjs/common';
 import { ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { TedTenderSearchRequestDto } from './dto/ted-tender-search-request.dto';
 import { TedSearchService } from './ted-search.service';
@@ -8,6 +8,8 @@ import { TenderListDto } from '@/resources/tenders/dto/tender.dto';
 import { TariffService } from '@/resources/tariff';
 import { UserDocument } from '@/resources/user/user.types';
 import { TenderModel } from '@/resources/tenders/schemas';
+import { TenderGeneralAnalysisService } from '@/resources/tender-analysis/tender-general-analysis.service';
+import { TenderGeneralAnalysisModel } from '@/resources/tender-analysis/schemas';
 
 @ApiTags('ted')
 @Controller('ted')
@@ -16,7 +18,36 @@ export class TedSearchController {
     private readonly tedSearchService: TedSearchService,
     private readonly tendersService: TendersService,
     private readonly tariffService: TariffService,
+    private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
   ) {}
+
+  @Get('/search-page')
+  async searchTendersForSearchPage(
+    @Query() query: TedTenderSearchRequestDto,
+  ): Promise<TedSearchResponse> {
+    console.log({ query });
+    const { tenders, count } =
+      await this.tedSearchService.searchTendersForPureList(query);
+
+    const generalAnalysis = await this.tenderGeneralAnalysisService
+      .ensureBaseAnalysisForMultipleTenders([tenders[0]])
+      .then((analyses) => analyses[0]);
+
+    return {
+      notices: tenders.map(TenderModel.serializeList).map((t, i) => {
+        if (t.id === generalAnalysis?.tenderId) {
+          return {
+            ...t,
+            generalAnalysis:
+              TenderGeneralAnalysisModel.serializeList(generalAnalysis),
+          };
+        }
+
+        return t;
+      }) as any,
+      totalNoticeCount: count,
+    };
+  }
 
   @Get('/search-pure')
   @ApiOperation({ summary: 'Search local tenders by structured filters' })

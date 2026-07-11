@@ -11,7 +11,6 @@ export class TedSearchSorting {
 
     return {
       [sortField]: sortDirection,
-      _id: -1,
     };
   }
 

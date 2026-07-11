@@ -276,11 +276,7 @@ export class TedTenderSearchRequestDto implements TedTenderSearchFilters {
 }
 
 function normalizeCountryInput(value: unknown): unknown {
-  if (!Array.isArray(value)) {
-    return value;
-  }
-
-  return value.map((item: unknown) => {
+  return normalizeArrayInput(value, (item) => {
     if (typeof item === 'string') {
       return item.trim().toUpperCase();
     }
@@ -290,11 +286,7 @@ function normalizeCountryInput(value: unknown): unknown {
 }
 
 function normalizeCurrencyInput(value: unknown): unknown {
-  if (!Array.isArray(value)) {
-    return value;
-  }
-
-  return value.map((item: unknown) => {
+  return normalizeArrayInput(value, (item) => {
     if (typeof item === 'string') {
       return item.trim().toUpperCase();
     }
@@ -304,17 +296,22 @@ function normalizeCurrencyInput(value: unknown): unknown {
 }
 
 function normalizeStringCodeInput(value: unknown): unknown {
-  if (!Array.isArray(value)) {
-    return value;
-  }
-
-  return value.map((item: unknown) => {
+  return normalizeArrayInput(value, (item) => {
     if (typeof item === 'string') {
       return item.trim().toUpperCase();
     }
 
     return item;
   });
+}
+
+function normalizeArrayInput(
+  value: unknown,
+  normalizeItem: (item: unknown) => unknown,
+): unknown {
+  const items = Array.isArray(value) ? value : [value];
+
+  return items.map(normalizeItem);
 }
 
 function toOptionalBoolean({ value }: { value: unknown }): unknown {
