@@ -149,7 +149,7 @@ export abstract class BaseLlmAnalysisService {
     } catch (error: unknown) {
       lastError = error;
       this.logger.warn(
-        `${this.providerName} createJsonResponse failed on attempt ${attempt + 1}: ${getSafeErrorMessage(
+        `${this.providerName} createJsonResponse failed on attempt ${attempt}: ${getSafeErrorMessage(
           error,
         )}`,
       );

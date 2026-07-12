@@ -130,6 +130,9 @@ export class TenderGeneralAnalysisService {
       existingBaseAnalysis?.resultJson &&
       existingBaseAnalysis.status === TenderGeneralAnalysisStatus.DONE &&
       isHashEqual;
+    const hasFailedAnalysis =
+      existingBaseAnalysis?.status === TenderGeneralAnalysisStatus.FAILED &&
+      isHashEqual;
 
     const isStaleProcessing =
       existingBaseAnalysis?.status === TenderGeneralAnalysisStatus.PROCESSING &&
@@ -140,7 +143,10 @@ export class TenderGeneralAnalysisService {
       isHashEqual &&
       !isStaleProcessing;
 
-    if ((hasDoneAnalysis || isInProces) && !isForceBaseAnalysis) {
+    if (
+      (hasDoneAnalysis || hasFailedAnalysis || isInProces) &&
+      !isForceBaseAnalysis
+    ) {
       return existingBaseAnalysis;
     }
 
