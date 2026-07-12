@@ -25,7 +25,6 @@ export class TedSearchController {
   async searchTendersForSearchPage(
     @Query() query: TedTenderSearchRequestDto,
   ): Promise<TedSearchResponse> {
-    console.log({ query });
     const { tenders, count } =
       await this.tedSearchService.searchTendersForPureList(query);
 
