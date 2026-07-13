@@ -1,19 +1,19 @@
 export const STATIC_SITEMAP_PATHS = [
-  { path: '', priority: 1.0 },
+  { path: '' },
 
-  { path: 'guides', priority: 0.8 },
+  { path: 'guides' },
 
-  { path: 'tender-search', priority: 0.7 },
-  { path: 'industries', priority: 0.6 },
-  { path: 'countries', priority: 0.6 },
-  { path: 'explore', priority: 0.5 },
+  { path: 'tender-search' },
+  { path: 'industries' },
+  { path: 'countries' },
+  { path: 'explore' },
 
-  { path: 'how-to-find-eu-tenders', priority: 0.7 },
-  { path: 'how-to-evaluate-a-tender-opportunity', priority: 0.7 },
-  { path: 'how-to-analyze-tender-documents-with-ai', priority: 0.7 },
-  { path: 'common-tender-requirements-in-europe', priority: 0.7 },
+  { path: 'how-to-find-eu-tenders' },
+  { path: 'how-to-evaluate-a-tender-opportunity' },
+  { path: 'how-to-analyze-tender-documents-with-ai' },
+  { path: 'common-tender-requirements-in-europe' },
 
-  { path: 'privacy', priority: 0.3 },
-  { path: 'terms', priority: 0.3 },
-  { path: 'cookies', priority: 0.3 },
+  { path: 'privacy' },
+  { path: 'terms' },
+  { path: 'cookies' },
 ] as const;

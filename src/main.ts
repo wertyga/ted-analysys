@@ -70,6 +70,13 @@ async function bootstrap() {
       extensions: ['xml'],
       fallthrough: true,
       index: false,
+      setHeaders: (res) => {
+        res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+        res.setHeader(
+          'Cache-Control',
+          'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400',
+        );
+      },
     }),
   );
 

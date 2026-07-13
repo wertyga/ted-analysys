@@ -63,6 +63,12 @@ export class SitemapTechController {
   ) {
     const outputPath = this.sitemapTechService.getSitemapDownloadPath(filename);
 
-    return res.download(outputPath, filename);
+    res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+    res.setHeader(
+      'Cache-Control',
+      'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400',
+    );
+
+    return res.sendFile(outputPath);
   }
 }

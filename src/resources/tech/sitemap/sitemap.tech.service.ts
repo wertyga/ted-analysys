@@ -31,7 +31,6 @@ type SitemapContractor = {
 type SitemapUrl = {
   loc: string;
   lastmod?: string;
-  priority?: number;
 };
 
 type WrittenSitemapFile = {
@@ -125,7 +124,6 @@ export class SitemapTechService {
       this.buildSitemapIndexXml(
         sitemapFiles.map((file) => ({
           loc: file.loc,
-          lastmod: new Date().toISOString(),
         })),
       ),
       'utf8',
@@ -294,7 +292,6 @@ export class SitemapTechService {
     for (const locale of locales) {
       buffer.push({
         loc: `${domain}/${locale}/buyers`,
-        priority: 0.8,
       });
       totalCount++;
 
@@ -369,7 +366,6 @@ export class SitemapTechService {
     for (const locale of locales) {
       buffer.push({
         loc: `${domain}/${locale}/contractors`,
-        priority: 0.8,
       });
       totalCount++;
 
@@ -421,7 +417,6 @@ export class SitemapTechService {
         loc: page.path
           ? `${domain}/${locale}/${page.path}`
           : `${domain}/${locale}`,
-        priority: page.priority,
       })),
     );
   }
@@ -604,14 +599,9 @@ export class SitemapTechService {
           ? `\n    <lastmod>${this.escapeXml(url.lastmod)}</lastmod>`
           : '';
 
-        const priority =
-          typeof url.priority === 'number'
-            ? `\n    <priority>${url.priority.toFixed(1)}</priority>`
-            : '';
-
         return `  <url>\n    <loc>${this.escapeXml(
           url.loc,
-        )}</loc>${lastmod}${priority}\n  </url>`;
+        )}</loc>${lastmod}\n  </url>`;
       })
       .join('\n');
 
