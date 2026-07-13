@@ -19,6 +19,10 @@ import {
 } from '@/utils';
 import { MoneyValue, TenderLot } from '@/resources/tenders/schemas';
 import { TedContractNature } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
+import {
+  fetchAwardCriteriaFromXml,
+  XmlAwardCriterion,
+} from '@/resources/tender-normalizer/tender-normalizer-xml';
 
 export type NormalizedTenderLot = Omit<
   TenderLot,
@@ -94,7 +98,9 @@ export class TenderNormalizerService {
     };
   }
 
-  normalizeTenderLotsNotice(notice: TedNotice): NormalizedTenderLot[] {
+  async normalizeTenderLotsNotice(
+    notice: TedNotice,
+  ): Promise<NormalizedTenderLot[]> {
     const data = {
       identifiers: getArrayValue('identifier-lot', notice),
       titles: getEngValueOrFirst('title-lot', notice),
@@ -198,13 +204,19 @@ export class TenderNormalizerService {
       return [];
     }
 
+    const xmlAwardCriteria = this.shouldLoadAwardCriteriaFromXml(data)
+      ? await fetchAwardCriteriaFromXml(notice.links)
+      : [];
+    const useXmlAwardCriteria = xmlAwardCriteria.length > 0;
+
     return Array.from({ length }, (_, i) => {
       const durationValue = data.durationPeriodValues?.[i];
       const durationUnit = data.durationPeriodUnits?.[i];
+      const identifier = data.identifiers?.[i];
 
       return {
         isSME: data.areSMEs?.[i],
-        identifier: data.identifiers?.[i],
+        identifier,
         title: data.titles?.[i],
 
         isEuFunded: data.euFundLots?.[i],
@@ -266,12 +278,9 @@ export class TenderNormalizerService {
         placeOfPerformanceSubdivision: data.placeOfPerformanceSubdivisions?.[i],
         placeOfPerformanceCity: data.placeOfPerformanceCities?.[i],
 
-        awardCriteria: {
-          type: data.awardCriterionTypes?.[i],
-          description: data.awardCriterionDescriptions?.[i],
-          weight: data.awardCriterionNumbers?.[i] ?? null,
-          weightCode: data.awardCriterionNumberWeights?.[i],
-        },
+        awardCriteria: useXmlAwardCriteria
+          ? this.mapXmlAwardCriteriaForLot(xmlAwardCriteria, identifier)
+          : this.mapNoticeAwardCriteriaForLot(data, i),
         selectionCriteria: {
           name: data.selectionCriterionNames?.[i],
           description: data.selectionCriterionDescriptions?.[i],
@@ -280,8 +289,72 @@ export class TenderNormalizerService {
     }).filter((l) => !!l.identifier);
   }
 
-  normalizeTedNotice(notice: TedNotice): NormalizedTenderDto {
-    const lots = this.normalizeTenderLotsNotice(notice);
+  private shouldLoadAwardCriteriaFromXml(data: {
+    identifiers: unknown[];
+    awardCriterionTypes: unknown[];
+    awardCriterionDescriptions: unknown[];
+    awardCriterionNumbers: unknown[];
+    awardCriterionNumberWeights: unknown[];
+  }): boolean {
+    const lotCount = data.identifiers.length;
+
+    if (lotCount === 0) {
+      return false;
+    }
+
+    return [
+      data.awardCriterionTypes,
+      data.awardCriterionDescriptions,
+      data.awardCriterionNumbers,
+      data.awardCriterionNumberWeights,
+    ].some((values) => values.length > 0 && values.length !== lotCount);
+  }
+
+  private mapNoticeAwardCriteriaForLot(
+    data: {
+      awardCriterionTypes: (string | undefined)[];
+      awardCriterionDescriptions: (string | undefined)[];
+      awardCriterionNumbers: (number | null | undefined)[];
+      awardCriterionNumberWeights: (string | undefined)[];
+    },
+    index: number,
+  ): NonNullable<TenderLot['awardCriteria']> {
+    const criterion = {
+      type: data.awardCriterionTypes?.[index],
+      description: data.awardCriterionDescriptions?.[index],
+      weight: data.awardCriterionNumbers?.[index] ?? null,
+      weightCode: data.awardCriterionNumberWeights?.[index],
+    };
+
+    return criterion.type ||
+      criterion.description ||
+      criterion.weight !== null ||
+      criterion.weightCode
+      ? [criterion]
+      : [];
+  }
+
+  private mapXmlAwardCriteriaForLot(
+    criteria: XmlAwardCriterion[],
+    lotId: string | undefined,
+  ): NonNullable<TenderLot['awardCriteria']> {
+    if (!lotId) {
+      return [];
+    }
+
+    return criteria
+      .filter((criterion) => criterion.lotId === lotId)
+      .map((criterion) => ({
+        name: criterion.name,
+        type: criterion.type,
+        description: criterion.description,
+        weight: criterion.weight ?? null,
+        weightCode: criterion.weightCode,
+      }));
+  }
+
+  async normalizeTedNotice(notice: TedNotice): Promise<NormalizedTenderDto> {
+    const lots = await this.normalizeTenderLotsNotice(notice);
     const frameworkData = this.normalizeFrameworkFromTEDNotice(notice);
 
     const data = {
@@ -414,17 +487,6 @@ export class TenderNormalizerService {
           description: l.selectionCriteria?.description,
         }))
         .filter((criteria) => criteria.name || criteria.description),
-      awardCriteria: lots
-        .map((l) => ({
-          identifier: l.identifier,
-          type: l.awardCriteria?.type,
-          description: l.awardCriteria?.description,
-          weight: l.awardCriteria?.weight,
-        }))
-        .filter(
-          (criteria) =>
-            criteria.type || criteria.description || criteria.weight,
-        ),
 
       submissionDeadline:
         data.deadline ??

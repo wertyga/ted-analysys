@@ -21,6 +21,9 @@ export class TenderDurationDto {
 }
 
 export class TenderAwardCriteriaDto {
+  @ApiPropertyOptional({ example: 'Price' })
+  name?: string | null;
+
   @ApiPropertyOptional({ example: 'price' })
   type?: string | null;
 
@@ -109,8 +112,8 @@ export class TenderLotDto {
   @ApiPropertyOptional({ type: [String] })
   placeOfPerformanceCities?: string[];
 
-  @ApiPropertyOptional({ type: TenderAwardCriteriaDto })
-  awardCriteria?: TenderAwardCriteriaDto;
+  @ApiPropertyOptional({ type: [TenderAwardCriteriaDto] })
+  awardCriteria?: TenderAwardCriteriaDto[];
 
   @ApiPropertyOptional({ type: TenderSelectionCriteriaDto })
   selectionCriteria?: TenderSelectionCriteriaDto;
@@ -376,13 +379,6 @@ export class TenderDto {
   selectionCriteria?: unknown[];
 
   @ApiPropertyOptional({
-    type: [Object],
-    description:
-      'TED award-criterion-*-lot: lot-level award criteria names/descriptions/types/weights.',
-  })
-  awardCriteria?: unknown[];
-
-  @ApiPropertyOptional({
     type: [String],
     description:
       'Aggregated raw CPV code strings from classification/main/additional CPV fields.',
@@ -428,7 +424,6 @@ export type TenderListDto = Omit<
   | 'lots'
   | 'submissionUrls'
   | 'selectionCriteria'
-  | 'awardCriteria'
   | 'nonLeadBuyers'
   | 'leadBuyers'
 > & {

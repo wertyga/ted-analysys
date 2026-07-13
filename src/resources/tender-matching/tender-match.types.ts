@@ -161,12 +161,6 @@ export type CompanyTenderFitAiPayload = {
       name?: string | null;
       description?: string | null;
     }[];
-    awardCriteria: {
-      name?: string | null;
-      description?: string | null;
-      type?: string | null;
-      weight?: number | null;
-    }[];
   };
 };
 

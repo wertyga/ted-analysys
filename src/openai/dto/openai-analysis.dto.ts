@@ -88,7 +88,6 @@ export interface GeneralTenderAnalysisInput {
       isEuFunded?: boolean;
       electronicSubmission?: string | null;
     };
-    awardCriteria?: unknown;
     selectionCriteria?: unknown;
     languages?: string[];
   };

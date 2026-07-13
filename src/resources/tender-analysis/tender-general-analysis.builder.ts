@@ -80,7 +80,6 @@ export class TenderGeneralAnalysisBuilder {
           electronicSubmission: tender.electronicSubmission ?? null,
         },
         selectionCriteria: tender.selectionCriteria ?? [],
-        awardCriteria: tender.awardCriteria ?? [],
         languages: tender.submissionLanguages ?? [],
       },
       documents,

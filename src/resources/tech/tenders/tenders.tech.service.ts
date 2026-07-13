@@ -1,12 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { LlmAnalysisService } from '@/llm/llm-analysis.service';
-import { TenderModel } from '@/resources/tenders/schemas';
+import {
+  TenderDocumentsLinks,
+  TenderLot,
+  TenderModel,
+} from '@/resources/tenders/schemas';
 import {
   TenderGeneralAnalysisModel,
   TenderGeneralAnalysisRecord,
 } from '@/resources/tender-analysis/schemas';
 import { TenderGeneralAnalysisService } from '@/resources/tender-analysis/tender-general-analysis.service';
 import { getSafeErrorMessage } from '@/utils';
+import {
+  fetchAwardCriteriaFromXml,
+  XmlAwardCriterion,
+} from '@/resources/tender-normalizer/tender-normalizer-xml';
 
 type GenerateTenderGeneralAnalysesResult = {
   scannedCount: number;
@@ -15,6 +23,20 @@ type GenerateTenderGeneralAnalysesResult = {
   skippedCount: number;
   limit: number;
   batchSize: number;
+  errors: Array<{ id: string; message: string }>;
+};
+
+type FixTenderLotAwardCriteriaResult = {
+  totalCount: number;
+  scannedCount: number;
+  remainingCount: number;
+  xmlFetchedCount: number;
+  xmlWithoutCriteriaCount: number;
+  matchedCount: number;
+  updatedCount: number;
+  dryRun: boolean;
+  batchSize: number;
+  changedTenderIds: string[];
   errors: Array<{ id: string; message: string }>;
 };
 
@@ -215,8 +237,141 @@ export class TendersTechService {
     return result;
   }
 
+  async fixTenderLotAwardCriteria(options: {
+    batchSize?: number;
+    ids?: string[];
+    dryRun?: boolean;
+  }): Promise<FixTenderLotAwardCriteriaResult> {
+    const batchSize = Math.min(
+      Math.max(Number(options.batchSize ?? 100), 1),
+      5000,
+    );
+    const ids = options.ids?.filter(Boolean) ?? [];
+    const dryRun = options.dryRun === true;
+    const result: FixTenderLotAwardCriteriaResult = {
+      totalCount: 0,
+      scannedCount: 0,
+      remainingCount: 0,
+      xmlFetchedCount: 0,
+      xmlWithoutCriteriaCount: 0,
+      matchedCount: 0,
+      updatedCount: 0,
+      dryRun,
+      batchSize,
+      changedTenderIds: [],
+      errors: [],
+    };
+    const query =
+      ids.length > 0
+        ? { id: { $in: ids } }
+        : {
+            'links.xml': { $exists: true },
+            lots: { $elemMatch: { identifier: { $exists: true, $ne: null } } },
+          };
+    result.totalCount = await TenderModel.countDocuments(query).exec();
+    result.remainingCount = result.totalCount;
+
+    const cursor = TenderModel.find(query)
+      .select('_id id links lots')
+      .sort({ createdAt: 1, _id: 1 })
+      .lean()
+      .cursor({ batchSize });
+
+    for await (const tender of cursor) {
+      result.scannedCount += 1;
+      result.remainingCount = Math.max(
+        result.totalCount - result.scannedCount,
+        0,
+      );
+
+      try {
+        if (!this.hasXmlLinks(tender.links)) {
+          continue;
+        }
+
+        const xmlCriteria = await fetchAwardCriteriaFromXml(tender.links);
+        result.xmlFetchedCount += 1;
+
+        if (xmlCriteria.length === 0) {
+          result.xmlWithoutCriteriaCount += 1;
+          continue;
+        }
+
+        const fixedLots = this.fixLotsAwardCriteriaFromXml(
+          tender.lots ?? [],
+          xmlCriteria,
+        );
+
+        if (!this.hasLotsChanged(tender.lots ?? [], fixedLots)) {
+          continue;
+        }
+
+        result.matchedCount += 1;
+        result.changedTenderIds.push(tender.id);
+
+        if (dryRun) {
+          continue;
+        }
+
+        const update = await TenderModel.updateOne(
+          { _id: tender._id },
+          { $set: { lots: fixedLots } },
+        ).exec();
+
+        result.updatedCount += update.modifiedCount;
+      } catch (error: unknown) {
+        result.errors.push({
+          id: tender.id,
+          message: getSafeErrorMessage(error),
+        });
+      }
+    }
+
+    return result;
+  }
+
   getTenderGeneralAnalysisStatus() {
     return this.tenderGeneralAnalysisService.getBaseAnalysisQueueStatus();
+  }
+
+  private hasXmlLinks(value: unknown): value is TenderDocumentsLinks {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      typeof (value as { xml?: unknown }).xml === 'object' &&
+      (value as { xml?: unknown }).xml !== null
+    );
+  }
+
+  private fixLotsAwardCriteriaFromXml(
+    lots: TenderLot[],
+    xmlCriteria: XmlAwardCriterion[],
+  ): TenderLot[] {
+    return lots.map((lot) => {
+      const awardCriteria = xmlCriteria
+        .filter((criterion) => {
+          return (
+            criterion.lotId === lot.identifier ||
+            criterion.lotInternalId === lot.identifier
+          );
+        })
+        .map((criterion) => ({
+          name: criterion.name,
+          type: criterion.type,
+          description: criterion.description,
+          weight: criterion.weight ?? null,
+          weightCode: criterion.weightCode,
+        }));
+
+      return {
+        ...lot,
+        awardCriteria,
+      };
+    });
+  }
+
+  private hasLotsChanged(before: TenderLot[], after: TenderLot[]): boolean {
+    return JSON.stringify(before) !== JSON.stringify(after);
   }
 }
 

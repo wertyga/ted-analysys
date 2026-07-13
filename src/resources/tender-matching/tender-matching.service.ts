@@ -11,7 +11,6 @@ import {
   DebouncedAsyncLatestQueueByKey,
   logger,
   QueueAsyncConcurrency,
-  readNumber,
   readString,
   readStringArray,
   toObjectId,
@@ -470,7 +469,6 @@ export class TenderMatchingService {
         noticeLanguage: tender.noticeLanguage ?? null,
         submissionLanguages: tender.submissionLanguages ?? [],
         selectionCriteria: this.mapSelectionCriteria(tender.selectionCriteria),
-        awardCriteria: this.mapAwardCriteria(tender.awardCriteria),
       },
     };
   }
@@ -546,23 +544,6 @@ export class TenderMatchingService {
       description: isRecord(item)
         ? (readString(item.description) ?? null)
         : (readString(item) ?? null),
-    }));
-  }
-
-  private mapAwardCriteria(
-    value: unknown,
-  ): CompanyTenderFitAiPayload['tender']['awardCriteria'] {
-    if (!Array.isArray(value)) {
-      return [];
-    }
-
-    return value.map((item) => ({
-      name: isRecord(item) ? (readString(item.name) ?? null) : null,
-      description: isRecord(item)
-        ? (readString(item.description) ?? null)
-        : (readString(item) ?? null),
-      type: isRecord(item) ? (readString(item.type) ?? null) : null,
-      weight: isRecord(item) ? (readNumber(item.weight) ?? null) : null,
     }));
   }
 

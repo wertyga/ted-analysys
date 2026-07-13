@@ -4,6 +4,7 @@ import type { Response } from 'express';
 import { AdminAccessGuard } from '@/guards';
 import { TendersTechService } from './tenders.tech.service';
 import {
+  FixTenderLotAwardCriteriaRequestDto,
   GenerateTenderGeneralAnalysesRequestDto,
   GenerateTenderShortTitlesRequestDto,
 } from './tenders.tech.dto';
@@ -59,6 +60,20 @@ export class TendersTechController {
     return this.tendersTechService.generateMissingOrStaleTenderGeneralAnalyses({
       limit: body.limit,
       batchSize: body.batchSize,
+    });
+  }
+
+  @ApiDefaultResponse({
+    description: 'Fixed tender lots award criteria from TED XML notices.',
+  })
+  @Post('/fix-lots-award-criteria')
+  fixTenderLotAwardCriteria(
+    @Body() body: FixTenderLotAwardCriteriaRequestDto,
+  ) {
+    return this.tendersTechService.fixTenderLotAwardCriteria({
+      batchSize: body.batchSize,
+      ids: body.ids,
+      dryRun: body.dryRun,
     });
   }
 

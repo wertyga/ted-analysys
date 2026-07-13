@@ -116,7 +116,6 @@ export class TenderDeepAnalysisBuilder {
       submissionUrls: tender.submissionUrls,
       euFundLot: tender.euFundLot,
       selectionCriteria: tender.selectionCriteria,
-      awardCriteria: tender.awardCriteria,
       links: tender.links,
     };
   }

@@ -54,7 +54,7 @@ export class AwardTenderNormalizer {
     lotWinners: { lotIdentifier: string; winnerKey: string }[];
   }> {
     const noticeWinners = this.normalizeWinnersNotice(notice);
-    const noticeLots = this.normalizeAwardLotsNotice(notice);
+    const noticeLots = await this.normalizeAwardLotsNotice(notice);
     const xmlLots = await extractLotWinnersFromXml(notice.links);
 
     const lots: NormalizedAwardTenderLot[] = noticeLots.map((l) => {
@@ -227,14 +227,17 @@ export class AwardTenderNormalizer {
     );
   }
 
-  normalizeAwardLotsNotice(notice: TedNotice): NormalizedAwardTenderLot[] {
+  async normalizeAwardLotsNotice(
+    notice: TedNotice,
+  ): Promise<NormalizedAwardTenderLot[]> {
     const data = {
       resultValues: getNumberArrayValue('result-value-lot', notice),
       resultValuesCurs: getArrayValue('result-value-cur-lot', notice),
       resultLotIdentifiers: getArrayValue('result-lot-identifier', notice),
     };
 
-    const tenderLots = this.tenderNormalizer.normalizeTenderLotsNotice(notice);
+    const tenderLots =
+      await this.tenderNormalizer.normalizeTenderLotsNotice(notice);
 
     return tenderLots.map((l, i) => {
       return {
@@ -251,11 +254,10 @@ export class AwardTenderNormalizer {
     });
   }
 
-  normalizeAwardTenderNotice(notice: TedNotice): NormalizedAwardTender {
-    const awardLots = this.normalizeAwardLotsNotice(notice);
-
-    const frameworkData =
-      this.tenderNormalizer.normalizeFrameworkFromTEDNotice(notice);
+  async normalizeAwardTenderNotice(
+    notice: TedNotice,
+  ): Promise<NormalizedAwardTender> {
+    const awardLots = await this.normalizeAwardLotsNotice(notice);
 
     const data = {
       id: getStringValue('publication-number', notice),

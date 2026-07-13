@@ -129,7 +129,8 @@ export class TendersService {
     notice: TedNotice,
     shortTitle?: TenderShortTitle,
   ): Promise<TenderDocument | undefined> {
-    const normalizedTender = this.tenderNormalizer.normalizeTedNotice(notice);
+    const normalizedTender =
+      await this.tenderNormalizer.normalizeTedNotice(notice);
 
     if (!normalizedTender.id) {
       return;
@@ -145,7 +146,7 @@ export class TendersService {
         ),
       ]);
 
-    const sourceHash = this.buildTenderSourceHash(notice);
+    const sourceHash = this.buildTenderSourceHash(normalizedTender);
     const tenderSet = {
       ...normalizedTender,
       nonLeadBuyers: buyers.nonLeadIds,
@@ -269,10 +270,8 @@ export class TendersService {
             id: getStringValue('publication-number', notice),
           });
 
-      const shouldTrackChangedTender = this.shouldUpdateTenderFromTedNotice(
-        existingTender,
-        notice,
-      );
+      const shouldTrackChangedTender =
+        this.shouldUpdateTenderFromTedNotice(existingTender);
 
       if (shouldTrackChangedTender || forceUpdate) {
         const publicationNumber = getStringValue('publication-number', notice);
@@ -437,13 +436,12 @@ export class TendersService {
 
   private shouldUpdateTenderFromTedNotice(
     tender: TenderDocument | undefined | null,
-    notice: TedNotice,
   ): boolean {
     if (!tender) {
       return true;
     }
 
-    const sourceHash = this.buildTenderSourceHash(notice);
+    const sourceHash = this.buildTenderSourceHash(tender);
 
     return tender.sourceHash !== sourceHash;
   }
@@ -605,10 +603,8 @@ export class TendersService {
         .populate(tenderPopulateFields)
         .exec();
 
-    const shouldUpsertTender = this.shouldUpdateTenderFromTedNotice(
-      savedTender,
-      notice,
-    );
+    const shouldUpsertTender =
+      this.shouldUpdateTenderFromTedNotice(savedTender);
 
     if (shouldUpsertTender) {
       savedTender = await this.upsertTender(notice);
@@ -737,9 +733,14 @@ export class TendersService {
     });
   }
 
-  buildTenderSourceHash(notice: TedNotice): string {
+  buildTenderSourceHash(normalizedTender: NormalizedTenderDto): string {
     return createHash('sha256')
-      .update((notice['notice-version'] ?? 1).toString())
+      .update(
+        JSON.stringify({
+          version: normalizedTender.noticeVersion,
+          lots: normalizedTender.lots.length,
+        }),
+      )
       .digest('hex');
   }
 

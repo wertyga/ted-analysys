@@ -15,10 +15,14 @@ export interface EstimatedValueCandidate {
 }
 
 export interface XmlAwardCriterion {
+  lotId?: string;
+  lotInternalId?: string;
+  lotName?: string;
   name?: string;
   description?: string;
   type?: string;
-  weight?: string;
+  weight?: number | null;
+  weightCode?: string;
 }
 
 export function findXmlUrl<T extends TenderDocumentsLinks>(
@@ -46,6 +50,18 @@ export async function fetchXmlContentFromNotice<T extends TenderDocumentsLinks>(
   const xmlUrl = findXmlUrl(links);
 
   return fetchXmlContentFromUrl(xmlUrl);
+}
+
+export async function fetchAwardCriteriaFromXml(
+  links: TenderDocumentsLinks,
+): Promise<XmlAwardCriterion[]> {
+  const content = await fetchXmlContentFromNotice(links);
+
+  if (!content) {
+    return [];
+  }
+
+  return extractXmlAwardCriteria(content);
 }
 
 export async function fetchXmlContentFromUrl(
@@ -376,51 +392,108 @@ export function extractXmlUrlsByAncestor(
 export function extractXmlAwardCriteria(xml: string): XmlAwardCriterion[] {
   const $ = cheerio.load(xml, { xmlMode: true });
   const criteria: XmlAwardCriterion[] = [];
+  const lots: Element[] = [];
 
   $('*').each((_, element) => {
-    const localName = getElementLocalName(element).toLowerCase();
-
     if (
-      localName !== 'subordinateawardingcriterion' &&
-      localName !== 'awardingcriterion'
+      isTag(element) &&
+      getElementLocalName(element).toLowerCase() === 'procurementprojectlot'
     ) {
-      return;
-    }
-
-    if (!isTag(element)) {
-      return;
-    }
-
-    const criterion: XmlAwardCriterion = {
-      name: firstXmlChildText($, element, 'Name'),
-      description: firstXmlChildText($, element, 'Description'),
-      type: firstXmlChildText($, element, 'AwardingCriterionTypeCode'),
-      weight: extractAwardCriterionWeight($, element),
-    };
-
-    if (
-      criterion.name !== undefined ||
-      criterion.description !== undefined ||
-      criterion.type !== undefined
-    ) {
-      criteria.push(criterion);
+      lots.push(element);
     }
   });
 
-  return dedupeAwardCriteria(criteria);
+  if (lots.length > 0) {
+    for (const lot of lots) {
+      const lotMeta = extractXmlLotMeta($, lot);
+      criteria.push(...extractAwardCriteriaFromElement($, lot, lotMeta));
+    }
+
+    return dedupeAwardCriteria(criteria);
+  }
+
+  return dedupeAwardCriteria(extractAwardCriteriaFromElement($, $.root()[0]));
+}
+
+function extractAwardCriteriaFromElement(
+  $: cheerio.CheerioAPI,
+  root: Element | AnyNode,
+  lotMeta: Pick<XmlAwardCriterion, 'lotId' | 'lotInternalId' | 'lotName'> = {},
+): XmlAwardCriterion[] {
+  const criteria: XmlAwardCriterion[] = [];
+
+  $(root)
+    .find('*')
+    .each((_, element) => {
+      const localName = getElementLocalName(element).toLowerCase();
+
+      if (
+        localName !== 'subordinateawardingcriterion' &&
+        localName !== 'awardingcriterion'
+      ) {
+        return;
+      }
+
+      if (!isTag(element)) {
+        return;
+      }
+
+      const weightData = extractAwardCriterionWeight($, element);
+      const criterion: XmlAwardCriterion = {
+        ...lotMeta,
+        name: firstXmlChildText($, element, 'Name'),
+        description: firstXmlChildText($, element, 'Description'),
+        type: firstXmlChildText($, element, 'AwardingCriterionTypeCode'),
+        weight: weightData.weight,
+        weightCode: weightData.weightCode,
+      };
+
+      if (
+        criterion.name !== undefined ||
+        criterion.description !== undefined ||
+        criterion.type !== undefined
+      ) {
+        criteria.push(criterion);
+      }
+    });
+
+  return criteria;
+}
+
+function extractXmlLotMeta(
+  $: cheerio.CheerioAPI,
+  lot: Element,
+): Pick<XmlAwardCriterion, 'lotId' | 'lotInternalId' | 'lotName'> {
+  const procurementProject = findFirstChildByLocalName(
+    $,
+    lot,
+    'ProcurementProject',
+  );
+
+  return {
+    lotId: firstXmlChildText($, lot, 'ID'),
+    lotInternalId:
+      procurementProject === undefined
+        ? undefined
+        : firstXmlChildText($, procurementProject, 'ID'),
+    lotName:
+      procurementProject === undefined
+        ? undefined
+        : firstXmlChildText($, procurementProject, 'Name'),
+  };
 }
 
 function extractAwardCriterionWeight(
   $: cheerio.CheerioAPI,
   criterion: Element,
-): string | undefined {
-  let result: string | undefined;
+): Pick<XmlAwardCriterion, 'weight' | 'weightCode'> {
+  const result: Pick<XmlAwardCriterion, 'weight' | 'weightCode'> = {};
 
   $(criterion)
     .find('*')
     .each((_, element) => {
       if (
-        result !== undefined ||
+        result.weight !== undefined ||
         getElementLocalName(element).toLowerCase() !== 'awardcriterionparameter'
       ) {
         return;
@@ -444,10 +517,23 @@ function extractAwardCriterionWeight(
         return;
       }
 
-      result = firstXmlChildText($, element, 'ParameterNumeric');
+      result.weightCode = firstXmlChildText($, element, 'ParameterCode');
+      result.weight = parseXmlNumber(
+        firstXmlChildText($, element, 'ParameterNumeric'),
+      );
     });
 
   return result;
+}
+
+function parseXmlNumber(value: string | undefined): number | null {
+  if (value === undefined || value.trim().length === 0) {
+    return null;
+  }
+
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function firstXmlChildText(
@@ -507,10 +593,13 @@ function dedupeAwardCriteria(
 
   for (const criterion of criteria) {
     const key = JSON.stringify([
+      criterion.lotId ?? null,
+      criterion.lotInternalId ?? null,
       criterion.name ?? null,
       criterion.description ?? null,
       criterion.type ?? null,
       criterion.weight ?? null,
+      criterion.weightCode ?? null,
     ]);
 
     if (seen.has(key)) {

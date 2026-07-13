@@ -250,7 +250,8 @@ export class AwardTenderService {
   async upsertAwardTender(
     notice: TedNotice,
   ): Promise<AwardTenderDocument | null> {
-    const normalizedTender = this.normalizer.normalizeAwardTenderNotice(notice);
+    const normalizedTender =
+      await this.normalizer.normalizeAwardTenderNotice(notice);
     if (!normalizedTender.id) {
       return null;
     }

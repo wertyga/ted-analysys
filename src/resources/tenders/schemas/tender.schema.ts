@@ -53,11 +53,12 @@ export interface TenderLot {
   placeOfPerformanceSubdivision?: string;
   placeOfPerformanceCity?: string;
   awardCriteria?: {
+    name?: string | null | undefined;
     type: string | null | undefined;
     description: string | null | undefined;
     weight: number | null | undefined;
     weightCode?: string | null | undefined;
-  };
+  }[];
   selectionCriteria?: {
     name: string | null | undefined;
     description: string | null | undefined;
@@ -145,8 +146,6 @@ export interface Tender {
   euFundLot?: boolean;
   /** TED selection-criterion-*-lot: lot-level selection criteria names/descriptions. */
   selectionCriteria?: unknown[];
-  /** TED award-criterion-*-lot: lot-level award criteria names/descriptions/types/weights. */
-  awardCriteria?: unknown[];
   /** Aggregated raw CPV code strings from classification/main/additional CPV fields. */
   cpvCodes?: string[];
   /** Raw TED links object, including notice/XML/HTML/document links when returned. */
@@ -185,8 +184,9 @@ export const TenderDurationSchema = new Schema<TenderDuration>(
   { _id: false },
 );
 
-const TenderAwardCriteriaSchema = new Schema(
+export const TenderCriteriaSchema = new Schema(
   {
+    name: { type: String, default: null },
     type: { type: String, default: null },
     description: { type: String, default: null },
     weight: { type: Number, default: null },
@@ -228,7 +228,7 @@ export const TenderLotSchema = new Schema<TenderLot>(
     placeOfPerformanceCountry: String,
     placeOfPerformanceSubdivision: String,
     placeOfPerformanceCity: String,
-    awardCriteria: { type: TenderAwardCriteriaSchema },
+    awardCriteria: { type: [TenderCriteriaSchema], default: [] },
     selectionCriteria: { type: TenderSelectionCriteriaSchema },
     selectionCriteriaSource: String,
     estimatedValueEur: { type: Number, default: null },
@@ -301,7 +301,6 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
       index: true,
     },
     selectionCriteria: { type: [Schema.Types.Mixed], default: [] },
-    awardCriteria: { type: [Schema.Types.Mixed], default: [] },
     cpvCodes: { type: [String], default: [] },
     links: Schema.Types.Mixed,
     sourceHash: { type: String, required: true, index: true },
@@ -390,8 +389,15 @@ TenderSchema.index(
 );
 
 function serializeTender(tender: TenderSerializable): Tender {
+  console.log('serializeTender');
   return filterModel(tender as TenderDocument, {
-    excludeFields: ['sourceHash'],
+    excludeFields: [
+      'sourceHash',
+      'links',
+      'noticeSubtype',
+      'noticeVersion',
+      'noticeType',
+    ],
   }) as Tender;
 }
 
@@ -420,7 +426,6 @@ TenderSchema.statics.serializeList = function (
       'legalBasis',
       'submissionUrls',
       'selectionCriteria',
-      'awardCriteria',
     ],
   });
 

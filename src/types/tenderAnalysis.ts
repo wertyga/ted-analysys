@@ -28,7 +28,6 @@ export interface TenderLotAnalysisInput {
   placeOfPerformanceCountries?: string[];
   placeOfPerformanceSubdivisions?: string[];
   placeOfPerformanceCities?: string[];
-  awardCriteria?: unknown;
   selectionCriteria?: unknown;
   selectionCriteriaSource?: string;
 }

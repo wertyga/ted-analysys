@@ -317,7 +317,6 @@ export interface TenderAnalysisTenderDto {
   documentAccess?: unknown;
   euFundLot?: boolean;
   selectionCriteria?: unknown[];
-  awardCriteria?: unknown[];
   links?: unknown;
 }
 

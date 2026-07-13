@@ -2,6 +2,7 @@ import mongoose, { Document, Model, Schema } from 'mongoose';
 import { TedContractNature } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
 import {
   MoneyValue,
+  TenderCriteriaSchema,
   TenderDocumentsLinks,
   TenderLot,
 } from '@/resources/tenders/schemas';
@@ -252,7 +253,7 @@ const AwardTenderLotSchema = new Schema<AwardTenderLot>(
     placeOfPerformanceCountry: String,
     placeOfPerformanceSubdivision: String,
     placeOfPerformanceCity: String,
-    awardCriteria: { type: Schema.Types.Mixed },
+    awardCriteria: { type: [TenderCriteriaSchema], default: [] },
     selectionCriteria: { type: Schema.Types.Mixed },
     selectionCriteriaSource: String,
 

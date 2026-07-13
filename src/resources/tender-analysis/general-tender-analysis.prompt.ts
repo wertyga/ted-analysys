@@ -69,7 +69,7 @@ export function buildGeneralTenderAnalysisPrompt(
 
     'ELIGIBILITY AND AWARD CRITERIA',
     'Use selectionCriteria as eligibility criteria.',
-    'Use awardCriteria as award criteria.',
+    'Use tender.lots[*].awardCriteria as award criteria.',
     'Return top-level awardCriteria as an aggregated human-readable English list across all lots and procedure-level criteria. Include lot identifiers in the text when criteria differ by lot.',
     'Preserve explicit weights, types, and descriptions when present.',
     'If criteria are only available per lot, mention that criteria may differ by lot.',

@@ -47,8 +47,10 @@ export class TedSearchAdminController {
 
       return {
         ...noticeData,
-        normalized: noticeData.notices.map((notice) =>
-          this.tenderNormalizerService.normalizeTedNotice(notice),
+        normalized: await Promise.all(
+          noticeData.notices.map((notice) =>
+            this.tenderNormalizerService.normalizeTedNotice(notice),
+          ),
         ),
       };
     } catch (e) {

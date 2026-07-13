@@ -82,6 +82,23 @@ type GeneralAnalysesResult = {
   }>;
 };
 
+type FixAwardCriteriaResult = {
+  totalCount: number;
+  scannedCount: number;
+  remainingCount: number;
+  xmlFetchedCount: number;
+  xmlWithoutCriteriaCount: number;
+  matchedCount: number;
+  updatedCount: number;
+  dryRun: boolean;
+  batchSize: number;
+  changedTenderIds: string[];
+  errors: Array<{
+    id: string;
+    message: string;
+  }>;
+};
+
 type GeneralAnalysisStatus = {
   totalTenders: number;
   totalAnalyses: number;
@@ -351,6 +368,13 @@ export default function AdminApp() {
   const [generalAnalysisStatus, setGeneralAnalysisStatus] =
     useState<GeneralAnalysisStatus | null>(null);
   const [generalAnalysesLoading, setGeneralAnalysesLoading] = useState(false);
+  const [fixAwardCriteriaBatchSize, setFixAwardCriteriaBatchSize] =
+    useState('100');
+  const [fixAwardCriteriaDryRun, setFixAwardCriteriaDryRun] = useState(true);
+  const [fixAwardCriteriaResult, setFixAwardCriteriaResult] =
+    useState<FixAwardCriteriaResult | null>(null);
+  const [fixAwardCriteriaLoading, setFixAwardCriteriaLoading] =
+    useState(false);
   const [dbCopyResult, setDbCopyResult] = useState<DbCopyResult | null>(null);
   const [dbCopyLoading, setDbCopyLoading] = useState(false);
   const [syncIndexesLoading, setSyncIndexesLoading] = useState(false);
@@ -914,6 +938,52 @@ export default function AdminApp() {
       );
     } finally {
       setGeneralAnalysesLoading(false);
+    }
+  }
+
+  async function fixTenderLotAwardCriteria(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!fixAwardCriteriaDryRun) {
+      const confirmed = window.confirm(
+        'Update tender lots award criteria from XML? Run dry-run first if you have not checked the expected changes.',
+      );
+
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    setFixAwardCriteriaLoading(true);
+    setMessage('');
+
+    try {
+      const result = await request<FixAwardCriteriaResult>(
+        '/adm/tech/tenders/fix-lots-award-criteria',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            batchSize: Number(fixAwardCriteriaBatchSize) || undefined,
+            dryRun: fixAwardCriteriaDryRun,
+          }),
+          token,
+        },
+      );
+
+      setFixAwardCriteriaResult(result);
+      setMessage(
+        result.dryRun
+          ? 'Award criteria dry-run finished.'
+          : 'Award criteria fix finished.',
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Failed to fix lot award criteria',
+      );
+    } finally {
+      setFixAwardCriteriaLoading(false);
     }
   }
 
@@ -2184,6 +2254,118 @@ export default function AdminApp() {
                   {generalAnalysesResult?.errors.length ? (
                     <div className="errorList">
                       {generalAnalysesResult.errors
+                        .slice(0, 10)
+                        .map((error) => (
+                          <div key={`${error.id}-${error.message}`}>
+                            <strong>{error.id}</strong>: {error.message}
+                          </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+
+                <section className="panel panelWide">
+                  <div className="panelHeader">
+                    <div>
+                      <h2>Lot award criteria fix</h2>
+                      <p>
+                        Rebuild saved lots award criteria from TED XML notices
+                        when the structured TED lot criteria are misaligned.
+                        Processes all matching tenders; batch size only controls
+                        database read chunks.
+                      </p>
+                    </div>
+                  </div>
+
+                  <form
+                    className="techForm techFormCompact"
+                    onSubmit={fixTenderLotAwardCriteria}
+                  >
+                    <label>
+                      Batch size
+                      <input
+                        max="5000"
+                        min="1"
+                        onChange={(event) =>
+                          setFixAwardCriteriaBatchSize(event.target.value)
+                        }
+                        type="number"
+                        value={fixAwardCriteriaBatchSize}
+                      />
+                    </label>
+                    <label className="checkboxLabel">
+                      <input
+                        checked={fixAwardCriteriaDryRun}
+                        onChange={(event) =>
+                          setFixAwardCriteriaDryRun(event.target.checked)
+                        }
+                        type="checkbox"
+                      />
+                      Dry run
+                    </label>
+                    <button
+                      disabled={fixAwardCriteriaLoading}
+                      type="submit"
+                    >
+                      {fixAwardCriteriaLoading
+                        ? 'Running...'
+                        : fixAwardCriteriaDryRun
+                          ? 'Preview fixes'
+                          : 'Apply fixes'}
+                    </button>
+                  </form>
+
+                  {fixAwardCriteriaResult ? (
+                    <dl className="stats">
+                      <div>
+                        <dt>Total</dt>
+                        <dd>{fixAwardCriteriaResult.totalCount}</dd>
+                      </div>
+                      <div>
+                        <dt>Scanned</dt>
+                        <dd>{fixAwardCriteriaResult.scannedCount}</dd>
+                      </div>
+                      <div>
+                        <dt>Remaining</dt>
+                        <dd>{fixAwardCriteriaResult.remainingCount}</dd>
+                      </div>
+                      <div>
+                        <dt>XML fetched</dt>
+                        <dd>{fixAwardCriteriaResult.xmlFetchedCount}</dd>
+                      </div>
+                      <div>
+                        <dt>Matched</dt>
+                        <dd>{fixAwardCriteriaResult.matchedCount}</dd>
+                      </div>
+                      <div>
+                        <dt>Updated</dt>
+                        <dd>{fixAwardCriteriaResult.updatedCount}</dd>
+                      </div>
+                      <div>
+                        <dt>No XML criteria</dt>
+                        <dd>
+                          {fixAwardCriteriaResult.xmlWithoutCriteriaCount}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Errors</dt>
+                        <dd>{fixAwardCriteriaResult.errors.length}</dd>
+                      </div>
+                    </dl>
+                  ) : null}
+
+                  {fixAwardCriteriaResult?.changedTenderIds.length ? (
+                    <div className="errorList">
+                      <strong>Changed tenders</strong>:{' '}
+                      {fixAwardCriteriaResult.changedTenderIds
+                        .slice(0, 20)
+                        .join(', ')}
+                    </div>
+                  ) : null}
+
+                  {fixAwardCriteriaResult?.errors.length ? (
+                    <div className="errorList">
+                      {fixAwardCriteriaResult.errors
                         .slice(0, 10)
                         .map((error) => (
                           <div key={`${error.id}-${error.message}`}>
