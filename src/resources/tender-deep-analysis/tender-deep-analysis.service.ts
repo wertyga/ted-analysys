@@ -388,7 +388,7 @@ export class TenderDeepAnalysisService {
     return createHash('sha256')
       .update(
         JSON.stringify({
-          provider: this.llmAnalysisService.getProvider(),
+          provider: this.llmAnalysisService.getDeepAnalysisProvider(),
           model: this.llmAnalysisService.getDeepAnalysisModel(),
           promptVersion: TENDER_DEEP_COMPANY_FIT_PROMPT_VERSION,
           outputLanguage,

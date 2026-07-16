@@ -321,7 +321,7 @@ export class TenderGeneralAnalysisService {
       .update(
         JSON.stringify({
           promptVersion: GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
-          provider: this.llmAnalysisService.getProvider(),
+          provider: this.llmAnalysisService.getGeneralAnalysisProvider(),
           tenderSourceHash: tender.sourceHash,
           model: this.llmAnalysisService.getGeneralAnalysisModel(),
         }),

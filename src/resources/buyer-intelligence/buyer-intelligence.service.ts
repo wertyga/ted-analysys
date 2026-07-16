@@ -616,7 +616,7 @@ export class BuyerIntelligenceService {
         JSON.stringify({
           buyerVersion,
           promptVersion: BUYER_INTELLIGENCE_PROMPT_VERSION,
-          provider: this.llmAnalysisService.getProvider(),
+          provider: this.llmAnalysisService.getGeneralAnalysisProvider(),
           model: this.llmAnalysisService.getGeneralAnalysisModel(),
         }),
       )

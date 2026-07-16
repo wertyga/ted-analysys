@@ -262,7 +262,7 @@ export class CompanyFilterService {
             : undefined,
           minDaysBeforeDeadline: user.minDaysBeforeDeadline,
           companyDocumentEvidenceSourceHash,
-          provider: this.llmAnalysisService.getProvider(),
+          provider: this.llmAnalysisService.getGeneralAnalysisProvider(),
           model: this.llmAnalysisService.getGeneralAnalysisModel(),
         }),
       )

@@ -25,61 +25,74 @@ export interface TenderShortTitleResult {
 }
 
 type LlmProvider = 'deepseek' | 'openai';
+type LlmAnalysisPurpose = 'general' | 'deep';
+
+interface LlmProviderConnection {
+  client: OpenAI;
+  model: string;
+  provider: LlmProvider;
+  providerName: string;
+}
 
 @Injectable()
 export class LlmAnalysisService extends BaseLlmAnalysisService {
-  private readonly client: OpenAI;
-  private readonly provider: LlmProvider;
-  private readonly generalAnalysisModel: string;
-  private readonly deepAnalysisModel: string;
+  private readonly generalConnection: LlmProviderConnection;
+  private readonly deepConnection: LlmProviderConnection;
 
   constructor(private readonly configService: ConfigService) {
-    const provider = LlmAnalysisService.resolveProvider(configService);
-    const providerName = provider === 'openai' ? 'OpenAI' : 'DeepSeek';
+    super('LLM', new Logger(LlmAnalysisService.name));
 
-    super(providerName, new Logger(LlmAnalysisService.name));
-
-    this.provider = provider;
-    this.client = new OpenAI({
-      apiKey: this.getApiKey(provider),
-      baseURL: this.getBaseUrl(provider),
-    });
-    this.generalAnalysisModel = this.getRequiredConfig(
-      'LLM_GENERAL_ANALYSIS_MODEL',
+    this.generalConnection = this.createConnection(
+      'general',
+      this.resolveProvider('GENERAL_ANALYSIS_PROVIDER'),
+      'GENERAL_ANALYSIS_MODEL',
     );
-    this.deepAnalysisModel = this.getRequiredConfig('LLM_DEEP_ANALYSIS_MODEL');
+    this.deepConnection = this.createConnection(
+      'deep',
+      this.resolveProvider('DEEP_ANALYSIS_PROVIDER'),
+      'DEEP_ANALYSIS_MODEL',
+    );
   }
 
-  private static resolveProvider(configService: ConfigService): LlmProvider {
+  private resolveProvider(purposeProviderKey: string): LlmProvider {
     const provider =
-      configService.get<string>('LLM_PROVIDER')?.toLowerCase() ?? 'deepseek';
+      this.getFirstConfigValue(`LLM_${purposeProviderKey}`, 'LLM_PROVIDER')
+        ?.toLowerCase() ?? 'deepseek';
 
     if (provider === 'deepseek' || provider === 'openai') {
       return provider;
     }
 
     throw new ServiceUnavailableException(
-      `Unsupported LLM_PROVIDER "${provider}". Use "deepseek" or "openai".`,
+      `Unsupported LLM provider "${provider}". Use "deepseek" or "openai".`,
     );
   }
 
   getProvider(): LlmProvider {
-    return this.provider;
+    return this.getGeneralAnalysisProvider();
+  }
+
+  getGeneralAnalysisProvider(): LlmProvider {
+    return this.generalConnection.provider;
+  }
+
+  getDeepAnalysisProvider(): LlmProvider {
+    return this.deepConnection.provider;
   }
 
   getGeneralAnalysisModel(): string {
-    return this.generalAnalysisModel;
+    return this.generalConnection.model;
   }
 
   getDeepAnalysisModel(): string {
-    return this.deepAnalysisModel;
+    return this.deepConnection.model;
   }
 
   async generateTenderShortTitles(
     input: TenderShortTitleInput[],
   ): Promise<TenderShortTitleResult[]> {
-    const response = await this.client.chat.completions.create({
-      model: this.generalAnalysisModel,
+    const response = await this.generalConnection.client.chat.completions.create({
+      model: this.generalConnection.model,
       messages: [
         {
           role: 'system',
@@ -104,7 +117,9 @@ export class LlmAnalysisService extends BaseLlmAnalysisService {
     const responseText = response.choices[0]?.message.content;
 
     if (!responseText) {
-      throw new Error(`${this.providerName} response did not contain message content`);
+      throw new Error(
+        `${this.generalConnection.providerName} response did not contain message content`,
+      );
     }
 
     const parsed = JSON.parse(responseText) as unknown;
@@ -115,11 +130,11 @@ export class LlmAnalysisService extends BaseLlmAnalysisService {
   protected async createProviderJsonResponse(
     prompt: string,
     context: string,
-    purpose: 'general' | 'deep',
+    purpose: LlmAnalysisPurpose,
   ): Promise<string> {
-    const response = await this.client.chat.completions.create({
-      model:
-        purpose === 'deep' ? this.deepAnalysisModel : this.generalAnalysisModel,
+    const connection = this.getConnection(purpose);
+    const response = await connection.client.chat.completions.create({
+      model: connection.model,
       messages: [
         { role: 'system', content: prompt },
         { role: 'user', content: context },
@@ -131,17 +146,41 @@ export class LlmAnalysisService extends BaseLlmAnalysisService {
     const responseText = response.choices[0]?.message.content;
 
     if (!responseText) {
-      throw new Error(`${this.providerName} response did not contain message content`);
+      throw new Error(
+        `${connection.providerName} response did not contain message content`,
+      );
     }
 
     return responseText;
   }
 
-  private getApiKey(provider: LlmProvider): string {
+  private createConnection(
+    purpose: LlmAnalysisPurpose,
+    provider: LlmProvider,
+    modelKey: string,
+  ): LlmProviderConnection {
+    return {
+      client: new OpenAI({
+        apiKey: this.getApiKey(provider, purpose),
+        baseURL: this.getBaseUrl(provider, purpose),
+      }),
+      model: this.getModelConfig(provider, modelKey),
+      provider,
+      providerName: this.getProviderName(provider),
+    };
+  }
+
+  private getConnection(purpose: LlmAnalysisPurpose): LlmProviderConnection {
+    return purpose === 'deep' ? this.deepConnection : this.generalConnection;
+  }
+
+  private getApiKey(provider: LlmProvider, purpose: LlmAnalysisPurpose): string {
     const providerPrefix = provider === 'openai' ? 'OPENAI' : 'DEEPSEEK';
-    const apiKey =
-      this.configService.get<string>('LLM_API_KEY') ??
-      this.configService.get<string>(`${providerPrefix}_API_KEY`);
+    const apiKey = this.getFirstConfigValue(
+      `LLM_${purpose.toUpperCase()}_ANALYSIS_API_KEY`,
+      'LLM_API_KEY',
+      `${providerPrefix}_API_KEY`,
+    );
 
     if (!apiKey) {
       throw new ServiceUnavailableException(
@@ -152,11 +191,17 @@ export class LlmAnalysisService extends BaseLlmAnalysisService {
     return apiKey;
   }
 
-  private getBaseUrl(provider: LlmProvider): string | undefined {
+  private getBaseUrl(
+    provider: LlmProvider,
+    purpose: LlmAnalysisPurpose,
+  ): string | undefined {
     const providerPrefix = provider === 'openai' ? 'OPENAI' : 'DEEPSEEK';
-    const baseUrl =
-      this.configService.get<string>('LLM_BASE_URL') ??
-      this.configService.get<string>(`${providerPrefix}_BASE_URL`);
+    const baseUrl = this.getFirstConfigValue(
+      `LLM_${purpose.toUpperCase()}_ANALYSIS_BASE_URL`,
+      'LLM_BASE_URL',
+      `${providerPrefix}_BASE_URL`,
+      `${providerPrefix}_API_BASE_URL`,
+    );
 
     if (baseUrl) {
       return baseUrl;
@@ -165,14 +210,35 @@ export class LlmAnalysisService extends BaseLlmAnalysisService {
     return provider === 'deepseek' ? 'https://api.deepseek.com' : undefined;
   }
 
-  private getRequiredConfig(key: string): string {
-    const value = this.configService.get<string>(key);
+  private getModelConfig(provider: LlmProvider, modelKey: string): string {
+    const providerPrefix = provider === 'openai' ? 'OPENAI' : 'DEEPSEEK';
+    const sharedKey = `LLM_${modelKey}`;
+    const providerKey = `${providerPrefix}_${modelKey}`;
+    const value = this.getFirstConfigValue(sharedKey, providerKey);
 
     if (!value) {
-      throw new ServiceUnavailableException(`${key} is not configured`);
+      throw new ServiceUnavailableException(
+        `${sharedKey} or ${providerKey} is not configured`,
+      );
     }
 
     return value;
+  }
+
+  private getProviderName(provider: LlmProvider): string {
+    return provider === 'openai' ? 'OpenAI' : 'DeepSeek';
+  }
+
+  private getFirstConfigValue(...keys: string[]): string | undefined {
+    for (const key of keys) {
+      const value = this.configService.get<string>(key)?.trim();
+
+      if (value) {
+        return value;
+      }
+    }
+
+    return undefined;
   }
 
   private validateTenderShortTitles(value: unknown): TenderShortTitleResult[] {
