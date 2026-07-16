@@ -4,7 +4,8 @@ import { PaymentsService } from '@/resources/payments/payments.service';
 import { UserDocument } from '@/resources/user/user.types';
 import { CouponDocument, CouponModel } from './schemas';
 
-export const FREE_USE_COUPON_HEADER = 'x-free-use-coupon';
+const FREE_USE_COUPON_CODE_LENGTH = 10;
+const FREE_USE_COUPON_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 @Injectable()
 export class CouponService {
@@ -12,25 +13,42 @@ export class CouponService {
 
   async redeemFreeUseCouponForUser(
     user: UserDocument,
-    code?: string,
-  ): Promise<PaymentEntitlementDocument | null> {
-    if (!code) {
-      return null;
-    }
-
+  ): Promise<PaymentEntitlementDocument> {
     return this.paymentsService.createFreeCouponEntitlement(
       user,
-      await this.createCouponRedemption(user, code),
+      await this.createCouponRedemption(user),
     );
   }
 
   private async createCouponRedemption(
     user: UserDocument,
-    code: string,
   ): Promise<CouponDocument> {
     return CouponModel.create({
-      code,
+      code: await this.generateUnusedCouponCode(),
       usedBy: user._id,
     });
+  }
+
+  private async generateUnusedCouponCode(): Promise<string> {
+    let code = this.generateCouponCode();
+
+    while (await CouponModel.exists({ code })) {
+      code = this.generateCouponCode();
+    }
+
+    return code;
+  }
+
+  private generateCouponCode(): string {
+    let code = '';
+
+    for (let i = 0; i < FREE_USE_COUPON_CODE_LENGTH; i += 1) {
+      code +=
+        FREE_USE_COUPON_ALPHABET[
+          Math.floor(Math.random() * FREE_USE_COUPON_ALPHABET.length)
+        ];
+    }
+
+    return code;
   }
 }

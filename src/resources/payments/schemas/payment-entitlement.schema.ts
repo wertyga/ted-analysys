@@ -13,6 +13,7 @@ export interface PaymentEntitlement {
   type: PurchaseEntitlementType;
   expiration: Date | null;
   isCanceled: boolean;
+  isTrial: boolean;
   createdAt: Date;
   updatedAt?: Date;
 }
@@ -70,6 +71,11 @@ const PaymentEntitlementSchema = new Schema<PaymentEntitlementDocument>(
     isCanceled: {
       type: Boolean,
       required: true,
+    },
+    isTrial: {
+      type: Boolean,
+      required: true,
+      default: false,
     },
   },
   {

@@ -31,8 +31,7 @@ export class AuthService {
   constructCreateTempUserPayload({
     email,
     password,
-    tempFreeUseCouponCode,
-  }: Pick<UserType, 'email' | 'password' | 'tempFreeUseCouponCode'>) {
+  }: Pick<UserType, 'email' | 'password'>) {
     const token = generateToken(email);
 
     const payload: Partial<UserType> = {
@@ -41,7 +40,6 @@ export class AuthService {
       recoveryToken: token,
       hashPassword: generateHash(password),
       status: USER_TYPE.TEMPORARY,
-      tempFreeUseCouponCode,
     };
 
     return payload;
@@ -93,13 +91,9 @@ export class AuthService {
     }
   }
 
-  async upsertTempUser(
-    userPayload: CreateUserDto,
-    couponCode?: string,
-  ): Promise<UserDocument> {
+  async upsertTempUser(userPayload: CreateUserDto): Promise<UserDocument> {
     const payload = this.constructCreateTempUserPayload({
       ...userPayload,
-      tempFreeUseCouponCode: couponCode,
     });
 
     return UserModel.findOneAndUpdate(
@@ -116,22 +110,16 @@ export class AuthService {
       return null;
     }
 
-    const freeUseCouponCode = user.tempFreeUseCouponCode;
-
     user.status = USER_TYPE.USER;
     user.email = user.tempEmail as string;
     user.tempEmail = '';
     user.tempFreeUseCouponCode = '';
     user.recoveryToken = '';
     user.token = generateToken(user.email);
+
     await user.save();
 
-    if (freeUseCouponCode) {
-      await this.couponService.redeemFreeUseCouponForUser(
-        user,
-        freeUseCouponCode,
-      );
-    }
+    await this.couponService.redeemFreeUseCouponForUser(user);
 
     return user;
   }

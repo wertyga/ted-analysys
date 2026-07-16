@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  Headers,
   Post,
   Query,
   Req,
@@ -39,7 +38,7 @@ import { replaceTemplateVars } from '@/resources/email/email.utils';
 import { EMAIL_TEMPLATES } from '@/resources/email/type';
 import { HttpErrorLoggingFilter } from '@/http-logger/HTTPLogger';
 import { AuthGuard } from '@/guards';
-import { CouponService, FREE_USE_COUPON_HEADER } from '@/resources/coupon';
+import { CouponService } from '@/resources/coupon';
 
 export const AUTH_EXCLUDE_FIELDS = [] as (keyof UserDocument)[];
 
@@ -60,14 +59,11 @@ export class AuthController {
   @ApiBody({ type: SignInUserDto })
   @ApiDefaultResponse({ type: UserAuthDto })
   @Post('/oauth/google')
-  async oauthGoogle(
-    @Body() data: OauthSignInDto,
-    @Headers(FREE_USE_COUPON_HEADER) couponCode?: string,
-  ) {
+  async oauthGoogle(@Body() data: OauthSignInDto) {
     const { user, isNewUser } = await this.authService.oauthSignIn(data);
 
-    if (couponCode) {
-      await this.couponService.redeemFreeUseCouponForUser(user, couponCode);
+    if (isNewUser) {
+      await this.couponService.redeemFreeUseCouponForUser(user);
     }
 
     return {
@@ -96,10 +92,7 @@ export class AuthController {
   @ApiBody({ type: CreateUserDto })
   @ApiDefaultResponse({ type: SuccessDto })
   @Post('/signup')
-  async signUpUser(
-    @Body() userPayload: CreateUserDto,
-    @Headers(FREE_USE_COUPON_HEADER) couponCode: string | undefined,
-  ) {
+  async signUpUser(@Body() userPayload: CreateUserDto) {
     const { email } = userPayload;
 
     await this.authService.utils.checkIfUserExistsGuard([
@@ -107,7 +100,7 @@ export class AuthController {
       { email },
     ]);
 
-    const user = await this.authService.upsertTempUser(userPayload, couponCode);
+    const user = await this.authService.upsertTempUser(userPayload);
 
     await this.authService.sendConfirmLink({
       email: user.tempEmail ?? '',

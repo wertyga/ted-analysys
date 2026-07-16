@@ -23,6 +23,7 @@ type ActivePaymentEntitlement = Record<string, any> & {
   planId: string;
   tariffType?: TariffType | null;
   isCanceled?: boolean;
+  isTrial?: boolean;
   expiration?: Date | null;
 };
 
@@ -37,9 +38,7 @@ export class PaymentsService {
     coupon: CouponDocument,
   ) {
     const now = new Date();
-    const registrationDate = user.createdAt ? new Date(user.createdAt) : now;
-    const expiration = new Date(registrationDate);
-    expiration.setDate(expiration.getDate() + 7);
+    const expiration = new Date(now).setDate(now.getDate() + 7);
 
     const licenseId = this.buildFreeCouponLicenseId(coupon, user);
 
@@ -59,6 +58,7 @@ export class PaymentsService {
           type: 'subscription',
           expiration,
           isCanceled: false,
+          isTrial: true,
         },
       },
       {
@@ -238,6 +238,7 @@ export class PaymentsService {
         type: 'subscription',
         expiration: purchase.renewalDate,
         isCanceled: purchase.canceled,
+        isTrial: false,
         subscriptionId: purchase.subscriptionId,
         ...(tariffType ? { tariffType } : {}),
       },
