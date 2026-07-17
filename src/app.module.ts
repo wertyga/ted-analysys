@@ -13,6 +13,7 @@ import { TendersModule } from './resources/tenders/tenders.module';
 import { TenderWishlistModule } from './resources/tender-wishlist/tender-wishlist.module';
 import { AuthModule } from './resources/auth/auth.module';
 import { GetUserMiddleware } from './middlewares/auth.middleware';
+import { BotDetectionMiddleware } from './middlewares/bot-detection.middleware';
 import { UsersModule } from './resources/user/users.module';
 import { CodelistModule } from './resources/codelist/codelist.module';
 import { CompanyFilterModule } from './resources/company-filter/company-filter.module';
@@ -70,6 +71,6 @@ import { SettingsModule } from '@/resources/settings/settings.module';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(GetUserMiddleware).forRoutes('*');
+    consumer.apply(BotDetectionMiddleware, GetUserMiddleware).forRoutes('*');
   }
 }
