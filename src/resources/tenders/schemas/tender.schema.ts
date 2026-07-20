@@ -389,7 +389,6 @@ TenderSchema.index(
 );
 
 function serializeTender(tender: TenderSerializable): Tender {
-  console.log('serializeTender');
   return filterModel(tender as TenderDocument, {
     excludeFields: [
       'sourceHash',
