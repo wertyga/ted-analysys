@@ -16,6 +16,7 @@ import { TariffService } from '@/resources/tariff/tariff.service';
 import { TariffType } from '@/resources/tariff/tariff.types';
 import { TenderGeneralAnalysisService } from '@/resources/tender-analysis/tender-general-analysis.service';
 import { TenderGeneralAnalysisDetailDto } from '@/resources/tender-analysis/dto/tender-general-analysis.dto';
+import { logger } from '@/utils';
 
 @ApiTags('tenders')
 @Controller('tenders')
@@ -35,6 +36,8 @@ export class TendersController {
     @Param('id') id: string,
     @Req() req,
   ): Promise<TenderDetailDto> {
+    await logger.info('Find by id request', req.headers);
+
     const tba = await this.tendersService.findById(id, !!req.isBot);
 
     const tender = tba.toObject();
