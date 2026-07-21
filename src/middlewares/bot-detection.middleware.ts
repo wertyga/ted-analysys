@@ -2,7 +2,7 @@ import { Injectable, NestMiddleware } from '@nestjs/common';
 import { NextFunction, Request, Response } from 'express';
 
 const SEARCH_BOT_UA_REGEX =
-  /googlebot|bingbot|yandexbot|duckduckbot|baiduspider|slurp|facebookexternalhit|twitterbot|linkedinbot|telegrambot|applebot|semrushbot|ahrefsbot|mj12bot|googleother|node/i;
+  /googlebot|bingbot|yandexbot|duckduckbot|baiduspider|slurp|facebookexternalhit|twitterbot|linkedinbot|telegrambot|applebot|semrushbot|ahrefsbot|mj12bot|googleother|node|bot/i;
 
 export function isSearchBot(userAgent?: string): boolean {
   if (!userAgent) return false;
