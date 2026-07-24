@@ -36,7 +36,10 @@ export class TendersController {
     @Param('id') id: string,
     @Req() req,
   ): Promise<TenderDetailDto> {
-    await logger.info('Find by id request', req.headers);
+    await logger.info('Find by id request', {
+      headers: req.headers,
+      isBot: req.isBot,
+    });
 
     const tba = await this.tendersService.findById(id, !!req.isBot);
 
