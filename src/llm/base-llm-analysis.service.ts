@@ -25,7 +25,7 @@ type JsonRecord = Record<string, unknown>;
 type LlmAnalysisPurpose = 'general' | 'deep';
 
 export abstract class BaseLlmAnalysisService {
-  protected readonly retryDelaysMs = [500, ...new Array(10).fill(1500)];
+  protected readonly retryDelaysMs = [500, ...new Array(2).fill(1000)];
   protected readonly maxDocumentChars = 40_000;
   protected readonly maxContextChars = 180_000;
 

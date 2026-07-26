@@ -24,7 +24,7 @@ export interface TenderShortTitleResult {
   };
 }
 
-type LlmProvider = 'deepseek' | 'openai';
+type LlmProvider = 'deepseek' | 'openai' | 'kimi' | 'aigate';
 type LlmAnalysisPurpose = 'general' | 'deep';
 
 interface LlmProviderConnection {
@@ -42,29 +42,35 @@ export class LlmAnalysisService extends BaseLlmAnalysisService {
   constructor(private readonly configService: ConfigService) {
     super('LLM', new Logger(LlmAnalysisService.name));
 
+    const provider = this.resolveProvider();
+
     this.generalConnection = this.createConnection(
       'general',
-      this.resolveProvider('GENERAL_ANALYSIS_PROVIDER'),
+      provider,
       'GENERAL_ANALYSIS_MODEL',
     );
     this.deepConnection = this.createConnection(
       'deep',
-      this.resolveProvider('DEEP_ANALYSIS_PROVIDER'),
+      provider,
       'DEEP_ANALYSIS_MODEL',
     );
   }
 
-  private resolveProvider(purposeProviderKey: string): LlmProvider {
+  private resolveProvider(): LlmProvider {
     const provider =
-      this.getFirstConfigValue(`LLM_${purposeProviderKey}`, 'LLM_PROVIDER')
-        ?.toLowerCase() ?? 'deepseek';
+      this.getFirstConfigValue('LLM_PROVIDER')?.toLowerCase() ?? 'deepseek';
 
-    if (provider === 'deepseek' || provider === 'openai') {
+    if (
+      provider === 'deepseek' ||
+      provider === 'openai' ||
+      provider === 'kimi' ||
+      provider === 'aigate'
+    ) {
       return provider;
     }
 
     throw new ServiceUnavailableException(
-      `Unsupported LLM provider "${provider}". Use "deepseek" or "openai".`,
+      `Unsupported LLM provider "${provider}". Use "deepseek", "openai", "kimi", or "aigate".`,
     );
   }
 
@@ -91,29 +97,29 @@ export class LlmAnalysisService extends BaseLlmAnalysisService {
   async generateTenderShortTitles(
     input: TenderShortTitleInput[],
   ): Promise<TenderShortTitleResult[]> {
-    const response = await this.generalConnection.client.chat.completions.create({
-      model: this.generalConnection.model,
-      messages: [
-        {
-          role: 'system',
-          content: [
-            'You rewrite public procurement tender titles into short, clear, user-facing titles.',
-            'For each input item, preserve the id exactly.',
-            'Create shortTitle translations in English, German, French, Polish, and Russian.',
-            'Keep each title concise, ideally 5-10 words.',
-            'Preserve the procurement subject and avoid adding facts not present in the source title.',
-            'Return JSON only in this exact shape: {"items":[{"id":"...","en":"...","de":"...","fr":"...","pl":"...","ru":"..."}]}.',
-          ].join('\n'),
-        },
-        {
-          role: 'user',
-          content: JSON.stringify({ items: input }, null, 2),
-        },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.1,
-      stream: false,
-    });
+    const response =
+      await this.generalConnection.client.chat.completions.create({
+        model: this.generalConnection.model,
+        messages: [
+          {
+            role: 'system',
+            content: [
+              'You rewrite public procurement tender titles into short, clear, user-facing titles.',
+              'For each input item, preserve the id exactly.',
+              'Create shortTitle translations in English, German, French, Polish, and Russian.',
+              'Keep each title concise, ideally 5-10 words.',
+              'Preserve the procurement subject and avoid adding facts not present in the source title.',
+              'Return JSON only in this exact shape: {"items":[{"id":"...","en":"...","de":"...","fr":"...","pl":"...","ru":"..."}]}.',
+            ].join('\n'),
+          },
+          {
+            role: 'user',
+            content: JSON.stringify({ items: input }, null, 2),
+          },
+        ],
+        ...this.getChatCompletionOptions(this.generalConnection),
+        stream: false,
+      });
     const responseText = response.choices[0]?.message.content;
 
     if (!responseText) {
@@ -139,8 +145,7 @@ export class LlmAnalysisService extends BaseLlmAnalysisService {
         { role: 'system', content: prompt },
         { role: 'user', content: context },
       ],
-      response_format: { type: 'json_object' },
-      temperature: 0.1,
+      ...this.getChatCompletionOptions(connection),
       stream: false,
     });
     const responseText = response.choices[0]?.message.content;
@@ -154,6 +159,17 @@ export class LlmAnalysisService extends BaseLlmAnalysisService {
     return responseText;
   }
 
+  private getChatCompletionOptions(connection: LlmProviderConnection) {
+    if (connection.provider === 'aigate') {
+      return {};
+    }
+
+    return {
+      response_format: { type: 'json_object' } as const,
+      temperature: 0.1,
+    };
+  }
+
   private createConnection(
     purpose: LlmAnalysisPurpose,
     provider: LlmProvider,
@@ -161,8 +177,8 @@ export class LlmAnalysisService extends BaseLlmAnalysisService {
   ): LlmProviderConnection {
     return {
       client: new OpenAI({
-        apiKey: this.getApiKey(provider, purpose),
-        baseURL: this.getBaseUrl(provider, purpose),
+        apiKey: this.getApiKey(),
+        baseURL: this.getBaseUrl(provider),
       }),
       model: this.getModelConfig(provider, modelKey),
       provider,
@@ -174,44 +190,50 @@ export class LlmAnalysisService extends BaseLlmAnalysisService {
     return purpose === 'deep' ? this.deepConnection : this.generalConnection;
   }
 
-  private getApiKey(provider: LlmProvider, purpose: LlmAnalysisPurpose): string {
-    const providerPrefix = provider === 'openai' ? 'OPENAI' : 'DEEPSEEK';
-    const apiKey = this.getFirstConfigValue(
-      `LLM_${purpose.toUpperCase()}_ANALYSIS_API_KEY`,
-      'LLM_API_KEY',
-      `${providerPrefix}_API_KEY`,
-    );
+  private getApiKey(): string {
+    const apiKey = this.getFirstConfigValue('LLM_API_KEY');
 
     if (!apiKey) {
       throw new ServiceUnavailableException(
-        `LLM API key is not configured. Set LLM_API_KEY or ${providerPrefix}_API_KEY.`,
+        'LLM API key is not configured. Set LLM_API_KEY.',
       );
     }
 
     return apiKey;
   }
 
-  private getBaseUrl(
-    provider: LlmProvider,
-    purpose: LlmAnalysisPurpose,
-  ): string | undefined {
-    const providerPrefix = provider === 'openai' ? 'OPENAI' : 'DEEPSEEK';
+  private getBaseUrl(provider: LlmProvider): string | undefined {
+    const providerPrefix = this.getProviderEnvPrefix(provider);
+    const providerBaseUrlFallbacks =
+      provider === 'kimi' ? ['MOONSHOT_BASE_URL', 'MOONSHOT_API_BASE_URL'] : [];
     const baseUrl = this.getFirstConfigValue(
-      `LLM_${purpose.toUpperCase()}_ANALYSIS_BASE_URL`,
       'LLM_BASE_URL',
       `${providerPrefix}_BASE_URL`,
       `${providerPrefix}_API_BASE_URL`,
+      ...providerBaseUrlFallbacks,
     );
 
     if (baseUrl) {
       return baseUrl;
     }
 
-    return provider === 'deepseek' ? 'https://api.deepseek.com' : undefined;
+    if (provider === 'deepseek') {
+      return 'https://api.deepseek.com';
+    }
+
+    if (provider === 'kimi') {
+      return 'https://api.moonshot.ai/v1';
+    }
+
+    if (provider === 'aigate') {
+      return 'https://api.aigate.shop/v1';
+    }
+
+    return undefined;
   }
 
   private getModelConfig(provider: LlmProvider, modelKey: string): string {
-    const providerPrefix = provider === 'openai' ? 'OPENAI' : 'DEEPSEEK';
+    const providerPrefix = this.getProviderEnvPrefix(provider);
     const sharedKey = `LLM_${modelKey}`;
     const providerKey = `${providerPrefix}_${modelKey}`;
     const value = this.getFirstConfigValue(sharedKey, providerKey);
@@ -226,7 +248,35 @@ export class LlmAnalysisService extends BaseLlmAnalysisService {
   }
 
   private getProviderName(provider: LlmProvider): string {
-    return provider === 'openai' ? 'OpenAI' : 'DeepSeek';
+    if (provider === 'openai') {
+      return 'OpenAI';
+    }
+
+    if (provider === 'kimi') {
+      return 'Kimi';
+    }
+
+    if (provider === 'aigate') {
+      return 'AIGate';
+    }
+
+    return 'DeepSeek';
+  }
+
+  private getProviderEnvPrefix(provider: LlmProvider): string {
+    if (provider === 'openai') {
+      return 'OPENAI';
+    }
+
+    if (provider === 'kimi') {
+      return 'KIMI';
+    }
+
+    if (provider === 'aigate') {
+      return 'AIGATE';
+    }
+
+    return 'DEEPSEEK';
   }
 
   private getFirstConfigValue(...keys: string[]): string | undefined {

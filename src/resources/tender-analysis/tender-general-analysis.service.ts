@@ -101,6 +101,7 @@ export class TenderGeneralAnalysisService {
         },
       );
     } catch (error: unknown) {
+      console.log({ error });
       return TenderGeneralAnalysisModel.findByIdAndUpdate(
         baseTenderAnalysis._id,
         {
@@ -323,7 +324,8 @@ export class TenderGeneralAnalysisService {
           promptVersion: GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
           provider: this.llmAnalysisService.getGeneralAnalysisProvider(),
           tenderSourceHash: tender.sourceHash,
-          model: this.llmAnalysisService.getGeneralAnalysisModel(),
+          model: 'deepseek',
+          // model: this.llmAnalysisService.getGeneralAnalysisModel(),
         }),
       )
       .digest('hex');

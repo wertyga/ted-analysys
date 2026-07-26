@@ -200,12 +200,11 @@ Shared helpers live in `src/utils`.
 
 ## Model Configuration
 
-- `LLM_PROVIDER`: shared provider, `deepseek` by default, or `openai`.
-- `LLM_GENERAL_ANALYSIS_PROVIDER` and `LLM_DEEP_ANALYSIS_PROVIDER`: optional provider overrides for general and deep analysis. Each accepts `deepseek` or `openai`.
-- `LLM_API_KEY`: shared API key override. Otherwise use `DEEPSEEK_API_KEY` or `OPENAI_API_KEY`.
-- `LLM_BASE_URL`: optional shared base URL override. Otherwise use `DEEPSEEK_BASE_URL`/`DEEPSEEK_API_BASE_URL` or `OPENAI_BASE_URL`; DeepSeek defaults to `https://api.deepseek.com`, OpenAI uses the SDK default.
+- `LLM_PROVIDER`: shared provider, `deepseek` by default, or `openai`/`kimi`/`aigate`.
+- `LLM_API_KEY`: shared API key for the selected provider.
+- `LLM_BASE_URL`: optional shared base URL override. Otherwise use `DEEPSEEK_BASE_URL`/`DEEPSEEK_API_BASE_URL`, `OPENAI_BASE_URL`, `KIMI_BASE_URL`/`KIMI_API_BASE_URL`, `MOONSHOT_BASE_URL`/`MOONSHOT_API_BASE_URL`, or `AIGATE_BASE_URL`/`AIGATE_API_BASE_URL`; DeepSeek defaults to `https://api.deepseek.com`, Kimi defaults to `https://api.moonshot.ai/v1`, AIGate defaults to `https://api.aigate.shop/v1`, OpenAI uses the SDK default.
 - `LLM_GENERAL_ANALYSIS_MODEL` and `LLM_DEEP_ANALYSIS_MODEL`: shared model overrides for general and deep analysis.
-- Provider-specific model variables are also supported: `DEEPSEEK_GENERAL_ANALYSIS_MODEL`, `DEEPSEEK_DEEP_ANALYSIS_MODEL`, `OPENAI_GENERAL_ANALYSIS_MODEL`, and `OPENAI_DEEP_ANALYSIS_MODEL`.
+- Provider-specific model variables are also supported: `DEEPSEEK_GENERAL_ANALYSIS_MODEL`, `DEEPSEEK_DEEP_ANALYSIS_MODEL`, `OPENAI_GENERAL_ANALYSIS_MODEL`, `OPENAI_DEEP_ANALYSIS_MODEL`, `KIMI_GENERAL_ANALYSIS_MODEL`, `KIMI_DEEP_ANALYSIS_MODEL`, `AIGATE_GENERAL_ANALYSIS_MODEL`, and `AIGATE_DEEP_ANALYSIS_MODEL`.
 
 ## Data Notes
 
