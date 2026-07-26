@@ -3,8 +3,8 @@ import {
   forwardRef,
   Get,
   Inject,
+  NotFoundException,
   Param,
-  Query,
   Req,
 } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -16,7 +16,6 @@ import { TariffService } from '@/resources/tariff/tariff.service';
 import { TariffType } from '@/resources/tariff/tariff.types';
 import { TenderGeneralAnalysisService } from '@/resources/tender-analysis/tender-general-analysis.service';
 import { TenderGeneralAnalysisDetailDto } from '@/resources/tender-analysis/dto/tender-general-analysis.dto';
-import { logger } from '@/utils';
 
 @ApiTags('tenders')
 @Controller('tenders')
@@ -34,20 +33,23 @@ export class TendersController {
   @ApiOkResponse({ type: TenderDto })
   async findById(
     @Param('id') id: string,
+    @Param('withBa') withBa: boolean,
     @Req() req,
   ): Promise<TenderDetailDto> {
-    await logger.info('Find by id request', {
-      headers: req.headers,
-      isBot: req.isBot,
-    });
+    const [tenderSerialized, tariff] = await Promise.all([
+      this.tendersService
+        .findById(id, withBa)
+        .then((tender) =>
+          tender ? TenderModel.serializeDetail(tender.toObject()) : null,
+        ),
+      withBa
+        ? this.tariffService.getUserTariff(req.user)
+        : { type: TariffType.free },
+    ]);
 
-    const tba = await this.tendersService.findById(id, !!req.isBot);
-
-    const tender = tba.toObject();
-
-    const tenderSerialized = TenderModel.serializeDetail(tender);
-
-    const tariff = await this.tariffService.getUserTariff(req.user);
+    if (!tenderSerialized) {
+      throw new NotFoundException(`Tender ${id} not found`);
+    }
 
     if (req.user) {
       await this.tendersService.fillUpTenderListByDeepAnalysisAndWishListStatus(
@@ -57,7 +59,7 @@ export class TendersController {
     }
 
     let generalAnalysis = TenderGeneralAnalysisModel.serializeDetail(
-      tender.generalAnalysis,
+      (tenderSerialized as any).generalAnalysis,
     );
 
     if (tariff.type === TariffType.free) {
