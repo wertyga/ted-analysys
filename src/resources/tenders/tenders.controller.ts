@@ -37,7 +37,7 @@ export class TendersController {
     @Param('withBa') withBa: boolean,
     @Req() req,
   ): Promise<TenderDetailDto> {
-    const isWithGenAnalysis = withBa && !req.isBot;
+    const withoutBaseAnalysisGenerating = !withBa || req.isBot;
 
     if (withBa) {
       await logger.info('findById::withBa', {
@@ -48,13 +48,13 @@ export class TendersController {
 
     const [tenderSerialized, tariff] = await Promise.all([
       this.tendersService
-        .findById(id, isWithGenAnalysis)
+        .findById(id, withoutBaseAnalysisGenerating)
         .then((tender) =>
           tender ? TenderModel.serializeDetail(tender.toObject()) : null,
         ),
-      isWithGenAnalysis
-        ? this.tariffService.getUserTariff(req.user)
-        : { type: TariffType.free },
+      withoutBaseAnalysisGenerating
+        ? { type: TariffType.free }
+        : this.tariffService.getUserTariff(req.user),
     ]);
 
     if (!tenderSerialized) {
