@@ -10,6 +10,7 @@ import { UserDocument } from '@/resources/user/user.types';
 import { TenderModel } from '@/resources/tenders/schemas';
 import { TenderGeneralAnalysisService } from '@/resources/tender-analysis/tender-general-analysis.service';
 import { TenderGeneralAnalysisModel } from '@/resources/tender-analysis/schemas';
+import { logger } from '@/utils';
 
 @ApiTags('ted')
 @Controller('ted')
@@ -72,6 +73,14 @@ export class TedSearchController {
     @Req() req,
     @Body() body: TedTenderSearchRequestDto,
   ): Promise<TedSearchResponse> {
+    await logger.info(
+      'searchLocalTenders::body.withoutBaseAnalysisGenerating',
+      {
+        withoutBaseAnalysisGenerating: body.withoutBaseAnalysisGenerating,
+        userAgent: req.headers['user-agent'],
+      },
+    );
+
     const searchBody = await this.applySearchTariffRules(req.user, body);
     const noticeData = await this.tedSearchService.searchLocalTenders({
       ...searchBody,
