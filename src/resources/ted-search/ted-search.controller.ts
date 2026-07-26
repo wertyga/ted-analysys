@@ -73,13 +73,15 @@ export class TedSearchController {
     @Req() req,
     @Body() body: TedTenderSearchRequestDto,
   ): Promise<TedSearchResponse> {
-    await logger.info(
-      'searchLocalTenders::body.withoutBaseAnalysisGenerating',
-      {
-        withoutBaseAnalysisGenerating: body.withoutBaseAnalysisGenerating,
-        userAgent: req.headers['user-agent'],
-      },
-    );
+    if (!body.withoutBaseAnalysisGenerating) {
+      await logger.info(
+        'searchLocalTenders::body.withoutBaseAnalysisGenerating',
+        {
+          withoutBaseAnalysisGenerating: body.withoutBaseAnalysisGenerating,
+          userAgent: req.headers['user-agent'],
+        },
+      );
+    }
 
     const searchBody = await this.applySearchTariffRules(req.user, body);
     const noticeData = await this.tedSearchService.searchLocalTenders({

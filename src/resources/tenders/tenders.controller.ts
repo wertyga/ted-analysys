@@ -37,9 +37,12 @@ export class TendersController {
     @Param('withBa') withBa: boolean,
     @Req() req,
   ): Promise<TenderDetailDto> {
-    await logger.info('findById', {
-      userAgent: req.headers['user-agent'],
-    });
+    if (withBa) {
+      await logger.info('findById::withBa', {
+        userAgent: req.headers['user-agent'],
+        withBa,
+      });
+    }
 
     const [tenderSerialized, tariff] = await Promise.all([
       this.tendersService
