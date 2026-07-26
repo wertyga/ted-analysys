@@ -37,6 +37,8 @@ export class TendersController {
     @Param('withBa') withBa: boolean,
     @Req() req,
   ): Promise<TenderDetailDto> {
+    const isWithGenAnalysis = withBa && !req.isBot;
+
     if (withBa) {
       await logger.info('findById::withBa', {
         userAgent: req.headers['user-agent'],
@@ -46,11 +48,11 @@ export class TendersController {
 
     const [tenderSerialized, tariff] = await Promise.all([
       this.tendersService
-        .findById(id, withBa)
+        .findById(id, isWithGenAnalysis)
         .then((tender) =>
           tender ? TenderModel.serializeDetail(tender.toObject()) : null,
         ),
-      withBa
+      isWithGenAnalysis
         ? this.tariffService.getUserTariff(req.user)
         : { type: TariffType.free },
     ]);
