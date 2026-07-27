@@ -118,6 +118,7 @@ export class TedSearchService {
         skip,
         limit,
         select: TENDER_PURE_LIST_SELECT,
+        isPure: true,
       }),
       TenderModel.countDocuments(query),
     ]);

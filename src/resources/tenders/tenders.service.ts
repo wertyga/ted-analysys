@@ -481,14 +481,20 @@ export class TendersService {
       skip?: number;
       limit?: number;
       select?: string | string[];
+      isPure?: boolean;
     } = {},
   ) {
-    return TenderModel.find(tenderQuery)
+    const cursor = TenderModel.find(tenderQuery)
       .select(options.select ?? '')
       .sort(options.sort ?? {})
       .skip(options.skip ?? 0)
-      .limit(options.limit ?? 0)
-      .populate(tenderPopulateFields);
+      .limit(options.limit ?? 0);
+
+    if (!options.isPure) {
+      cursor.populate(tenderPopulateFields);
+    }
+
+    return await cursor;
   }
 
   async findMultipleLocalTendersWithBaseAnalysis(
