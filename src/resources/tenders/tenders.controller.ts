@@ -5,6 +5,7 @@ import {
   Inject,
   NotFoundException,
   Param,
+  Query,
   Req,
 } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -34,24 +35,24 @@ export class TendersController {
   @ApiOkResponse({ type: TenderDto })
   async findById(
     @Param('id') id: string,
-    @Param('withBa') withBa: boolean,
+    @Query('withGA') withGA: boolean,
     @Req() req,
   ): Promise<TenderDetailDto> {
-    const withoutBaseAnalysisGenerating = !withBa || req.isBot;
+    const withoutBaseAnalysisGenerating = !withGA || req.isBot;
 
-    if (withBa) {
+    if (withGA) {
       await logger.info('findById::withBa', {
         userAgent: req.headers['user-agent'],
-        withBa,
+        withGA,
       });
     }
 
     const [tenderSerialized, tariff] = await Promise.all([
       this.tendersService
         .findById(id, withoutBaseAnalysisGenerating)
-        .then((tender) =>
-          tender ? TenderModel.serializeDetail(tender.toObject()) : null,
-        ),
+        .then((tender) => {
+          return tender ? TenderModel.serializeDetail(tender.toObject()) : null;
+        }),
       withoutBaseAnalysisGenerating
         ? { type: TariffType.free }
         : this.tariffService.getUserTariff(req.user),

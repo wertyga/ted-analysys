@@ -13,7 +13,6 @@
     "build:api": "nest build",
     "start": "nest start",
     "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch",
     "start:prod": "cross-env NODE_ENV=production node dist/main"
   },
   "dependencies": {
