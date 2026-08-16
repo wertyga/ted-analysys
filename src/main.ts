@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import compression from 'compression';
 import express from 'express';
 import { existsSync } from 'fs';
 import { dirname, isAbsolute, join, normalize } from 'path';
@@ -18,6 +19,8 @@ async function bootstrap() {
   const corsOrigin = process.env.CORS_ORIGIN?.split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
+
+  app.use(compression());
 
   app.enableCors({
     origin: corsOrigin?.length ? corsOrigin : true,
