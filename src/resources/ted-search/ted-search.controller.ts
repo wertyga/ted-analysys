@@ -7,7 +7,7 @@ import { TendersService } from '@/resources/tenders/tenders.service';
 import { TenderListDto } from '@/resources/tenders/dto/tender.dto';
 import { TariffService } from '@/resources/tariff';
 import { UserDocument } from '@/resources/user/user.types';
-import { TenderModel } from '@/resources/tenders/schemas';
+import { TenderDocument, TenderModel } from '@/resources/tenders/schemas';
 import { TenderGeneralAnalysisService } from '@/resources/tender-analysis/tender-general-analysis.service';
 import { TenderGeneralAnalysisModel } from '@/resources/tender-analysis/schemas';
 import { logger } from '@/utils';
@@ -30,7 +30,9 @@ export class TedSearchController {
       await this.tedSearchService.searchTendersForPureList(query);
 
     const generalAnalysis = await this.tenderGeneralAnalysisService
-      .ensureBaseAnalysisForMultipleTenders([tenders[0]])
+      .ensureBaseAnalysisForMultipleTenders([
+        tenders[0],
+      ] as unknown as TenderDocument[])
       .then((analyses) => analyses[0]);
 
     return {

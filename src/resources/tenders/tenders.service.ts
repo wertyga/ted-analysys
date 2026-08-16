@@ -27,6 +27,7 @@ import {
   TenderDocument,
   TenderLot,
   TenderModel,
+  TenderRecord,
   TenderShortTitle,
 } from './schemas';
 import {
@@ -67,6 +68,10 @@ export interface SaveNewTedTendersResult {
 }
 
 export type TenderDocumentWithGeneralAnalysis = TenderDocument & {
+  generalAnalysis?: TenderGeneralAnalysisDetailDto | null;
+};
+
+export type TenderRecordWithGeneralAnalysis = TenderRecord & {
   generalAnalysis?: TenderGeneralAnalysisDetailDto | null;
 };
 
@@ -494,7 +499,7 @@ export class TendersService {
       cursor.populate(tenderPopulateFields);
     }
 
-    return await cursor;
+    return await cursor.lean<TenderRecord[]>();
   }
 
   async findMultipleLocalTendersWithBaseAnalysis(
@@ -505,7 +510,7 @@ export class TendersService {
       limit?: number;
     } = {},
     withoutBaseAnalysisGenerating?: boolean,
-  ): Promise<TenderDocumentWithGeneralAnalysis[]> {
+  ): Promise<TenderRecordWithGeneralAnalysis[]> {
     const localTenders = await this.findLocalTenders(tenderQuery, options);
 
     let generalAnalyses: TenderGeneralAnalysisDocument[] = [];
@@ -519,7 +524,7 @@ export class TendersService {
     } else {
       generalAnalyses =
         await this.tenderGeneralAnalysisService.ensureBaseAnalysisForMultipleTenders(
-          localTenders,
+          localTenders as unknown as TenderDocument[],
         );
     }
 
@@ -527,16 +532,15 @@ export class TendersService {
       generalAnalyses.map((analysis) => [analysis.tenderId, analysis]),
     );
 
-    return localTenders.map((tender) => {
+    return localTenders.map((tender): TenderRecordWithGeneralAnalysis => {
       const generalAnalysis = generalAnalysesByTenderId.get(tender.id);
 
-      tender.set(
-        'generalAnalysis',
-        TenderGeneralAnalysisModel.serializeDetail(generalAnalysis),
-        { strict: false },
-      );
-
-      return tender;
+      return {
+        ...tender,
+        generalAnalysis: TenderGeneralAnalysisModel.serializeDetail(
+          generalAnalysis,
+        ),
+      };
     });
   }
 
@@ -660,7 +664,7 @@ export class TendersService {
   }
 
   toWholeTenderListDto(
-    tender: TenderDocumentWithGeneralAnalysis,
+    tender: TenderDocumentWithGeneralAnalysis | TenderRecordWithGeneralAnalysis,
   ): TenderListDto {
     const tenderList = TenderModel.serializeList(tender);
 

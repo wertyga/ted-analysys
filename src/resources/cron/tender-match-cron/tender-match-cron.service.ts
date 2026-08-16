@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { CRON_CONFIG } from '@/config/cron.config';
 import { CronTaskQueueService } from '@/resources/cron/cron-task-queue/cron-task-queue.service';
 import { TenderMatchNotificationsService } from '@/resources/tender-match-notifications/tender-match-notifications.service';
+import { isCronLeaderInstance } from '@/utils';
 
 @Injectable()
 export class TenderMatchCronService {
@@ -16,6 +17,10 @@ export class TenderMatchCronService {
     timeZone: CRON_CONFIG.timeZone,
   })
   async sendDailyReportsCron(): Promise<void> {
+    if (!isCronLeaderInstance()) {
+      return;
+    }
+
     await this.cronTaskQueueService.runExclusive('sendDailyReportsCron', () =>
       this.tenderMatchNotificationsService.sendDailyReports(),
     );
@@ -26,6 +31,10 @@ export class TenderMatchCronService {
     timeZone: CRON_CONFIG.timeZone,
   })
   async sendWeeklyReportsCron(): Promise<void> {
+    if (!isCronLeaderInstance()) {
+      return;
+    }
+
     await this.cronTaskQueueService.runExclusive('sendWeeklyReportsCron', () =>
       this.tenderMatchNotificationsService.sendWeeklyReports(),
     );

@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { CRON_CONFIG } from '@/config/cron.config';
 import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rates/currency-exchange-rates.service';
 import { CronTaskQueueService } from '@/resources/cron/cron-task-queue/cron-task-queue.service';
+import { isCronLeaderInstance } from '@/utils';
 
 @Injectable()
 export class CurrencyExchangeRatesCronService {
@@ -16,6 +17,10 @@ export class CurrencyExchangeRatesCronService {
     timeZone: CRON_CONFIG.timeZone,
   })
   async syncLatestRatesCron(): Promise<void> {
+    if (!isCronLeaderInstance()) {
+      return;
+    }
+
     await this.syncLatestRatesQueued();
   }
 

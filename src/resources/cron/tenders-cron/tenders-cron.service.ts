@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { TenderDocument } from '@/resources/tenders/schemas';
 import { TenderModel } from '@/resources/tenders/schemas';
-import { devLog, logger } from '@/utils';
+import { devLog, isCronLeaderInstance, logger } from '@/utils';
 import { TenderCompanyMatchDocument } from '@/resources/tender-matching/schemas/tender-company-match.schema';
 import { TenderMatchingService } from '@/resources/tender-matching/tender-matching.service';
 import {
@@ -200,6 +200,10 @@ export class TendersCronService {
     timeZone: CRON_CONFIG.timeZone,
   })
   async gatherRecentCompetitionTenders(): Promise<void> {
+    if (!isCronLeaderInstance()) {
+      return;
+    }
+
     await this.cronTaskQueueService.runExclusive(
       'gatherRecentCompetitionTenders',
       () => this.gatherRecentCompetitionTendersUnsafe(),
@@ -274,6 +278,10 @@ export class TendersCronService {
     timeZone: CRON_CONFIG.timeZone,
   })
   async refreshExpiredCompetitionTenderBuyerMeta(): Promise<void> {
+    if (!isCronLeaderInstance()) {
+      return;
+    }
+
     await this.cronTaskQueueService.runExclusive(
       'refreshExpiredCompetitionTenderBuyerMeta',
       () => this.refreshExpiredCompetitionTenderBuyerMetaUnsafe(),
@@ -354,6 +362,10 @@ export class TendersCronService {
     timeZone: CRON_CONFIG.timeZone,
   })
   async gatherRecentAwardTenders(): Promise<void> {
+    if (!isCronLeaderInstance()) {
+      return;
+    }
+
     await this.cronTaskQueueService.runExclusive(
       'gatherRecentAwardTenders',
       () => this.gatherRecentAwardTendersUnsafe(),

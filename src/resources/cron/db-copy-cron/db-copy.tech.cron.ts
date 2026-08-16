@@ -7,6 +7,7 @@ import { join } from 'path';
 import { CdnFile, CdnService } from '@/cdn';
 import { CRON_CONFIG } from '@/config/cron.config';
 import { CronTaskQueueService } from '@/resources/cron/cron-task-queue/cron-task-queue.service';
+import { isCronLeaderInstance } from '@/utils';
 
 const DEFAULT_DB_COPY_MAX_COPIES = 10;
 
@@ -33,6 +34,10 @@ export class DbCopyTechCron {
   //   timeZone: CRON_CONFIG.timeZone,
   // })
   async copyDatabaseDumpToCdnCron() {
+    if (!isCronLeaderInstance()) {
+      return;
+    }
+
     await this.cronTaskQueueService.runExclusive(
       'copyDatabaseDumpToCdnCron',
       () => this.copyDatabaseDumpToCdnCronUnsafe(),
