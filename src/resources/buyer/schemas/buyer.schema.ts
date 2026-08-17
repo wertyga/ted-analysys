@@ -409,6 +409,7 @@ BuyerSchema.index({ 'stats.totalAwardedValueEur': -1, name: 1, _id: 1 });
 BuyerSchema.index({ 'stats.totalEstimatedValueEur': -1, name: 1, _id: 1 });
 BuyerSchema.index({ 'stats.awardTendersCount': -1, name: 1, _id: 1 });
 BuyerSchema.index({ 'stats.tendersCount': -1, name: 1, _id: 1 });
+BuyerSchema.index({ name: 1, _id: 1 });
 
 BuyerSchema.statics.serializeList = function (
   buyer: BuyerSerializable,

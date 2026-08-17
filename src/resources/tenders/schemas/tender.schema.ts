@@ -266,13 +266,11 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
     nonLeadBuyers: {
       type: [Schema.Types.ObjectId],
       ref: 'Buyer',
-      index: true,
       default: [],
     },
     leadBuyers: {
       type: [Schema.Types.ObjectId],
       ref: 'Buyer',
-      index: true,
       default: [],
     },
     publicationDate: Date,
@@ -386,6 +384,24 @@ TenderSchema.index(
     _id: -1,
   },
   { name: 'idx_notice_budget' },
+);
+
+TenderSchema.index(
+  {
+    leadBuyers: 1,
+    publicationDate: -1,
+    submissionDeadline: 1,
+  },
+  { name: 'idx_leadbuyers_pubdate_deadline' },
+);
+
+TenderSchema.index(
+  {
+    nonLeadBuyers: 1,
+    publicationDate: -1,
+    submissionDeadline: 1,
+  },
+  { name: 'idx_nonleadbuyers_pubdate_deadline' },
 );
 
 function serializeTender(tender: TenderSerializable): Tender {

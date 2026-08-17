@@ -131,6 +131,7 @@ ContractorSchema.index({ name: 1 });
 ContractorSchema.index({ euRegistrationNumber: 1 });
 ContractorSchema.index({ countries: 1, 'stats.totalAwardAmountEur': -1 });
 ContractorSchema.index({ cpvCodes: 1, 'stats.totalAwardAmountEur': -1 });
+ContractorSchema.index({ 'stats.totalAwardAmountEur': -1 });
 
 ContractorSchema.statics.serializeList = function (
   contractor: ContractorSerializable,

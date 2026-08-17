@@ -322,13 +322,11 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
     nonLeadBuyers: {
       type: [Schema.Types.ObjectId],
       ref: 'Buyer',
-      index: true,
       default: [],
     },
     leadBuyers: {
       type: [Schema.Types.ObjectId],
       ref: 'Buyer',
-      index: true,
       default: [],
     },
 
@@ -345,10 +343,12 @@ AwardTenderSchema.index({
   contractNature: 1,
   publicationDate: -1,
 });
-AwardTenderSchema.index({ winners: 1 });
+AwardTenderSchema.index({ winners: 1, publicationDate: -1 });
 AwardTenderSchema.index({ 'lots.winner': 1 });
 AwardTenderSchema.index({ 'winners.identifier': 1 });
 AwardTenderSchema.index({ 'winners.name': 1 });
+AwardTenderSchema.index({ leadBuyers: 1, publicationDate: -1 });
+AwardTenderSchema.index({ nonLeadBuyers: 1, publicationDate: -1 });
 
 function serializeAwardTenderRelations<T extends Partial<AwardTender>>(
   tender: T,

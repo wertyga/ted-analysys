@@ -48,6 +48,8 @@ const emptySyncIndexesStatus = (): SyncIndexesStatus => ({
 
 const LEGACY_INDEXES_TO_DROP: Record<string, Array<Record<string, 1 | -1>>> = {
   TenderGeneralAnalysis: [{ tender: 1 }],
+  AwardTender: [{ winners: 1 }, { leadBuyers: 1 }, { nonLeadBuyers: 1 }],
+  Tender: [{ leadBuyers: 1 }, { nonLeadBuyers: 1 }],
 };
 
 @Injectable()
