@@ -51,7 +51,7 @@ export class TedSearchController {
     };
   }
 
-  @Get('/search-pure')
+  @Post('/search-pure')
   @ApiOperation({ summary: 'Search local tenders by structured filters' })
   @ApiBody({ type: TedTenderSearchRequestDto })
   @ApiOkResponse({ description: 'Local tenders search response' })
