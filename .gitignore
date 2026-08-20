@@ -2,8 +2,6 @@
 /dist
 /node_modules
 /build
-/admin/.next
-/admin/out
 /sitemaps
 
 # Logs

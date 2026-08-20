@@ -53,8 +53,8 @@ async function bootstrap() {
     ? normalize(sitemapOutputPath)
     : join(process.cwd(), sitemapOutputPath);
   const sitemapOutDir = dirname(sitemapOutputAbsolutePath);
-  const adminOutDir = join(process.cwd(), 'admin', 'out');
-  const adminIndexPath = join(adminOutDir, 'index.html');
+  const adminDir = join(process.cwd(), 'admin');
+  const adminIndexPath = join(adminDir, 'index.html');
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.set('query parser', 'extended');
 
@@ -75,13 +75,13 @@ async function bootstrap() {
   );
 
   if (existsSync(adminIndexPath)) {
-    expressApp.use('/admin', express.static(adminOutDir));
+    expressApp.use('/admin', express.static(adminDir));
     expressApp.get(/^\/admin(?:\/.*)?$/, (_req, res) => {
       res.sendFile(adminIndexPath);
     });
   } else {
     expressApp.get(/^\/admin(?:\/.*)?$/, (_req, res) => {
-      res.status(503).send('Admin app is not built. Run npm run admin:build.');
+      res.status(503).send('Admin app is missing (admin/index.html not found).');
     });
   }
 

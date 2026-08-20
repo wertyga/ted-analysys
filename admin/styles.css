@@ -35,11 +35,12 @@ a {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
-.shell button:not(.ant-btn):not(.ant-pagination-item-link) {
+button {
   border: 0;
   border-radius: 8px;
   background: var(--primary);
@@ -49,16 +50,17 @@ input {
   padding: 11px 16px;
 }
 
-.shell button:not(.ant-btn):not(.ant-pagination-item-link):hover {
+button:hover {
   background: var(--primary-hover);
 }
 
-.shell button:not(.ant-btn):not(.ant-pagination-item-link):disabled {
+button:disabled {
   cursor: not-allowed;
   opacity: 0.65;
 }
 
-input {
+input,
+select {
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--foreground);
@@ -97,9 +99,11 @@ input {
   border-radius: 8px;
   color: #d6deeb;
   padding: 10px 12px;
+  display: block;
 }
 
-.nav a:hover {
+.nav a:hover,
+.nav a.active {
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
 }
@@ -154,49 +158,35 @@ h2 {
   padding: 10px 12px;
 }
 
-.secondaryButton {
-  background: transparent;
-  color: inherit;
-}
-
-.secondaryButton:hover {
-  background: rgba(20, 89, 217, 0.08);
-  color: var(--primary);
-}
-
-.shell button.secondaryButton:not(.ant-btn):not(.ant-pagination-item-link) {
+button.secondaryButton {
   background: transparent;
   border: 1px solid var(--line);
   color: inherit;
 }
 
-.shell button.secondaryButton:not(.ant-btn):not(.ant-pagination-item-link):hover {
+button.secondaryButton:hover {
   background: rgba(20, 89, 217, 0.08);
   color: var(--primary);
 }
 
-.shell button.successButton:not(.ant-btn):not(.ant-pagination-item-link),
-.successButton {
+button.successButton {
   background: #e8f7ee;
   border-color: #8fd4a8;
   color: #0f7a3a;
 }
 
-.shell button.successButton:not(.ant-btn):not(.ant-pagination-item-link):hover,
-.successButton:hover {
+button.successButton:hover {
   background: #d7f0e0;
   color: #0a612e;
 }
 
-.shell button.dangerButton:not(.ant-btn):not(.ant-pagination-item-link),
-.dangerButton {
+button.dangerButton {
   background: #fff1f1;
   border-color: #ffb3b3;
   color: #b42318;
 }
 
-.shell button.dangerButton:not(.ant-btn):not(.ant-pagination-item-link):hover,
-.dangerButton:hover {
+button.dangerButton:hover {
   background: #ffe0e0;
   color: #8f1d14;
 }
@@ -367,36 +357,6 @@ h2 {
   white-space: pre-wrap;
 }
 
-.table {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.row {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-  padding: 12px 14px;
-}
-
-.row + .row {
-  border-top: 1px solid var(--line);
-}
-
-.row span {
-  overflow-wrap: anywhere;
-}
-
-.row span:last-child,
-.empty {
-  color: var(--muted);
-}
-
-.empty {
-  padding: 16px;
-}
-
 .stats {
   display: grid;
   gap: 10px;
@@ -425,6 +385,153 @@ h2 {
 
 .stats .smallStat {
   font-size: 14px;
+}
+
+/* Tag */
+.tag {
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border: 1px solid var(--line);
+  background: #fafafa;
+  color: var(--muted);
+}
+
+.tag-blue {
+  background: #e6f1ff;
+  border-color: #b6d4ff;
+  color: #0d47a1;
+}
+
+.tag-processing {
+  background: #e6f1ff;
+  border-color: #b6d4ff;
+  color: #0d47a1;
+}
+
+.tag-default {
+  background: #f2f4f7;
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+/* Table */
+.tableWrap {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: auto;
+}
+
+table.dataTable {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+table.dataTable th,
+table.dataTable td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+table.dataTable th {
+  background: #fafbfd;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  user-select: none;
+}
+
+table.dataTable th.sortable {
+  cursor: pointer;
+}
+
+table.dataTable th .sortArrow {
+  color: var(--primary);
+  margin-left: 4px;
+}
+
+table.dataTable tbody tr:hover {
+  background: #f7f9fc;
+}
+
+table.dataTable td.wrapCell {
+  white-space: normal;
+}
+
+.tableEmpty {
+  color: var(--muted);
+  padding: 24px;
+  text-align: center;
+}
+
+.tableFooter {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
+.tableFooter .pageSizeSelect {
+  margin-top: 0;
+  width: auto;
+}
+
+.pagination {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.pagination button {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: inherit;
+  padding: 6px 12px;
+}
+
+.pagination button:hover:not(:disabled) {
+  background: rgba(20, 89, 217, 0.08);
+  color: var(--primary);
+}
+
+.pagination .pageInfo {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.progressBar {
+  background: #eef1f6;
+  border-radius: 999px;
+  height: 8px;
+  margin-top: 8px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.progressBar > div {
+  background: var(--primary);
+  height: 100%;
+}
+
+.progressBar.exception > div {
+  background: #b42318;
+}
+
+.progressBar.success > div {
+  background: #0f7a3a;
+}
+
+.resultNote {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 10px;
 }
 
 @media (max-width: 860px) {

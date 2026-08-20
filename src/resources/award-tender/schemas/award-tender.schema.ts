@@ -17,7 +17,6 @@ import {
   BuyerSerializable,
 } from '@/resources/buyer/schemas';
 import { TMongoId } from '@/types';
-import { getFilter } from 'next/dist/build/webpack/loaders/css-loader/src/utils';
 
 export type AwardTenderLot = TenderLot & {
   awardValue?: {

@@ -155,7 +155,7 @@ export class AwardTenderService {
     const query = (await this.tedSearchFilters.buildLocalTenderQuery(
       filters,
     )) as QueryFilter<AwardTenderDocument>;
-
+    console.log({ query });
     const { skip, limit } = getPaginationMeta(pagination);
     const [awardTenders, totalCount] = await Promise.all([
       AwardTenderModel.find(query)
