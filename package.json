@@ -6,9 +6,6 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "admin:dev": "next dev admin -p 3001",
-    "admin:build": "next build admin",
-    "admin:start": "next start admin",
     "build": "npm run admin:build && npm run build:api",
     "build:api": "nest build",
     "start": "nest start",

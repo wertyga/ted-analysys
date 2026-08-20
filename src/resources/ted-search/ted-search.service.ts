@@ -56,6 +56,18 @@ const TENDER_PURE_LIST_SELECT = [
   'lots.isFrameworkAgreement',
 ];
 
+export const TENDER_SEARCH_PURE_RESPONSE_SELECT = [
+  '_id',
+  'id',
+  'title',
+  'shortTitle',
+  'submissionDeadline',
+  'contractNature',
+  'placeOfPerformanceCountries',
+  'estimatedValue',
+  'estimatedValueEur',
+];
+
 @Injectable()
 export class TedSearchService {
   private readonly logger = new Logger(TedSearchService.name);
@@ -103,7 +115,10 @@ export class TedSearchService {
     });
   }
 
-  async searchTendersForPureList(filters: TedTenderSearchRequestDto) {
+  async searchTendersForPureList(
+    filters: TedTenderSearchRequestDto,
+    select: string | string[] = TENDER_PURE_LIST_SELECT,
+  ) {
     const { limit, skip } = getPaginationMeta({
       page: filters.page,
       limit: filters.limit,
@@ -117,7 +132,7 @@ export class TedSearchService {
         sort,
         skip,
         limit,
-        select: TENDER_PURE_LIST_SELECT,
+        select,
         isPure: true,
       }),
       TenderModel.countDocuments(query),

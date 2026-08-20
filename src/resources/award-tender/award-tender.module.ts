@@ -5,6 +5,7 @@ import { TendersModule } from '@/resources/tenders/tenders.module';
 import { ContractorModule } from '@/resources/contractor/contractor.module';
 import { TenderNormalizerModule } from '@/resources/tender-normalizer/tender-normalizer.module';
 import { BuyerModule } from '@/resources/buyer/buyer.module';
+import { CurrencyExchangeRatesModule } from '@/resources/currency-exchange-rates/currency-exchange-rates.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { BuyerModule } from '@/resources/buyer/buyer.module';
     ContractorModule,
     TenderNormalizerModule,
     forwardRef(() => BuyerModule),
+    CurrencyExchangeRatesModule,
   ],
   controllers: [AwardTenderController],
   providers: [AwardTenderService],

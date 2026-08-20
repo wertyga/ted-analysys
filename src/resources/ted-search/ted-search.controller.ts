@@ -1,7 +1,10 @@
 import { Body, Controller, Get, Post, Query, Req } from '@nestjs/common';
 import { ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { TedTenderSearchRequestDto } from './dto/ted-tender-search-request.dto';
-import { TedSearchService } from './ted-search.service';
+import {
+  TedSearchService,
+  TENDER_SEARCH_PURE_RESPONSE_SELECT,
+} from './ted-search.service';
 import { TedSearchResponse } from './types/ted-search.types';
 import { TendersService } from '@/resources/tenders/tenders.service';
 import { TenderListDto } from '@/resources/tenders/dto/tender.dto';
@@ -59,13 +62,32 @@ export class TedSearchController {
     @Body() body: TedTenderSearchRequestDto,
   ): Promise<TedSearchResponse> {
     const { tenders, count } =
-      await this.tedSearchService.searchTendersForPureList(body);
+      await this.tedSearchService.searchTendersForPureList(
+        body,
+        TENDER_SEARCH_PURE_RESPONSE_SELECT,
+      );
 
     return {
-      notices: tenders.map(TenderModel.serializeList),
+      notices: tenders as unknown as TedSearchResponse['notices'],
       totalNoticeCount: count,
     };
   }
+
+  // @Post('/search-pure-expired')
+  // @ApiOperation({ summary: 'Search local tenders by structured filters' })
+  // @ApiBody({ type: TedTenderSearchRequestDto })
+  // @ApiOkResponse({ description: 'Local tenders search response' })
+  // async searchLocalPureExpiredTenders(
+  //   @Body() body: TedTenderSearchRequestDto,
+  // ): Promise<TedSearchResponse> {
+  //   const { tenders, count } =
+  //     await this.tedSearchService.searchTendersForPureList(body);
+  //
+  //   return {
+  //     notices: tenders.map(TenderModel.serializeList),
+  //     totalNoticeCount: count,
+  //   };
+  // }
 
   @Post('/search')
   @ApiOperation({ summary: 'Search local tenders by structured filters' })

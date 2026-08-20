@@ -58,6 +58,7 @@ export enum TedDeadlineRange {
   NEXT_7_DAYS = 'next-7-days',
   NEXT_14_DAYS = 'next-14-days',
   NEXT_30_DAYS = 'next-30-days',
+  EXPIRED = 'expired',
   CUSTOM = 'custom',
 }
 

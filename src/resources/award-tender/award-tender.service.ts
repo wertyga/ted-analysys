@@ -37,6 +37,25 @@ import {
 import { BuyerService } from '@/resources/buyer/buyer.service';
 import fs from 'node:fs';
 import { ContractorDocument } from '@/resources/contractor/schemas';
+import { TedSearchFilters } from '@/resources/ted-search/ted.search.filters';
+import { TedTenderSearchRequestDto } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
+import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rates/currency-exchange-rates.service';
+
+export type AwardTenderPureSearchFilters = Pick<
+  TedTenderSearchRequestDto,
+  'cpvCodes' | 'placeOfPerformance' | 'procedureType' | 'contractNature'
+>;
+
+const AWARD_TENDER_PURE_LIST_SELECT = [
+  '_id',
+  'id',
+  'title',
+  'titleProc',
+  'contractNature',
+  'placeOfPerformanceCountries',
+  'awardValue',
+  'awardValueEur',
+];
 
 export interface SaveAwardTedTendersResult {
   saved: number;
@@ -79,6 +98,7 @@ export interface SaveAwardTedTendersOptions {
 @Injectable()
 export class AwardTenderService {
   normalizer = new AwardTenderNormalizer();
+  private readonly tedSearchFilters: TedSearchFilters;
 
   constructor(
     @Inject(forwardRef(() => TendersService))
@@ -86,7 +106,12 @@ export class AwardTenderService {
     private readonly contractorService: ContractorService,
     @Inject(forwardRef(() => BuyerService))
     private readonly buyerService: BuyerService,
-  ) {}
+    private readonly currencyExchangeRatesService: CurrencyExchangeRatesService,
+  ) {
+    this.tedSearchFilters = new TedSearchFilters(
+      this.currencyExchangeRatesService,
+    );
+  }
 
   async searchAwardTendersLocal(
     tenderId: string,
@@ -120,6 +145,32 @@ export class AwardTenderService {
       notices: savedTenders.map((tender) =>
         AwardTenderModel.serializeList(tender),
       ),
+    };
+  }
+
+  async searchAwardTendersLocalPure(
+    filters: AwardTenderPureSearchFilters = {},
+    pagination: { page?: number; limit?: number } = {},
+  ) {
+    const query = (await this.tedSearchFilters.buildLocalTenderQuery(
+      filters,
+    )) as QueryFilter<AwardTenderDocument>;
+
+    const { skip, limit } = getPaginationMeta(pagination);
+    const [awardTenders, totalCount] = await Promise.all([
+      AwardTenderModel.find(query)
+        .select(AWARD_TENDER_PURE_LIST_SELECT)
+        .sort({ publicationDate: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
+        .exec(),
+      AwardTenderModel.countDocuments(query),
+    ]);
+
+    return {
+      totalNoticeCount: totalCount,
+      notices: awardTenders,
     };
   }
 

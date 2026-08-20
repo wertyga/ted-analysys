@@ -33,6 +33,13 @@ export function resolveDeadlineRange(
         submissionDeadlineTo: undefined,
       };
 
+    case TedDeadlineRange.EXPIRED:
+      return {
+        ...filters,
+        submissionDeadlineFrom: undefined,
+        submissionDeadlineTo: todayTedDate,
+      };
+
     case TedDeadlineRange.NEXT_7_DAYS:
       return withNextDaysDeadline(filters, today, 7);
 

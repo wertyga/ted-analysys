@@ -8,6 +8,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { AwardTenderAwardsRequestDto } from './dto/award-tender-awards-request.dto';
+import { AwardTenderPureSearchRequestDto } from './dto/award-tender-pure-search-request.dto';
 import { AwardTenderService } from './award-tender.service';
 import { AwardTenderDetailDto } from './schemas';
 
@@ -29,6 +30,31 @@ export class AwardTenderController {
       page: query.page,
       limit: query.limit,
     });
+  }
+
+  @Get('/search-pure')
+  @ApiOperation({
+    summary: 'List historical award tenders with minimal fields',
+  })
+  @ApiQuery({ type: AwardTenderPureSearchRequestDto })
+  @ApiOkResponse({ description: 'TED history awards pure search response' })
+  @ApiBadRequestResponse({ description: 'Invalid pagination parameters' })
+  @ApiServiceUnavailableResponse({ description: 'TED API is unavailable' })
+  async searchHistoryAwardsPure(
+    @Query() query: AwardTenderPureSearchRequestDto,
+  ) {
+    return this.awardTenderService.searchAwardTendersLocalPure(
+      {
+        cpvCodes: query.cpvCodes,
+        placeOfPerformance: query.placeOfPerformance,
+        contractNature: query.contractNature,
+        procedureType: query.procedureType,
+      },
+      {
+        page: query.page,
+        limit: query.limit,
+      },
+    );
   }
 
   @Get('/:id')
