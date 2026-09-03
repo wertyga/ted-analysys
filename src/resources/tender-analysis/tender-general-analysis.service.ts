@@ -101,7 +101,6 @@ export class TenderGeneralAnalysisService {
         },
       );
     } catch (error: unknown) {
-      console.log({ error });
       return TenderGeneralAnalysisModel.findByIdAndUpdate(
         baseTenderAnalysis._id,
         {
@@ -322,9 +321,9 @@ export class TenderGeneralAnalysisService {
       .update(
         JSON.stringify({
           promptVersion: GENERAL_TENDER_ANALYSIS_PROMPT_VERSION,
-          provider: this.llmAnalysisService.getGeneralAnalysisProvider(),
+          // provider: this.llmAnalysisService.getGeneralAnalysisProvider(),
           tenderSourceHash: tender.sourceHash,
-          model: 'deepseek',
+          // model: 'deepseek',
           // model: this.llmAnalysisService.getGeneralAnalysisModel(),
         }),
       )
