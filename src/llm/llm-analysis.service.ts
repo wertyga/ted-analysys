@@ -164,6 +164,14 @@ export class LlmAnalysisService extends BaseLlmAnalysisService {
       return {};
     }
 
+    if (connection.provider === 'openai') {
+      // OpenAI's newer models (e.g. gpt-5.x) only support the default
+      // temperature (1) and reject any other explicit value.
+      return {
+        response_format: { type: 'json_object' } as const,
+      };
+    }
+
     return {
       response_format: { type: 'json_object' } as const,
       temperature: 0.1,
