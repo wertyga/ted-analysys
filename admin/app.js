@@ -900,27 +900,40 @@
   }
 
   function dbCopyPanelHtml() {
+    var running = state.dbCopyLoading || (state.dbCopyResult && state.dbCopyResult.isRunning);
     var html =
       '<section class="panel panelWide"><div class="panelHeader"><div><h2>Database dump copy</h2>' +
-      '<p>Create a MongoDB dump and upload it to CDN using the configured backup prefix.</p></div>' +
+      '<p>Create a MongoDB dump and upload it to CDN using the configured backup prefix. This runs in the background and can take a long time for large databases.</p></div>' +
       '<button ' +
       (state.dbCopyLoading ? 'disabled' : '') +
       ' onclick="Admin.copyDatabaseDumpToCdn()" type="button">' +
-      (state.dbCopyLoading ? 'Copying...' : 'Copy database dump') +
-      '</button></div>';
+      (state.dbCopyLoading ? 'Starting...' : 'Copy database dump') +
+      '</button></div>' +
+      '<div class="statusList"><div><span>Database dump copy</span>' +
+      tagHtml(running ? 'RUNNING' : 'IDLE', running ? 'processing' : 'default') +
+      '</div></div>';
 
     var r = state.dbCopyResult;
     if (r) {
-      html +=
-        '<dl class="stats"><div><dt>File</dt><dd class="smallStat">' +
-        escapeHtml(r.filename) +
-        '</dd></div><div><dt>Deleted old copies</dt><dd>' +
-        r.deletedCount +
-        '</dd></div><div><dt>URL</dt><dd class="smallStat"><a href="' +
-        escapeHtml(r.url) +
-        '" rel="noreferrer" target="_blank">' +
-        escapeHtml(r.url) +
-        '</a></dd></div></dl>';
+      var pairs = [
+        ['Started', escapeHtml(r.startedAt ? fmtDateTime(r.startedAt) : '-'), 'smallStat'],
+        ['Finished', escapeHtml(r.finishedAt ? fmtDateTime(r.finishedAt) : '-'), 'smallStat'],
+      ];
+      if (r.lastError) pairs.push(['Last error', escapeHtml(r.lastError), 'smallStat']);
+      html += statsHtml(pairs);
+
+      if (r.result) {
+        html +=
+          '<dl class="stats"><div><dt>File</dt><dd class="smallStat">' +
+          escapeHtml(r.result.filename) +
+          '</dd></div><div><dt>Deleted old copies</dt><dd>' +
+          r.result.deletedCount +
+          '</dd></div><div><dt>URL</dt><dd class="smallStat"><a href="' +
+          escapeHtml(r.result.url) +
+          '" rel="noreferrer" target="_blank">' +
+          escapeHtml(r.result.url) +
+          '</a></dd></div></dl>';
+      }
     }
 
     html += '</section>';
@@ -1502,6 +1515,15 @@
       .catch(function () {});
   }
 
+  function loadDbCopyStatus() {
+    return request('/adm/tech/db-copy/status', { token: state.token })
+      .then(function (status) {
+        state.dbCopyResult = status;
+        state.dbCopyLoading = status.isRunning;
+      })
+      .catch(function () {});
+  }
+
   function updatePolling() {
     if (state.token && state.section === 'tech') startPolling();
     else stopPolling();
@@ -1532,6 +1554,7 @@
       loadCollectTenderBuyersStatus(),
       loadContractorStatsRefreshStatus(),
       loadGeneralAnalysisStatus(),
+      loadDbCopyStatus(),
     ])
       .then(render)
       .catch(render);
@@ -1682,14 +1705,16 @@
     render();
 
     request('/adm/tech/db-copy', { method: 'POST', token: state.token })
-      .then(function (result) {
-        state.dbCopyResult = result;
+      .then(function (status) {
+        state.dbCopyResult = status;
+        state.dbCopyLoading = status.isRunning;
+        state.message = 'Database dump copy started.';
       })
       .catch(function (error) {
         state.message = error && error.message ? error.message : 'Failed to copy database dump';
+        state.dbCopyLoading = false;
       })
       .finally(function () {
-        state.dbCopyLoading = false;
         render();
       });
   }

@@ -22,11 +22,27 @@ export type DatabaseDumpCopyResult = {
   deletedCount: number;
 };
 
+export type DatabaseDumpCopyStatus = {
+  isRunning: boolean;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+  lastError: string | null;
+  result: DatabaseDumpCopyResult | null;
+};
+
+const emptyDatabaseDumpCopyStatus = (): DatabaseDumpCopyStatus => ({
+  isRunning: false,
+  startedAt: null,
+  finishedAt: null,
+  lastError: null,
+  result: null,
+});
+
 @Injectable()
 export class DbCopyTechCron {
   private readonly logger = new Logger(DbCopyTechCron.name);
   private readonly cdnService = new CdnService();
-  private isRunning = false;
+  private status = emptyDatabaseDumpCopyStatus();
 
   constructor(private readonly cronTaskQueueService: CronTaskQueueService) {}
 
@@ -49,7 +65,7 @@ export class DbCopyTechCron {
       return;
     }
 
-    if (this.isRunning) {
+    if (this.status.isRunning) {
       this.logger.warn('Database dump copy is already running, skipping');
       return;
     }
@@ -59,32 +75,48 @@ export class DbCopyTechCron {
       return;
     }
 
-    this.isRunning = true;
-
-    try {
-      await this.copyDatabaseDumpToCdnUnsafe();
-    } catch (error: unknown) {
-      this.logger.error(
-        `Database dump copy failed: ${
-          error instanceof Error ? error.message : 'unknown error'
-        }`,
-      );
-    } finally {
-      this.isRunning = false;
-    }
+    await this.runCopyDatabaseDumpToCdn();
   }
 
-  async copyDatabaseDumpToCdn(): Promise<DatabaseDumpCopyResult> {
-    if (this.isRunning) {
-      throw new Error('Database dump copy is already running');
+  getStatus(): DatabaseDumpCopyStatus {
+    return { ...this.status };
+  }
+
+  // Starts the dump in the background and returns immediately: a mongodump
+  // of a large database can take far longer than an HTTP request/proxy
+  // timeout allows, so the admin panel polls getStatus() instead of
+  // waiting on this call.
+  startCopyDatabaseDumpToCdn(): DatabaseDumpCopyStatus {
+    if (this.status.isRunning) {
+      return this.getStatus();
     }
 
-    this.isRunning = true;
+    void this.runCopyDatabaseDumpToCdn();
+
+    return this.getStatus();
+  }
+
+  private async runCopyDatabaseDumpToCdn(): Promise<void> {
+    if (this.status.isRunning) {
+      return;
+    }
+
+    this.status = {
+      ...emptyDatabaseDumpCopyStatus(),
+      isRunning: true,
+      startedAt: new Date(),
+    };
+    const status = this.status;
 
     try {
-      return await this.copyDatabaseDumpToCdnUnsafe();
+      status.result = await this.copyDatabaseDumpToCdnUnsafe();
+    } catch (error: unknown) {
+      status.lastError =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Database dump copy failed: ${status.lastError}`);
     } finally {
-      this.isRunning = false;
+      status.isRunning = false;
+      status.finishedAt = new Date();
     }
   }
 

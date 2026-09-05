@@ -201,7 +201,7 @@ export class CronController {
         id: 'copy-database-dump-to-cdn',
         title: 'Copy database dump to CDN',
         description: 'Create a MongoDB dump and upload it to CDN.',
-        run: () => this.dbCopyTechCron.copyDatabaseDumpToCdn(),
+        run: async () => this.dbCopyTechCron.startCopyDatabaseDumpToCdn(),
       },
     ];
   }

@@ -26,7 +26,7 @@ import {
   XPostStatus,
 } from './schemas';
 import { XPostImageService } from './image/x-post-image.service';
-import { XPostDataService } from './x-post-data.service';
+import { TENDERWIZE_ORIGIN, XPostDataService } from './x-post-data.service';
 
 const NO_DATA_MESSAGE =
   'No matching real data was found for this topic. Try a broader or more specific topic (a different country, category, or value range).';
@@ -34,6 +34,7 @@ const NO_DATA_MESSAGE =
 @Injectable()
 export class XPostService {
   private guidelinesCache?: string;
+  private featuresCache?: string;
 
   constructor(
     private readonly llmAnalysisService: LlmAnalysisService,
@@ -50,6 +51,17 @@ export class XPostService {
     }
 
     return this.guidelinesCache;
+  }
+
+  private getFeatures(): string {
+    if (!this.featuresCache) {
+      this.featuresCache = readFileSync(
+        join(process.cwd(), '.claude/skills/x-post/FEATURES.md'),
+        'utf-8',
+      );
+    }
+
+    return this.featuresCache;
   }
 
   private async getRecentlyCoveredSummaries(
@@ -82,7 +94,9 @@ export class XPostService {
       tone: dto.tone,
       notes: dto.notes,
       guidelines: this.getGuidelines(),
+      features: this.getFeatures(),
       recentlyCovered,
+      homepageUrl: `${TENDERWIZE_ORIGIN}/en`,
     };
 
     let result: GenerateXPostResult;

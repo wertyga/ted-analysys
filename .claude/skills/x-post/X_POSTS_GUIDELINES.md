@@ -24,40 +24,79 @@ There are exactly four post types. Rotate across them — don't post the same ty
 
 For Interesting Tender, Market Insight, and Contract Award, the admin AI generator fetches the real facts itself — it queries Tenderwize's tender/award database (submission deadlines, buyers, winners, amounts, counts) and is only allowed to cite what a query actually returned; if nothing matches, it refuses to generate rather than inventing data. Procurement Insight needs no query. When drafting by hand instead (e.g. via the `x-post` skill without the generator), apply the same discipline yourself: look up the real record or stat before writing, never approximate one.
 
-### 🔥 Interesting Tender
+### Value first, then product
 
-**Goal:** surface one specific, currently open tender and drive a click to its Tenderwize page. This is the "look at this opportunity" post.
+Every pillar pairs a piece of real procurement value with a soft demonstration of what Tenderwize can do — never the other way around. The formula:
+
+```
+Procurement value → Tenderwize capability → relevant CTA/link
+```
+
+Lead with the fact, problem, or insight. Only once that's established, and only if it fits naturally, connect it to the relevant Tenderwize capability. Never open with the product.
+
+Not this:
+
+```
+Tenderwize has powerful tender filters...
+```
+
+But this:
+
+```
+Searching only by keywords can cause relevant tenders to be missed.
+...
+Tenderwize lets you combine keywords, categories and other filters...
+```
+
+The product half of the formula is optional, not mandatory — don't force a feature mention into every single post. If the connection would feel forced, it's enough to end with a relevant link (section 9) and skip the feature callout entirely. A post that's 100% value with no product mention is a valid outcome, not a miss.
+
+When you do name a capability, pick it from `FEATURES.md` (same skill folder) only. It's the fixed list of what Tenderwize actually does — never invent, guess, or embellish a feature that isn't on that list, the same discipline as the no-fabricated-URLs rule in section 9.
+
+**The CTA/link step stops being optional once you use the capability step.** A feature mention only counts as a real CTA if the reader can click through on it — "Tenderwize's tender analysis surfaces key requirements first" with no URL after it is not a complete formula, it's a dangling product mention. So:
+
+- Named a feature? → the post must end with a link (homepage at minimum, or a more specific page per section 9's priority if one was supplied).
+- Not naming a feature? → the link stays fully optional, per each pillar's own rule in section 9.
+
+Don't work around this by naming a feature and then skipping the link because "it didn't feel natural" — if the link doesn't fit, drop the feature mention instead and stay pure value-only.
+
+### 🔥 Interesting Tender — Opportunity + Discovery
+
+**Goal:** surface one specific, currently open tender and unobtrusively demonstrate Tenderwize as the way it was found: show the opportunity, lead with the key facts, then drive a click to its Tenderwize page.
 
 - What qualifies: a large estimated value, a notable/well-known buyer, an unusual procurement subject, or just an unusually good fit for the audience (generous deadline, low competition category, etc.).
 - **Must be currently open** — check the submission deadline is still in the future before posting. Never present an expired tender as a live opportunity.
 - Ground it in real fields: buyer name/country, title/subject, CPV category, estimated value, submission deadline. Never invent or round up a number you don't have.
-- Structure: hook = the single most striking fact (amount, buyer, or subject) in one line; 1-2 lines on why it's worth a look; CTA = link to the tender's Tenderwize page (`tenderwize.com/{locale}/tenders/{id}`), ideally in the first reply per the links rule in section 8.
+- Structure: hook = the single most striking fact (amount, buyer, or subject) in one line; 1-2 lines on why it's worth a look; CTA = link to the tender's Tenderwize page, ideally in the first reply — see section 9 for the link rules.
 - This data is public (TED notices are public by nature), so citing/linking the real notice is fine.
 
-### 📊 Market Insight
+### 📊 Market Insight — Data + Analytics
 
-**Goal:** turn Tenderwize's own aggregated data into procurement intelligence — the post that makes this account a source people check for market signal.
+**Goal:** turn Tenderwize's own aggregated data into procurement intelligence — stats and trends across countries, industries, tender counts, values, and momentum — while the post itself demonstrates the platform's value as a procurement-intelligence source.
 
 - What qualifies: how many tenders/awards appeared over a period, which countries or industries (CPV categories) are trending up or down, total procurement volume, period-over-period comparisons.
 - Always state the time window and that it's Tenderwize-tracked data (e.g. "across the N tenders Tenderwize tracked in Q3" or "vs. the same period last year") — never present a stat as if it's the entire EU market unless it demonstrably is.
 - Observation, not causation: state what the data shows, not why it's happening, unless the cause is independently verifiable.
 - Structure: hook = the number/trend itself; 1-2 lines of context on why it matters to a bidder; CTA is optional and usually skippable — this pillar's job is credibility, not clicks.
 
-### 🏆 Contract Award
+### 🏆 Contract Award — Award + Market Intelligence
 
-**Goal:** show the money moving — who bought, who won, how much. The market-movement post.
+**Goal:** show the money moving — who won, from whom, what was procured, and for how much — and connect it to Tenderwize's ability to research awards, suppliers, and procurement history.
 
 - Ground it in real award fields: buyer (`leadBuyers`/`nonLeadBuyers`), winner (`winners`), awarded value (`awardValue`/`awardValueEur`), what was procured (title/CPV codes), and the award/conclusion date.
 - Structure: hook = buyer + winner + amount in a single line; 1 line on what was actually procured; optional context (e.g. how it compares to the original estimated value) if it adds a real insight.
 - This data is public by definition (TED result notices) — cite it plainly. Don't speculate about the winning bidder's strategy or pricing beyond what the notice discloses.
 
-### 💡 Procurement Insight
+### 💡 Procurement Insight — Education + Product
 
-**Goal:** short, practical, educational content that builds Tenderwize's expertise — no live data required, evergreen.
+**Goal:** a useful procurement tip paired with the relevant Tenderwize feature that addresses it — no live data required, evergreen.
 
 - Topics: CPV codes, framework agreements, how to search/read tenders effectively, how award criteria weighting works, common reasons bids get disqualified, quirks and gotchas of public procurement.
 - One tactical tip per post, with a concrete example — never a generic platitude ("communication is key").
-- Product mentions are optional and must stay soft ("this is exactly the kind of clause Tenderwize's deep analysis flags") — this pillar's job is to teach, not to pitch.
+- Follow the value-first formula: state the problem/insight first, then (if it fits naturally) the Tenderwize feature that solves it. Examples of the pairing:
+  - Problem: keyword-only search misses relevant tenders → Feature: CPV/category search.
+  - Problem: hard to keep track of new tenders as they're published → Feature: alerts.
+  - Problem: procurement is spread across many countries and sources → Feature: unified cross-country search.
+- Product mentions are optional and must stay soft — this pillar's job is to teach first, pitch second. If the tip doesn't have a natural product tie-in, don't manufacture one; a relevant link is enough. But if you do name a feature, the post must end with a link to it (or the homepage) — see section 9. Never name a feature and leave it as a dangling, unlinked mention.
 
 ## 4. Card image
 
@@ -91,14 +130,112 @@ Target length: 1-3 short lines is often enough. Hard cap is the platform limit (
 
 - **Emojis**: 0-2 per post, used as visual markers (bullets, emphasis), never decoratively at the end of every line. When in doubt, leave them out.
 - **Hashtags**: max 1, only if it's a real, actively-used tag (e.g. `#PublicProcurement`); never stack 3-5 generic hashtags — it reads as spam and doesn't help reach on this platform.
-- **Links**: a post with an external link gets less algorithmic reach. Either accept that tradeoff deliberately for a real destination (blog post, tender notice), or drop the link into the first reply instead of the main post.
+- **Links**: a post with an external link gets less algorithmic reach. Either accept that tradeoff deliberately for a real destination (blog post, tender notice), or drop the link into the first reply instead of the main post. See section 9 for where the link/URL itself is allowed to come from.
 - **Capitalization**: sentence case. No ALL CAPS for emphasis — use word choice or line breaks instead.
 - **Line breaks**: prefer short lines over long run-on sentences; a post that reads well broken into 3-4 lines is better than the same content as one paragraph.
 
-## 9. Do's and don'ts
+## 9. Links and CTA
+
+Every generated post SHOULD include a relevant Tenderwize URL when the post has a useful destination.
+
+The URL MUST come from the backend/context — the tool-call record, an admin-provided field, or a URL the user explicitly pasted. The AI MUST NEVER invent, guess, or construct a URL itself, including by pattern-matching a tender/award id into a `tenderwize.com/...` path — even a correctly-shaped guess counts as fabrication if it wasn't actually returned by a query.
+
+### What's actually available today
+
+- **Interesting Tender**: `search_open_tenders` records already carry a real `tenderwize.com/en/tenders/{id}` URL (see `x-post-data.service.ts`) — use it as returned, don't rebuild it.
+- **Contract Award**: `search_contract_awards` does not currently return a page URL. Don't fabricate one from the award id — omit the link, or fall back per the priority list below, until the backend adds a real award/contract page URL.
+- **Market Insight**: no per-record URL exists yet (e.g. no country × industry landing page lookup). Only use a country/industry page URL if it's explicitly supplied in context; otherwise fall back to the homepage or skip the link.
+- **Procurement Insight**: no query is made at all — same fallback as above.
+
+### Link priority
+
+Always link to the most specific relevant page available among the URLs actually supplied.
+
+Priority:
+
+1. Specific tender page
+2. Specific contract / award page
+3. Relevant country × industry page
+4. Relevant country page
+5. Tenderwize homepage
+
+Do not link to the homepage if a more relevant destination was actually provided.
+
+### Rules by pillar
+
+**Interesting Tender** — always link directly to the tender.
+
+Preferred CTA:
+
+```
+Explore the tender ↓
+{url}
+```
+
+or:
+
+```
+View the opportunity ↓
+{url}
+```
+
+**Contract Award** — link directly to the contract/award page when the backend provides one (currently it doesn't — see above). Don't invent a substitute link just to have a CTA.
+
+Preferred CTA:
+
+```
+View the contract ↓
+{url}
+```
+
+or:
+
+```
+See the award ↓
+{url}
+```
+
+**Market Insight** — link to the page that best matches the data being discussed, only if that URL was actually supplied.
+
+Example — post: "Germany published 384 new IT tenders..." → preferred destination: Germany × IT Services page.
+
+```
+Explore IT tenders in Germany ↓
+{url}
+```
+
+**Procurement Insight** — a link is optional only if the post stays pure value with no product mention. The moment the post names a specific Tenderwize feature (section 3), the link becomes mandatory: link to a relevant landing page if one was supplied, otherwise the homepage.
+
+Preferred CTA:
+
+```
+Explore European tenders ↓
+{url}
+```
+
+Don't force a CTA if it makes the post feel unnatural.
+
+### CTA style
+
+Keep CTAs short and informational.
+
+Good: "Explore the tender ↓", "View the contract ↓", "Explore IT tenders in Germany ↓", "See more opportunities ↓", "Explore European tenders ↓".
+
+Avoid: "Click here", "Learn more now", "Don't miss out", "Sign up today", "Start winning tenders", "Check it out".
+
+### Important
+
+The CTA and URL count toward the post's character limit (section 6) — the final post must stay within it.
+
+Never output placeholders such as `{url}`, `[link]`, `INSERT_URL`, or a hand-typed `tenderwize.com/...` guess in the published text — those are draft-time tokens only, and must be replaced with a real URL from context before the post is finalized.
+
+If no valid URL is available for the destination you want, either omit the link entirely or use the explicitly-provided Tenderwize homepage URL. Never fabricate a destination.
+
+## 10. Do's and don'ts
 
 **Do:**
 - Lead with the most interesting/specific fact you have.
+- Follow the value-first formula from section 3: procurement value → Tenderwize capability (optional) → relevant CTA/link.
 - Cite real numbers from real (public) tender/award data for Interesting Tender, Market Insight, and Contract Award posts.
 - Write the way you'd explain it to one specific person, not "an audience".
 - Read the post out loud before publishing — if it sounds like a press release, rewrite it.
@@ -110,19 +247,26 @@ Target length: 1-3 short lines is often enough. Hard cap is the platform limit (
 - Don't use engagement-bait phrasing ("this will blow your mind", "you won't believe").
 - Don't post two pieces of content back to back that make the same point.
 - Don't end every post with a link and "Learn more" — vary the CTA, and often have no CTA at all.
+- Don't construct a URL yourself, even one that "looks right" — only use a URL that actually came back from a query or context (see section 9).
+- Don't open a post with the product ("Tenderwize has powerful filters...") — the fact or problem always comes first, the feature (if any) second.
+- Don't reference a Tenderwize feature that isn't in `FEATURES.md` — treat an unlisted capability the same as an unverified data claim.
+- Don't name a specific feature and then leave it without a link — if a link genuinely doesn't fit, drop the feature mention instead (section 3).
 
-## 10. Compliance & brand safety
+## 11. Compliance & brand safety
 
 - Only reference tender/award data that is genuinely public (TED notices are public by nature — fine to cite/link them directly).
 - Never publish customer names, logos, or specific results without their explicit approval on file.
 - No unverifiable superlatives ("#1", "the only tool that...") without a citable source.
 - No political commentary beyond factual procurement-policy news.
 
-## 11. Pre-publish checklist
+## 12. Pre-publish checklist
 
 Before a post is scheduled/published, it should pass all of these:
 
 - [ ] One idea, not two.
+- [ ] Value/fact comes before any product mention, not after (section 3) — and the product mention isn't forced in if the connection feels unnatural.
+- [ ] Any named Tenderwize feature is actually on the list in `FEATURES.md` — not invented or embellished.
+- [ ] If a feature is named, the post ends with a real link (homepage minimum) — no dangling, unlinked feature mentions.
 - [ ] It declares which of the four pillars it is (Interesting Tender / Market Insight / Contract Award / Procurement Insight).
 - [ ] First line works as a standalone hook — it's also what renders on the card image (section 4).
 - [ ] No banned buzzwords (see section 2).
@@ -131,5 +275,7 @@ Before a post is scheduled/published, it should pass all of these:
 - [ ] For Interesting Tender: the submission deadline is verified still in the future.
 - [ ] For Market Insight: the time window and data source are stated.
 - [ ] At most 1 hashtag, at most 2 emoji.
+- [ ] Any link/URL in the post actually came from the backend/context — never hand-constructed (section 9).
+- [ ] No leftover placeholder text (`{url}`, `[link]`, etc.) in the final post.
 - [ ] If it names a customer, approval is on file.
 - [ ] Read it out loud — does it sound like a person, not a press release?

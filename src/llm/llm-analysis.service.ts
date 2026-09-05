@@ -36,8 +36,20 @@ export interface GenerateXPostInput {
   tone?: string;
   notes?: string;
   guidelines: string;
+  /**
+   * The fixed list of real Tenderwize capabilities the model may cite as the
+   * "Tenderwize capability" step of the value-first formula (guidelines
+   * section 3). It must not reference any feature outside this list.
+   */
+  features?: string;
   /** One-line summaries of recently generated posts for this pillar, to avoid repeats. */
   recentlyCovered?: string[];
+  /**
+   * The only URL the model may use when no more specific record/page URL is
+   * available (guidelines section 9, link priority level 5 - homepage). It
+   * must never construct any other URL itself.
+   */
+  homepageUrl?: string;
 }
 
 export interface GenerateXPostResult {
@@ -178,8 +190,10 @@ export class LlmAnalysisService extends BaseLlmAnalysisService {
               'You write posts for X (formerly Twitter) for TED, a SaaS platform that helps companies find, analyze, and win public procurement tenders.',
               'Follow these house style guidelines exactly:',
               input.guidelines,
+              this.buildFeaturesGuidance(input),
               formatInstruction,
               this.buildTopicGuidance(input),
+              this.buildLinkGuidance(input),
               'Return JSON only in this exact shape: {"posts":["..."],"hashtags":["..."],"notes":"..."}.',
               '"posts" is an ordered array of post bodies. "hashtags" contains at most 1 hashtag without the # symbol, or an empty array. "notes" is one short sentence explaining the angle you took (or, if you picked the topic yourself, what you picked and why).',
             ]
@@ -246,8 +260,10 @@ export class LlmAnalysisService extends BaseLlmAnalysisService {
       'You write posts for X (formerly Twitter) for TED, a SaaS platform that helps companies find, analyze, and win public procurement tenders.',
       'Follow these house style guidelines exactly:',
       input.guidelines,
+      this.buildFeaturesGuidance(input),
       formatInstruction,
       this.buildTopicGuidance(input),
+      this.buildLinkGuidance(input),
       "You have a tool to fetch real data from Tenderwize's database. You MUST call it at least once before writing anything, and every specific fact in the post (buyer, winner, amount, date, count, CPV code) MUST come from a tool result — never invent, estimate, or round a number that is not present in a tool result.",
       'If a tool call returns no matching items (an empty items array), call it again once with broader parameters (drop some filters). If it is still empty after that, do not write a post about invented data — respond with the final JSON answer using an empty "posts" array and explain in "notes" that no matching data was found.',
       'When you do have results, pick ONE record to write about (for a list of items) unless you used a stats tool, in which case write about the returned numbers.',
@@ -437,6 +453,42 @@ export class LlmAnalysisService extends BaseLlmAnalysisService {
     }
 
     return lines.join('\n\n');
+  }
+
+  /**
+   * Gives the model the fixed list of real Tenderwize features it may cite
+   * for the "Tenderwize capability" step of the value-first formula
+   * (guidelines section 3). Without this, the model has no grounded feature
+   * list and would either skip product mentions entirely or invent one.
+   */
+  private buildFeaturesGuidance(input: GenerateXPostInput): string {
+    if (!input.features) {
+      return 'No feature list was provided for this generation. Do not describe or reference any specific Tenderwize feature — stick to pure procurement value, or a generic phrase like "Tenderwize" with no capability claim.';
+    }
+
+    return [
+      'When the value-first formula (guidelines section 3) calls for connecting to a Tenderwize capability, pick ONLY from this list of real features — never invent, guess, or embellish one that is not here:',
+      input.features,
+      'Rule: if the post names or describes a specific feature from this list, it MUST also end with a link (see the link/CTA guidance below - the homepage URL, or a more specific one if you were given one) so the reader can actually act on it. A feature mention with no clickable link is not allowed. If you decide not to include a link, do not name a feature either - keep the post to pure procurement value with no product mention.',
+    ].join('\n\n');
+  }
+
+  /**
+   * Tells the model exactly which URL(s) it is allowed to use, per the
+   * "never fabricate a URL" rule in the guidelines (section 9). A
+   * tool-result record's own `url` field (when present) always outranks
+   * this - this only covers the homepage fallback for pillars/situations
+   * where no more specific page URL exists.
+   */
+  private buildLinkGuidance(input: GenerateXPostInput): string {
+    if (!input.homepageUrl) {
+      return 'No homepage URL was provided for this generation. Do not include any link or URL in the post unless a tool result gave you one directly.';
+    }
+
+    return [
+      `The only URL you may use as a fallback (link priority level 5 in the guidelines) is: ${input.homepageUrl}`,
+      'Use it only if a link genuinely fits and no more specific URL (e.g. a tool result\'s own url field) is available. Never modify it, append a path to it, or use any other URL.',
+    ].join('\n');
   }
 
   private stripJsonCodeFence(content: string): string {

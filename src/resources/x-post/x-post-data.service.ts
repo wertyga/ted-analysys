@@ -6,7 +6,7 @@ import { AwardTenderModel } from '@/resources/award-tender/schemas';
 import { tenderPopulateFields, awardTenderPopulateFields } from '@/utils';
 import { XPostPillar } from './schemas/x-post.schema';
 
-const TENDERWIZE_ORIGIN = 'https://tenderwize.com';
+export const TENDERWIZE_ORIGIN = 'https://tenderwize.com';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface XPostToolRecord {

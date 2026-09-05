@@ -7,6 +7,8 @@ description: Draft an X (Twitter) post for Tenderwize. Use when asked to write/d
 
 The full house style rules live in `X_POSTS_GUIDELINES.md` in this skill's own directory (`.claude/skills/x-post/X_POSTS_GUIDELINES.md`) — **read that file before drafting anything**, it is the source of truth (voice, structure, formatting, do's/don'ts, pre-publish checklist). This skill only adds the workflow around it.
 
+If the draft will name a Tenderwize feature (the "capability" step of the value-first formula in guidelines section 3), also read `FEATURES.md` in the same directory first — it's the fixed list of what Tenderwize actually does. Never name a feature that isn't on that list.
+
 There is also an in-app AI generator at `admin/x-posts` (backed by `POST /x-posts/adm/generate`) that follows the same guidelines file, saves results as drafts in the database, and auto-renders a branded card image (1200×675, see guidelines section 4) from the post's hook via `POST /x-posts/adm/:id/image`. For Interesting Tender, Market Insight, and Contract Award it queries Tenderwize's real tender/award data itself (via LLM tool-calling against MongoDB) and refuses to generate if nothing real matches the topic — it never invents facts. This skill is for conversational drafting/review in chat — it does not write to the database, render images, or run that tool-calling pipeline. If the user wants the result persisted as a draft (with its image and verified data), tell them to run it through the admin panel's "Generate" form (same topic/pillar/notes), or paste your draft into the "extra notes" field there.
 
 ## Workflow
@@ -23,8 +25,8 @@ There is also an in-app AI generator at `admin/x-posts` (backed by `POST /x-post
    - For **Interesting Tender**, explicitly check the submission deadline is still in the future before treating it as a live opportunity.
    - **Procurement Insight** needs no data lookup — it's expertise content.
 
-3. **Draft** following `X_POSTS_GUIDELINES.md` section 6 (single post) or section 7 (thread), matching the pillar's specific rules from section 3, and keep the card image in mind (section 4) — the hook (first post) is what gets rendered onto it.
+3. **Draft** following `X_POSTS_GUIDELINES.md` section 6 (single post) or section 7 (thread), matching the pillar's specific rules from section 3, and keep the card image in mind (section 4) — the hook (first post) is what gets rendered onto it. If the post links anywhere, follow section 9: only use a URL you actually have (from the user, real data you looked up, or context) — never construct or guess one, e.g. by pattern-matching a tender id into `tenderwize.com/en/tenders/{id}`.
 
-4. **Self-check against the pre-publish checklist** (section 11 of the guidelines) before presenting the draft. Fix anything that fails rather than presenting a draft you know breaks a rule.
+4. **Self-check against the pre-publish checklist** (section 12 of the guidelines) before presenting the draft. Fix anything that fails rather than presenting a draft you know breaks a rule.
 
 5. **Present the draft(s)** with the pillar labeled, plus a one-line note on where the facts came from (so the user can verify them). If you wrote a thread, number the posts so the user can see the split.
