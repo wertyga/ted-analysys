@@ -50,6 +50,17 @@ export interface GenerateXPostInput {
    * must never construct any other URL itself.
    */
   homepageUrl?: string;
+  /**
+   * Raw contents of the frontend's live route manifest (`ROUTES.md`),
+   * fetched fresh from `{clientUrl}/ROUTES.md` for this generation. When
+   * present, the model may build a URL itself by combining `clientUrl` with
+   * one of the exact path patterns listed here, substituting only real
+   * values already returned by a tool call (see buildLinkGuidance). Absent
+   * when the fetch failed or CLIENT_URL isn't configured.
+   */
+  routes?: string;
+  /** Origin the `routes` patterns are relative to (`process.env.CLIENT_URL`). */
+  clientUrl?: string;
 }
 
 export interface GenerateXPostResult {
@@ -475,20 +486,53 @@ export class LlmAnalysisService extends BaseLlmAnalysisService {
 
   /**
    * Tells the model exactly which URL(s) it is allowed to use, per the
-   * "never fabricate a URL" rule in the guidelines (section 9). A
-   * tool-result record's own `url` field (when present) always outranks
-   * this - this only covers the homepage fallback for pillars/situations
-   * where no more specific page URL exists.
+   * "never fabricate a URL" rule in the guidelines (section 9). Priority:
+   * 1) a tool result's own `url` field, used verbatim; 2) a URL built from
+   * `input.routes` (the frontend's live ROUTES.md) + `input.clientUrl`,
+   * substituting only real values a tool already returned; 3) the homepage
+   * fallback. The model must never use any other domain or invent a path or
+   * placeholder value — XPostService also strips any line whose URL doesn't
+   * match a known origin as a backstop.
    */
   private buildLinkGuidance(input: GenerateXPostInput): string {
-    if (!input.homepageUrl) {
-      return 'No homepage URL was provided for this generation. Do not include any link or URL in the post unless a tool result gave you one directly.';
+    const lines: string[] = [];
+
+    if (input.routes && input.clientUrl) {
+      lines.push(
+        [
+          `Here is the real, current list of Tenderwize frontend pages (ROUTES.md), fetched live from ${input.clientUrl}:`,
+          input.routes,
+        ].join('\n\n'),
+        [
+          `You may build a URL yourself ONLY by combining ${input.clientUrl} with one of the exact path patterns listed above, substituting any placeholder in that pattern with a real value already present in this conversation — an id, country code, CPV category, or similar that an actual tool result returned.`,
+          'Never invent, guess, or round a value to fill a placeholder. Never use a path/pattern that is not listed above. Never use any domain other than the one shown above.',
+          'If no listed pattern genuinely matches what the post is about, do not force one — fall back per the priority below instead.',
+        ].join(' '),
+      );
+    } else {
+      lines.push(
+        'No route list (ROUTES.md) was available for this generation (fetch failed or not configured). Do not construct any path yourself under any circumstances.',
+      );
     }
 
-    return [
-      `The only URL you may use as a fallback (link priority level 5 in the guidelines) is: ${input.homepageUrl}`,
-      'Use it only if a link genuinely fits and no more specific URL (e.g. a tool result\'s own url field) is available. Never modify it, append a path to it, or use any other URL.',
-    ].join('\n');
+    if (input.homepageUrl) {
+      lines.push(
+        [
+          `The only other URL you may use, as a last-resort fallback (link priority level 5 in the guidelines), is: ${input.homepageUrl}`,
+          "Use it only if a link genuinely fits and nothing more specific is available (a tool result's own url field, or a URL built from ROUTES.md above). Never modify it or append a path to it.",
+        ].join(' '),
+      );
+    } else {
+      lines.push(
+        'No homepage URL was provided either. If you have no other real URL to use, do not include any link in the post.',
+      );
+    }
+
+    lines.push(
+      'Link priority, most to least specific: (1) a url field returned directly by a tool result, (2) a URL you built from ROUTES.md using only real values from tool results, (3) the homepage fallback above, (4) no link at all.',
+    );
+
+    return lines.join('\n\n');
   }
 
   private stripJsonCodeFence(content: string): string {

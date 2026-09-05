@@ -25,7 +25,7 @@ There is also an in-app AI generator at `admin/x-posts` (backed by `POST /x-post
    - For **Interesting Tender**, explicitly check the submission deadline is still in the future before treating it as a live opportunity.
    - **Procurement Insight** needs no data lookup — it's expertise content.
 
-3. **Draft** following `X_POSTS_GUIDELINES.md` section 6 (single post) or section 7 (thread), matching the pillar's specific rules from section 3, and keep the card image in mind (section 4) — the hook (first post) is what gets rendered onto it. If the post links anywhere, follow section 9: only use a URL you actually have (from the user, real data you looked up, or context) — never construct or guess one, e.g. by pattern-matching a tender id into `tenderwize.com/en/tenders/{id}`.
+3. **Draft** following `X_POSTS_GUIDELINES.md` section 6 (single post) or section 7 (thread), matching the pillar's specific rules from section 3, and keep the card image in mind (section 4) — the hook (first post) is what gets rendered onto it. If the post links anywhere, follow section 9: use a URL you actually have (from the user, real data you looked up, or a tool result), or one built strictly from a real pattern in the frontend's live `ROUTES.md` (fetch it from `{CLIENT_URL}/ROUTES.md`, or ask the user for its current contents if you can't fetch it) plus a real value you actually looked up — never guess a path or a placeholder value.
 
 4. **Self-check against the pre-publish checklist** (section 12 of the guidelines) before presenting the draft. Fix anything that fails rather than presenting a draft you know breaks a rule.
 

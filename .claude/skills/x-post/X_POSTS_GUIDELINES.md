@@ -140,28 +140,36 @@ Target length: 1-3 short lines is often enough. Hard cap is the platform limit (
 
 Every generated post SHOULD include a relevant Tenderwize URL when the post has a useful destination.
 
-The URL MUST come from the backend/context — the tool-call record, an admin-provided field, or a URL the user explicitly pasted. The AI MUST NEVER invent, guess, or construct a URL itself, including by pattern-matching a tender/award id into a `tenderwize.com/...` path — even a correctly-shaped guess counts as fabrication if it wasn't actually returned by a query.
+The URL MUST come from one of exactly two sources:
+
+1. A tool-call record's own `url` field, used verbatim — never modified.
+2. A URL built from **ROUTES.md** — the frontend's live route manifest, fetched fresh from `{CLIENT_URL}/ROUTES.md` on every generation — by taking one of its exact path patterns and substituting any placeholder with a real value that a tool result actually returned earlier in the same generation (an id, country code, CPV category, etc.).
+
+The AI MUST NEVER invent, guess, or construct a URL any other way: no path/pattern that isn't listed in ROUTES.md for that generation, no placeholder value that wasn't actually returned by a query, no domain other than the one ROUTES.md was fetched from. Even a correctly-shaped guess counts as fabrication if it wasn't built this way. If ROUTES.md couldn't be fetched for this generation (network failure, `CLIENT_URL` not configured), treat it as unavailable and fall back per the priority list below — never reuse a path pattern from memory of a previous generation.
+
+As a backstop, the backend strips any link whose domain doesn't match a URL it actually supplied for that generation before a post is saved — so a fabricated domain gets silently dropped rather than published, but don't rely on that; get it right in the draft.
+
+When drafting by hand via the `x-post` skill (no live generator/tool-calling), apply the same rule: fetch or ask for the current `ROUTES.md` content before proposing a link, and build the URL only from a pattern actually in it plus a real value you looked up — never a remembered or guessed path.
 
 ### What's actually available today
 
-- **Interesting Tender**: `search_open_tenders` records already carry a real `tenderwize.com/en/tenders/{id}` URL (see `x-post-data.service.ts`) — use it as returned, don't rebuild it.
-- **Contract Award**: `search_contract_awards` does not currently return a page URL. Don't fabricate one from the award id — omit the link, or fall back per the priority list below, until the backend adds a real award/contract page URL.
-- **Market Insight**: no per-record URL exists yet (e.g. no country × industry landing page lookup). Only use a country/industry page URL if it's explicitly supplied in context; otherwise fall back to the homepage or skip the link.
-- **Procurement Insight**: no query is made at all — same fallback as above.
+- **Interesting Tender**: `search_open_tenders` records already carry a real `tenderwize.com/en/tenders/{id}` URL (see `x-post-data.service.ts`) — use it as returned, don't rebuild it from ROUTES.md.
+- **Contract Award**: `search_contract_awards` does not return a page URL directly. Look for a matching award/contract page pattern in ROUTES.md and build it from the award's real id; if no such pattern exists, fall back per the priority list below — don't fabricate one from the award id.
+- **Market Insight**: no per-record URL comes back from the stats tool. Look for a matching country/industry landing-page pattern in ROUTES.md, using the real country/CPV values from the query that was actually run; otherwise fall back to the homepage or skip the link.
+- **Procurement Insight**: no query is made at all. Check ROUTES.md for a landing page relevant to the topic; otherwise fall back to the homepage.
 
 ### Link priority
 
-Always link to the most specific relevant page available among the URLs actually supplied.
+Always link to the most specific relevant page actually buildable from what you have.
 
 Priority:
 
-1. Specific tender page
-2. Specific contract / award page
-3. Relevant country × industry page
-4. Relevant country page
-5. Tenderwize homepage
+1. A URL returned directly in a tool result's own `url` field.
+2. A URL built from a ROUTES.md pattern + real values from tool results (specific tender/award/country/industry page).
+3. The Tenderwize homepage URL supplied for this generation.
+4. No link at all.
 
-Do not link to the homepage if a more relevant destination was actually provided.
+Do not link to the homepage if a more relevant destination is actually buildable from ROUTES.md.
 
 ### Rules by pillar
 
@@ -181,7 +189,7 @@ View the opportunity ↓
 {url}
 ```
 
-**Contract Award** — link directly to the contract/award page when the backend provides one (currently it doesn't — see above). Don't invent a substitute link just to have a CTA.
+**Contract Award** — link directly to the contract/award page when ROUTES.md has a matching pattern (see above). Don't invent a substitute link just to have a CTA.
 
 Preferred CTA:
 
@@ -249,7 +257,7 @@ If no valid URL is available for the destination you want, either omit the link 
 - Don't use engagement-bait phrasing ("this will blow your mind", "you won't believe").
 - Don't post two pieces of content back to back that make the same point.
 - Don't end every post with a link and "Learn more" — vary the CTA, and often have no CTA at all.
-- Don't construct a URL yourself, even one that "looks right" — only use a URL that actually came back from a query or context (see section 9).
+- Don't construct a URL yourself except by following an exact pattern from ROUTES.md with real values that actually came back from a query — never a path that isn't in ROUTES.md, and never a placeholder value you made up (see section 9).
 - Don't open a post with the product ("Tenderwize has powerful filters...") — the fact or problem always comes first, the feature (if any) second.
 - Don't reference a Tenderwize feature that isn't in `FEATURES.md` — treat an unlisted capability the same as an unverified data claim.
 - Don't name a specific feature and then leave it without a link — if a link genuinely doesn't fit, drop the feature mention instead (section 3).
@@ -277,7 +285,7 @@ Before a post is scheduled/published, it should pass all of these:
 - [ ] For Interesting Tender: the submission deadline is verified still in the future.
 - [ ] For Market Insight: the time window and data source are stated.
 - [ ] At most 1 hashtag, at most 2 emoji.
-- [ ] Any link/URL in the post actually came from the backend/context — never hand-constructed (section 9).
+- [ ] Any link/URL in the post either came directly from the backend/context or was built strictly from a real ROUTES.md pattern plus real values from a query — never hand-constructed from memory or guesswork (section 9).
 - [ ] No leftover placeholder text (`{url}`, `[link]`, etc.) in the final post.
 - [ ] If it names a customer, approval is on file.
 - [ ] Read it out loud — does it sound like a person, not a press release?

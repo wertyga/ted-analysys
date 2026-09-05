@@ -2,10 +2,12 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import axios from 'axios';
 import mongoose from 'mongoose';
 import { getPaginationMeta } from '@/utils';
 import {
@@ -33,6 +35,7 @@ const NO_DATA_MESSAGE =
 
 @Injectable()
 export class XPostService {
+  private readonly logger = new Logger(XPostService.name);
   private guidelinesCache?: string;
   private featuresCache?: string;
 
@@ -64,6 +67,71 @@ export class XPostService {
     return this.featuresCache;
   }
 
+  /**
+   * Fetches the frontend's live route manifest (`{CLIENT_URL}/ROUTES.md`) so
+   * the model can pick a real page pattern for the link/CTA (guidelines
+   * section 9) instead of only ever getting a homepage fallback. Fetched
+   * fresh on every generation (no cache) so a frontend route change is
+   * picked up immediately; a fetch failure just means no route list for
+   * this generation, not a hard error.
+   */
+  private async getRoutes(): Promise<string | undefined> {
+    const clientUrl = process.env.CLIENT_URL;
+
+    if (!clientUrl) return undefined;
+
+    try {
+      const response = await axios.get<string>(
+        `${clientUrl.replace(/\/$/, '')}/ROUTES.md`,
+        { timeout: 5000, responseType: 'text' },
+      );
+
+      return typeof response.data === 'string' && response.data.trim()
+        ? response.data
+        : undefined;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to fetch ROUTES.md from ${clientUrl}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+
+      return undefined;
+    }
+  }
+
+  /**
+   * Last line of defense against a hallucinated link: strips any line
+   * containing a URL whose origin isn't one we actually supplied to the
+   * model (TENDERWIZE_ORIGIN or CLIENT_URL), even though the prompt already
+   * forbids constructing anything else (guidelines section 9).
+   */
+  private sanitizePostUrls(
+    posts: string[],
+    allowedOrigins: (string | undefined)[],
+  ): string[] {
+    const normalizedOrigins = allowedOrigins
+      .filter((origin): origin is string => Boolean(origin))
+      .map((origin) => origin.replace(/\/$/, ''));
+    const urlPattern = /https?:\/\/\S+/gi;
+
+    return posts.map((post) =>
+      post
+        .split('\n')
+        .filter((line) => {
+          const urls = line.match(urlPattern);
+
+          if (!urls) return true;
+
+          return urls.every((url) =>
+            normalizedOrigins.some((origin) => url.startsWith(origin)),
+          );
+        })
+        .join('\n')
+        .trim(),
+    );
+  }
+
   private async getRecentlyCoveredSummaries(
     pillar: XPostPillar,
   ): Promise<string[]> {
@@ -86,7 +154,11 @@ export class XPostService {
     createdBy?: mongoose.Types.ObjectId,
   ) {
     const format = dto.format ?? XPostFormat.Single;
-    const recentlyCovered = await this.getRecentlyCoveredSummaries(dto.pillar);
+    const [recentlyCovered, routes] = await Promise.all([
+      this.getRecentlyCoveredSummaries(dto.pillar),
+      this.getRoutes(),
+    ]);
+    const clientUrl = process.env.CLIENT_URL;
     const baseInput: GenerateXPostInput = {
       topic: dto.topic,
       pillar: dto.pillar,
@@ -97,6 +169,8 @@ export class XPostService {
       features: this.getFeatures(),
       recentlyCovered,
       homepageUrl: `${TENDERWIZE_ORIGIN}/en`,
+      routes,
+      clientUrl,
     };
 
     let result: GenerateXPostResult;
@@ -157,6 +231,11 @@ export class XPostService {
           .join(' | ') || undefined;
     }
 
+    const sanitizedPosts = this.sanitizePostUrls(result.posts, [
+      TENDERWIZE_ORIGIN,
+      clientUrl,
+    ]);
+
     const storedTopic =
       dto.topic && dto.topic.trim()
         ? dto.topic.trim()
@@ -169,7 +248,7 @@ export class XPostService {
       topic: storedTopic,
       pillar: dto.pillar,
       format,
-      posts: result.posts,
+      posts: sanitizedPosts,
       hashtags: result.hashtags,
       notes: result.notes,
       status: XPostStatus.Draft,
