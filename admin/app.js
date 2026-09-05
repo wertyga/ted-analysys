@@ -111,6 +111,39 @@
     recentAwardTendersCronStatus: null,
   };
 
+  var X_POST_PILLARS = [
+    ['interesting_tender', '🔥 Interesting Tender'],
+    ['market_insight', '📊 Market Insight'],
+    ['contract_award', '🏆 Contract Award'],
+    ['procurement_insight', '💡 Procurement Insight'],
+  ];
+
+  Object.assign(state, {
+    xPosts: [],
+    xPostsTotal: 0,
+    xPostsPage: 1,
+    xPostsPageSize: 20,
+    xPostsLoading: false,
+    xPostsStatusFilter: '',
+    xPostsPillarFilter: '',
+
+    xPostTopic: '',
+    xPostPillar: X_POST_PILLARS[0][0],
+    xPostFormat: 'single',
+    xPostTone: '',
+    xPostNotes: '',
+    xPostGenerateLoading: false,
+
+    xPostEditingId: null,
+    xPostEditPosts: '',
+    xPostEditHashtags: '',
+    xPostEditNotes: '',
+    xPostEditStatus: '',
+    xPostEditSaving: false,
+
+    xPostImageLoadingById: {},
+  });
+
   var pollHandle = null;
 
   // ---------------- utils ----------------
@@ -221,7 +254,13 @@
     return fetch(getApiUrl(path), Object.assign({}, options, { headers: headers })).then(function (response) {
       return response.text().then(function (text) {
         if (!response.ok) {
-          throw apiError(text, response.status);
+          var message = text;
+          try {
+            var parsedError = JSON.parse(text);
+            if (parsedError && typeof parsedError.message === 'string') message = parsedError.message;
+            else if (parsedError && Array.isArray(parsedError.message)) message = parsedError.message.join(', ');
+          } catch (e) {}
+          throw apiError(message, response.status);
         }
         if (!text) return undefined;
         try {
@@ -273,7 +312,9 @@
           ? 'Tenders'
           : state.section === 'tech'
             ? 'Tech'
-            : 'Dashboard';
+            : state.section === 'x-posts'
+              ? 'X Posts'
+              : 'Dashboard';
 
     return (
       '<main class="shell">' +
@@ -285,6 +326,7 @@
       navLinkHtml('/admin/users', 'Users', 'users') +
       navLinkHtml('/admin/tenders', 'Tenders', 'tenders') +
       navLinkHtml('/admin/tech', 'Tech', 'tech') +
+      navLinkHtml('/admin/x-posts', 'X Posts', 'x-posts') +
       '</nav>' +
       '</div>' +
       (isAuth ? '<button class="secondaryButton" onclick="Admin.signOut()" type="button">Sign out</button>' : '') +
@@ -333,6 +375,7 @@
     if (state.section === 'users') inner = usersSectionHtml();
     else if (state.section === 'tenders') inner = tendersSectionHtml();
     else if (state.section === 'tech') inner = techSectionHtml();
+    else if (state.section === 'x-posts') inner = xPostsSectionHtml();
     else inner = dashboardSectionHtml();
     return '<div class="grid">' + inner + '</div>';
   }
@@ -986,12 +1029,196 @@
     );
   }
 
+  // ---- x-posts ----
+
+  function xPostStatusTagVariant(status) {
+    if (status === 'published') return 'green';
+    if (status === 'approved') return 'blue';
+    return 'default';
+  }
+
+  function xPostPillarLabel(pillar) {
+    var found = X_POST_PILLARS.filter(function (p) {
+      return p[0] === pillar;
+    })[0];
+    return found ? found[1] : '-';
+  }
+
+  function xPostGeneratePanelHtml() {
+    return (
+      '<section class="panel panelWide"><div class="panelHeader"><div><h2>Write an X post</h2>' +
+      '<p>Generates a draft with AI following the house style rules in .claude/skills/x-post/X_POSTS_GUIDELINES.md.</p></div></div>' +
+      '<form class="xPostForm" onsubmit="return Admin.generateXPost(event)">' +
+      '<label>Topic / brief (optional — leave empty to let the AI pick)<textarea placeholder="What is this post about? Leave empty to let the AI choose a fresh subject itself." rows="3" oninput="Admin.setField(\'xPostTopic\', this.value)">' +
+      escapeHtml(state.xPostTopic) +
+      '</textarea></label>' +
+      '<div class="xPostFormRow">' +
+      '<label>Pillar<select required onchange="Admin.setField(\'xPostPillar\', this.value)">' +
+      X_POST_PILLARS.map(function (p) {
+        return '<option value="' + p[0] + '"' + (state.xPostPillar === p[0] ? ' selected' : '') + '>' + escapeHtml(p[1]) + '</option>';
+      }).join('') +
+      '</select></label>' +
+      '<label>Format<select onchange="Admin.setField(\'xPostFormat\', this.value)">' +
+      '<option value="single"' + (state.xPostFormat === 'single' ? ' selected' : '') + '>Single post</option>' +
+      '<option value="thread"' + (state.xPostFormat === 'thread' ? ' selected' : '') + '>Thread</option>' +
+      '</select></label>' +
+      '<label>Tone (optional)<input placeholder="e.g. confident, dry humor" value="' +
+      escapeHtml(state.xPostTone) +
+      '" oninput="Admin.setField(\'xPostTone\', this.value)"></label>' +
+      '</div>' +
+      '<label>Extra notes (optional)<textarea rows="2" oninput="Admin.setField(\'xPostNotes\', this.value)">' +
+      escapeHtml(state.xPostNotes) +
+      '</textarea></label>' +
+      '<button ' +
+      (state.xPostGenerateLoading ? 'disabled' : '') +
+      ' type="submit">' +
+      (state.xPostGenerateLoading ? 'Generating...' : 'Generate draft') +
+      '</button>' +
+      '</form>' +
+      '</section>'
+    );
+  }
+
+  function xPostCardHtml(item) {
+    var isEditing = state.xPostEditingId === item._id;
+    var body;
+
+    if (isEditing) {
+      body =
+        '<label>Posts (separate thread posts with a line containing only ---)<textarea rows="6" oninput="Admin.setField(\'xPostEditPosts\', this.value)">' +
+        escapeHtml(state.xPostEditPosts) +
+        '</textarea></label>' +
+        '<label>Hashtags (comma separated, no #)<input value="' +
+        escapeHtml(state.xPostEditHashtags) +
+        '" oninput="Admin.setField(\'xPostEditHashtags\', this.value)"></label>' +
+        '<label>Notes<input value="' +
+        escapeHtml(state.xPostEditNotes) +
+        '" oninput="Admin.setField(\'xPostEditNotes\', this.value)"></label>' +
+        '<label>Status<select onchange="Admin.setField(\'xPostEditStatus\', this.value)">' +
+        ['draft', 'approved', 'published']
+          .map(function (s) {
+            return '<option value="' + s + '"' + (state.xPostEditStatus === s ? ' selected' : '') + '>' + s + '</option>';
+          })
+          .join('') +
+        '</select></label>' +
+        '<div class="buttonGroup">' +
+        '<button class="secondaryButton" ' +
+        (state.xPostEditSaving ? 'disabled' : '') +
+        ' onclick="Admin.cancelEditXPost()" type="button">Cancel</button>' +
+        '<button ' +
+        (state.xPostEditSaving ? 'disabled' : '') +
+        ' onclick="Admin.saveXPost(\'' + item._id + '\')" type="button">' +
+        (state.xPostEditSaving ? 'Saving...' : 'Save') +
+        '</button>' +
+        '</div>';
+    } else {
+      var isRegeneratingImage = Boolean(state.xPostImageLoadingById[item._id]);
+
+      body =
+        (item.imageUrl
+          ? '<img class="xPostImage" src="' + escapeHtml(item.imageUrl) + '" alt="Post card image">'
+          : '<div class="xPostImagePlaceholder">No image yet</div>') +
+        (item.format === 'single' && item.posts.length > 1
+          ? '<p class="mutedText"><em>Pick one variant to post — these are not a thread.</em></p>'
+          : '') +
+        '<div class="xPostBody">' +
+        item.posts
+          .map(function (p, idx) {
+            var label = '';
+            if (item.posts.length > 1) {
+              label = item.format === 'single' ? 'Variant ' + (idx + 1) : (idx + 1) + '/' + item.posts.length;
+            }
+            return '<p>' + (label ? '<strong>' + label + '</strong> ' : '') + escapeHtml(p) + '</p>';
+          })
+          .join('') +
+        '</div>' +
+        (item.hashtags && item.hashtags.length
+          ? '<p class="mutedText">' +
+            escapeHtml(
+              item.hashtags
+                .map(function (h) {
+                  return '#' + h;
+                })
+                .join(' '),
+            ) +
+            '</p>'
+          : '') +
+        (item.notes ? '<p class="mutedText"><em>' + escapeHtml(item.notes) + '</em></p>' : '') +
+        (item.sourceSummary ? '<p class="xPostSource">Sourced from: ' + escapeHtml(item.sourceSummary) + '</p>' : '') +
+        '<div class="buttonGroup">' +
+        '<button class="secondaryButton" onclick="Admin.startEditXPost(\'' + item._id + '\')" type="button">Edit</button>' +
+        '<button class="secondaryButton" ' +
+        (isRegeneratingImage ? 'disabled' : '') +
+        ' onclick="Admin.regenerateXPostImage(\'' + item._id + '\')" type="button">' +
+        (isRegeneratingImage ? 'Rendering...' : item.imageUrl ? 'Regenerate image' : 'Generate image') +
+        '</button>' +
+        '<button class="secondaryButton dangerButton" onclick="Admin.deleteXPost(\'' + item._id + '\')" type="button">Delete</button>' +
+        '</div>';
+    }
+
+    return (
+      '<div class="xPostCard">' +
+      '<div class="xPostCardHeader"><div>' +
+      tagHtml(item.status, xPostStatusTagVariant(item.status)) +
+      tagHtml(xPostPillarLabel(item.pillar), 'default') +
+      tagHtml(item.format, 'default') +
+      '</div><small class="mutedText">' +
+      fmtDateTime(item.createdAt) +
+      (item.llmModel ? ' &middot; ' + escapeHtml(item.llmModel) : '') +
+      '</small></div>' +
+      '<p class="xPostTopic">' +
+      escapeHtml(item.topic) +
+      '</p>' +
+      body +
+      '</div>'
+    );
+  }
+
+  function xPostsListPanelHtml() {
+    var cards = state.xPosts.map(xPostCardHtml).join('');
+
+    return (
+      '<section class="panel panelWide"><div class="panelHeader"><div><h2>Drafts &amp; history</h2><p>' +
+      state.xPostsTotal +
+      ' total posts</p></div>' +
+      '<div class="buttonGroup">' +
+      '<select onchange="Admin.setXPostFilter(\'xPostsStatusFilter\', this.value)">' +
+      '<option value="">All statuses</option>' +
+      ['draft', 'approved', 'published']
+        .map(function (s) {
+          return '<option value="' + s + '"' + (state.xPostsStatusFilter === s ? ' selected' : '') + '>' + s + '</option>';
+        })
+        .join('') +
+      '</select>' +
+      '<select onchange="Admin.setXPostFilter(\'xPostsPillarFilter\', this.value)">' +
+      '<option value="">All pillars</option>' +
+      X_POST_PILLARS.map(function (p) {
+        return '<option value="' + p[0] + '"' + (state.xPostsPillarFilter === p[0] ? ' selected' : '') + '>' + escapeHtml(p[1]) + '</option>';
+      }).join('') +
+      '</select>' +
+      '<button class="secondaryButton" ' +
+      (state.xPostsLoading ? 'disabled' : '') +
+      ' onclick="Admin.loadXPosts()" type="button">Refresh</button>' +
+      '</div></div>' +
+      '<div class="xPostList">' +
+      (cards || '<p class="mutedText">No X posts yet.</p>') +
+      '</div>' +
+      paginationHtml('xPosts', state.xPostsPage, state.xPostsPageSize, state.xPostsTotal) +
+      '</section>'
+    );
+  }
+
+  function xPostsSectionHtml() {
+    return xPostGeneratePanelHtml() + xPostsListPanelHtml();
+  }
+
   // ---------------- routing ----------------
 
   function sectionFromPath(pathname) {
     if (pathname.indexOf('/tenders') !== -1) return 'tenders';
     if (pathname.indexOf('/users') !== -1) return 'users';
     if (pathname.indexOf('/tech') !== -1) return 'tech';
+    if (pathname.indexOf('/x-posts') !== -1) return 'x-posts';
     return 'dashboard';
   }
 
@@ -1063,6 +1290,11 @@
     state.dbCopyResult = null;
     state.gatherAllStatus = null;
     state.awardTendersRefreshResult = null;
+    state.xPosts = [];
+    state.xPostsTotal = 0;
+    state.xPostsPage = 1;
+    state.xPostsPageSize = 20;
+    state.xPostEditingId = null;
     render();
   }
 
@@ -1079,6 +1311,7 @@
         if (state.section === 'users') return loadUsers(state.usersPage, state.usersPageSize);
         if (state.section === 'tenders') return loadTenders(state.tendersPage, state.tendersPageSize);
         if (state.section === 'tech') return loadGatherAllStatus();
+        if (state.section === 'x-posts') return loadXPosts(state.xPostsPage, state.xPostsPageSize);
       })
       .catch(function (error) {
         if (error && error.status === 403) {
@@ -1139,16 +1372,44 @@
       });
   }
 
+  function loadXPosts(page, pageSize) {
+    page = page || state.xPostsPage;
+    pageSize = pageSize || state.xPostsPageSize;
+    state.xPostsLoading = true;
+    render();
+
+    var params = 'page=' + page + '&limit=' + pageSize;
+    if (state.xPostsStatusFilter) params += '&status=' + encodeURIComponent(state.xPostsStatusFilter);
+    if (state.xPostsPillarFilter) params += '&pillar=' + encodeURIComponent(state.xPostsPillarFilter);
+
+    return request('/x-posts/adm?' + params, { token: state.token })
+      .then(function (response) {
+        state.xPosts = response.items || [];
+        state.xPostsTotal = response.total || 0;
+        state.xPostsPage = page;
+        state.xPostsPageSize = pageSize;
+      })
+      .catch(function (error) {
+        state.message = error && error.message ? error.message : 'Failed to load X posts';
+      })
+      .finally(function () {
+        state.xPostsLoading = false;
+        render();
+      });
+  }
+
   function changePage(prefix, page) {
     if (page < 1) return;
     if (prefix === 'users') loadUsers(page, state.usersPageSize);
     else if (prefix === 'tenders') loadTenders(page, state.tendersPageSize);
+    else if (prefix === 'xPosts') loadXPosts(page, state.xPostsPageSize);
   }
 
   function changePageSize(prefix, size) {
     size = Number(size);
     if (prefix === 'users') loadUsers(1, size);
     else if (prefix === 'tenders') loadTenders(1, size);
+    else if (prefix === 'xPosts') loadXPosts(1, size);
   }
 
   function toggleUsersSort(key) {
@@ -1619,6 +1880,153 @@
       });
   }
 
+  function generateXPost(event) {
+    event.preventDefault();
+
+    state.xPostGenerateLoading = true;
+    state.message = '';
+    render();
+
+    request('/x-posts/adm/generate', {
+      method: 'POST',
+      token: state.token,
+      body: JSON.stringify({
+        topic: state.xPostTopic.trim() || undefined,
+        pillar: state.xPostPillar || undefined,
+        format: state.xPostFormat || undefined,
+        tone: state.xPostTone || undefined,
+        notes: state.xPostNotes || undefined,
+      }),
+    })
+      .then(function () {
+        state.xPostTopic = '';
+        state.xPostTone = '';
+        state.xPostNotes = '';
+        state.message = 'Draft generated.';
+        return loadXPosts(1, state.xPostsPageSize);
+      })
+      .catch(function (error) {
+        state.message = error && error.message ? error.message : 'Failed to generate X post';
+      })
+      .finally(function () {
+        state.xPostGenerateLoading = false;
+        render();
+      });
+
+    return false;
+  }
+
+  function setXPostFilter(name, value) {
+    state[name] = value;
+    loadXPosts(1, state.xPostsPageSize);
+  }
+
+  function startEditXPost(id) {
+    var item = state.xPosts.filter(function (p) {
+      return p._id === id;
+    })[0];
+    if (!item) return;
+
+    state.xPostEditingId = id;
+    state.xPostEditPosts = item.posts.join('\n---\n');
+    state.xPostEditHashtags = (item.hashtags || []).join(', ');
+    state.xPostEditNotes = item.notes || '';
+    state.xPostEditStatus = item.status;
+    render();
+  }
+
+  function cancelEditXPost() {
+    state.xPostEditingId = null;
+    render();
+  }
+
+  function saveXPost(id) {
+    var posts = state.xPostEditPosts
+      .split('\n---\n')
+      .map(function (p) {
+        return p.trim();
+      })
+      .filter(Boolean);
+
+    if (!posts.length) {
+      state.message = 'Posts cannot be empty.';
+      render();
+      return;
+    }
+
+    var hashtags = state.xPostEditHashtags
+      .split(',')
+      .map(function (h) {
+        return h.trim().replace(/^#/, '');
+      })
+      .filter(Boolean);
+
+    state.xPostEditSaving = true;
+    state.message = '';
+    render();
+
+    request('/x-posts/adm/' + id, {
+      method: 'PATCH',
+      token: state.token,
+      body: JSON.stringify({
+        posts: posts,
+        hashtags: hashtags,
+        notes: state.xPostEditNotes || undefined,
+        status: state.xPostEditStatus || undefined,
+      }),
+    })
+      .then(function () {
+        state.xPostEditingId = null;
+        state.message = 'X post updated.';
+        return loadXPosts(state.xPostsPage, state.xPostsPageSize);
+      })
+      .catch(function (error) {
+        state.message = error && error.message ? error.message : 'Failed to update X post';
+      })
+      .finally(function () {
+        state.xPostEditSaving = false;
+        render();
+      });
+  }
+
+  function regenerateXPostImage(id) {
+    state.xPostImageLoadingById[id] = true;
+    state.message = '';
+    render();
+
+    request('/x-posts/adm/' + id + '/image', { method: 'POST', token: state.token })
+      .then(function () {
+        state.message = 'Image regenerated.';
+        return loadXPosts(state.xPostsPage, state.xPostsPageSize);
+      })
+      .catch(function (error) {
+        state.message = error && error.message ? error.message : 'Failed to render image';
+      })
+      .finally(function () {
+        state.xPostImageLoadingById[id] = false;
+        render();
+      });
+  }
+
+  function deleteXPost(id) {
+    var confirmed = window.confirm('Delete this X post draft? This cannot be undone.');
+    if (!confirmed) return;
+
+    state.message = '';
+
+    request('/x-posts/adm/' + id, { method: 'DELETE', token: state.token })
+      .then(function () {
+        state.message = 'X post deleted.';
+        return loadXPosts(state.xPostsPage, state.xPostsPageSize);
+      })
+      .catch(function (error) {
+        state.message = error && error.message ? error.message : 'Failed to delete X post';
+      })
+      .finally(function () {
+        render();
+      });
+  }
+
   // ---------------- init ----------------
 
   function init() {
@@ -1676,5 +2084,15 @@
     refreshAwardTendersHistory: refreshAwardTendersHistory,
     runCronTask: runCronTask,
     toggleCronTask: toggleCronTask,
+    generateXPost: generateXPost,
+    loadXPosts: function () {
+      loadXPosts(state.xPostsPage, state.xPostsPageSize);
+    },
+    setXPostFilter: setXPostFilter,
+    startEditXPost: startEditXPost,
+    cancelEditXPost: cancelEditXPost,
+    saveXPost: saveXPost,
+    deleteXPost: deleteXPost,
+    regenerateXPostImage: regenerateXPostImage,
   };
 })();

@@ -42,6 +42,25 @@ export class CdnService {
     return normalizedPrefix ? `/${normalizedPrefix}` : '';
   }
 
+  /**
+   * DNS_STORAGE can be just a storage zone name ("myzone"), or a zone name
+   * plus a fixed subfolder within it ("myzone/subfolder") when the zone is
+   * shared across multiple apps. The Storage API needs the full value (the
+   * zone name is the first path segment either way), but the public/pull
+   * zone URL (DNS_PREFIX) already points at the zone root, so only the
+   * subfolder part (if any) belongs in the public URL — the zone name must
+   * not be repeated there.
+   */
+  private getPublicStoragePrefix(): string {
+    const { DNS_STORAGE } = process.env;
+
+    if (!DNS_STORAGE) return '';
+
+    const slashIndex = DNS_STORAGE.indexOf('/');
+
+    return slashIndex === -1 ? '' : DNS_STORAGE.slice(slashIndex + 1);
+  }
+
   async deleteFileFromCdn({
     filenameOrFilePath,
     prefixFolder,
@@ -104,6 +123,12 @@ export class CdnService {
       data: buffer,
     });
 
-    return `${DNS_PREFIX}/${DNS_STORAGE}${normalizedPrefix}/${filename}`;
+    const publicPathSegments = [
+      this.getPublicStoragePrefix(),
+      ...normalizedPrefix.split('/').filter(Boolean),
+      filename,
+    ].filter(Boolean);
+
+    return `${DNS_PREFIX}/${publicPathSegments.join('/')}`;
   }
 }

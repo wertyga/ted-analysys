@@ -31,6 +31,7 @@ import { TenderNormalizerModule } from '@/resources/tender-normalizer/tender-nor
 import { BuyerIntelligenceModule } from '@/resources/buyer-intelligence';
 import { BuyerModule } from '@/resources/buyer/buyer.module';
 import { SettingsModule } from '@/resources/settings/settings.module';
+import { XPostModule } from '@/resources/x-post/x-post.module';
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { SettingsModule } from '@/resources/settings/settings.module';
     BuyerIntelligenceModule,
     BuyerModule,
     SettingsModule,
+    XPostModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -5,6 +5,10 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
+import type {
+  ChatCompletionMessageParam,
+  ChatCompletionTool,
+} from 'openai/resources/chat/completions';
 import { BaseLlmAnalysisService } from './base-llm-analysis.service';
 import { isRecord } from '@/utils';
 
@@ -22,6 +26,31 @@ export interface TenderShortTitleResult {
     pl: string;
     ru: string;
   };
+}
+
+export interface GenerateXPostInput {
+  /** When omitted, the model picks the subject itself — see buildTopicGuidance. */
+  topic?: string;
+  pillar?: string;
+  format: 'single' | 'thread';
+  tone?: string;
+  notes?: string;
+  guidelines: string;
+  /** One-line summaries of recently generated posts for this pillar, to avoid repeats. */
+  recentlyCovered?: string[];
+}
+
+export interface GenerateXPostResult {
+  posts: string[];
+  hashtags: string[];
+  notes: string;
+}
+
+export interface GenerateXPostWithDataResult extends GenerateXPostResult {
+  /** ids of the tool-result records the model claims to have based the post on */
+  usedSourceIds: string[];
+  /** names of every tool actually invoked during generation */
+  calledTools: string[];
 }
 
 type LlmProvider = 'deepseek' | 'openai' | 'kimi' | 'aigate';
@@ -131,6 +160,326 @@ export class LlmAnalysisService extends BaseLlmAnalysisService {
     const parsed = JSON.parse(responseText) as unknown;
 
     return this.validateTenderShortTitles(parsed);
+  }
+
+  async generateXPost(input: GenerateXPostInput): Promise<GenerateXPostResult> {
+    const formatInstruction =
+      input.format === 'thread'
+        ? 'Write a thread: an array of 3-7 posts. The first post is the hook and must also work as a standalone post. Each subsequent post covers exactly one point, following the thread structure rules.'
+        : 'Write a single standalone post, under 280 characters, following the single-post structure rules. You may return up to 3 alternative variants of the same idea in the posts array.';
+
+    const response =
+      await this.generalConnection.client.chat.completions.create({
+        model: this.generalConnection.model,
+        messages: [
+          {
+            role: 'system',
+            content: [
+              'You write posts for X (formerly Twitter) for TED, a SaaS platform that helps companies find, analyze, and win public procurement tenders.',
+              'Follow these house style guidelines exactly:',
+              input.guidelines,
+              formatInstruction,
+              this.buildTopicGuidance(input),
+              'Return JSON only in this exact shape: {"posts":["..."],"hashtags":["..."],"notes":"..."}.',
+              '"posts" is an ordered array of post bodies. "hashtags" contains at most 1 hashtag without the # symbol, or an empty array. "notes" is one short sentence explaining the angle you took (or, if you picked the topic yourself, what you picked and why).',
+            ]
+              .filter(Boolean)
+              .join('\n\n'),
+          },
+          {
+            role: 'user',
+            content: JSON.stringify(
+              {
+                topic: input.topic,
+                pillar: input.pillar ?? null,
+                tone: input.tone ?? null,
+                format: input.format,
+                extraNotes: input.notes ?? null,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+        ...this.getChatCompletionOptions(this.generalConnection),
+        stream: false,
+      });
+    const responseText = response.choices[0]?.message.content;
+
+    if (!responseText) {
+      throw new Error(
+        `${this.generalConnection.providerName} response did not contain message content`,
+      );
+    }
+
+    const parsed = this.parseModelJson(responseText);
+
+    return this.validateXPostResult(parsed);
+  }
+
+  /**
+   * Same as generateXPost, but gives the model tools to fetch real data from
+   * Tenderwize's database before writing, and requires it to cite which
+   * tool-result records it actually used (see XPostService for server-side
+   * verification of those ids against what the tools really returned).
+   */
+  async generateXPostWithData(
+    input: GenerateXPostInput,
+    tools: ChatCompletionTool[],
+    executeTool: (
+      name: string,
+      args: Record<string, unknown>,
+    ) => Promise<unknown>,
+  ): Promise<GenerateXPostWithDataResult> {
+    if (tools.length === 0) {
+      const base = await this.generateXPost(input);
+
+      return { ...base, usedSourceIds: [], calledTools: [] };
+    }
+
+    const formatInstruction =
+      input.format === 'thread'
+        ? 'Write a thread: an array of 3-7 posts. The first post is the hook and must also work as a standalone post. Each subsequent post covers exactly one point, following the thread structure rules.'
+        : 'Write a single standalone post, under 280 characters, following the single-post structure rules. You may return up to 3 alternative variants of the same idea in the posts array.';
+
+    const systemPrompt = [
+      'You write posts for X (formerly Twitter) for TED, a SaaS platform that helps companies find, analyze, and win public procurement tenders.',
+      'Follow these house style guidelines exactly:',
+      input.guidelines,
+      formatInstruction,
+      this.buildTopicGuidance(input),
+      "You have a tool to fetch real data from Tenderwize's database. You MUST call it at least once before writing anything, and every specific fact in the post (buyer, winner, amount, date, count, CPV code) MUST come from a tool result — never invent, estimate, or round a number that is not present in a tool result.",
+      'If a tool call returns no matching items (an empty items array), call it again once with broader parameters (drop some filters). If it is still empty after that, do not write a post about invented data — respond with the final JSON answer using an empty "posts" array and explain in "notes" that no matching data was found.',
+      'When you do have results, pick ONE record to write about (for a list of items) unless you used a stats tool, in which case write about the returned numbers.',
+      'Final answer format: JSON only, no markdown code fences, in this exact shape: {"posts":["..."],"hashtags":["..."],"notes":"...","usedSourceIds":["..."]}.',
+      '"usedSourceIds" must contain the "id" field(s) of the tool-result record(s) you actually used — an empty array if you used a stats tool or found no data.',
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    const messages: ChatCompletionMessageParam[] = [
+      { role: 'system', content: systemPrompt },
+      {
+        role: 'user',
+        content: JSON.stringify(
+          {
+            topic: input.topic,
+            pillar: input.pillar ?? null,
+            tone: input.tone ?? null,
+            format: input.format,
+            extraNotes: input.notes ?? null,
+          },
+          null,
+          2,
+        ),
+      },
+    ];
+
+    const calledTools = new Set<string>();
+    // A topic-less generation (esp. Market Insight "find an interesting
+    // trend") needs a few extra tool-call rounds to explore before writing.
+    const maxRounds = input.topic && input.topic.trim() ? 4 : 6;
+
+    for (let round = 0; round < maxRounds; round += 1) {
+      const response =
+        await this.generalConnection.client.chat.completions.create({
+          model: this.generalConnection.model,
+          messages,
+          tools,
+          tool_choice: 'auto',
+          stream: false,
+          // OpenAI's reasoning models (e.g. gpt-5.x) reject function tools on
+          // /v1/chat/completions unless reasoning is explicitly turned off.
+          ...(this.generalConnection.provider === 'openai'
+            ? { reasoning_effort: 'none' as const }
+            : {}),
+        });
+      const message = response.choices[0]?.message;
+
+      if (!message) {
+        throw new Error(
+          `${this.generalConnection.providerName} response did not contain a message`,
+        );
+      }
+
+      if (message.tool_calls && message.tool_calls.length > 0) {
+        messages.push({
+          role: 'assistant',
+          content: message.content,
+          tool_calls: message.tool_calls,
+        });
+
+        for (const toolCall of message.tool_calls) {
+          const toolName =
+            toolCall.type === 'function' ? toolCall.function.name : '';
+
+          calledTools.add(toolName);
+
+          let args: Record<string, unknown> = {};
+
+          if (toolCall.type === 'function') {
+            try {
+              args = JSON.parse(toolCall.function.arguments || '{}') as Record<
+                string,
+                unknown
+              >;
+            } catch {
+              args = {};
+            }
+          }
+
+          let toolResult: unknown;
+
+          try {
+            toolResult = await executeTool(toolName, args);
+          } catch (error) {
+            toolResult = {
+              error: error instanceof Error ? error.message : String(error),
+            };
+          }
+
+          messages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(toolResult),
+          });
+        }
+
+        continue;
+      }
+
+      if (calledTools.size === 0 && round < maxRounds - 1) {
+        // The model answered without calling the tool at all. Don't accept
+        // this as final — nudge it and give it another round. If it still
+        // never calls the tool, XPostService's post-hoc verification (no
+        // verified source ids) rejects the draft rather than trusting a
+        // possibly-invented answer.
+        messages.push({ role: 'assistant', content: message.content });
+        messages.push({
+          role: 'user',
+          content:
+            'You must call the data tool before writing anything. Call it now with parameters derived from the topic above.',
+        });
+        continue;
+      }
+
+      const content = message.content;
+
+      if (!content) {
+        throw new Error(
+          `${this.generalConnection.providerName} response did not contain message content`,
+        );
+      }
+
+      const parsed = this.parseModelJson(content);
+      const validated = this.validateXPostResult(parsed);
+      const usedSourceIds =
+        isRecord(parsed) && Array.isArray(parsed.usedSourceIds)
+          ? parsed.usedSourceIds.filter(
+              (id): id is string => typeof id === 'string',
+            )
+          : [];
+
+      return {
+        ...validated,
+        usedSourceIds,
+        calledTools: Array.from(calledTools),
+      };
+    }
+
+    throw new ServiceUnavailableException(
+      `${this.generalConnection.providerName} did not produce a final answer after ${maxRounds} tool-call rounds`,
+    );
+  }
+
+  /**
+   * Builds the "pick the subject yourself" / "avoid repeating past posts"
+   * instructions. Returns '' when a topic was given and there's no history
+   * to avoid, so callers can filter it out of the prompt.
+   */
+  private buildTopicGuidance(input: GenerateXPostInput): string {
+    const lines: string[] = [];
+    const hasTopic = Boolean(input.topic && input.topic.trim());
+
+    if (!hasTopic) {
+      if (input.pillar === 'interesting_tender') {
+        lines.push(
+          'No topic was given. Search broadly for real open tenders (try sorting by newest and by highest value across a couple of calls) and pick whichever one is most compelling for the audience — a big number, a notable buyer, or an unusual subject.',
+        );
+      } else if (input.pillar === 'market_insight') {
+        lines.push(
+          'No topic was given. Explore the data yourself: try a few different metrics, countries, or categories with multiple tool calls, and report whichever trend is the most interesting or surprising — not just the first thing you queried.',
+        );
+      } else if (input.pillar === 'contract_award') {
+        lines.push(
+          'No topic was given. Search broadly for real recent contract awards and pick whichever one is most notable — a large value, a well-known buyer or winner, or an unusual subject.',
+        );
+      } else if (input.pillar === 'procurement_insight') {
+        lines.push(
+          'No topic was given. Pick an educational procurement topic yourself (CPV codes, framework agreements, how to search tenders, award criteria, common bid mistakes, procurement quirks) — one that is not in the "recently covered" list below.',
+        );
+      } else {
+        lines.push(
+          'No topic was given. Choose a compelling, on-brand subject yourself.',
+        );
+      }
+    }
+
+    if (input.recentlyCovered && input.recentlyCovered.length > 0) {
+      lines.push(
+        [
+          'Recently covered by this account for this pillar — avoid repeating these, or the same underlying record/stat/story:',
+          ...input.recentlyCovered.map(
+            (item, index) => `${index + 1}. ${item}`,
+          ),
+        ].join('\n'),
+      );
+    }
+
+    return lines.join('\n\n');
+  }
+
+  private stripJsonCodeFence(content: string): string {
+    const trimmed = content.trim();
+    const fenceMatch = /```(?:json)?\s*([\s\S]*?)\s*```/i.exec(trimmed);
+
+    return fenceMatch ? fenceMatch[1] : trimmed;
+  }
+
+  /**
+   * Models occasionally wrap the JSON answer in prose ("Based on my
+   * search, here's the post: {...}") even when told to return JSON only.
+   * Try increasingly lenient extraction strategies before giving up.
+   */
+  private parseModelJson(content: string): unknown {
+    const candidates = [
+      content.trim(),
+      this.stripJsonCodeFence(content),
+      this.extractJsonObjectSubstring(content),
+    ];
+
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+
+      try {
+        return JSON.parse(candidate);
+      } catch {
+        // try the next strategy
+      }
+    }
+
+    throw new Error(
+      `${this.generalConnection.providerName} response did not contain valid JSON`,
+    );
+  }
+
+  private extractJsonObjectSubstring(content: string): string | null {
+    const start = content.indexOf('{');
+    const end = content.lastIndexOf('}');
+
+    if (start === -1 || end === -1 || end <= start) return null;
+
+    return content.slice(start, end + 1);
   }
 
   protected async createProviderJsonResponse(
@@ -326,6 +675,36 @@ export class LlmAnalysisService extends BaseLlmAnalysisService {
         shortTitle,
       };
     });
+  }
+
+  private validateXPostResult(value: unknown): GenerateXPostResult {
+    if (!isRecord(value) || !Array.isArray(value.posts)) {
+      throw new Error(
+        `${this.generalConnection.providerName} x-post response must contain a posts array`,
+      );
+    }
+
+    const posts = value.posts.map((post, index) => {
+      if (typeof post !== 'string' || post.trim().length === 0) {
+        throw new Error(
+          `${this.generalConnection.providerName} x-post posts[${index}] must be a non-empty string`,
+        );
+      }
+
+      return post.trim();
+    });
+
+    const hashtagsValue = Array.isArray(value.hashtags) ? value.hashtags : [];
+    const hashtags = hashtagsValue
+      .filter(
+        (tag): tag is string =>
+          typeof tag === 'string' && tag.trim().length > 0,
+      )
+      .map((tag) => tag.trim().replace(/^#/, ''));
+
+    const notes = typeof value.notes === 'string' ? value.notes.trim() : '';
+
+    return { posts, hashtags, notes };
   }
 
   private requireShortTitleString(value: unknown, language: string): string {

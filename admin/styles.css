@@ -60,13 +60,19 @@ button:disabled {
 }
 
 input,
-select {
+select,
+textarea {
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--foreground);
   margin-top: 8px;
   padding: 11px 12px;
   width: 100%;
+}
+
+textarea {
+  font-family: inherit;
+  resize: vertical;
 }
 
 .shell {
@@ -261,6 +267,110 @@ button.dangerButton:hover {
   margin-top: 12px;
 }
 
+.xPostForm {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 4px;
+}
+
+.xPostForm label {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.xPostFormRow {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+}
+
+.xPostForm button {
+  justify-self: start;
+}
+
+.xPostList {
+  display: grid;
+  gap: 14px;
+}
+
+.xPostCard {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.xPostCardHeader {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.xPostCardHeader > div {
+  display: flex;
+  gap: 6px;
+}
+
+.xPostTopic {
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.xPostImage {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: block;
+  margin-bottom: 12px;
+  max-width: 420px;
+  width: 100%;
+}
+
+.xPostSource {
+  background: #f2f4f7;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+}
+
+.xPostImagePlaceholder {
+  align-items: center;
+  background: #f2f4f7;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  display: flex;
+  font-size: 13px;
+  height: 120px;
+  justify-content: center;
+  margin-bottom: 12px;
+  max-width: 420px;
+}
+
+.xPostBody p {
+  margin: 0 0 8px;
+  white-space: pre-wrap;
+}
+
+.xPostBody p:last-child {
+  margin-bottom: 0;
+}
+
+.xPostCard .buttonGroup {
+  justify-content: flex-start;
+  margin-top: 12px;
+}
+
+.xPostCard label {
+  color: var(--muted);
+  display: block;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
 .grid {
   display: grid;
   gap: 18px;
@@ -415,6 +525,12 @@ button.dangerButton:hover {
   background: #f2f4f7;
   border-color: var(--line);
   color: var(--muted);
+}
+
+.tag-green {
+  background: #e8f7ee;
+  border-color: #8fd4a8;
+  color: #0f7a3a;
 }
 
 /* Table */
