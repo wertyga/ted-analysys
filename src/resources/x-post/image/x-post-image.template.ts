@@ -36,6 +36,27 @@ export interface SatoriNode {
   };
 }
 
+// No 'g' flag - a global regex's .test() mutates lastIndex across calls,
+// which would make repeated filter() calls below skip matches unpredictably.
+const URL_PATTERN = /https?:\/\/\S+/i;
+// A CTA label line ("Explore the tender ↓") that's left dangling once the
+// URL line after it gets stripped - short, and ends with the arrow.
+const DANGLING_CTA_LABEL_PATTERN = /^.{0,60}[↓→]\s*$/;
+
+/**
+ * The card image can't make a URL clickable, so any link/CTA line in the
+ * post text must never be rendered onto it - only the post's readable
+ * value/hook content should show up here.
+ */
+function stripLinksForImage(text: string): string {
+  const lines = text
+    .split('\n')
+    .filter((line) => !URL_PATTERN.test(line))
+    .filter((line) => !DANGLING_CTA_LABEL_PATTERN.test(line.trim()));
+
+  return lines.join('\n').trim();
+}
+
 function pickHeadlineFontSize(text: string): number {
   const length = text.length;
 
@@ -48,7 +69,10 @@ function pickHeadlineFontSize(text: string): number {
 
 export function buildXPostImageTree(input: XPostImageInput): SatoriNode {
   const meta = input.pillar ? PILLAR_META[input.pillar] : DEFAULT_META;
-  const fontSize = pickHeadlineFontSize(input.headline);
+  // Fall back to the raw text in the unlikely case stripping leaves nothing
+  // (e.g. a post that was somehow only a link) so the card is never blank.
+  const headline = stripLinksForImage(input.headline) || input.headline;
+  const fontSize = pickHeadlineFontSize(headline);
 
   return {
     type: 'div',
@@ -149,7 +173,7 @@ export function buildXPostImageTree(input: XPostImageInput): SatoriNode {
               fontWeight: 700,
               lineHeight: 1.25,
             },
-            children: input.headline,
+            children: headline,
           },
         },
         {

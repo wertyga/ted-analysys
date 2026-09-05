@@ -100,7 +100,9 @@ Don't work around this by naming a feature and then skipping the link because "i
 
 ## 4. Card image
 
-Every post gets an auto-generated card image (1200×675) alongside the text — a dark branded card with the pillar name and accent color, the post's hook as the headline, and the `tenderwize.com` mark. It's rendered from the first post in `posts[]`, so **the hook must stand on its own** (see section 5) — it's the only text that ends up on the image.
+Every post gets an auto-generated card image (1200×675) alongside the text — a dark branded card with the pillar name and accent color, the post's text as the headline, and the `tenderwize.com` mark. It's rendered from the first post in `posts[]`, so **the hook must stand on its own** (see section 5).
+
+The renderer automatically strips any link/CTA line before drawing the headline — a URL is never clickable on a static image, so it would just be dead text taking up space. Don't rely on this as a substitute for writing a real link in the post itself (section 9); it only prevents an unusable URL from being burned into the image.
 
 Each pillar has a fixed accent color so the four types stay visually distinguishable at a glance: 🔥 Interesting Tender = orange, 📊 Market Insight = blue, 🏆 Contract Award = gold, 💡 Procurement Insight = purple. Don't change these per post.
 
