@@ -39,8 +39,12 @@ import {
   DetectedInterestingTender,
   TenderCandidateFacts,
 } from './interesting-tender-detector';
-import { detectBestMarketInsight } from './market-insight-detector';
+import {
+  DetectedMarketInsight,
+  detectBestMarketInsight,
+} from './market-insight-detector';
 import { HISTORICAL_STORY_TOPICS } from './historical-story-topics';
+import { PROCUREMENT_INSIGHT_TOPICS } from './procurement-insight-topics';
 
 const NO_DATA_MESSAGE =
   'No matching real data was found for this topic. Try a broader or more specific topic (a different country, category, or value range).';
@@ -74,6 +78,44 @@ const COMPANY_STORY_RANK_KEEP = 10;
  * COMPANY_STORY_RANK_KEEP is larger.
  */
 const COMPANY_STORY_ENRICH_ATTEMPTS = 3;
+/**
+ * How many days a Market Insight fingerprint (scope + metric + period +
+ * direction, see market-insight-detector.ts) stays excluded from
+ * re-selection. Much shorter than Company Story's cooldown: slices are
+ * recomputed fresh on every call from live data rather than a slowly-changing
+ * award history, and there are many independent scopes (Overall, each top
+ * country, each top CPV division) to rotate through — the goal is to force
+ * genuine variety of fact, not to permanently retire a scope that's still the
+ * most notable trend.
+ */
+const MARKET_INSIGHT_COOLDOWN_DAYS = 30;
+/**
+ * Period lengths scanned for a Market Insight trend — a quarter-over-quarter
+ * view (90d) and a month-over-month view (30d), run as fully independent
+ * detection passes (never merged into one slice array, since scopeKey alone
+ * doesn't encode period length and mixing periods would corrupt
+ * concentration's single-overall-baseline assumption). The best-scoring
+ * result across both is kept, so a genuinely sharper short-term swing can
+ * surface even when the quarterly view looks flat, and vice versa.
+ */
+const MARKET_INSIGHT_PERIOD_OPTIONS_DAYS = [90, 30];
+/**
+ * Never re-select the same open tender within this window, even if it's
+ * still the best-scoring detected candidate — otherwise a long-lived DPS/
+ * framework tender that stays open for months would get reworded on every
+ * generation instead of genuine variety coming from a different tender.
+ * Shorter than Company Story's cooldown since the candidate pool here is
+ * small (30 open tenders) and a tender eventually closes on its own anyway.
+ */
+const INTERESTING_TENDER_COOLDOWN_DAYS = 21;
+/**
+ * Never re-pick the same award for a fresh (non-Company-Story) Contract
+ * Award post within this window — the "Auto" fallback has no detect-first
+ * structure of its own (it's tool-based, see the generic branch of
+ * generateDraft), so without this the model could re-describe the same
+ * highest-value recent award every time it's asked to pick one.
+ */
+const CONTRACT_AWARD_FRESH_PICK_COOLDOWN_DAYS = 30;
 
 @Injectable()
 export class XPostService {
@@ -190,6 +232,60 @@ export class XPostService {
       .filter((summary): summary is string =>
         Boolean(summary && summary.trim()),
       );
+  }
+
+  /**
+   * Ids (see XPost.sourceIds) already posted about for a given pillar within
+   * `cooldownDays` — used to exclude a real-world entity (an open tender, an
+   * award) from being re-selected and merely reworded across generations.
+   * Generic across pillars: Interesting Tender stores the tender id,
+   * Contract Award's fresh-pick path stores the award id.
+   */
+  private async getRecentSourceIds(
+    pillar: XPostPillar,
+    cooldownDays: number,
+  ): Promise<Set<string>> {
+    const cutoff = new Date(Date.now() - cooldownDays * DAY_MS);
+    const recent = await XPostModel.find({
+      pillar,
+      createdAt: { $gte: cutoff },
+    })
+      .select('sourceIds')
+      .lean()
+      .exec();
+
+    const ids = new Set<string>();
+
+    for (const post of recent) {
+      for (const id of post.sourceIds ?? []) ids.add(id);
+    }
+
+    return ids;
+  }
+
+  /**
+   * Fingerprints (see market-insight-detector.ts) of Market Insight facts
+   * already told within MARKET_INSIGHT_COOLDOWN_DAYS, so detectBestMarketInsight
+   * can skip re-selecting (and having the model merely reword) a fact that
+   * was already posted — diversity has to come from picking a different
+   * underlying fact, not from asking the LLM to paraphrase the same one.
+   */
+  private async getRecentMarketInsightFingerprints(): Promise<Set<string>> {
+    const cutoff = new Date(Date.now() - MARKET_INSIGHT_COOLDOWN_DAYS * DAY_MS);
+    const recent = await XPostModel.find({
+      pillar: XPostPillar.MarketInsight,
+      createdAt: { $gte: cutoff },
+      sourceEntityId: { $exists: true, $ne: null },
+    })
+      .select('sourceEntityId')
+      .lean()
+      .exec();
+
+    return new Set(
+      recent
+        .map((post) => post.sourceEntityId)
+        .filter((id): id is string => Boolean(id)),
+    );
   }
 
   /**
@@ -413,7 +509,14 @@ export class XPostService {
   private async selectInterestingTenderCandidate(): Promise<
     (TenderCandidateFacts & { detectedStory: DetectedInterestingTender }) | null
   > {
-    const ids = await this.xPostDataService.findInterestingTenderCandidates(30);
+    const [allIds, excludedIds] = await Promise.all([
+      this.xPostDataService.findInterestingTenderCandidates(30),
+      this.getRecentSourceIds(
+        XPostPillar.InterestingTender,
+        INTERESTING_TENDER_COOLDOWN_DAYS,
+      ),
+    ]);
+    const ids = allIds.filter((id) => !excludedIds.has(id));
 
     if (ids.length === 0) return null;
 
@@ -486,6 +589,34 @@ export class XPostService {
     }
 
     return null;
+  }
+
+  /**
+   * Rotates through PROCUREMENT_INSIGHT_TOPICS avoiding whatever this pillar
+   * has posted most recently (resetting once the whole list has been used),
+   * exactly like selectHistoricalStoryTopic's rotation — but with no web
+   * enrichment stage, since this pillar needs no external verification (see
+   * X_POSTS_GUIDELINES.md "Procurement Insight": evergreen expertise, not a
+   * factual claim about a specific real-world event).
+   */
+  private async selectProcurementInsightTopic(): Promise<string> {
+    const recentPosts = await XPostModel.find({
+      pillar: XPostPillar.ProcurementInsight,
+    })
+      .sort({ createdAt: -1 })
+      .limit(PROCUREMENT_INSIGHT_TOPICS.length)
+      .select('topic')
+      .lean()
+      .exec();
+
+    const usedTopics = new Set(recentPosts.map((post) => post.topic));
+    const unusedTopics = PROCUREMENT_INSIGHT_TOPICS.filter(
+      (topic) => !usedTopics.has(topic),
+    );
+    const pool =
+      unusedTopics.length > 0 ? unusedTopics : [...PROCUREMENT_INSIGHT_TOPICS];
+
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 
   async generateDraft(
@@ -751,8 +882,24 @@ export class XPostService {
       // minimum sample size) or genuinely new activity — see
       // market-insight-detector.ts — instead of letting the model explore
       // get_market_stats itself and report whatever it found first.
-      const slices = await this.xPostDataService.findMarketInsightSlices();
-      const detected = detectBestMarketInsight(slices);
+      const [sliceSets, excludeFingerprints] = await Promise.all([
+        Promise.all(
+          MARKET_INSIGHT_PERIOD_OPTIONS_DAYS.map((days) =>
+            this.xPostDataService.findMarketInsightSlices(days),
+          ),
+        ),
+        this.getRecentMarketInsightFingerprints(),
+      ]);
+
+      let detected: DetectedMarketInsight | null = null;
+
+      for (const slices of sliceSets) {
+        const candidate = detectBestMarketInsight(slices, excludeFingerprints);
+
+        if (candidate && (!detected || candidate.score > detected.score)) {
+          detected = candidate;
+        }
+      }
 
       if (detected) {
         // Stage 2 (LLM): phrase the already-confirmed trend.
@@ -763,6 +910,8 @@ export class XPostService {
 
         if (marketResult.posts.length > 0) {
           result = marketResult;
+          sourceEntityId = detected.fingerprint;
+          storyFacts = detected.evidence;
           sourceSummary = `Market Insight: detected pattern ${detected.type} (score ${detected.score.toFixed(2)}) — ${detected.summary}`;
         } else {
           this.logger.warn(
@@ -774,6 +923,15 @@ export class XPostService {
 
     if (!result) {
       if (dto.pillar === XPostPillar.ProcurementInsight) {
+        if (!dto.topic?.trim()) {
+          // No detect-first structure exists for this pillar (it's
+          // evergreen, not data-grounded) — rotate through a curated topic
+          // list instead of asking the model to "think of a tip", the same
+          // failure mode the other pillars fixed for data selection.
+          topicOverride = await this.selectProcurementInsightTopic();
+          baseInput.topic = topicOverride;
+        }
+
         result = await this.llmAnalysisService.generateXPost(baseInput);
 
         if (result.posts.length === 0) {
@@ -782,15 +940,40 @@ export class XPostService {
           );
         }
       } else {
+        // Exclude entities already posted about recently from the tool's
+        // own candidate pool — for pillars whose "Auto" flow falls back to
+        // this generic tool-based path with no detect-first structure of
+        // its own (Contract Award's fresh pick, or Interesting Tender when
+        // its detector found nothing), so the model can't re-describe the
+        // same tender/award it (or a prior generation) already covered.
+        const excludedSourceIds =
+          dto.pillar === XPostPillar.InterestingTender
+            ? await this.getRecentSourceIds(
+                dto.pillar,
+                INTERESTING_TENDER_COOLDOWN_DAYS,
+              )
+            : dto.pillar === XPostPillar.ContractAward
+              ? await this.getRecentSourceIds(
+                  dto.pillar,
+                  CONTRACT_AWARD_FRESH_PICK_COOLDOWN_DAYS,
+                )
+              : new Set<string>();
+
         const seenRecordSummaries = new Map<string, string>();
         const tools = this.xPostDataService.getToolsForPillar(dto.pillar);
         const executeTool = async (
           name: string,
           args: Record<string, unknown>,
         ) => {
+          const finalArgs =
+            excludedSourceIds.size > 0 &&
+            (name === 'search_open_tenders' ||
+              name === 'search_contract_awards')
+              ? { ...args, excludeIds: Array.from(excludedSourceIds) }
+              : args;
           const execution = await this.xPostDataService.executeTool(
             name,
-            args,
+            finalArgs,
           );
 
           for (const record of execution.records) {

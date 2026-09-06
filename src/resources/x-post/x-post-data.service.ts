@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import mongoose from 'mongoose';
 import type { Model } from 'mongoose';
 import type { ChatCompletionTool } from 'openai/resources/chat/completions';
 import { TenderModel } from '@/resources/tenders/schemas';
 import { AwardTenderModel } from '@/resources/award-tender/schemas';
+import { BuyerModel } from '@/resources/buyer/schemas';
 import { tenderPopulateFields, awardTenderPopulateFields } from '@/utils';
 import { XPostPillar } from './schemas/x-post.schema';
 import {
@@ -364,6 +366,18 @@ export class XPostDataService {
     return list.length ? { placeOfPerformanceCountries: { $in: list } } : {};
   }
 
+  /**
+   * Filters out records already posted about recently (see
+   * XPostService.getRecentSourceIds) — injected by the caller, never set by
+   * the LLM itself, so a repeat candidate doesn't even appear in the tool
+   * results for it to pick from.
+   */
+  private buildExcludeIdsFilter(excludeIds: unknown): Record<string, unknown> {
+    const ids = asStringArray(excludeIds);
+
+    return ids.length ? { id: { $nin: ids } } : {};
+  }
+
   private buildCpvFilter(cpvCodePrefixes: unknown): Record<string, unknown> {
     const prefixes = asStringArray(cpvCodePrefixes);
 
@@ -395,6 +409,7 @@ export class XPostDataService {
       ...this.buildTextFilter(args.query),
       ...this.buildCountriesFilter(args.countries),
       ...this.buildCpvFilter(args.cpvCodePrefixes),
+      ...this.buildExcludeIdsFilter(args.excludeIds),
     };
 
     const minValueEur = asOptionalNumber(args.minValueEur);
@@ -457,6 +472,7 @@ export class XPostDataService {
       ...this.buildTextFilter(args.query),
       ...this.buildCountriesFilter(args.countries),
       ...this.buildCpvFilter(args.cpvCodePrefixes),
+      ...this.buildExcludeIdsFilter(args.excludeIds),
     };
 
     const minAwardValueEur = asOptionalNumber(args.minAwardValueEur);
@@ -914,17 +930,20 @@ export class XPostDataService {
 
   /**
    * Candidate pool for Market Insight pattern detection: "Overall" plus the
-   * top 10 most active countries and top 10 most active CPV divisions
-   * (by recent volume), each with a current-vs-previous period comparison —
-   * the real baselines market-insight-detector.ts scores against, instead
-   * of letting the model wander across metrics/countries itself.
+   * top 10 most active countries, top 10 most active CPV divisions, and top
+   * 10 most active buyers (by recent volume), each with a current-vs-previous
+   * period comparison — the real baselines market-insight-detector.ts scores
+   * against, instead of letting the model wander across metrics/countries
+   * itself. Country/CPV slices also double as the input to concentration
+   * detection (see detectBestMarketInsight), since they already carry each
+   * scope's current-period count.
    */
   async findMarketInsightSlices(periodDays = 90): Promise<MarketSliceStats[]> {
     const now = new Date();
     const periodStart = new Date(now.getTime() - periodDays * DAY_MS);
     const prevStart = new Date(periodStart.getTime() - periodDays * DAY_MS);
 
-    const [topCountries, topDivisions] = await Promise.all([
+    const [topCountries, topDivisions, topBuyers] = await Promise.all([
       TenderModel.aggregate<{ _id: string; count: number }>([
         {
           $match: {
@@ -953,25 +972,79 @@ export class XPostDataService {
         { $sort: { count: -1 } },
         { $limit: 10 },
       ]).exec(),
+      TenderModel.aggregate<{ _id: string; count: number }>([
+        {
+          $match: {
+            publicationDate: { $gte: prevStart },
+            leadBuyers: { $exists: true, $ne: [] },
+          },
+        },
+        { $unwind: '$leadBuyers' },
+        { $group: { _id: '$leadBuyers', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 10 },
+      ]).exec(),
     ]);
+
+    const buyerNameById = new Map<string, string>();
+
+    if (topBuyers.length > 0) {
+      const buyerFilter: Record<string, unknown> = {
+        _id: { $in: topBuyers.map((b) => new mongoose.Types.ObjectId(b._id)) },
+      };
+      const buyerDocs = await BuyerModel.find(buyerFilter as never)
+        .select('name')
+        .lean()
+        .exec();
+
+      for (const buyer of buyerDocs) {
+        buyerNameById.set(String(buyer._id), buyer.name);
+      }
+    }
 
     interface Scope {
       label: string;
+      /** Stable identity for fingerprinting — see MarketSliceStats.scopeKey. */
+      scopeKey: string;
       countries: string[] | null;
       cpvDivision: string | null;
+      buyerId: string | null;
     }
 
     const scopes: Scope[] = [
-      { label: 'Overall', countries: null, cpvDivision: null },
+      {
+        label: 'Overall',
+        scopeKey: 'overall',
+        countries: null,
+        cpvDivision: null,
+        buyerId: null,
+      },
       ...topCountries
         .filter((c) => c._id)
-        .map((c) => ({ label: c._id, countries: [c._id], cpvDivision: null })),
+        .map((c) => ({
+          label: c._id,
+          scopeKey: `country:${c._id}`,
+          countries: [c._id],
+          cpvDivision: null,
+          buyerId: null,
+        })),
       ...topDivisions
         .filter((d) => d._id)
         .map((d) => ({
           label: `CPV ${d._id}`,
+          scopeKey: `cpv:${d._id}`,
           countries: null,
           cpvDivision: d._id,
+          buyerId: null,
+        })),
+      ...topBuyers
+        .filter((b) => b._id && buyerNameById.has(String(b._id)))
+        .map((b) => ({
+          label: buyerNameById.get(String(b._id))!,
+          scopeKey: `buyer:${String(b._id)}`,
+          countries: null,
+          cpvDivision: null,
+          buyerId: String(b._id),
         })),
     ];
 
@@ -992,6 +1065,13 @@ export class XPostDataService {
         filter.cpvCodes = {
           $in: [new RegExp('^' + this.escapeRegExp(scope.cpvDivision))],
         };
+      }
+
+      if (scope.buyerId) {
+        // Aggregation $match does no schema-based casting — leadBuyers is
+        // stored as ObjectId, so a plain string here would silently match
+        // nothing.
+        filter.leadBuyers = new mongoose.Types.ObjectId(scope.buyerId);
       }
 
       const rows = await TenderModel.aggregate<{
@@ -1021,6 +1101,7 @@ export class XPostDataService {
 
       slices.push({
         label: scope.label,
+        scopeKey: scope.scopeKey,
         countries: scope.countries,
         cpvDivision: scope.cpvDivision,
         periodDays,
