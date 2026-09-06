@@ -116,7 +116,17 @@
     ['market_insight', '📊 Market Insight'],
     ['contract_award', '🏆 Contract Award'],
     ['procurement_insight', '💡 Procurement Insight'],
+    ['historical_story', '📜 Historical Story'],
   ];
+
+  // Story angles are a second level within a pillar (how it's told, not what
+  // it's about). Only Contract Award has one implemented today.
+  var X_POST_STORY_ANGLES_BY_PILLAR = {
+    contract_award: [
+      ['auto', 'Auto'],
+      ['company_story', 'Company Story'],
+    ],
+  };
 
   Object.assign(state, {
     xPosts: [],
@@ -129,6 +139,7 @@
 
     xPostTopic: '',
     xPostPillar: X_POST_PILLARS[0][0],
+    xPostStoryAngle: 'auto',
     xPostFormat: 'single',
     xPostTone: '',
     xPostNotes: '',
@@ -1057,7 +1068,18 @@
     return found ? found[1] : '-';
   }
 
+  function xPostStoryAngleLabel(pillar, storyAngle) {
+    if (!storyAngle) return null;
+    var options = X_POST_STORY_ANGLES_BY_PILLAR[pillar] || [];
+    var found = options.filter(function (a) {
+      return a[0] === storyAngle;
+    })[0];
+    return found ? found[1] : storyAngle;
+  }
+
   function xPostGeneratePanelHtml() {
+    var storyAngleOptions = X_POST_STORY_ANGLES_BY_PILLAR[state.xPostPillar];
+
     return (
       '<section class="panel panelWide"><div class="panelHeader"><div><h2>Write an X post</h2>' +
       '<p>Generates a draft with AI following the house style rules in .claude/skills/x-post/X_POSTS_GUIDELINES.md.</p></div></div>' +
@@ -1071,6 +1093,15 @@
         return '<option value="' + p[0] + '"' + (state.xPostPillar === p[0] ? ' selected' : '') + '>' + escapeHtml(p[1]) + '</option>';
       }).join('') +
       '</select></label>' +
+      (storyAngleOptions
+        ? '<label>Story angle<select onchange="Admin.setField(\'xPostStoryAngle\', this.value)">' +
+          storyAngleOptions
+            .map(function (a) {
+              return '<option value="' + a[0] + '"' + (state.xPostStoryAngle === a[0] ? ' selected' : '') + '>' + escapeHtml(a[1]) + '</option>';
+            })
+            .join('') +
+          '</select></label>'
+        : '') +
       '<label>Format<select onchange="Admin.setField(\'xPostFormat\', this.value)">' +
       '<option value="single"' + (state.xPostFormat === 'single' ? ' selected' : '') + '>Single post</option>' +
       '<option value="thread"' + (state.xPostFormat === 'thread' ? ' selected' : '') + '>Thread</option>' +
@@ -1158,6 +1189,23 @@
           : '') +
         (item.notes ? '<p class="mutedText"><em>' + escapeHtml(item.notes) + '</em></p>' : '') +
         (item.sourceSummary ? '<p class="xPostSource">Sourced from: ' + escapeHtml(item.sourceSummary) + '</p>' : '') +
+        (item.externalFacts && item.externalFacts.length
+          ? '<div class="xPostExternalFacts"><p class="mutedText"><em>External sources — verify before publishing:</em></p><ul>' +
+            item.externalFacts
+              .map(function (f) {
+                return (
+                  '<li>' +
+                  escapeHtml(f.fact) +
+                  ' — <a href="' + escapeHtml(f.sourceUrl) + '" target="_blank" rel="noopener noreferrer">' +
+                  escapeHtml(f.sourceTitle || f.sourceUrl) +
+                  '</a>' +
+                  (f.publishedAt ? ' (' + escapeHtml(f.publishedAt) + ')' : '') +
+                  '</li>'
+                );
+              })
+              .join('') +
+            '</ul></div>'
+          : '') +
         '<div class="buttonGroup">' +
         '<button class="secondaryButton" onclick="Admin.startEditXPost(\'' + item._id + '\')" type="button">Edit</button>' +
         '<button class="secondaryButton" ' +
@@ -1174,6 +1222,9 @@
       '<div class="xPostCardHeader"><div>' +
       tagHtml(item.status, xPostStatusTagVariant(item.status)) +
       tagHtml(xPostPillarLabel(item.pillar), 'default') +
+      (xPostStoryAngleLabel(item.pillar, item.storyAngle)
+        ? tagHtml(xPostStoryAngleLabel(item.pillar, item.storyAngle), 'blue')
+        : '') +
       tagHtml(item.format, 'default') +
       '</div><small class="mutedText">' +
       fmtDateTime(item.createdAt) +
@@ -1918,6 +1969,7 @@
       body: JSON.stringify({
         topic: state.xPostTopic.trim() || undefined,
         pillar: state.xPostPillar || undefined,
+        storyAngle: X_POST_STORY_ANGLES_BY_PILLAR[state.xPostPillar] ? state.xPostStoryAngle || undefined : undefined,
         format: state.xPostFormat || undefined,
         tone: state.xPostTone || undefined,
         notes: state.xPostNotes || undefined,

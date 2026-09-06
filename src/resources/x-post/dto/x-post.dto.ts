@@ -13,6 +13,7 @@ import {
   XPostFormat,
   XPostPillar,
   XPostStatus,
+  XPostStoryAngle,
 } from '../schemas/x-post.schema';
 
 export class GenerateXPostDto {
@@ -29,6 +30,16 @@ export class GenerateXPostDto {
   @ApiProperty({ enum: XPostPillar })
   @IsEnum(XPostPillar)
   pillar: XPostPillar;
+
+  @ApiPropertyOptional({
+    enum: XPostStoryAngle,
+    default: XPostStoryAngle.Auto,
+    description:
+      'Second-level format within the pillar. Currently only meaningful for Contract Award: "auto" tries a Company Story first and falls back to a generic award pick if none qualifies; "company_story" requires one or fails with a clear message. Ignored by other pillars.',
+  })
+  @IsOptional()
+  @IsEnum(XPostStoryAngle)
+  storyAngle?: XPostStoryAngle;
 
   @ApiPropertyOptional({ enum: XPostFormat, default: XPostFormat.Single })
   @IsOptional()
@@ -72,6 +83,11 @@ export class UpdateXPostDto {
   @IsEnum(XPostPillar)
   pillar?: XPostPillar;
 
+  @ApiPropertyOptional({ enum: XPostStoryAngle })
+  @IsOptional()
+  @IsEnum(XPostStoryAngle)
+  storyAngle?: XPostStoryAngle;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -101,4 +117,9 @@ export class GetXPostsRequestDto {
   @IsOptional()
   @IsEnum(XPostPillar)
   pillar?: XPostPillar;
+
+  @ApiPropertyOptional({ enum: XPostStoryAngle })
+  @IsOptional()
+  @IsEnum(XPostStoryAngle)
+  storyAngle?: XPostStoryAngle;
 }

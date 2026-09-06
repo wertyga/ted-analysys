@@ -17,6 +17,10 @@ const PILLAR_META: Record<XPostPillar, { label: string; accent: string }> = {
     label: 'PROCUREMENT INSIGHT',
     accent: '#b98cff',
   },
+  [XPostPillar.HistoricalStory]: {
+    label: 'HISTORICAL STORY',
+    accent: '#2dd4bf',
+  },
 };
 
 const DEFAULT_META = { label: 'TENDERWIZE', accent: '#5b9dff' };
