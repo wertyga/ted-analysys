@@ -1,4 +1,4 @@
-import buyerLegalTypes from './buyer-legal-type.json';
+import buyerLegalTypes from './buyer-legal-type.data.json';
 
 export interface BuyerLegalTypeOption {
   code: string;

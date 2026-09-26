@@ -1,4 +1,4 @@
-import buyerMainActivities from './buyer-main-activity.json';
+import buyerMainActivities from './buyer-main-activity.data.json';
 
 export interface BuyerMainActivityOption {
   code: string;

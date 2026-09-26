@@ -51,14 +51,10 @@ import {
   BuyerIntelligenceAiPayload,
   BuyerIntelligenceCpvPayload,
 } from './buyer-intelligence.types';
-import { buildTenderDeepCompanyFitSystemPrompt } from '@/resources/tender-deep-analysis/tender-deep-company-fit.prompt';
-import { DEEP_COMPANY_FIT_LLM_JSON_SCHEMA } from '@/openai/schemas/deep-analysis';
 import { BUYER_INTELLIGENCE_LLM_JSON_SCHEMA } from '@/openai/schemas/buyer-intelligence';
-import fs from 'node:fs';
 import { getAwardTenderAwardValueEur } from '@/resources/buyer/buyer-utils';
 import { TENDER_ANALYSIS_CONFIG } from '@/config/tender-analysis.config';
 import { createHash } from 'crypto';
-import { GENERAL_TENDER_ANALYSIS_PROMPT_VERSION } from '@/resources/tender-analysis/general-tender-analysis.prompt';
 
 const DEFAULT_RECENT_TENDERS_LIMIT = 30;
 
@@ -393,11 +389,10 @@ export class BuyerIntelligenceService {
         JSON.stringify(payload, null, 2),
       ].join('\n');
 
-      const response =
-        await this.llmAnalysisService.createGeneralJsonResponse(
-          prompt,
-          context,
-        );
+      const response = await this.llmAnalysisService.createGeneralJsonResponse(
+        prompt,
+        context,
+      );
 
       const result = this.normalizeBuyerIntelligenceResult(response);
 
@@ -623,5 +618,3 @@ export class BuyerIntelligenceService {
       .digest('hex');
   }
 }
-
-

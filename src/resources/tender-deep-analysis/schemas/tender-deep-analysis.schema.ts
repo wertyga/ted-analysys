@@ -1,7 +1,10 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
 import { validateTenderDeepCompanyFitResult } from '@/openai/schemas/deep-analysis';
 import { TenderDeepAnalysisResult, TenderDeepRecommendation } from '@/types';
-import { filterModel } from '@/utils';
+import { filterModel, isMongoId, isPopulatedRecord } from '@/utils';
+import { TenderGeneralAnalysisModel } from '@/resources/tender-analysis/schemas';
+import { UserModel } from '@/resources/user/user.schema';
+import { UserDocument } from '@/resources/user/user.types';
 
 export enum TenderDeepAnalysisStatus {
   PENDING = 'PENDING',
@@ -103,8 +106,24 @@ TenderDeepAnalysisSchema.index({ company: 1, tenderId: 1 });
 TenderDeepAnalysisSchema.statics.serializeDetail = function serializeDetail(
   analysis?: TenderDeepAnalysisDocument | null,
 ) {
+  const generalAnalysis = isMongoId(analysis?.generalAnalysis)
+    ? analysis?.generalAnalysis
+    : TenderGeneralAnalysisModel.serializeDetail(analysis?.generalAnalysis);
+
   return analysis
-    ? filterModel(analysis, { excludeFields: ['sourceHash', 'promptVersion'] })
+    ? {
+        ...filterModel(analysis, {
+          excludeFields: ['sourceHash', 'promptVersion'],
+        }),
+        generalAnalysis,
+        // Populated for the analysis itself; strip password hash, tokens etc.
+        company: isPopulatedRecord(analysis.company)
+          ? UserModel.serializeUser(
+              analysis.company as unknown as UserDocument,
+              true,
+            )
+          : analysis.company,
+      }
     : null;
 };
 

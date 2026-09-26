@@ -4,6 +4,7 @@ import { CurrencyExchangeRatesCronModule } from './currency-exchange-rates-cron/
 import { DbCopyCronModule } from './db-copy-cron/db-copy-cron.module';
 import { TenderMatchCronModule } from './tender-match-cron/tender-match-cron.module';
 import { TendersCronModule } from './tenders-cron/tenders-cron.module';
+import { MarketingTaskCronModule } from './marketing-task-cron/marketing-task-cron.module';
 import { CronController } from './cron.controller';
 import { SettingsModule } from '@/resources/settings/settings.module';
 import { CronSettingsService } from './cron-settings.service';
@@ -15,6 +16,7 @@ import { CronSettingsService } from './cron-settings.service';
     CurrencyExchangeRatesCronModule,
     TenderMatchCronModule,
     DbCopyCronModule,
+    MarketingTaskCronModule,
     SettingsModule,
   ],
   controllers: [CronController],

@@ -34,6 +34,16 @@
       title: 'Copy database dump to CDN',
       description: 'Create and upload a database dump.',
     },
+    {
+      id: 'generate-marketing-tasks',
+      title: 'Generate marketing tasks',
+      description: 'Analyze Search Console + GA4 data with AI and create tasks.',
+    },
+    {
+      id: 'check-marketing-tasks',
+      title: 'Check marketing tasks',
+      description: 'AI-check in-progress and recently done tasks (live page + metrics).',
+    },
   ];
 
   var state = {
@@ -153,6 +163,56 @@
     xPostEditSaving: false,
 
     xPostImageLoadingById: {},
+  });
+
+  var MARKETING_TASK_CATEGORIES = [
+    ['ctr', 'CTR / snippet'],
+    ['content', 'Content'],
+    ['content_gap', 'Content gap'],
+    ['technical', 'Technical'],
+    ['conversion', 'Conversion'],
+    ['traffic_drop', 'Traffic drop'],
+    ['tracking', 'Tracking'],
+  ];
+  var MARKETING_TASK_STATUSES = ['new', 'in_progress', 'done', 'rejected'];
+  var MARKETING_TASK_PRIORITIES = ['high', 'medium', 'low'];
+
+  Object.assign(state, {
+    // status -> tasks shown in that board column / total tasks with that status
+    marketingBoard: {},
+    marketingBoardTotals: {},
+    marketingTasksLoading: false,
+    marketingTasksPriorityFilter: '',
+    marketingTasksCategoryFilter: '',
+
+    marketingGenerateDays: '28',
+    marketingGenerateMaxTasks: '10',
+    marketingGenerateLanguage: 'ru',
+    marketingGenerateLoading: false,
+    marketingGenerateResult: null,
+
+    marketingNewTitle: '',
+    marketingNewDescription: '',
+    marketingNewCategory: MARKETING_TASK_CATEGORIES[0][0],
+    marketingNewPriority: 'medium',
+    marketingNewPageUrl: '',
+    marketingNewQuery: '',
+    marketingCreateLoading: false,
+
+    // task page (/admin/marketing-tasks/:id)
+    marketingTaskId: null,
+    marketingTask: null,
+    marketingTaskLoading: false,
+    marketingCommentDraft: '',
+    marketingCommentSaving: false,
+    marketingCheckLoading: false,
+    marketingCheckDays: '14',
+
+    marketingEditing: false,
+    marketingEditTitle: '',
+    marketingEditDescription: '',
+    marketingEditNotes: '',
+    marketingEditSaving: false,
   });
 
   var pollHandle = null;
@@ -325,7 +385,9 @@
             ? 'Tech'
             : state.section === 'x-posts'
               ? 'X Posts'
-              : 'Dashboard';
+              : state.section === 'marketing-tasks'
+                ? 'Marketing Tasks'
+                : 'Dashboard';
 
     return (
       '<main class="shell">' +
@@ -338,6 +400,7 @@
       navLinkHtml('/admin/tenders', 'Tenders', 'tenders') +
       navLinkHtml('/admin/tech', 'Tech', 'tech') +
       navLinkHtml('/admin/x-posts', 'X Posts', 'x-posts') +
+      navLinkHtml('/admin/marketing-tasks', 'Marketing Tasks', 'marketing-tasks') +
       '</nav>' +
       '</div>' +
       (isAuth ? '<button class="secondaryButton" onclick="Admin.signOut()" type="button">Sign out</button>' : '') +
@@ -387,6 +450,7 @@
     else if (state.section === 'tenders') inner = tendersSectionHtml();
     else if (state.section === 'tech') inner = techSectionHtml();
     else if (state.section === 'x-posts') inner = xPostsSectionHtml();
+    else if (state.section === 'marketing-tasks') inner = marketingTasksSectionHtml();
     else inner = dashboardSectionHtml();
     return '<div class="grid">' + inner + '</div>';
   }
@@ -1276,6 +1340,421 @@
     return xPostGeneratePanelHtml() + xPostsListPanelHtml();
   }
 
+  // ---- marketing tasks ----
+
+  function marketingCategoryLabel(category) {
+    var found = MARKETING_TASK_CATEGORIES.filter(function (c) {
+      return c[0] === category;
+    })[0];
+    return found ? found[1] : category || '-';
+  }
+
+  function marketingPriorityTagVariant(priority) {
+    if (priority === 'high') return 'red';
+    if (priority === 'medium') return 'orange';
+    return 'default';
+  }
+
+  function marketingStatusTagVariant(status) {
+    if (status === 'done') return 'green';
+    if (status === 'in_progress') return 'blue';
+    if (status === 'rejected') return 'default';
+    return 'processing';
+  }
+
+  function optionsHtml(values, selected, labels) {
+    return values
+      .map(function (v, idx) {
+        var label = labels ? labels[idx] : v;
+        return '<option value="' + escapeHtml(v) + '"' + (selected === v ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
+      })
+      .join('');
+  }
+
+  var marketingCategoryValues = MARKETING_TASK_CATEGORIES.map(function (c) {
+    return c[0];
+  });
+  var marketingCategoryLabels = MARKETING_TASK_CATEGORIES.map(function (c) {
+    return c[1];
+  });
+
+  function marketingGeneratePanelHtml() {
+    var result = state.marketingGenerateResult;
+
+    return (
+      '<section class="panel"><div class="panelHeader"><div><h2>Run AI analysis</h2>' +
+      '<p>Pulls Search Console + GA4 data for the period, compares it with the previous period and asks AI what to fix. Duplicates of open or recently rejected tasks are skipped. Also runs weekly by cron.</p></div></div>' +
+      '<form class="xPostForm" onsubmit="return Admin.generateMarketingTasks(event)">' +
+      '<div class="xPostFormRow">' +
+      '<label>Period<select onchange="Admin.setField(\'marketingGenerateDays\', this.value)">' +
+      optionsHtml(['28', '56', '90'], state.marketingGenerateDays, ['Last 28 days', 'Last 56 days', 'Last 90 days']) +
+      '</select></label>' +
+      '<label>Max tasks<input type="number" min="1" max="30" value="' +
+      escapeHtml(state.marketingGenerateMaxTasks) +
+      '" oninput="Admin.setField(\'marketingGenerateMaxTasks\', this.value)"></label>' +
+      '<label>Language<select onchange="Admin.setField(\'marketingGenerateLanguage\', this.value)">' +
+      optionsHtml(['ru', 'en'], state.marketingGenerateLanguage, ['Russian', 'English']) +
+      '</select></label>' +
+      '</div>' +
+      '<button ' +
+      (state.marketingGenerateLoading ? 'disabled' : '') +
+      ' type="submit">' +
+      (state.marketingGenerateLoading ? 'Analyzing... (up to a minute)' : 'Run analysis') +
+      '</button>' +
+      '</form>' +
+      (result
+        ? statsHtml([
+            ['Period', escapeHtml(result.periodStart + ' — ' + result.periodEnd)],
+            ['Created', result.created ? result.created.length : 0, 'success'],
+            ['Reviewed (AI notes on tracked tasks)', result.reviewed || 0],
+            ['Skipped (duplicates / invalid)', result.skipped],
+          ]) +
+          (result.dataErrors && result.dataErrors.length
+            ? '<div class="errorList">' +
+              result.dataErrors
+                .map(function (e) {
+                  return '<div>' + escapeHtml(e) + '</div>';
+                })
+                .join('') +
+              '</div>'
+            : '')
+        : '') +
+      '</section>'
+    );
+  }
+
+  function marketingCreatePanelHtml() {
+    return (
+      '<section class="panel"><div class="panelHeader"><div><h2>Add task manually</h2></div></div>' +
+      '<form class="xPostForm" onsubmit="return Admin.createMarketingTask(event)">' +
+      '<label>Title<input required maxlength="200" value="' +
+      escapeHtml(state.marketingNewTitle) +
+      '" oninput="Admin.setField(\'marketingNewTitle\', this.value)"></label>' +
+      '<div class="xPostFormRow">' +
+      '<label>Category<select onchange="Admin.setField(\'marketingNewCategory\', this.value)">' +
+      optionsHtml(marketingCategoryValues, state.marketingNewCategory, marketingCategoryLabels) +
+      '</select></label>' +
+      '<label>Priority<select onchange="Admin.setField(\'marketingNewPriority\', this.value)">' +
+      optionsHtml(MARKETING_TASK_PRIORITIES, state.marketingNewPriority) +
+      '</select></label>' +
+      '</div>' +
+      '<div class="xPostFormRow">' +
+      '<label>Page (optional)<input placeholder="/en/tenders or https://..." value="' +
+      escapeHtml(state.marketingNewPageUrl) +
+      '" oninput="Admin.setField(\'marketingNewPageUrl\', this.value)"></label>' +
+      '<label>Search query (optional)<input value="' +
+      escapeHtml(state.marketingNewQuery) +
+      '" oninput="Admin.setField(\'marketingNewQuery\', this.value)"></label>' +
+      '</div>' +
+      '<label>Description<textarea required rows="4" maxlength="3000" oninput="Admin.setField(\'marketingNewDescription\', this.value)">' +
+      escapeHtml(state.marketingNewDescription) +
+      '</textarea></label>' +
+      '<button ' +
+      (state.marketingCreateLoading ? 'disabled' : '') +
+      ' type="submit">' +
+      (state.marketingCreateLoading ? 'Saving...' : 'Add task') +
+      '</button>' +
+      '</form>' +
+      '</section>'
+    );
+  }
+
+  function marketingPageHtml(pageUrl) {
+    if (!pageUrl) return '';
+    var isAbsolute = /^https?:\/\//i.test(pageUrl);
+    return isAbsolute
+      ? '<a href="' + escapeHtml(pageUrl) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(pageUrl) + '</a>'
+      : '<code>' + escapeHtml(pageUrl) + '</code>';
+  }
+
+  var MARKETING_STATUS_LABELS = {
+    new: 'New',
+    in_progress: 'In progress',
+    done: 'Done',
+    rejected: 'Rejected',
+  };
+
+  var MARKETING_HISTORY_LABELS = {
+    created: 'Created',
+    status_changed: 'Status',
+    comment: 'Comment',
+    ai_review: 'AI review',
+    metrics: 'Metrics',
+    check: 'Check',
+  };
+
+  var MARKETING_VERDICT_TAGS = {
+    implemented: ['implemented', 'green'],
+    partially: ['partially done', 'orange'],
+    not_implemented: ['not on site', 'red'],
+    unclear: ['unclear', 'default'],
+  };
+
+  var MARKETING_EFFECT_TAGS = {
+    positive: ['positive effect', 'green'],
+    negative: ['negative effect', 'red'],
+    none: ['no effect', 'orange'],
+    too_early: ['too early', 'blue'],
+    unknown: ['effect unknown', 'default'],
+  };
+
+  function marketingCheckTagsHtml(entry) {
+    var verdict = MARKETING_VERDICT_TAGS[entry.verdict];
+    var effect = MARKETING_EFFECT_TAGS[entry.effect];
+    if (!verdict && !effect) return '';
+    return (
+      '<div class="marketingCheckTags">' +
+      (verdict ? tagHtml(verdict[0], verdict[1]) : '') +
+      (effect ? tagHtml(effect[0], effect[1]) : '') +
+      '</div>'
+    );
+  }
+
+  function marketingTaskPath(id) {
+    return '/admin/marketing-tasks/' + id;
+  }
+
+  function marketingMetricsHtml(metrics) {
+    if (!metrics) return '';
+    var parts = [];
+    if (metrics.clicks != null) parts.push(metrics.clicks + ' clicks');
+    if (metrics.impressions != null) parts.push(metrics.impressions + ' impr.');
+    if (metrics.ctr != null) parts.push('CTR ' + (metrics.ctr * 100).toFixed(1) + '%');
+    if (metrics.position != null) parts.push('pos ' + metrics.position);
+    if (metrics.sessions != null) parts.push(metrics.sessions + ' sessions');
+    if (metrics.engagementRate != null) parts.push('engaged ' + Math.round(metrics.engagementRate * 100) + '%');
+    if (metrics.keyEvents != null) parts.push(metrics.keyEvents + ' key events');
+    return parts.length ? '<div class="marketingHistoryMetrics">' + escapeHtml(parts.join(' · ')) + '</div>' : '';
+  }
+
+  function marketingHistoryEntryHtml(entry) {
+    var label = MARKETING_HISTORY_LABELS[entry.type] || entry.type;
+    if (entry.type === 'status_changed' && entry.status) {
+      label += ' → ' + (MARKETING_STATUS_LABELS[entry.status] || entry.status);
+    }
+
+    return (
+      '<li class="marketingHistoryEntry marketingHistoryEntry-' + escapeHtml(entry.actor) + '">' +
+      '<div class="mutedText"><strong>' + escapeHtml(label) + '</strong> &middot; ' +
+      escapeHtml(entry.actor) + ' &middot; ' + fmtDateTime(entry.at) +
+      (entry.periodStart ? ' &middot; data ' + escapeHtml(entry.periodStart) + ' — ' + escapeHtml(entry.periodEnd) : '') +
+      '</div>' +
+      marketingCheckTagsHtml(entry) +
+      (entry.text ? '<div class="marketingHistoryText">' + escapeHtml(entry.text) + '</div>' : '') +
+      marketingMetricsHtml(entry.metrics) +
+      '</li>'
+    );
+  }
+
+  // ---- board ----
+
+  function marketingBoardCardHtml(item) {
+    var target = item.query || item.pageUrl;
+
+    return (
+      '<a class="marketingCard" draggable="true" href="' + marketingTaskPath(item._id) + '"' +
+      ' ondragstart="Admin.dragMarketingTask(event, \'' + item._id + '\')"' +
+      ' onclick="return Admin.navigate(event, \'' + marketingTaskPath(item._id) + '\')">' +
+      '<div class="marketingCardTitle">' + escapeHtml(item.title) + '</div>' +
+      (target ? '<div class="marketingCardTarget">' + escapeHtml(target) + '</div>' : '') +
+      '<div class="marketingCardFooter">' +
+      tagHtml(item.priority, marketingPriorityTagVariant(item.priority)) +
+      tagHtml(marketingCategoryLabel(item.category), 'default') +
+      (item.source === 'manual' ? tagHtml('manual', 'default') : '') +
+      '<span class="marketingCardMeta">' +
+      (item.historyCount ? '&#128172; ' + item.historyCount + ' &middot; ' : '') +
+      formatDate(item.createdAt) +
+      '</span>' +
+      '</div>' +
+      '</a>'
+    );
+  }
+
+  function marketingBoardColumnHtml(status) {
+    var items = state.marketingBoard[status] || [];
+    var total = state.marketingBoardTotals[status] || 0;
+
+    return (
+      '<div class="marketingColumn" data-status="' + status + '"' +
+      ' ondragover="Admin.dragOverMarketingColumn(event)"' +
+      ' ondragleave="Admin.dragLeaveMarketingColumn(event)"' +
+      ' ondrop="Admin.dropMarketingTask(event, \'' + status + '\')">' +
+      '<div class="marketingColumnHeader">' +
+      '<span>' + escapeHtml(MARKETING_STATUS_LABELS[status]) + '</span>' +
+      '<span class="marketingColumnCount">' + total + '</span>' +
+      '</div>' +
+      '<div class="marketingColumnBody">' +
+      (items.map(marketingBoardCardHtml).join('') || '<p class="mutedText marketingColumnEmpty">No tasks</p>') +
+      (total > items.length ? '<p class="mutedText marketingColumnEmpty">+' + (total - items.length) + ' older not shown</p>' : '') +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  function marketingBoardHtml() {
+    return (
+      '<section class="panel panelWide"><div class="panelHeader"><div><h2>Board</h2>' +
+      '<p>Drag a card to change its status. Open a card to see its history and add comments.</p></div>' +
+      '<div class="buttonGroup">' +
+      '<select onchange="Admin.setMarketingTaskFilter(\'marketingTasksPriorityFilter\', this.value)">' +
+      '<option value="">All priorities</option>' +
+      optionsHtml(MARKETING_TASK_PRIORITIES, state.marketingTasksPriorityFilter) +
+      '</select>' +
+      '<select onchange="Admin.setMarketingTaskFilter(\'marketingTasksCategoryFilter\', this.value)">' +
+      '<option value="">All categories</option>' +
+      optionsHtml(marketingCategoryValues, state.marketingTasksCategoryFilter, marketingCategoryLabels) +
+      '</select>' +
+      '<button class="secondaryButton" ' +
+      (state.marketingTasksLoading ? 'disabled' : '') +
+      ' onclick="Admin.loadMarketingTasks()" type="button">' +
+      (state.marketingTasksLoading ? 'Loading...' : 'Refresh') +
+      '</button>' +
+      '</div></div>' +
+      '<div class="marketingBoard">' +
+      MARKETING_TASK_STATUSES.map(marketingBoardColumnHtml).join('') +
+      '</div>' +
+      '</section>'
+    );
+  }
+
+  // ---- task page ----
+
+  function marketingTaskEditHtml(item) {
+    return (
+      '<label>Title<input maxlength="200" value="' +
+      escapeHtml(state.marketingEditTitle) +
+      '" oninput="Admin.setField(\'marketingEditTitle\', this.value)"></label>' +
+      '<label>Description<textarea rows="8" maxlength="3000" oninput="Admin.setField(\'marketingEditDescription\', this.value)">' +
+      escapeHtml(state.marketingEditDescription) +
+      '</textarea></label>' +
+      '<label>Notes<textarea rows="3" maxlength="2000" oninput="Admin.setField(\'marketingEditNotes\', this.value)">' +
+      escapeHtml(state.marketingEditNotes) +
+      '</textarea></label>' +
+      '<div class="buttonGroup">' +
+      '<button class="secondaryButton" ' +
+      (state.marketingEditSaving ? 'disabled' : '') +
+      ' onclick="Admin.cancelEditMarketingTask()" type="button">Cancel</button>' +
+      '<button ' +
+      (state.marketingEditSaving ? 'disabled' : '') +
+      ' onclick="Admin.saveMarketingTask(\'' + item._id + '\')" type="button">' +
+      (state.marketingEditSaving ? 'Saving...' : 'Save') +
+      '</button>' +
+      '</div>'
+    );
+  }
+
+  function marketingTaskDetailsHtml(item) {
+    return (
+      '<h2 class="marketingTaskPageTitle">' + escapeHtml(item.title) + '</h2>' +
+      '<div class="xPostBody"><p>' + escapeHtml(item.description) + '</p></div>' +
+      (item.evidence ? '<p class="xPostSource"><strong>Data:</strong> ' + escapeHtml(item.evidence) + '</p>' : '') +
+      (item.expectedImpact ? '<p class="mutedText"><strong>Expected impact:</strong> ' + escapeHtml(item.expectedImpact) + '</p>' : '') +
+      (item.notes ? '<p class="mutedText"><strong>Notes:</strong> ' + escapeHtml(item.notes) + '</p>' : '') +
+      (item.summary ? '<p class="marketingTaskSummary"><strong>Progress:</strong> ' + escapeHtml(item.summary) + '</p>' : '')
+    );
+  }
+
+  function marketingTaskActivityHtml(item) {
+    var history = (item.history || []).slice().reverse();
+    var saving = state.marketingCommentSaving;
+
+    return (
+      '<h3 class="marketingActivityTitle">Activity</h3>' +
+      '<form class="marketingCommentForm" onsubmit="return Admin.addMarketingTaskComment(event, \'' + item._id + '\')">' +
+      '<textarea rows="3" maxlength="2000" placeholder="What was done on the site, blockers, questions — the AI reads this on the next analysis run" oninput="Admin.setField(\'marketingCommentDraft\', this.value)">' +
+      escapeHtml(state.marketingCommentDraft) +
+      '</textarea>' +
+      '<div class="buttonGroup"><button type="submit" ' + (saving ? 'disabled' : '') + '>' +
+      (saving ? 'Saving...' : 'Add to history') +
+      '</button></div>' +
+      '</form>' +
+      (history.length
+        ? '<ul class="marketingHistoryList">' + history.map(marketingHistoryEntryHtml).join('') + '</ul>'
+        : '<p class="mutedText">No history yet.</p>')
+    );
+  }
+
+  function marketingTaskSidebarHtml(item) {
+    var rows = [
+      ['Status', '<select onchange="Admin.patchMarketingTaskField(\'' + item._id + '\', \'status\', this.value)">' +
+        optionsHtml(MARKETING_TASK_STATUSES, item.status, MARKETING_TASK_STATUSES.map(function (s) {
+          return MARKETING_STATUS_LABELS[s];
+        })) + '</select>'],
+      ['Priority', '<select onchange="Admin.patchMarketingTaskField(\'' + item._id + '\', \'priority\', this.value)">' +
+        optionsHtml(MARKETING_TASK_PRIORITIES, item.priority) + '</select>'],
+      ['Category', escapeHtml(marketingCategoryLabel(item.category))],
+      ['Page', item.pageUrl ? marketingPageHtml(item.pageUrl) : '-'],
+      ['Query', item.query ? '<strong>' + escapeHtml(item.query) + '</strong>' : '-'],
+      ['Source', escapeHtml(item.source) + (item.llmModel ? ' &middot; ' + escapeHtml(item.llmModel) : '')],
+      ['Data period', item.periodStart ? escapeHtml(item.periodStart + ' — ' + item.periodEnd) : '-'],
+      ['Created', fmtDateTime(item.createdAt)],
+      ['Updated', fmtDateTime(item.updatedAt)],
+      ['Completed', item.completedAt ? fmtDateTime(item.completedAt) : '-'],
+    ];
+
+    return (
+      '<section class="panel"><h2>Details</h2>' +
+      '<form class="marketingCheckForm" onsubmit="return Admin.checkMarketingTask(event, \x27' + item._id + '\x27)">' +
+      '<p class="mutedText">AI checks the live page and the metrics of this page/query, then writes the verdict to the history.</p>' +
+      '<div class="buttonGroup">' +
+      '<select onchange="Admin.setField(\x27marketingCheckDays\x27, this.value)">' +
+      optionsHtml(['7', '14', '28'], state.marketingCheckDays, ['Last 7 vs prev 7 days', 'Last 14 vs prev 14 days', 'Last 28 vs prev 28 days']) +
+      '</select>' +
+      '<button type="submit" ' + (state.marketingCheckLoading ? 'disabled' : '') + '>' +
+      (state.marketingCheckLoading ? 'Checking... (up to a minute)' : 'Run check') +
+      '</button>' +
+      '</div>' +
+      '</form>' +
+      '<dl class="marketingDetails">' +
+      rows
+        .map(function (row) {
+          return '<dt>' + row[0] + '</dt><dd>' + row[1] + '</dd>';
+        })
+        .join('') +
+      '</dl>' +
+      '<div class="buttonGroup">' +
+      (state.marketingEditing
+        ? ''
+        : '<button class="secondaryButton" onclick="Admin.startEditMarketingTask()" type="button">Edit</button>') +
+      '<button class="secondaryButton dangerButton" onclick="Admin.deleteMarketingTask(\'' + item._id + '\')" type="button">Delete</button>' +
+      '</div>' +
+      '</section>'
+    );
+  }
+
+  function marketingTaskPageHtml() {
+    var item = state.marketingTask;
+    var back =
+      '<a class="marketingBackLink" href="/admin/marketing-tasks" onclick="return Admin.navigate(event, \'/admin/marketing-tasks\')">&larr; Board</a>';
+
+    if (!item || item._id !== state.marketingTaskId) {
+      return (
+        '<section class="panel panelWide">' + back +
+        '<p class="mutedText">' + (state.marketingTaskLoading ? 'Loading task...' : 'Task not found.') + '</p>' +
+        '</section>'
+      );
+    }
+
+    return (
+      '<section class="panel">' +
+      back +
+      '<div class="marketingTaskPageTags">' +
+      tagHtml(MARKETING_STATUS_LABELS[item.status] || item.status, marketingStatusTagVariant(item.status)) +
+      tagHtml(item.priority, marketingPriorityTagVariant(item.priority)) +
+      tagHtml(marketingCategoryLabel(item.category), 'default') +
+      '</div>' +
+      (state.marketingEditing ? marketingTaskEditHtml(item) : marketingTaskDetailsHtml(item)) +
+      marketingTaskActivityHtml(item) +
+      '</section>' +
+      marketingTaskSidebarHtml(item)
+    );
+  }
+
+  function marketingTasksSectionHtml() {
+    if (state.marketingTaskId) return marketingTaskPageHtml();
+    return marketingBoardHtml() + marketingGeneratePanelHtml() + marketingCreatePanelHtml();
+  }
+
   // ---------------- routing ----------------
 
   function sectionFromPath(pathname) {
@@ -1283,6 +1762,7 @@
     if (pathname.indexOf('/users') !== -1) return 'users';
     if (pathname.indexOf('/tech') !== -1) return 'tech';
     if (pathname.indexOf('/x-posts') !== -1) return 'x-posts';
+    if (pathname.indexOf('/marketing-tasks') !== -1) return 'marketing-tasks';
     return 'dashboard';
   }
 
@@ -1293,8 +1773,21 @@
     return false;
   }
 
+  function applyRoute() {
+    var pathname = window.location.pathname;
+    var taskId = marketingTaskIdFromPath(pathname);
+
+    if (taskId !== state.marketingTaskId) {
+      state.marketingEditing = false;
+      state.marketingCommentDraft = '';
+    }
+
+    state.section = sectionFromPath(pathname);
+    state.marketingTaskId = taskId;
+  }
+
   function onRouteChange() {
-    state.section = sectionFromPath(window.location.pathname);
+    applyRoute();
     render();
     if (state.token) loadSectionData();
     updatePolling();
@@ -1376,6 +1869,8 @@
         if (state.section === 'tenders') return loadTenders(state.tendersPage, state.tendersPageSize);
         if (state.section === 'tech') return loadGatherAllStatus();
         if (state.section === 'x-posts') return loadXPosts(state.xPostsPage, state.xPostsPageSize);
+        if (state.section === 'marketing-tasks')
+          return state.marketingTaskId ? loadMarketingTask(state.marketingTaskId) : loadMarketingTasks();
       })
       .catch(function (error) {
         if (error && error.status === 403) {
@@ -1920,7 +2415,8 @@
     request('/adm/cron/' + task.id, { method: 'POST', token: state.token })
       .then(function (result) {
         state.cronRunResult = result;
-        state.message = 'Cron task "' + task.title + '" finished.';
+        state.message =
+          'Cron task "' + task.title + '" ' + (result && result.result && result.result.started ? 'started in the background.' : 'finished.');
       })
       .catch(function (error) {
         state.message = error && error.message ? error.message : 'Failed to run cron task';
@@ -2104,12 +2600,340 @@
       });
   }
 
+  function marketingTaskIdFromPath(pathname) {
+    var match = /\/marketing-tasks\/([a-f0-9]{24})/i.exec(pathname);
+    return match ? match[1] : null;
+  }
+
+  // Open tasks are ordered by priority; closed ones show the latest first.
+  var MARKETING_BOARD_QUERIES = {
+    new: 'sort=priority&limit=100',
+    in_progress: 'sort=priority&limit=100',
+    done: 'sort=recent&limit=30',
+    rejected: 'sort=recent&limit=30',
+  };
+
+  function loadMarketingTasks() {
+    state.marketingTasksLoading = true;
+    render();
+
+    var filters = '';
+    if (state.marketingTasksPriorityFilter) filters += '&priority=' + encodeURIComponent(state.marketingTasksPriorityFilter);
+    if (state.marketingTasksCategoryFilter) filters += '&category=' + encodeURIComponent(state.marketingTasksCategoryFilter);
+
+    return Promise.all(
+      MARKETING_TASK_STATUSES.map(function (status) {
+        return request('/marketing-tasks/adm?status=' + status + '&' + MARKETING_BOARD_QUERIES[status] + filters, {
+          token: state.token,
+        });
+      }),
+    )
+      .then(function (responses) {
+        MARKETING_TASK_STATUSES.forEach(function (status, idx) {
+          state.marketingBoard[status] = responses[idx].items || [];
+          state.marketingBoardTotals[status] = responses[idx].total || 0;
+        });
+      })
+      .catch(function (error) {
+        state.message = error && error.message ? error.message : 'Failed to load marketing tasks';
+      })
+      .finally(function () {
+        state.marketingTasksLoading = false;
+        render();
+      });
+  }
+
+  function loadMarketingTask(id) {
+    state.marketingTaskLoading = true;
+    render();
+
+    return request('/marketing-tasks/adm/' + id, { token: state.token })
+      .then(function (task) {
+        state.marketingTask = task;
+      })
+      .catch(function (error) {
+        state.marketingTask = null;
+        state.message = error && error.message ? error.message : 'Failed to load task';
+      })
+      .finally(function () {
+        state.marketingTaskLoading = false;
+        render();
+      });
+  }
+
+  function generateMarketingTasks(event) {
+    event.preventDefault();
+
+    state.marketingGenerateLoading = true;
+    state.marketingGenerateResult = null;
+    state.message = '';
+    render();
+
+    request('/marketing-tasks/adm/generate', {
+      method: 'POST',
+      token: state.token,
+      body: JSON.stringify({
+        days: Number(state.marketingGenerateDays) || undefined,
+        maxTasks: Number(state.marketingGenerateMaxTasks) || undefined,
+        language: state.marketingGenerateLanguage || undefined,
+      }),
+    })
+      .then(function (result) {
+        state.marketingGenerateResult = result;
+        state.message = 'Analysis finished: ' + (result.created ? result.created.length : 0) + ' new task(s).';
+        return loadMarketingTasks();
+      })
+      .catch(function (error) {
+        state.message = error && error.message ? error.message : 'Failed to run marketing analysis';
+      })
+      .finally(function () {
+        state.marketingGenerateLoading = false;
+        render();
+      });
+
+    return false;
+  }
+
+  function createMarketingTask(event) {
+    event.preventDefault();
+
+    state.marketingCreateLoading = true;
+    state.message = '';
+    render();
+
+    request('/marketing-tasks/adm', {
+      method: 'POST',
+      token: state.token,
+      body: JSON.stringify({
+        title: state.marketingNewTitle.trim(),
+        description: state.marketingNewDescription.trim(),
+        category: state.marketingNewCategory,
+        priority: state.marketingNewPriority,
+        pageUrl: state.marketingNewPageUrl.trim() || undefined,
+        query: state.marketingNewQuery.trim() || undefined,
+      }),
+    })
+      .then(function () {
+        state.marketingNewTitle = '';
+        state.marketingNewDescription = '';
+        state.marketingNewPageUrl = '';
+        state.marketingNewQuery = '';
+        state.message = 'Task added.';
+        return loadMarketingTasks();
+      })
+      .catch(function (error) {
+        state.message = error && error.message ? error.message : 'Failed to add task';
+      })
+      .finally(function () {
+        state.marketingCreateLoading = false;
+        render();
+      });
+
+    return false;
+  }
+
+  function setMarketingTaskFilter(name, value) {
+    state[name] = value;
+    loadMarketingTasks();
+  }
+
+  /** PATCHes a task and refreshes whichever view is open (task page or board). */
+  function patchMarketingTask(id, body, successMessage) {
+    state.message = '';
+
+    return request('/marketing-tasks/adm/' + id, {
+      method: 'PATCH',
+      token: state.token,
+      body: JSON.stringify(body),
+    })
+      .then(function (task) {
+        state.message = successMessage;
+        if (state.marketingTaskId === id) {
+          state.marketingTask = task;
+          render();
+          return;
+        }
+        return loadMarketingTasks();
+      })
+      .catch(function (error) {
+        state.message = error && error.message ? error.message : 'Failed to update task';
+        render();
+      });
+  }
+
+  function patchMarketingTaskField(id, field, value) {
+    var body = {};
+    body[field] = value;
+    patchMarketingTask(id, body, 'Task ' + field + ' changed to ' + value + '.');
+  }
+
+  function dragMarketingTask(event, id) {
+    event.dataTransfer.setData('text/plain', id);
+    event.dataTransfer.effectAllowed = 'move';
+  }
+
+  function dragOverMarketingColumn(event) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    event.currentTarget.classList.add('marketingColumnDropTarget');
+  }
+
+  function dragLeaveMarketingColumn(event) {
+    if (!event.currentTarget.contains(event.relatedTarget)) {
+      event.currentTarget.classList.remove('marketingColumnDropTarget');
+    }
+  }
+
+  function dropMarketingTask(event, status) {
+    event.preventDefault();
+    event.currentTarget.classList.remove('marketingColumnDropTarget');
+
+    var id = event.dataTransfer.getData('text/plain');
+    var fromStatus = MARKETING_TASK_STATUSES.filter(function (s) {
+      return (state.marketingBoard[s] || []).some(function (t) {
+        return t._id === id;
+      });
+    })[0];
+    if (!id || !fromStatus || fromStatus === status) return;
+
+    // Move the card right away; the reload after PATCH brings the real order.
+    var item = state.marketingBoard[fromStatus].filter(function (t) {
+      return t._id === id;
+    })[0];
+    state.marketingBoard[fromStatus] = state.marketingBoard[fromStatus].filter(function (t) {
+      return t._id !== id;
+    });
+    state.marketingBoard[status] = [Object.assign({}, item, { status: status })].concat(state.marketingBoard[status]);
+    state.marketingBoardTotals[fromStatus] -= 1;
+    state.marketingBoardTotals[status] += 1;
+    render();
+
+    patchMarketingTask(id, { status: status }, 'Moved to ' + MARKETING_STATUS_LABELS[status] + '.');
+  }
+
+  function startEditMarketingTask() {
+    var item = state.marketingTask;
+    if (!item) return;
+
+    state.marketingEditing = true;
+    state.marketingEditTitle = item.title || '';
+    state.marketingEditDescription = item.description || '';
+    state.marketingEditNotes = item.notes || '';
+    render();
+  }
+
+  function cancelEditMarketingTask() {
+    state.marketingEditing = false;
+    render();
+  }
+
+  function saveMarketingTask(id) {
+    if (!state.marketingEditTitle.trim() || !state.marketingEditDescription.trim()) {
+      state.message = 'Title and description cannot be empty.';
+      render();
+      return;
+    }
+
+    state.marketingEditSaving = true;
+    render();
+
+    patchMarketingTask(
+      id,
+      {
+        title: state.marketingEditTitle.trim(),
+        description: state.marketingEditDescription.trim(),
+        notes: state.marketingEditNotes,
+      },
+      'Task updated.',
+    ).finally(function () {
+      state.marketingEditing = false;
+      state.marketingEditSaving = false;
+      render();
+    });
+  }
+
+  function addMarketingTaskComment(event, id) {
+    if (event) event.preventDefault();
+
+    var text = state.marketingCommentDraft.trim();
+    if (!text) return false;
+
+    state.marketingCommentSaving = true;
+    state.message = '';
+    render();
+
+    request('/marketing-tasks/adm/' + id + '/comments', {
+      method: 'POST',
+      token: state.token,
+      body: JSON.stringify({ text: text }),
+    })
+      .then(function (task) {
+        state.marketingTask = task;
+        state.marketingCommentDraft = '';
+      })
+      .catch(function (error) {
+        state.message = error && error.message ? error.message : 'Failed to add comment';
+      })
+      .finally(function () {
+        state.marketingCommentSaving = false;
+        render();
+      });
+
+    return false;
+  }
+
+  function checkMarketingTask(event, id) {
+    if (event) event.preventDefault();
+
+    state.marketingCheckLoading = true;
+    state.message = '';
+    render();
+
+    request('/marketing-tasks/adm/' + id + '/check', {
+      method: 'POST',
+      token: state.token,
+      body: JSON.stringify({ days: Number(state.marketingCheckDays) || undefined }),
+    })
+      .then(function (result) {
+        state.marketingTask = result.task;
+        state.message =
+          'Check finished.' +
+          (result.dataErrors && result.dataErrors.length ? ' Data errors: ' + result.dataErrors.join('; ') : '');
+      })
+      .catch(function (error) {
+        state.message = error && error.message ? error.message : 'Failed to check task';
+      })
+      .finally(function () {
+        state.marketingCheckLoading = false;
+        render();
+      });
+
+    return false;
+  }
+
+  function deleteMarketingTask(id) {
+    var confirmed = window.confirm('Delete this task? Consider marking it "rejected" instead, so the AI does not suggest it again.');
+    if (!confirmed) return;
+
+    state.message = '';
+
+    request('/marketing-tasks/adm/' + id, { method: 'DELETE', token: state.token })
+      .then(function () {
+        state.message = 'Task deleted.';
+        navigate(null, '/admin/marketing-tasks');
+      })
+      .catch(function (error) {
+        state.message = error && error.message ? error.message : 'Failed to delete task';
+        render();
+      });
+  }
+
   // ---------------- init ----------------
 
   function init() {
     var savedToken = window.localStorage.getItem(TOKEN_KEY);
     if (savedToken) state.token = savedToken;
-    state.section = sectionFromPath(window.location.pathname);
+    applyRoute();
     render();
 
     if (state.token) {
@@ -2171,5 +2995,22 @@
     saveXPost: saveXPost,
     deleteXPost: deleteXPost,
     regenerateXPostImage: regenerateXPostImage,
+    loadMarketingTasks: function () {
+      loadMarketingTasks();
+    },
+    generateMarketingTasks: generateMarketingTasks,
+    createMarketingTask: createMarketingTask,
+    setMarketingTaskFilter: setMarketingTaskFilter,
+    patchMarketingTaskField: patchMarketingTaskField,
+    dragMarketingTask: dragMarketingTask,
+    dragOverMarketingColumn: dragOverMarketingColumn,
+    dragLeaveMarketingColumn: dragLeaveMarketingColumn,
+    dropMarketingTask: dropMarketingTask,
+    startEditMarketingTask: startEditMarketingTask,
+    cancelEditMarketingTask: cancelEditMarketingTask,
+    saveMarketingTask: saveMarketingTask,
+    deleteMarketingTask: deleteMarketingTask,
+    addMarketingTaskComment: addMarketingTaskComment,
+    checkMarketingTask: checkMarketingTask,
   };
 })();

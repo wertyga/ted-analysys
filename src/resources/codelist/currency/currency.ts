@@ -1,4 +1,4 @@
-import currencies from './currency.json';
+import currencies from './currency.data.json';
 
 export enum CurrencySign {
   AED = 'AED',

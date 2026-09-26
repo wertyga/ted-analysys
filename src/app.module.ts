@@ -32,6 +32,7 @@ import { BuyerIntelligenceModule } from '@/resources/buyer-intelligence';
 import { BuyerModule } from '@/resources/buyer/buyer.module';
 import { SettingsModule } from '@/resources/settings/settings.module';
 import { XPostModule } from '@/resources/x-post/x-post.module';
+import { MarketingTaskModule } from '@/resources/marketing-task/marketing-task.module';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { XPostModule } from '@/resources/x-post/x-post.module';
     BuyerModule,
     SettingsModule,
     XPostModule,
+    MarketingTaskModule,
   ],
   controllers: [AppController],
   providers: [AppService],
