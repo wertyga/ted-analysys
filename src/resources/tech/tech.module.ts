@@ -12,6 +12,7 @@ import { TendersTechController } from './tenders/tenders.tech.controller';
 import { TendersTechService } from './tenders/tenders.tech.service';
 import { AwardTendersTechController } from './award-tenders/award-tenders.tech.controller';
 import { AwardTendersTechService } from './award-tenders/award-tenders.tech.service';
+import { AwardValuesFixTechService } from './award-tenders/award-values-fix.tech.service';
 import { AwardTenderModule } from '@/resources/award-tender/award-tender.module';
 import { TedSearchModule } from '@/resources/ted-search/ted-search.module';
 import { TendersModule } from '@/resources/tenders/tenders.module';
@@ -50,6 +51,7 @@ import { ContractorModule } from '@/resources/contractor/contractor.module';
   ],
   providers: [
     AwardTendersTechService,
+    AwardValuesFixTechService,
     ContractorsTechService,
     CpvTechService,
     SitemapTechService,

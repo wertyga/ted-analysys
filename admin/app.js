@@ -114,6 +114,12 @@
     awardTendersRefreshLoading: false,
     awardTendersRefreshResult: null,
 
+    awardValuesFixRefetchXml: false,
+    awardValuesFixLoading: false,
+    awardDatesBackfillLoading: false,
+    awardCountriesBackfillLoading: false,
+    awardValuesFixStatus: null,
+
     cronTaskLoadingById: {},
     cronTasks: defaultCronTasks.slice(),
     cronRunResult: null,
@@ -814,6 +820,84 @@
     return html;
   }
 
+  function awardValuesFixPanelHtml() {
+    var s = state.awardValuesFixStatus;
+    var running = state.awardValuesFixLoading || (s && s.isRunning);
+    var html =
+      '<section class="panel panelWide"><div class="panelHeader"><div><h2>Award values fix</h2>' +
+      '<p>Re-apply sanity rules to saved award values (x100 / x1000 typos, lots sum, cap), then refresh buyer and contractor stats. Run a dry run first.</p></div>' +
+      '<div class="buttonGroup"><label class="checkboxLabel"><input type="checkbox" ' +
+      (state.awardValuesFixRefetchXml ? 'checked' : '') +
+      ' onchange="Admin.setCheckbox(\'awardValuesFixRefetchXml\', this.checked)"> Fetch TED XML for awards over 1bn EUR</label>' +
+      '<button class="secondaryButton" ' +
+      (running ? 'disabled' : '') +
+      ' onclick="Admin.fixAwardValues(true)" type="button">Dry run</button>' +
+      '<button ' +
+      (running ? 'disabled' : '') +
+      ' onclick="Admin.fixAwardValues(false)" type="button">' +
+      (running ? 'Running...' : 'Apply fixes') +
+      '</button>' +
+      '<button class="secondaryButton" ' +
+      (state.awardDatesBackfillLoading ? 'disabled' : '') +
+      ' onclick="Admin.backfillAwardDates()" type="button">' +
+      (state.awardDatesBackfillLoading ? 'Recomputing...' : 'Recompute award dates') +
+      '</button>' +
+      '<button class="secondaryButton" ' +
+      (state.awardCountriesBackfillLoading ? 'disabled' : '') +
+      ' onclick="Admin.backfillAwardCountries()" type="button">' +
+      (state.awardCountriesBackfillLoading ? 'Filling...' : 'Fill missing countries') +
+      '</button></div></div>' +
+      '<div class="statusList"><div><span>Award values fix</span>' +
+      tagHtml(running ? 'RUNNING' : 'IDLE', running ? 'processing' : 'default') +
+      '</div></div>';
+
+    if (s && s.startedAt) {
+      var rules = Object.keys(s.correctionsByRule || {})
+        .map(function (rule) {
+          return rule + ': ' + s.correctionsByRule[rule];
+        })
+        .join(', ');
+      var pairs = [
+        ['Mode', s.dryRun ? 'Dry run' : 'Apply'],
+        ['Processed', s.processed + '/' + s.total],
+        ['Changed tenders', s.changedTenders],
+        ['Tenders with corrections', s.tendersWithCorrections],
+        ['Corrections by rule', escapeHtml(rules || '-'), 'smallStat'],
+        ['XML fetched / failed', s.xmlRefetched + ' / ' + s.xmlFailed],
+        ['Buyers refreshed', s.buyersRefreshed + '/' + s.buyersToRefresh],
+        ['Contractors refreshed', s.contractorsRefreshed + '/' + s.contractorsToRefresh],
+        ['Started', escapeHtml(fmtDateTime(s.startedAt)), 'smallStat'],
+        ['Finished', escapeHtml(s.finishedAt ? fmtDateTime(s.finishedAt) : '-'), 'smallStat'],
+      ];
+      if (s.lastError) pairs.push(['Error', escapeHtml(s.lastError), 'smallStat']);
+      html += statsHtml(pairs);
+
+      if (!s.isRunning && s.samples && s.samples.length) {
+        var fmtEur = function (value) {
+          return value == null ? 'null' : Math.round(value).toLocaleString('en-US') + ' EUR';
+        };
+        html +=
+          '<details><summary>Biggest changes (' + s.samples.length + ')</summary><table><thead><tr>' +
+          '<th>Notice</th><th>Before</th><th>After</th><th>Rules</th></tr></thead><tbody>' +
+          s.samples
+            .map(function (sample) {
+              return (
+                '<tr><td><a target="_blank" rel="noopener" href="https://ted.europa.eu/en/notice/-/detail/' +
+                encodeURIComponent(sample.id) + '">' + escapeHtml(sample.id) + '</a></td>' +
+                '<td>' + escapeHtml(fmtEur(sample.before)) + '</td>' +
+                '<td>' + escapeHtml(fmtEur(sample.after)) + '</td>' +
+                '<td>' + escapeHtml(sample.rules.join(', ')) + '</td></tr>'
+              );
+            })
+            .join('') +
+          '</tbody></table></details>';
+      }
+    }
+
+    html += '</section>';
+    return html;
+  }
+
   function buyerStatsPanelHtml() {
     var running = state.collectTenderBuyersLoading || (state.collectTenderBuyersResult && state.collectTenderBuyersResult.isRunning);
     var html =
@@ -1107,6 +1191,7 @@
       mongoIndexesPanelHtml() +
       competitionPanelHtml() +
       awardRefreshPanelHtml() +
+      awardValuesFixPanelHtml() +
       buyerStatsPanelHtml() +
       shortTitlesPanelHtml() +
       generalAnalysisPanelHtml() +
@@ -2002,6 +2087,15 @@
       .catch(function () {});
   }
 
+  function loadAwardValuesFixStatus() {
+    return request('/adm/tech/award-tenders/fix-award-values/status', { token: state.token })
+      .then(function (status) {
+        state.awardValuesFixStatus = status;
+        state.awardValuesFixLoading = status.isRunning;
+      })
+      .catch(function () {});
+  }
+
   function loadSyncIndexesStatus() {
     return request('/adm/tech/sync-indexes/status', { token: state.token })
       .then(function (status) {
@@ -2093,6 +2187,7 @@
     Promise.all([
       loadGatherAllStatus(),
       loadAwardTendersRefreshStatus(),
+      loadAwardValuesFixStatus(),
       loadSyncIndexesStatus(),
       loadCronTasks(),
       loadRecentCompetitionTendersCronStatus(),
@@ -2397,6 +2492,88 @@
         state.awardTendersRefreshLoading = false;
       })
       .finally(function () {
+        render();
+      });
+  }
+
+  function fixAwardValues(dryRun) {
+    if (!dryRun) {
+      var confirmed = window.confirm('Apply award value fixes to the database and refresh buyer/contractor stats?');
+      if (!confirmed) return;
+    }
+
+    state.awardValuesFixLoading = true;
+    state.message = '';
+    render();
+
+    request('/adm/tech/award-tenders/fix-award-values', {
+      method: 'POST',
+      token: state.token,
+      body: JSON.stringify({
+        dryRun: dryRun,
+        refetchXml: state.awardValuesFixRefetchXml,
+      }),
+    })
+      .then(function (status) {
+        state.awardValuesFixStatus = status;
+        state.awardValuesFixLoading = status.isRunning;
+        state.message = dryRun ? 'Award values dry run started.' : 'Award values fix started.';
+      })
+      .catch(function (error) {
+        state.message = error && error.message ? error.message : 'Failed to start award values fix';
+        state.awardValuesFixLoading = false;
+      })
+      .finally(function () {
+        render();
+      });
+  }
+
+  function backfillAwardDates() {
+    var confirmed = window.confirm('Recompute awardDate for all award tenders?');
+    if (!confirmed) return;
+
+    state.awardDatesBackfillLoading = true;
+    state.message = '';
+    render();
+
+    request('/adm/tech/award-tenders/backfill-award-dates', { method: 'POST', token: state.token })
+      .then(function (result) {
+        state.message =
+          'Award dates recomputed: ' +
+          result.modified +
+          ' changed of ' +
+          result.matched +
+          ', ' +
+          result.withoutAwardDate +
+          ' without award date.';
+      })
+      .catch(function (error) {
+        state.message = error && error.message ? error.message : 'Failed to recompute award dates';
+      })
+      .finally(function () {
+        state.awardDatesBackfillLoading = false;
+        render();
+      });
+  }
+
+  function backfillAwardCountries() {
+    var confirmed = window.confirm('Fill missing award countries from lead buyer countries?');
+    if (!confirmed) return;
+
+    state.awardCountriesBackfillLoading = true;
+    state.message = '';
+    render();
+
+    request('/adm/tech/award-tenders/backfill-award-countries', { method: 'POST', token: state.token })
+      .then(function (result) {
+        state.message =
+          'Award countries filled: ' + result.filled + ', still without country: ' + result.withoutCountry + '.';
+      })
+      .catch(function (error) {
+        state.message = error && error.message ? error.message : 'Failed to fill award countries';
+      })
+      .finally(function () {
+        state.awardCountriesBackfillLoading = false;
         render();
       });
   }
@@ -2983,6 +3160,9 @@
     refreshContractorStats: refreshContractorStats,
     gatherAllCompetitionTenders: gatherAllCompetitionTenders,
     refreshAwardTendersHistory: refreshAwardTendersHistory,
+    fixAwardValues: fixAwardValues,
+    backfillAwardDates: backfillAwardDates,
+    backfillAwardCountries: backfillAwardCountries,
     runCronTask: runCronTask,
     toggleCronTask: toggleCronTask,
     generateXPost: generateXPost,

@@ -37,6 +37,8 @@ type NormalizedAwardTender = Omit<
   | '_id'
   | 'estimatedValueEur'
   | 'awardValueEur'
+  | 'awardValueCorrections'
+  | 'awardDate'
   | 'winners'
   | 'lots'
   | 'nonLeadBuyers'
@@ -68,6 +70,7 @@ export class AwardTenderNormalizer {
           amount: this.getXmlAwardValue(xmlLot) ?? l.awardValue?.amount ?? null,
           currency: xmlLot?.awardCurrency ?? l.awardValue?.currency ?? null,
         },
+        tenderValueRange: xmlLot?.tenderValueRange ?? null,
       };
     });
 
@@ -244,7 +247,8 @@ export class AwardTenderNormalizer {
         ...l,
         resultLotIdentifier: data.resultLotIdentifiers?.[i],
         awardValue: {
-          amount: data.resultValues?.[i] ?? l.estimatedValue?.amount,
+          // No estimate fallback: an estimate is not an awarded value
+          amount: data.resultValues?.[i] ?? null,
           currency:
             data.resultValuesCurs?.[i] ??
             data.resultValuesCurs?.[0] ??

@@ -4,6 +4,9 @@ import { AWARD_TENDER_CONFIG } from '@/config/award-tender.config';
 import { TedTenderSearchFilters } from '@/resources/ted-search/ted-builders';
 import { getTedDate } from '@/resources/ted-search/utils';
 import { TedPaginationMode } from '@/resources/ted-search/types/ted-search.types';
+import { AwardTenderModel } from '@/resources/award-tender/schemas';
+import { getAwardDateExpression } from '@/resources/award-tender/utils';
+import { BuyerModel } from '@/resources/buyer/schemas';
 
 export type AwardTendersRefreshStatus = {
   isRunning: boolean;
@@ -50,6 +53,72 @@ export class AwardTendersTechService {
   constructor(
     private readonly tedOpenTendersCollectorService: TedOpenTendersCollectorService,
   ) {}
+
+  // Recomputes awardDate from awardDecisionDates for all saved award tenders
+  async backfillAwardDates() {
+    const result = await AwardTenderModel.updateMany(
+      {},
+      [{ $set: { awardDate: getAwardDateExpression() } }],
+      { updatePipeline: true },
+    );
+
+    return {
+      matched: result.matchedCount,
+      modified: result.modifiedCount,
+      withoutAwardDate: await AwardTenderModel.countDocuments({
+        awardDate: null,
+      }),
+    };
+  }
+
+  // Same fallback as on import: no place of performance -> lead buyer country
+  async backfillAwardCountries() {
+    const withoutCountry = {
+      'placeOfPerformanceCountries.0': { $exists: false },
+    };
+    const before = await AwardTenderModel.countDocuments(withoutCountry);
+
+    await AwardTenderModel.aggregate([
+      { $match: withoutCountry },
+      {
+        $lookup: {
+          from: BuyerModel.collection.name,
+          localField: 'leadBuyers',
+          foreignField: '_id',
+          as: 'leadBuyerDocs',
+        },
+      },
+      {
+        $project: {
+          placeOfPerformanceCountries: {
+            $setUnion: [
+              {
+                $filter: {
+                  input: '$leadBuyerDocs.address.country',
+                  cond: {
+                    $gt: [{ $strLenCP: { $ifNull: ['$$this', ''] } }, 0],
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+      { $match: { 'placeOfPerformanceCountries.0': { $exists: true } } },
+      {
+        $merge: {
+          into: AwardTenderModel.collection.name,
+          on: '_id',
+          whenMatched: 'merge',
+          whenNotMatched: 'discard',
+        },
+      },
+    ]).allowDiskUse(true);
+
+    const after = await AwardTenderModel.countDocuments(withoutCountry);
+
+    return { filled: before - after, withoutCountry: after };
+  }
 
   getRefreshAwardTendersHistoryStatus(): AwardTendersRefreshStatus {
     return { ...this.refreshStatus };
@@ -126,8 +195,7 @@ export class AwardTendersTechService {
                 status.noticesFetched =
                   cumulativeNoticesFetched + progress.noticesFetched;
                 status.totalNoticeCount =
-                  cumulativeTotalNoticeCount +
-                  (progress.totalNoticeCount ?? 0);
+                  cumulativeTotalNoticeCount + (progress.totalNoticeCount ?? 0);
               },
             },
           );

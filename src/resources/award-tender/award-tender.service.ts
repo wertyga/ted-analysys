@@ -34,12 +34,24 @@ import {
   AwardTenderNormalizer,
   NormalizedAwardTenderLot,
 } from './award-tender.normalizer';
+import {
+  getAwardDate,
+  sanitizeLotAwardValues,
+  sanitizeTenderAwardValue,
+} from './utils';
 import { BuyerService } from '@/resources/buyer/buyer.service';
+import { BuyerModel } from '@/resources/buyer/schemas';
 import fs from 'node:fs';
 import { ContractorDocument } from '@/resources/contractor/schemas';
 import { TedSearchFilters } from '@/resources/ted-search/ted.search.filters';
 import { TedTenderSearchRequestDto } from '@/resources/ted-search/dto/ted-tender-search-request.dto';
 import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rates/currency-exchange-rates.service';
+import {
+  AwardTenderFiltersRequestDto,
+  AwardTenderListRequestDto,
+  AwardTenderSortBy,
+  AwardTenderSortOrder,
+} from './dto/award-tender-list-request.dto';
 
 export type AwardTenderPureSearchFilters = Pick<
   TedTenderSearchRequestDto,
@@ -56,6 +68,38 @@ const AWARD_TENDER_PURE_LIST_SELECT = [
   'awardValue',
   'awardValueEur',
 ];
+
+const AWARD_LIST_SELECT = [
+  'id',
+  'title',
+  'titleProc',
+  'awardDate',
+  'awardValueEur',
+  'placeOfPerformanceCountries',
+  'leadBuyers',
+  'nonLeadBuyers',
+  'winners',
+];
+
+const AWARD_LIST_POPULATE = [
+  { path: 'leadBuyers', select: 'name' },
+  { path: 'nonLeadBuyers', select: 'name' },
+  { path: 'winners', select: 'name' },
+];
+
+type AwardListRef = { _id: Types.ObjectId; name?: string };
+
+type AwardListLeanItem = {
+  id: string;
+  title?: string;
+  titleProc?: string;
+  awardDate?: Date | null;
+  awardValueEur?: number | null;
+  placeOfPerformanceCountries?: string[];
+  leadBuyers?: AwardListRef[];
+  nonLeadBuyers?: AwardListRef[];
+  winners?: AwardListRef[];
+};
 
 export interface SaveAwardTedTendersResult {
   saved: number;
@@ -171,6 +215,191 @@ export class AwardTenderService {
     return {
       totalNoticeCount: totalCount,
       notices: awardTenders,
+    };
+  }
+
+  async listAwards(query: AwardTenderListRequestDto) {
+    const sortBy = query.sortBy ?? AwardTenderSortBy.AWARD_DATE;
+    const direction = query.sortOrder === AwardTenderSortOrder.ASC ? 1 : -1;
+    const sortField =
+      sortBy === AwardTenderSortBy.VALUE ? 'awardValueEur' : 'awardDate';
+    // Zero award values are placeholders, they go to the end with nulls
+    const hasSortValue =
+      sortBy === AwardTenderSortBy.VALUE
+        ? { awardValueEur: { $gt: 0 } }
+        : { awardDate: { $ne: null } };
+
+    const filter = await this.buildAwardsFilter(query);
+    const { skip, limit } = getPaginationMeta(query);
+
+    // Mongo puts nulls first in ascending order, so records without the sort
+    // value are paged separately after the ones with it, in both directions
+    const withValue = { $and: [filter, hasSortValue] };
+    const withoutValue = { $and: [filter, { $nor: [hasSortValue] }] };
+
+    const [total, withValueCount] = await Promise.all([
+      AwardTenderModel.countDocuments(filter),
+      AwardTenderModel.countDocuments(withValue),
+    ]);
+
+    const findPage = (
+      pageFilter: QueryFilter<AwardTenderDocument>,
+      pageSkip: number,
+      pageLimit: number,
+      sort: Record<string, 1 | -1>,
+    ) =>
+      pageLimit > 0
+        ? AwardTenderModel.find(pageFilter)
+            .select(AWARD_LIST_SELECT)
+            .sort(sort)
+            .skip(pageSkip)
+            .limit(pageLimit)
+            .populate(AWARD_LIST_POPULATE)
+            .lean()
+            .exec()
+        : Promise.resolve([]);
+
+    const withValueLimit = Math.max(0, Math.min(limit, withValueCount - skip));
+    const [withValueItems, withoutValueItems] = await Promise.all([
+      findPage(withValue, skip, withValueLimit, {
+        [sortField]: direction,
+        _id: direction,
+      }),
+      findPage(
+        withoutValue,
+        Math.max(0, skip - withValueCount),
+        limit - withValueLimit,
+        { _id: direction },
+      ),
+    ]);
+
+    return {
+      total,
+      results: [...withValueItems, ...withoutValueItems].map((tender) =>
+        this.serializeAwardListItem(tender as unknown as AwardListLeanItem),
+      ),
+    };
+  }
+
+  async getAwardsStats(query: AwardTenderFiltersRequestDto) {
+    const filter = await this.buildAwardsFilter(query);
+
+    const countDistinct = async (expression: string | object) => {
+      const [result] = await AwardTenderModel.aggregate<{ count: number }>([
+        { $match: filter },
+        { $project: { value: expression } },
+        { $unwind: '$value' },
+        { $group: { _id: '$value' } },
+        { $count: 'count' },
+      ]).allowDiskUse(true);
+
+      return result?.count ?? 0;
+    };
+
+    const [totals, winnersCount, buyersCount, countriesCount] =
+      await Promise.all([
+        AwardTenderModel.aggregate<{
+          awardsCount: number;
+          totalAwardValueEur: number;
+        }>([
+          { $match: filter },
+          {
+            $group: {
+              _id: null,
+              awardsCount: { $sum: 1 },
+              totalAwardValueEur: { $sum: '$awardValueEur' },
+            },
+          },
+        ]).allowDiskUse(true),
+        countDistinct('$winners'),
+        countDistinct({ $setUnion: ['$leadBuyers', '$nonLeadBuyers'] }),
+        countDistinct('$placeOfPerformanceCountries'),
+      ]);
+
+    return {
+      awardsCount: totals[0]?.awardsCount ?? 0,
+      totalAwardValueEur: totals[0]?.totalAwardValueEur ?? 0,
+      winnersCount,
+      buyersCount,
+      countriesCount,
+    };
+  }
+
+  private async buildAwardsFilter(
+    query: AwardTenderFiltersRequestDto,
+  ): Promise<QueryFilter<AwardTenderDocument>> {
+    const baseFilter = await this.tedSearchFilters.buildLocalTenderQuery({
+      text: query.q,
+      cpvCodes: query.cpvCodes,
+      placeOfPerformance: query.countries,
+      contractNature: query.contractNature,
+      procedureType: query.procedureType,
+    });
+
+    const parts: QueryFilter<AwardTenderDocument>[] = [];
+
+    if (Object.keys(baseFilter).length) {
+      parts.push(baseFilter);
+    }
+
+    if (query.awardDateFrom || query.awardDateTo) {
+      const range: Record<string, Date> = {};
+
+      if (query.awardDateFrom) {
+        range.$gte = new Date(query.awardDateFrom);
+      }
+
+      if (query.awardDateTo) {
+        const to = new Date(query.awardDateTo);
+
+        // A plain date means "up to the end of that day"
+        if (/^\d{4}-\d{2}-\d{2}$/.test(query.awardDateTo)) {
+          to.setUTCHours(23, 59, 59, 999);
+        }
+
+        range.$lte = to;
+      }
+
+      // Same field the list returns as awardDate
+      parts.push({ awardDate: range });
+    }
+
+    if (query.valueMin !== undefined || query.valueMax !== undefined) {
+      parts.push({
+        awardValueEur: {
+          ...(query.valueMin !== undefined && { $gte: query.valueMin }),
+          ...(query.valueMax !== undefined && { $lte: query.valueMax }),
+        },
+      });
+    }
+
+    if (query.winnerId) {
+      parts.push({ winners: new Types.ObjectId(query.winnerId) });
+    }
+
+    if (query.buyerId) {
+      const buyerId = new Types.ObjectId(query.buyerId);
+
+      parts.push({
+        $or: [{ leadBuyers: buyerId }, { nonLeadBuyers: buyerId }],
+      });
+    }
+
+    return parts.length ? { $and: parts } : {};
+  }
+
+  private serializeAwardListItem(tender: AwardListLeanItem) {
+    const toRef = (doc?: AwardListRef) =>
+      doc?._id ? { id: String(doc._id), name: doc.name ?? null } : null;
+
+    return {
+      id: tender.id,
+      title: tender.title ?? tender.titleProc ?? null,
+      awardDate: tender.awardDate ?? null,
+      awardValueEur: tender.awardValueEur ?? null,
+      country: tender.placeOfPerformanceCountries?.[0] ?? null,
+      buyer: toRef(tender.leadBuyers?.[0] ?? tender.nonLeadBuyers?.[0]),
+      winners: (tender.winners ?? []).map(toRef).filter(Boolean),
     };
   }
 
@@ -365,24 +594,46 @@ export class AwardTenderService {
         ),
       ]);
 
-    const lotAwardValue = this.getAwardValueFallbackFromLots(lotsWithEur);
-    const awardValueWithFallback = {
-      amount: normalizedTender.awardValue.amount ?? lotAwardValue.amount,
-      currency: normalizedTender.awardValue.currency ?? lotAwardValue.currency,
-    };
-    const awardValueEurWithFallback =
-      tenderAwardValueEur ?? this.getAwardValueEurFallbackFromLots(lotsWithEur);
+    // Lots first: the tender fallback and the lots-sum rule rely on them
+    const { lots: sanitizedLots, corrections: lotCorrections } =
+      sanitizeLotAwardValues(lotsWithEur);
+
+    const lotAwardValue = this.getAwardValueFallbackFromLots(sanitizedLots);
+    const { tender: sanitizedTender, corrections: tenderCorrections } =
+      sanitizeTenderAwardValue(
+        {
+          awardValue: {
+            amount: normalizedTender.awardValue.amount ?? lotAwardValue.amount,
+            currency:
+              normalizedTender.awardValue.currency ?? lotAwardValue.currency,
+          },
+          awardValueEur:
+            tenderAwardValueEur ??
+            this.getAwardValueEurFallbackFromLots(sanitizedLots),
+          estimatedValueEur: tenderEstimatedValueEur,
+        },
+        sanitizedLots,
+      );
 
     const insertPayload = {
       ...normalizedTender,
-      awardValue: awardValueWithFallback,
+      placeOfPerformanceCountries: await this.getAwardCountries(
+        normalizedTender.placeOfPerformanceCountries,
+        savedPureBuyers.leadIds,
+      ),
+      awardValue: sanitizedTender.awardValue,
       estimatedValueEur: tenderEstimatedValueEur,
-      awardValueEur: awardValueEurWithFallback,
-      lots: lotsWithEur,
+      awardValueEur: sanitizedTender.awardValueEur,
+      awardValueCorrections: [...lotCorrections, ...tenderCorrections],
+      awardDate: getAwardDate(
+        normalizedTender.awardDecisionDates,
+        normalizedTender.publicationDate,
+      ),
+      lots: sanitizedLots,
       leadBuyers: savedPureBuyers.leadIds,
       nonLeadBuyers: savedPureBuyers.nonLeadIds,
       winners: getUniqArray(
-        lotsWithEur.map((l) => l.winner?.toString()),
+        sanitizedLots.map((l) => l.winner?.toString()),
       ).filter(Boolean),
     };
     const payload = {
@@ -414,6 +665,26 @@ export class AwardTenderService {
     ]);
 
     return awardTender;
+  }
+
+  // ~15% of award notices have no place of performance at all; the country in
+  // the TED title comes from the buyer then, so fall back to lead buyers
+  private async getAwardCountries(
+    placeOfPerformanceCountries: string[],
+    leadBuyerIds: string[],
+  ): Promise<string[]> {
+    if (placeOfPerformanceCountries.length || !leadBuyerIds.length) {
+      return placeOfPerformanceCountries;
+    }
+
+    const buyers = await BuyerModel.find({
+      _id: { $in: leadBuyerIds as any },
+    })
+      .select('address.country')
+      .lean()
+      .exec();
+
+    return getUniqArray(buyers.map((buyer) => buyer.address?.country));
   }
 
   private buildAwardTenderUnset(

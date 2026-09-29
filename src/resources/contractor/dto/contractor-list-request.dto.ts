@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
@@ -16,6 +17,18 @@ const toStringArray = ({ value }: { value: unknown }) => {
 
   return Array.isArray(value) ? value : [value];
 };
+
+export enum ContractorListSortBy {
+  TOTAL_AWARD_AMOUNT_EUR = 'stats.totalAwardAmountEur',
+  AWARD_TENDERS_COUNT = 'stats.awardTendersCount',
+  AWARD_LOTS_COUNT = 'stats.awardLotsCount',
+  LAST_AWARD_WIN_DATE = 'stats.lastAwardWinDate',
+}
+
+export enum ContractorListSortOrder {
+  ASC = 'asc',
+  DESC = 'desc',
+}
 
 export class ContractorListRequestDto {
   @ApiProperty({ example: 'software' })
@@ -42,6 +55,22 @@ export class ContractorListRequestDto {
   @IsArray()
   @IsString({ each: true })
   countries?: string[];
+
+  @ApiPropertyOptional({
+    enum: ContractorListSortBy,
+    default: ContractorListSortBy.TOTAL_AWARD_AMOUNT_EUR,
+  })
+  @IsOptional()
+  @IsEnum(ContractorListSortBy)
+  sortBy?: ContractorListSortBy;
+
+  @ApiPropertyOptional({
+    enum: ContractorListSortOrder,
+    default: ContractorListSortOrder.DESC,
+  })
+  @IsOptional()
+  @IsEnum(ContractorListSortOrder)
+  sortOrder?: ContractorListSortOrder;
 
   @ApiPropertyOptional({ example: 1, minimum: 1 })
   @IsOptional()

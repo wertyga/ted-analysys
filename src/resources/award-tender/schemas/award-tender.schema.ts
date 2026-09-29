@@ -17,6 +17,10 @@ import {
   BuyerSerializable,
 } from '@/resources/buyer/schemas';
 import { TMongoId } from '@/types';
+import type {
+  AwardValueCorrection,
+  TenderValueRange,
+} from '../utils/award-value-sanity';
 
 export type AwardTenderLot = TenderLot & {
   awardValue?: {
@@ -24,6 +28,7 @@ export type AwardTenderLot = TenderLot & {
     currency: string | null;
   };
   awardValueEur?: MoneyValue;
+  tenderValueRange?: TenderValueRange | null;
   winner?: string | ContractorDocument;
 };
 
@@ -56,8 +61,12 @@ export interface AwardTender {
   };
   estimatedValueEur: MoneyValue;
   awardValueEur: MoneyValue;
+  // Fixes applied to the published award values, see award-value-sanity.ts
+  awardValueCorrections: AwardValueCorrection[];
 
   awardDecisionDates: string[];
+  // Latest plausible awardDecisionDates entry, see utils/award-date.ts
+  awardDate: Date | null;
   selectionStatuses: string[];
   placeOfPerformanceCountriesProc: string[];
   placeOfPerformanceCitiesProc: string[];
@@ -101,6 +110,7 @@ export type AwardTenderListDto = Omit<
     | 'awardValue'
     | 'awardValueEur'
     | 'awardDecisionDates'
+    | 'awardDate'
   >,
   never
 > & {
@@ -121,6 +131,7 @@ const awardTenderListFields = [
   'awardValue',
   'awardValueEur',
   'awardDecisionDates',
+  'awardDate',
   'contractConclusionDates',
   'leadBuyers',
   'nonLeadBuyers',
@@ -233,6 +244,17 @@ const AwardTenderLotSchema = new Schema<AwardTenderLot>(
     awardValue: { type: AwardTenderLotValueSchema },
     estimatedValueEur: { type: Number, default: null, index: true },
     awardValueEur: { type: Number, default: null, index: true },
+    tenderValueRange: {
+      type: new Schema(
+        {
+          lower: { type: Number, default: null },
+          higher: { type: Number, default: null },
+          currency: { type: String, default: null },
+        },
+        { _id: false },
+      ),
+      default: null,
+    },
     isFrameworkAgreement: Boolean,
     isDps: Boolean,
     isSME: Boolean,
@@ -279,6 +301,7 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
     publicationDate: { type: Date },
     dispatchDate: Date,
     awardDecisionDates: { type: [Date], default: [] },
+    awardDate: { type: Date, default: null },
     contractConclusionDates: { type: [Date], default: [] },
 
     submissionDeadline: { type: Date },
@@ -302,6 +325,7 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
     },
     estimatedValueEur: { type: Number, default: null },
     awardValueEur: { type: Number, default: null },
+    awardValueCorrections: { type: Schema.Types.Mixed, default: () => [] },
 
     placeOfPerformanceCitiesProc: { type: [String], default: [] },
     placeOfPerformanceCountriesProc: { type: [String], default: [] },
@@ -346,6 +370,8 @@ AwardTenderSchema.index({ winners: 1, publicationDate: -1 });
 AwardTenderSchema.index({ 'lots.winner': 1 });
 AwardTenderSchema.index({ 'winners.identifier': 1 });
 AwardTenderSchema.index({ 'winners.name': 1 });
+AwardTenderSchema.index({ awardDate: -1, _id: -1 });
+AwardTenderSchema.index({ awardValueEur: -1, _id: -1 });
 AwardTenderSchema.index({ leadBuyers: 1, publicationDate: -1 });
 AwardTenderSchema.index({ nonLeadBuyers: 1, publicationDate: -1 });
 

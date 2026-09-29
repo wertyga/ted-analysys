@@ -1,4 +1,10 @@
-export const STATIC_SITEMAP_PATHS = [
+const COMPARE_LOCALES = ['en', 'de', 'fr', 'pl'];
+
+export const STATIC_SITEMAP_PATHS: ReadonlyArray<{
+  path: string;
+  // If set, the page is included only for these locales
+  locales?: readonly string[];
+}> = [
   { path: '' },
 
   { path: 'guides' },
@@ -13,7 +19,13 @@ export const STATIC_SITEMAP_PATHS = [
   { path: 'how-to-analyze-tender-documents-with-ai' },
   { path: 'common-tender-requirements-in-europe' },
 
+  { path: 'compare', locales: COMPARE_LOCALES },
+  {
+    path: 'compare/best-tender-alert-services-europe',
+    locales: COMPARE_LOCALES,
+  },
+
   { path: 'privacy' },
   { path: 'terms' },
   { path: 'cookies' },
-] as const;
+];

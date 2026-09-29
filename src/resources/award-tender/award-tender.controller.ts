@@ -9,6 +9,10 @@ import {
 } from '@nestjs/swagger';
 import { AwardTenderAwardsRequestDto } from './dto/award-tender-awards-request.dto';
 import { AwardTenderPureSearchRequestDto } from './dto/award-tender-pure-search-request.dto';
+import {
+  AwardTenderFiltersRequestDto,
+  AwardTenderListRequestDto,
+} from './dto/award-tender-list-request.dto';
 import { AwardTenderService } from './award-tender.service';
 import { AwardTenderDetailDto } from './schemas';
 
@@ -16,6 +20,24 @@ import { AwardTenderDetailDto } from './schemas';
 @Controller('awards')
 export class AwardTenderController {
   constructor(private readonly awardTenderService: AwardTenderService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'List award tenders with filters and sorting' })
+  @ApiQuery({ type: AwardTenderListRequestDto })
+  @ApiOkResponse({ description: 'Paginated award tenders list' })
+  @ApiBadRequestResponse({ description: 'Invalid award filters' })
+  async listAwards(@Query() query: AwardTenderListRequestDto) {
+    return this.awardTenderService.listAwards(query);
+  }
+
+  @Get('/stats')
+  @ApiOperation({ summary: 'Aggregate stats for award tenders' })
+  @ApiQuery({ type: AwardTenderFiltersRequestDto })
+  @ApiOkResponse({ description: 'Award tenders stats' })
+  @ApiBadRequestResponse({ description: 'Invalid award filters' })
+  async getAwardsStats(@Query() query: AwardTenderFiltersRequestDto) {
+    return this.awardTenderService.getAwardsStats(query);
+  }
 
   @Get('/search')
   @ApiOperation({

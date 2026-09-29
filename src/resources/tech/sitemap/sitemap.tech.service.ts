@@ -413,7 +413,9 @@ export class SitemapTechService {
     locales: string[],
   ): SitemapUrl[] {
     return locales.flatMap((locale) =>
-      STATIC_SITEMAP_PATHS.map((page) => ({
+      STATIC_SITEMAP_PATHS.filter(
+        (page) => !page.locales || page.locales.includes(locale),
+      ).map((page) => ({
         loc: page.path
           ? `${domain}/${locale}/${page.path}`
           : `${domain}/${locale}`,

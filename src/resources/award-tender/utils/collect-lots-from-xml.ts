@@ -1,6 +1,7 @@
 import { XMLParser } from 'fast-xml-parser';
 import { Tender } from '@/resources/tenders/schemas';
 import { fetchXmlContentFromNotice } from '@/resources/tender-normalizer/tender-normalizer-xml';
+import { TenderValueRange } from './award-value-sanity';
 
 export type LotWinnerResult = {
   lotId: string | null;
@@ -23,6 +24,9 @@ export type LotWinnerResult = {
 
   awardValue: number | null;
   awardCurrency: string | null;
+
+  // Lowest and highest tender received for the lot
+  tenderValueRange: TenderValueRange | null;
 };
 
 const arr = <T>(value: T | T[] | null | undefined): T[] => {
@@ -93,6 +97,24 @@ const getAwardAmount = (
   return {
     value: rawValue != null ? Number(rawValue) : null,
     currency: amount?.['@_currencyID'] ?? null,
+  };
+};
+
+const getTenderValueRange = (lotResult: any): TenderValueRange | null => {
+  const lowerNode = lotResult?.['cbc:LowerTenderAmount'];
+  const higherNode = lotResult?.['cbc:HigherTenderAmount'];
+  const lower = text(lowerNode);
+  const higher = text(higherNode);
+
+  if (lower == null && higher == null) {
+    return null;
+  }
+
+  return {
+    lower: lower != null ? Number(lower) : null,
+    higher: higher != null ? Number(higher) : null,
+    currency:
+      lowerNode?.['@_currencyID'] ?? higherNode?.['@_currencyID'] ?? null,
   };
 };
 
@@ -217,6 +239,8 @@ export async function extractLotWinnersFromXml(
 
       awardValue,
       awardCurrency,
+
+      tenderValueRange: getTenderValueRange(lotResult),
     };
   });
 }

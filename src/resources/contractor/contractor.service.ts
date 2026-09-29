@@ -12,7 +12,11 @@ import {
 import { Contractor, ContractorDocument, ContractorModel } from './schemas';
 import { QueryFilter, Types } from 'mongoose';
 import { getPaginationMeta } from '@/utils';
-import { ContractorListRequestDto } from './dto/contractor-list-request.dto';
+import {
+  ContractorListRequestDto,
+  ContractorListSortBy,
+  ContractorListSortOrder,
+} from './dto/contractor-list-request.dto';
 import { ContractorSearchRequestDto } from './dto/contractor-search-request.dto';
 import {
   AwardTenderDocument,
@@ -139,6 +143,8 @@ export class ContractorService {
     cpvCodes,
     countries,
     q,
+    sortBy = ContractorListSortBy.TOTAL_AWARD_AMOUNT_EUR,
+    sortOrder,
     page,
     limit,
   }: ContractorListRequestDto) {
@@ -172,7 +178,10 @@ export class ContractorService {
     const pagination = getPaginationMeta({ page, limit });
     const [contractors, totalCount] = await Promise.all([
       ContractorModel.find(query)
-        .sort({ 'stats.totalAwardAmountEur': -1 })
+        .sort({
+          [sortBy]: sortOrder === ContractorListSortOrder.ASC ? 1 : -1,
+          _id: 1,
+        })
         .skip(pagination.skip)
         .limit(pagination.limit),
       ContractorModel.countDocuments(query),
