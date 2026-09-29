@@ -2,7 +2,13 @@ export type SearchConsoleDimension = 'query' | 'page' | 'device' | 'country';
 
 export interface SearchConsoleFilter {
   dimension: SearchConsoleDimension;
-  operator: 'equals' | 'contains';
+  operator:
+    | 'equals'
+    | 'notEquals'
+    | 'contains'
+    | 'notContains'
+    | 'includingRegex'
+    | 'excludingRegex';
   expression: string;
 }
 

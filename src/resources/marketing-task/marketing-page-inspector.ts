@@ -2,9 +2,73 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { getSafeErrorMessage } from '@/utils';
 import { MarketingPageInspection } from './marketing-task.types';
+import { classifyPage, normalizePagePath } from './marketing-task.utils';
 
 const REQUEST_TIMEOUT_MS = 10000;
 const MAX_HEADINGS = 15;
+
+/** Server HTML with fewer words is an empty shell (failed SSR / client render). */
+const EMPTY_PAGE_WORDS = 50;
+const THIN_PAGE_WORDS = 250;
+const MAX_TITLE_LENGTH = 60;
+const MAX_META_LENGTH = 160;
+
+/**
+ * SEO problems visible in the server HTML, computed in code so the model
+ * does not have to spot them in raw facts. Each issue is a short code with
+ * the value that triggered it.
+ */
+export const detectPageIssues = (page: MarketingPageInspection): string[] => {
+  if (page.error) return [`fetch_error: ${page.error}`];
+
+  const issues: string[] = [];
+  const { locale } = classifyPage(page.url);
+  const title = page.title ?? '';
+  // Title without ids and the brand suffix: what describes the entity.
+  const titleWords = title
+    .replace(/\|.*$/, '')
+    .replace(/[\d-]{5,}/g, '')
+    .split(/\s+/)
+    .filter((word) => /\p{L}{2,}/u.test(word));
+
+  if (page.httpStatus && page.httpStatus !== 200) {
+    issues.push(`http_status: ${page.httpStatus}`);
+  }
+  if (/noindex/i.test(page.robots ?? '')) {
+    issues.push(`noindex: ${page.robots}`);
+  }
+  if (
+    page.canonical &&
+    normalizePagePath(page.canonical) !== normalizePagePath(page.url)
+  ) {
+    issues.push(`canonical_to_other_url: ${page.canonical}`);
+  }
+  if (!title) issues.push('missing_title');
+  else if (titleWords.length < 3) issues.push(`generic_title: ${title}`);
+  if (title.length > MAX_TITLE_LENGTH) {
+    issues.push(`title_too_long: ${title.length} chars`);
+  }
+  if (!page.metaDescription) issues.push('missing_meta_description');
+  else if (page.metaDescription.length > MAX_META_LENGTH) {
+    issues.push(`meta_description_too_long: ${page.metaDescription.length} chars`);
+  }
+  if (!page.h1.length) issues.push('no_h1');
+  else if (page.h1.length > 1) issues.push(`multiple_h1: ${page.h1.length}`);
+  if (page.wordCount < EMPTY_PAGE_WORDS) {
+    issues.push(
+      `empty_server_html: ${page.wordCount} words (content is not in the HTML Google gets)`,
+    );
+  } else if (page.wordCount < THIN_PAGE_WORDS) {
+    issues.push(`thin_content: ${page.wordCount} words`);
+  }
+  if (locale && page.htmlLang && !page.htmlLang.toLowerCase().startsWith(locale)) {
+    issues.push(`html_lang_mismatch: lang=${page.htmlLang}, url locale=${locale}`);
+  }
+  if (locale && !page.hreflangs?.length) issues.push('no_hreflang');
+  if (!page.structuredDataTypes.length) issues.push('no_structured_data');
+
+  return issues;
+};
 
 const countMentions = (text: string | undefined, needle: string) => {
   if (!text || !needle) return 0;
@@ -69,6 +133,26 @@ export const inspectMarketingPage = async (
     const metaDescription =
       $('meta[name="description"]').attr('content')?.trim() || undefined;
     const h1 = text('h1');
+    const hreflangs = $('link[rel="alternate"][hreflang]')
+      .map((_, element) => $(element).attr('hreflang'))
+      .get()
+      .filter(Boolean);
+    const origin = new URL(url).origin;
+    const internalLinks = new Set(
+      $('a[href]')
+        .map((_, element) => {
+          try {
+            const link = new URL($(element).attr('href') ?? '', url);
+            return link.origin === origin ? link.pathname : undefined;
+          } catch {
+            return undefined;
+          }
+        })
+        .get()
+        .filter(Boolean),
+    ).size;
+    const headerRobots = response.headers['x-robots-tag'];
+    const metaRobots = $('meta[name="robots"]').attr('content');
 
     $('script, style, noscript, iframe, svg').remove();
 
@@ -83,7 +167,13 @@ export const inspectMarketingPage = async (
       h1,
       h2: text('h2'),
       canonical: $('link[rel="canonical"]').attr('href') || undefined,
-      robots: $('meta[name="robots"]').attr('content') || undefined,
+      robots:
+        [metaRobots, headerRobots && `X-Robots-Tag: ${String(headerRobots)}`]
+          .filter(Boolean)
+          .join('; ') || undefined,
+      htmlLang: $('html').attr('lang') || undefined,
+      hreflangs,
+      internalLinks,
       structuredDataTypes: [...structuredDataTypes],
       wordCount: bodyText ? bodyText.split(' ').length : 0,
       ...(needle && {

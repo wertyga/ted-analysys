@@ -7,9 +7,11 @@ import {
   MarketingTaskHistoryActor,
   MarketingTaskHistoryEntry,
   MarketingTaskHistoryType,
+  MarketingTaskScope,
   MarketingTaskSource,
   MarketingTaskStatus,
   Priority,
+  SitePageTemplate,
 } from '../marketing-task.types';
 
 /** Oldest history entries are dropped beyond this length. */
@@ -25,6 +27,15 @@ export interface MarketingTask {
   /** The concrete metrics that justify the task, so an admin can verify it. */
   evidence?: string;
   expectedImpact?: string;
+  scope?: MarketingTaskScope;
+  /** Page template the task changes (for template tasks) or belongs to. */
+  template?: SitePageTemplate;
+  /** Ready-to-apply changes: exact new title/meta, sections, link lists. */
+  deliverable?: string;
+  /** How to tell the work is done on the live site. */
+  acceptanceCriteria?: string;
+  /** Extra clicks per analysis period, computed from the snapshot. */
+  estimatedClicks?: number;
   priority: Priority;
   status: MarketingTaskStatus;
   source: MarketingTaskSource;
@@ -148,6 +159,29 @@ const MarketingTaskSchema = new Schema<
       maxlength: 500,
       default: undefined,
     },
+    scope: {
+      type: String,
+      enum: Object.values(MarketingTaskScope),
+      default: undefined,
+    },
+    template: {
+      type: String,
+      enum: Object.values(SitePageTemplate),
+      default: undefined,
+    },
+    deliverable: {
+      type: String,
+      trim: true,
+      maxlength: 4000,
+      default: undefined,
+    },
+    acceptanceCriteria: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+      default: undefined,
+    },
+    estimatedClicks: { type: Number, default: undefined },
     priority: {
       type: String,
       enum: Object.values(Priority),

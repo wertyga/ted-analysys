@@ -63,6 +63,8 @@ export interface GenerateMarketingTasksOptions {
 export interface GenerateMarketingTasksResult {
   periodStart: string;
   periodEnd: string;
+  /** The model's overall read of the period (what moved and why). */
+  diagnosis?: string;
   created: MarketingTaskDto[];
   /** Tracked tasks that got an AI review note in this run. */
   reviewed: number;
@@ -112,7 +114,7 @@ export class MarketingTaskGenerator {
         status: MarketingTaskStatus.rejected,
         updatedAt: { $gte: shiftDays(now, -REJECTED_TASK_MEMORY_DAYS) },
       })
-        .select('title category pageUrl query fingerprint')
+        .select('title category pageUrl query template fingerprint')
         .lean()
         .exec(),
     ]);
@@ -129,6 +131,7 @@ export class MarketingTaskGenerator {
           category: task.category,
           pageUrl: task.pageUrl,
           query: task.query,
+          template: task.template,
         })),
       }),
     );
@@ -192,7 +195,15 @@ export class MarketingTaskGenerator {
             priority: task.priority,
             pageUrl: task.pageUrl || undefined,
             query: task.query?.slice(0, 300) || undefined,
+            scope: task.scope,
+            template: task.template || undefined,
             evidence: task.evidence.trim().slice(0, 2000),
+            deliverable: task.deliverable.trim().slice(0, 4000),
+            acceptanceCriteria: task.acceptanceCriteria.trim().slice(0, 1000),
+            estimatedClicks:
+              task.estimatedClicks != null
+                ? Math.round(task.estimatedClicks)
+                : undefined,
             expectedImpact:
               task.expectedImpact?.trim().slice(0, 500) || undefined,
             fingerprint: task.fingerprint,
@@ -223,6 +234,7 @@ export class MarketingTaskGenerator {
     return {
       periodStart: snapshot.period.startDate,
       periodEnd: snapshot.period.endDate,
+      diagnosis: parsedResponse.data.diagnosis?.trim() || undefined,
       created: created.map(
         (task) => MarketingTaskModel.serialize(task) as MarketingTaskDto,
       ),
@@ -243,8 +255,11 @@ export class MarketingTaskGenerator {
       title: task.title,
       description: task.description,
       category: task.category,
+      scope: task.scope,
+      template: task.template,
       pageUrl: task.pageUrl,
       query: task.query,
+      deliverable: task.deliverable,
       status: task.status,
       createdAt: task.createdAt && formatDate(new Date(task.createdAt)),
       completedAt: task.completedAt && formatDate(new Date(task.completedAt)),

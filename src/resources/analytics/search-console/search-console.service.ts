@@ -10,6 +10,9 @@ import {
 
 const SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly';
 
+/** Max rows the Search Analytics API returns per request. */
+const API_MAX_ROWS = 25000;
+
 interface GscApiRow {
   keys?: string[];
   clicks?: number;
@@ -54,12 +57,39 @@ export class SearchConsoleService {
     }
   }
 
+  /** Pages through the API (25k rows per request) up to `maxRows`. */
+  async queryAll(
+    range: DateRange,
+    dimensions: SearchConsoleDimension[],
+    maxRows: number,
+    filters: SearchConsoleFilter[] = [],
+  ): Promise<GscRow[]> {
+    const rows: GscRow[] = [];
+
+    while (rows.length < maxRows) {
+      const rowLimit = Math.min(API_MAX_ROWS, maxRows - rows.length);
+      const page = await this.query(
+        range,
+        dimensions,
+        rowLimit,
+        filters,
+        rows.length,
+      );
+
+      rows.push(...page);
+      if (page.length < rowLimit) break;
+    }
+
+    return rows;
+  }
+
   async query(
     range: DateRange,
     dimensions: SearchConsoleDimension[],
     rowLimit = 1000,
     /** All filters must match (AND). */
     filters: SearchConsoleFilter[] = [],
+    startRow = 0,
   ): Promise<GscRow[]> {
     const siteUrl = this.getSiteUrl();
 
@@ -77,6 +107,7 @@ export class SearchConsoleService {
         endDate: range.endDate,
         dimensions,
         rowLimit,
+        ...(startRow && { startRow }),
         dataState: 'final',
         ...(filters.length && { dimensionFilterGroups: [{ filters }] }),
       },

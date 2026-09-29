@@ -165,9 +165,13 @@ export class MarketingTaskChecker {
           description: task.description,
           category: task.category,
           status: task.status,
+          scope: task.scope,
+          template: task.template,
           pageUrl: task.pageUrl,
           query: task.query,
           evidence: task.evidence,
+          deliverable: task.deliverable,
+          acceptanceCriteria: task.acceptanceCriteria,
           createdAt: task.createdAt && formatDate(new Date(task.createdAt)),
           completedAt:
             task.completedAt && formatDate(new Date(task.completedAt)),

@@ -917,3 +917,19 @@ table.dataTable td.wrapCell {
 .reviewWeb {
   margin-top: 4px;
 }
+
+.marketingTaskDeliverable {
+  background: #f6f8fa;
+  border: 1px solid #e1e4e8;
+  border-radius: 8px;
+  font-size: 13px;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+}
+
+.marketingTaskDeliverable pre {
+  font-family: inherit;
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

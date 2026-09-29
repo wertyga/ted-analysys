@@ -29,6 +29,38 @@ export enum MarketingTaskCategory {
   traffic_drop = 'traffic_drop',
   /** Broken or missing analytics/key events. */
   tracking = 'tracking',
+  /** Several site pages compete for the same query. */
+  cannibalization = 'cannibalization',
+  /** Hub/related links that pass authority to pages that need it. */
+  internal_linking = 'internal_linking',
+}
+
+/** What one task changes: a single page, a page template or the whole site. */
+export enum MarketingTaskScope {
+  page = 'page',
+  template = 'template',
+  site = 'site',
+}
+
+/** Page types of tenderwize.com, derived from the URL structure. */
+export enum SitePageTemplate {
+  home = 'home',
+  tender = 'tender',
+  award_tender = 'award_tender',
+  buyer = 'buyer',
+  buyer_list = 'buyer_list',
+  contractor = 'contractor',
+  contractor_list = 'contractor_list',
+  industry = 'industry',
+  industry_list = 'industry_list',
+  country = 'country',
+  country_list = 'country_list',
+  country_industry = 'country_industry',
+  guide = 'guide',
+  compare = 'compare',
+  tool = 'tool',
+  legal = 'legal',
+  other = 'other',
 }
 
 export enum MarketingTaskSource {
@@ -107,8 +139,54 @@ export interface GscRowWithDelta extends GscRow {
   prevPosition: number | null;
 }
 
+export interface GscTotalsWithDelta {
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+  prevClicks: number;
+  prevImpressions: number;
+  prevCtr: number;
+  prevPosition: number;
+}
+
+/** A page or query row with the clicks it could bring if the issue is fixed. */
+export type GscOpportunityRow = GscRowWithDelta & {
+  template?: SitePageTemplate;
+  expectedCtr: number;
+  /** Extra clicks per period, computed in code from impressions and CTR curve. */
+  estimatedExtraClicks: number;
+  /** For a query: the site page that gets most of its impressions. */
+  page?: string;
+};
+
+export interface GscCannibalizationRow {
+  query: string;
+  impressions: number;
+  clicks: number;
+  pages: {
+    page: string;
+    impressions: number;
+    clicks: number;
+    position: number;
+  }[];
+}
+
+export interface GscQueryChangeRow {
+  query: string;
+  clicks: number;
+  impressions: number;
+  position: number | null;
+  prevClicks: number;
+  prevImpressions: number;
+  prevPosition: number | null;
+  /** Page that got most impressions for the query in the current period. */
+  page?: string;
+}
+
 export interface Ga4LandingPageRow {
   page: string;
+  template?: SitePageTemplate;
   sessions: number;
   engagementRate: number;
   averageSessionDuration: number;
@@ -133,24 +211,47 @@ export interface MarketingDataSnapshot {
   period: DateRange;
   previousPeriod: DateRange;
   searchConsole?: {
-    totals: {
-      clicks: number;
-      impressions: number;
-      prevClicks: number;
-      prevImpressions: number;
+    /** Exact site totals (no row limits). */
+    totals: GscTotalsWithDelta;
+    /** Exact totals per page template, split by URL pattern. */
+    templates: (GscTotalsWithDelta & {
+      template: SitePageTemplate;
+      /** Pages of the template among the fetched top pages with impressions. */
+      pagesWithImpressions: number;
+    })[];
+    /** Exact totals per site locale (first URL segment). */
+    locales: (GscTotalsWithDelta & { locale: string })[];
+    /** Brand vs non-brand split over the fetched (non-anonymized) queries. */
+    brand: {
+      terms: string[];
+      brandClicks: number;
+      brandImpressions: number;
+      nonBrandClicks: number;
+      nonBrandImpressions: number;
+      prevBrandClicks: number;
+      prevNonBrandClicks: number;
     };
+    countries: GscRowWithDelta[];
+    devices: GscRowWithDelta[];
+    /** Non-brand queries by impressions. */
     topQueries: GscRowWithDelta[];
-    strikingDistanceQueries: GscRowWithDelta[];
-    lowCtrPages: (GscRowWithDelta & { expectedCtr: number })[];
-    decliningPages: GscRowWithDelta[];
-    queryPagePairs: {
-      query: string;
-      page: string;
-      clicks: number;
-      impressions: number;
-      position: number;
-    }[];
+    /** Non-brand queries in positions 4-20, by estimated extra clicks at position ~3. */
+    strikingDistanceQueries: GscOpportunityRow[];
+    /** Pages whose CTR is well below the norm for their position. */
+    lowCtrPages: GscOpportunityRow[];
+    decliningPages: (GscRowWithDelta & { template: SitePageTemplate })[];
+    /** Queries that lost most clicks/impressions vs the previous period. */
+    lostQueries: GscQueryChangeRow[];
+    /** Queries that appeared or grew strongly: demand to build on. */
+    newQueries: GscQueryChangeRow[];
+    cannibalization: GscCannibalizationRow[];
+    /** Non-brand queries with impressions where the site ranks beyond page 2. */
+    weakRankingQueries: GscQueryChangeRow[];
   };
+  /** Live HTML facts of the pages behind the top opportunities. */
+  inspectedPages?: (MarketingPageInspection & {
+    template: SitePageTemplate;
+  })[];
   analytics?: {
     landingPages: Ga4LandingPageRow[];
     channels: Ga4DimensionRow[];
@@ -159,10 +260,14 @@ export interface MarketingDataSnapshot {
   errors: string[];
 }
 
-/** Finds the current-period metrics of a task's page and/or query. */
+/**
+ * Finds the current-period metrics of a task's page and/or query, or of its
+ * whole template for template-wide tasks.
+ */
 export type MarketingTaskMetricsLookup = (task: {
   pageUrl?: string | null;
   query?: string | null;
+  template?: string | null;
 }) => MarketingTaskMetrics | undefined;
 
 export interface MarketingDataCollection {
@@ -195,6 +300,14 @@ export interface MarketingPageInspection {
   robots?: string;
   structuredDataTypes: string[];
   wordCount: number;
+  /** <html lang>. */
+  htmlLang?: string;
+  /** hreflang values of the alternate links. */
+  hreflangs?: string[];
+  /** Links to other pages of the same site. */
+  internalLinks?: number;
+  /** SEO problems detected in code from the facts above (see detectPageIssues). */
+  issues?: string[];
   /** Occurrences of the task query (case-insensitive) in the page parts. */
   queryMentions?: {
     title: number;

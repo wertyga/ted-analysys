@@ -189,6 +189,8 @@
     ['conversion', 'Conversion'],
     ['traffic_drop', 'Traffic drop'],
     ['tracking', 'Tracking'],
+    ['cannibalization', 'Cannibalization'],
+    ['internal_linking', 'Internal linking'],
   ];
   var MARKETING_TASK_STATUSES = ['new', 'in_progress', 'done', 'rejected'];
   var MARKETING_TASK_PRIORITIES = ['high', 'medium', 'low'];
@@ -1678,6 +1680,9 @@
             ['Reviewed (AI notes on tracked tasks)', result.reviewed || 0],
             ['Skipped (duplicates / invalid)', result.skipped],
           ]) +
+          (result.diagnosis
+            ? '<p class="marketingTaskSummary"><strong>Diagnosis:</strong> ' + escapeHtml(result.diagnosis) + '</p>'
+            : '') +
           (result.dataErrors && result.dataErrors.length
             ? '<div class="errorList">' +
               result.dataErrors
@@ -1915,7 +1920,18 @@
   function marketingTaskDetailsHtml(item) {
     return (
       '<h2 class="marketingTaskPageTitle">' + escapeHtml(item.title) + '</h2>' +
+      (item.scope || item.template || item.estimatedClicks != null
+        ? '<p class="mutedText">' +
+          [
+            item.scope ? 'Scope: ' + escapeHtml(item.scope) : '',
+            item.template ? 'Template: ' + escapeHtml(item.template) : '',
+            item.estimatedClicks != null ? 'Est. extra clicks / period: +' + escapeHtml(String(item.estimatedClicks)) : '',
+          ].filter(Boolean).join(' · ') +
+          '</p>'
+        : '') +
       '<div class="xPostBody"><p>' + escapeHtml(item.description) + '</p></div>' +
+      (item.deliverable ? '<div class="marketingTaskDeliverable"><strong>Deliverable</strong><pre>' + escapeHtml(item.deliverable) + '</pre></div>' : '') +
+      (item.acceptanceCriteria ? '<p class="mutedText"><strong>Done when:</strong> ' + escapeHtml(item.acceptanceCriteria) + '</p>' : '') +
       (item.evidence ? '<p class="xPostSource"><strong>Data:</strong> ' + escapeHtml(item.evidence) + '</p>' : '') +
       (item.expectedImpact ? '<p class="mutedText"><strong>Expected impact:</strong> ' + escapeHtml(item.expectedImpact) + '</p>' : '') +
       (item.notes ? '<p class="mutedText"><strong>Notes:</strong> ' + escapeHtml(item.notes) + '</p>' : '') +
