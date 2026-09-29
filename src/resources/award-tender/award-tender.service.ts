@@ -35,6 +35,7 @@ import {
   NormalizedAwardTenderLot,
 } from './award-tender.normalizer';
 import {
+  applyStickyAwardValueCorrections,
   getAwardDate,
   sanitizeLotAwardValues,
   sanitizeTenderAwardValue,
@@ -539,7 +540,11 @@ export class AwardTenderService {
     const [
       { lots: awardLots, winners: winnersNormalized, lotWinners },
       savedPureBuyers,
-      { winners: oldWinnersIds, buyers: oldBuyersIds },
+      {
+        winners: oldWinnersIds,
+        buyers: oldBuyersIds,
+        awardValueCorrections: oldAwardValueCorrections,
+      },
     ] = await Promise.all([
       this.normalizer.normalizeAwardTenderLotsAndWinners(notice),
       this.buyerService.upsertPureBuyersFromTEDNotice(notice),
@@ -550,6 +555,7 @@ export class AwardTenderService {
             ...(t?.leadBuyers?.map((b) => b.toString()) ?? []),
             ...(t?.nonLeadBuyers?.map((b) => b.toString()) ?? []),
           ],
+          awardValueCorrections: t?.awardValueCorrections ?? [],
         };
       }),
     ]);
@@ -595,11 +601,11 @@ export class AwardTenderService {
       ]);
 
     // Lots first: the tender fallback and the lots-sum rule rely on them
-    const { lots: sanitizedLots, corrections: lotCorrections } =
+    const { lots: ruleLots, corrections: lotCorrections } =
       sanitizeLotAwardValues(lotsWithEur);
 
-    const lotAwardValue = this.getAwardValueFallbackFromLots(sanitizedLots);
-    const { tender: sanitizedTender, corrections: tenderCorrections } =
+    const lotAwardValue = this.getAwardValueFallbackFromLots(ruleLots);
+    const { tender: ruleTender, corrections: tenderCorrections } =
       sanitizeTenderAwardValue(
         {
           awardValue: {
@@ -609,11 +615,22 @@ export class AwardTenderService {
           },
           awardValueEur:
             tenderAwardValueEur ??
-            this.getAwardValueEurFallbackFromLots(sanitizedLots),
+            this.getAwardValueEurFallbackFromLots(ruleLots),
           estimatedValueEur: tenderEstimatedValueEur,
         },
-        sanitizedLots,
+        ruleLots,
       );
+
+    // Corrections approved in the admin panel survive re-import
+    const {
+      tender: sanitizedTender,
+      lots: sanitizedLots,
+      corrections: stickyCorrections,
+    } = applyStickyAwardValueCorrections(
+      ruleTender,
+      ruleLots,
+      oldAwardValueCorrections,
+    );
 
     const insertPayload = {
       ...normalizedTender,
@@ -624,7 +641,11 @@ export class AwardTenderService {
       awardValue: sanitizedTender.awardValue,
       estimatedValueEur: tenderEstimatedValueEur,
       awardValueEur: sanitizedTender.awardValueEur,
-      awardValueCorrections: [...lotCorrections, ...tenderCorrections],
+      awardValueCorrections: [
+        ...lotCorrections,
+        ...tenderCorrections,
+        ...stickyCorrections,
+      ],
       awardDate: getAwardDate(
         normalizedTender.awardDecisionDates,
         normalizedTender.publicationDate,

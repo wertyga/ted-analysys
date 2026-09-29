@@ -1,7 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
-import axios from 'axios';
-import * as cheerio from 'cheerio';
+import { Injectable } from '@nestjs/common';
 import { LlmAnalysisService } from '@/llm/llm-analysis.service';
+import {
+  braveSearch,
+  fetchPage,
+  FetchedPage,
+  isWebSearchEnabled,
+  WebSearchResult,
+} from '@/lib/web/web-search';
 
 /**
  * A single, source-verified fact backing a Company Story — see
@@ -32,24 +37,10 @@ export interface InterestingTenderEnrichmentContext {
   mechanismKeyword?: string;
 }
 
-interface BraveSearchResult {
-  url: string;
-  title: string;
-}
-
-interface FetchedPage {
-  url: string;
-  title: string;
-  publishedAt: string | null;
-  text: string;
-}
-
-const BRAVE_SEARCH_ENDPOINT = 'https://api.search.brave.com/res/v1/web/search';
 const MAX_QUERIES_PER_CANDIDATE = 3;
 const MAX_RESULTS_PER_QUERY = 5;
 const MAX_PAGES_TO_FETCH = 3;
 const MAX_FACTS_RETURNED = 6;
-const REQUEST_TIMEOUT_MS = 8000;
 const MAX_PAGE_TEXT_CHARS = 6000;
 
 /**
@@ -162,7 +153,9 @@ function isGovernmentOrEuDomain(hostname: string): boolean {
 function matchesDomainList(hostname: string, domains: string[]): boolean {
   const host = hostname.toLowerCase();
 
-  return domains.some((domain) => host === domain || host.endsWith(`.${domain}`));
+  return domains.some(
+    (domain) => host === domain || host.endsWith(`.${domain}`),
+  );
 }
 
 function isAllowedSource(
@@ -182,7 +175,8 @@ function isAllowedSource(
     isGovernmentOrEuDomain(hostname) ||
     matchesDomainList(hostname, TRUSTED_MEDIA_DOMAINS) ||
     isLikelyOfficialSite(hostname, officialSiteMatchName) ||
-    (allowEncyclopedic && matchesDomainList(hostname, HISTORICAL_TRUSTED_DOMAINS))
+    (allowEncyclopedic &&
+      matchesDomainList(hostname, HISTORICAL_TRUSTED_DOMAINS))
   );
 }
 
@@ -198,12 +192,10 @@ function isAllowedSource(
  */
 @Injectable()
 export class WebEnrichmentService {
-  private readonly logger = new Logger(WebEnrichmentService.name);
-
   constructor(private readonly llmAnalysisService: LlmAnalysisService) {}
 
   isEnabled(): boolean {
-    return Boolean(process.env.BRAVE_API_KEY?.trim());
+    return isWebSearchEnabled();
   }
 
   async enrichCompanyStory(
@@ -225,7 +217,9 @@ export class WebEnrichmentService {
       queries,
       supplierName,
       supplierName,
-      [awardTitle, buyerName].filter((v): v is string => Boolean(v)).join(' — '),
+      [awardTitle, buyerName]
+        .filter((v): v is string => Boolean(v))
+        .join(' — '),
     );
   }
 
@@ -292,17 +286,19 @@ export class WebEnrichmentService {
     allowEncyclopedic = false,
   ): Promise<ExternalFact[]> {
     const seenUrls = new Set<string>();
-    const allowedResults: BraveSearchResult[] = [];
+    const allowedResults: WebSearchResult[] = [];
 
     for (const query of queries.slice(0, MAX_QUERIES_PER_CANDIDATE)) {
-      const results = await this.braveSearch(query);
+      const results = await braveSearch(query, MAX_RESULTS_PER_QUERY);
 
       for (const result of results) {
         if (seenUrls.has(result.url)) continue;
 
         seenUrls.add(result.url);
 
-        if (!isAllowedSource(result.url, officialSiteMatchName, allowEncyclopedic)) {
+        if (
+          !isAllowedSource(result.url, officialSiteMatchName, allowEncyclopedic)
+        ) {
           continue;
         }
 
@@ -315,7 +311,9 @@ export class WebEnrichmentService {
     const pages: FetchedPage[] = [];
 
     for (const result of allowedResults.slice(0, MAX_PAGES_TO_FETCH)) {
-      const page = await this.fetchPage(result.url);
+      const page = await fetchPage(result.url, {
+        maxChars: MAX_PAGE_TEXT_CHARS,
+      });
 
       if (page) pages.push(page);
     }
@@ -334,90 +332,5 @@ export class WebEnrichmentService {
       ...fact,
       retrievedAt,
     }));
-  }
-
-  private async braveSearch(query: string): Promise<BraveSearchResult[]> {
-    try {
-      const response = await axios.get<{
-        web?: { results?: { url?: unknown; title?: unknown }[] };
-      }>(BRAVE_SEARCH_ENDPOINT, {
-        params: { q: query, count: MAX_RESULTS_PER_QUERY },
-        headers: {
-          Accept: 'application/json',
-          'X-Subscription-Token': process.env.BRAVE_API_KEY,
-        },
-        timeout: REQUEST_TIMEOUT_MS,
-      });
-      const results = response.data?.web?.results;
-
-      if (!Array.isArray(results)) return [];
-
-      return results
-        .map((result) => ({
-          url: typeof result.url === 'string' ? result.url : '',
-          title: typeof result.title === 'string' ? result.title : '',
-        }))
-        .filter((result) => Boolean(result.url));
-    } catch (error) {
-      this.logger.warn(
-        `Brave Search failed for query "${query}": ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-
-      return [];
-    }
-  }
-
-  private async fetchPage(url: string): Promise<FetchedPage | null> {
-    try {
-      const response = await axios.get<string>(url, {
-        timeout: REQUEST_TIMEOUT_MS,
-        responseType: 'text',
-        maxContentLength: 3_000_000,
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (compatible; TenderwizeBot/1.0; +https://tenderwize.com)',
-          Accept: 'text/html',
-        },
-      });
-
-      if (typeof response.data !== 'string') return null;
-
-      const $ = cheerio.load(response.data);
-
-      $('script, style, nav, footer, header, noscript, iframe').remove();
-
-      const title =
-        $('title').first().text().trim() ||
-        $('meta[property="og:title"]').attr('content')?.trim() ||
-        url;
-      const publishedAt =
-        $('meta[property="article:published_time"]').attr('content') ||
-        $('meta[name="date"]').attr('content') ||
-        $('time[datetime]').first().attr('datetime') ||
-        null;
-      const mainText = ($('article').text() || $('main').text() || $('body').text() || '')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .slice(0, MAX_PAGE_TEXT_CHARS);
-
-      if (!mainText) return null;
-
-      return {
-        url,
-        title,
-        publishedAt: publishedAt ? publishedAt.trim() : null,
-        text: mainText,
-      };
-    } catch (error) {
-      this.logger.debug(
-        `Failed to fetch ${url}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-
-      return null;
-    }
   }
 }

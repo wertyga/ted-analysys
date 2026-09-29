@@ -1,4 +1,6 @@
 import {
+  applyStickyAwardValueCorrections,
+  AwardValueCorrection,
   restoreOriginalAwardValues,
   sanitizeLotAwardValues,
   sanitizeTenderAwardValue,
@@ -160,5 +162,42 @@ describe('award value sanity rules', () => {
         [],
       ).tender.awardValueEur,
     ).toBe(101_206_983);
+  });
+
+  it('keeps approved llm corrections when rules are re-applied', () => {
+    // Portuguese compost facility: EUR 3.2M published as 3 199 999 063
+    const first = sanitize({ awardEur: 3_199_999_063, estimatedEur: null }, [
+      lot(31_999_999_063),
+    ]);
+    const llm: AwardValueCorrection = {
+      scope: 'tender',
+      rule: 'llm',
+      factor: 1000,
+      original: { amount: 3_199_999_063, currency: 'EUR', eur: 3_199_999_063 },
+      corrected: { amount: 3_199_999.063, currency: 'EUR', eur: 3_199_999 },
+    };
+    const stored = [...first.corrections, llm];
+
+    const restored = restoreOriginalAwardValues(
+      { ...first.tender, awardValueEur: 3_199_999, lots: first.lots },
+      stored,
+    );
+
+    expect(restored.awardValueEur).toBe(3_199_999_063);
+    expect(restored.lots[0].awardValueEur).toBe(31_999_999_063);
+
+    const rerun = sanitize(
+      { awardEur: restored.awardValueEur, estimatedEur: null },
+      restored.lots,
+    );
+    const result = applyStickyAwardValueCorrections(
+      rerun.tender,
+      rerun.lots,
+      stored,
+    );
+
+    expect(result.tender.awardValueEur).toBe(3_199_999);
+    expect(result.lots[0].awardValueEur).toBeNull();
+    expect(result.corrections).toEqual([llm]);
   });
 });

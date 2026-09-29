@@ -120,6 +120,16 @@
     awardCountriesBackfillLoading: false,
     awardValuesFixStatus: null,
 
+    awardValueReviewMinM: '100',
+    awardValueReviewLimit: '',
+    awardValueReviewRecheck: false,
+    awardValueReviewLoading: false,
+    awardValueReviewStatus: null,
+    awardValueReviewFilter: 'pending',
+    awardValueReviewItems: null,
+    awardValueReviewCounts: {},
+    awardValueReviewBusy: false,
+
     cronTaskLoadingById: {},
     cronTasks: defaultCronTasks.slice(),
     cronRunResult: null,
@@ -1184,6 +1194,179 @@
     return html;
   }
 
+  var AWARD_VALUE_REVIEW_FILTERS = [
+    ['pending', 'Pending'],
+    ['applied', 'Applied'],
+    ['rejected', 'Rejected'],
+    ['no_change', 'No change'],
+    ['stale', 'Stale'],
+    ['failed', 'Failed'],
+  ];
+
+  function fmtMoneyValue(money) {
+    if (!money || money.amount == null) return 'null';
+    var text = Math.round(money.amount).toLocaleString('en-US') + ' ' + (money.currency || '');
+    if (money.currency !== 'EUR' && money.eur != null) {
+      text += ' (' + Math.round(money.eur).toLocaleString('en-US') + ' EUR)';
+    }
+    return text;
+  }
+
+  function awardValueReviewChangeHtml(change) {
+    var target =
+      change.scope === 'tender'
+        ? 'Total'
+        : 'Lot ' + (change.lotIndex + 1) + (change.lotTitle ? ': ' + change.lotTitle.slice(0, 60) : '');
+    var verdicts = {
+      replaced: ['from web', 'green'],
+      shifted: ['÷' + change.factor, 'blue'],
+      invalid: ['remove', 'red'],
+    };
+    var verdict = verdicts[change.verdict] || [change.verdict, 'default'];
+    return (
+      '<div class="reviewChange"><div><strong>' + escapeHtml(target) + '</strong> ' +
+      tagHtml(verdict[0], verdict[1]) + '</div>' +
+      '<div>' + escapeHtml(fmtMoneyValue(change.before)) + ' → <strong>' + escapeHtml(fmtMoneyValue(change.after)) + '</strong></div>' +
+      (change.source ? awardPriceFindingHtml(change.source) : '') +
+      '<div class="mutedText">' + escapeHtml(change.reason || '') + '</div></div>'
+    );
+  }
+
+  function awardPriceFindingHtml(finding) {
+    var host = finding.url;
+    try {
+      host = new URL(finding.url).hostname;
+    } catch (e) {}
+    return (
+      '<blockquote class="reviewQuote">«' + escapeHtml(finding.quote) + '»<br>' +
+      '<a target="_blank" rel="noopener" href="' + escapeHtml(finding.url) + '">' + escapeHtml(host) + '</a>' +
+      ' <span class="mutedText">' + escapeHtml(finding.scope + ', VAT ' + finding.vat) + '</span></blockquote>'
+    );
+  }
+
+  function awardValueReviewWebHtml(item) {
+    var web = item.webSearch;
+    if (!web) return '';
+    var findings = web.findings || [];
+    var errors = web.errors || [];
+    var summary =
+      'Web: ' + (findings.length ? findings.length + ' price(s)' : 'no price') + ' on ' + web.pagesFetched + ' page(s)';
+    return (
+      '<details class="reviewWeb"><summary class="mutedText">' + escapeHtml(summary) +
+      (errors.length ? ' ' + tagHtml(errors.length + ' error(s)', 'red') : '') + '</summary>' +
+      findings.map(awardPriceFindingHtml).join('') +
+      errorListHtml(
+        errors.map(function (e) {
+          return { id: e.stage + ' ' + e.target.slice(0, 80), message: e.message };
+        }),
+      ) +
+      '<div class="mutedText">Queries: ' + escapeHtml((web.queries || []).join(' | ')) + '</div></details>'
+    );
+  }
+
+  function awardValueReviewRowHtml(item) {
+    var isPending = item.status === 'pending';
+    var disabled = state.awardValueReviewBusy ? ' disabled' : '';
+    var changes = (item.changes || []).map(awardValueReviewChangeHtml).join('');
+    if (!changes) changes = '<span class="mutedText">' + escapeHtml(item.errorMessage || item.reason || '-') + '</span>';
+    changes += awardValueReviewWebHtml(item);
+
+    return (
+      '<tr><td><a target="_blank" rel="noopener" href="https://ted.europa.eu/en/notice/-/detail/' +
+      encodeURIComponent(item.tenderId) + '">' + escapeHtml(item.tenderId) + '</a>' +
+      '<div>' + escapeHtml((item.title || '').slice(0, 140)) + '</div>' +
+      '<div class="mutedText">' + escapeHtml(item.buyerName || '') + '</div></td>' +
+      '<td>' + changes + '</td>' +
+      '<td>' + escapeHtml(item.confidence || '-') + '</td>' +
+      '<td>' +
+      (isPending
+        ? '<div class="buttonGroup"><button' + disabled + ' onclick="Admin.applyAwardValueReviews([\'' + item._id + '\'])" type="button">Apply</button>' +
+          '<button class="secondaryButton"' + disabled + ' onclick="Admin.rejectAwardValueReviews([\'' + item._id + '\'])" type="button">Reject</button></div>'
+        : tagHtml(item.status, item.status === 'applied' ? 'green' : 'default')) +
+      '</td></tr>'
+    );
+  }
+
+  function awardValueReviewPanelHtml() {
+    var s = state.awardValueReviewStatus;
+    var running = state.awardValueReviewLoading || (s && s.isRunning);
+    var counts = state.awardValueReviewCounts || {};
+    var items = state.awardValueReviewItems || [];
+    var pendingItems = items.filter(function (item) {
+      return item.status === 'pending';
+    });
+
+    var html =
+      '<section class="panel panelWide"><div class="panelHeader"><div><h2>Award value LLM review</h2>' +
+      '<p>LLM checks award values over the threshold against the subject, lots and the buyer\'s usual award size. Nothing changes until you press Apply; applied values survive "Award values fix" and re-import.</p></div>' +
+      '<div class="buttonGroup"><label>Min award, M EUR<input min="1" type="number" value="' +
+      escapeHtml(state.awardValueReviewMinM) +
+      '" oninput="Admin.setField(\'awardValueReviewMinM\', this.value)"></label>' +
+      '<label>Limit<input min="1" type="number" placeholder="all" value="' +
+      escapeHtml(state.awardValueReviewLimit) +
+      '" oninput="Admin.setField(\'awardValueReviewLimit\', this.value)"></label>' +
+      '<label class="checkboxLabel"><input type="checkbox" ' +
+      (state.awardValueReviewRecheck ? 'checked' : '') +
+      ' onchange="Admin.setCheckbox(\'awardValueReviewRecheck\', this.checked)"> Re-check not applied</label>' +
+      (s && s.isRunning
+        ? '<button class="secondaryButton" onclick="Admin.stopAwardValueReview()" type="button">' +
+          (s.stopRequested ? 'Stopping...' : 'Stop') + '</button>'
+        : '') +
+      '<button ' + (running ? 'disabled' : '') + ' onclick="Admin.startAwardValueReview()" type="button">' +
+      (running ? 'Reviewing...' : 'Run review') + '</button></div></div>' +
+      '<div class="statusList"><div><span>Award value review</span>' +
+      tagHtml(running ? 'RUNNING' : 'IDLE', running ? 'processing' : 'default') +
+      '</div></div>';
+
+    if (s && s.startedAt) {
+      var pairs = [
+        ['Processed', s.processed + '/' + s.total],
+        ['Flagged', s.flagged],
+        ['No change', s.noChange],
+        ['Failed', s.failed],
+        ['Web price found', s.webSearchEnabled ? s.withWebPrice : 'web search off (no BRAVE_API_KEY)', 'smallStat'],
+        ['Min award', Math.round(s.minAwardValueEur / 1e6) + 'M EUR'],
+        ['Started', escapeHtml(fmtDateTime(s.startedAt)), 'smallStat'],
+        ['Finished', escapeHtml(s.finishedAt ? fmtDateTime(s.finishedAt) : '-'), 'smallStat'],
+      ];
+      if (s.lastError) pairs.push(['Error', escapeHtml(s.lastError), 'smallStat']);
+      html += statsHtml(pairs);
+
+      if (s.errors && s.errors.length) {
+        html +=
+          '<h3>Errors</h3>' +
+          errorListHtml(
+            s.errors.map(function (e) {
+              return { id: e.stage + ' ×' + e.count, message: e.message + ' (e.g. ' + e.example.slice(0, 100) + ')' };
+            }),
+          );
+      }
+    }
+
+    html +=
+      '<div class="buttonGroup"><select onchange="Admin.setAwardValueReviewFilter(this.value)">' +
+      AWARD_VALUE_REVIEW_FILTERS.map(function (f) {
+        return (
+          '<option value="' + f[0] + '"' + (state.awardValueReviewFilter === f[0] ? ' selected' : '') + '>' +
+          escapeHtml(f[1] + ' (' + (counts[f[0]] || 0) + ')') + '</option>'
+        );
+      }).join('') +
+      '</select>' +
+      (pendingItems.length
+        ? '<button ' + (state.awardValueReviewBusy ? 'disabled' : '') +
+          ' onclick="Admin.applyAllAwardValueReviews()" type="button">Apply all shown (' + pendingItems.length + ')</button>'
+        : '') +
+      '</div>' +
+      '<div class="tableWrap"><table class="dataTable"><thead><tr>' +
+      '<th>Notice</th><th>What will change</th><th>Confidence</th><th></th></tr></thead><tbody>' +
+      (items.length
+        ? items.map(awardValueReviewRowHtml).join('')
+        : '<tr><td colspan="4" class="tableEmpty">' + (state.awardValueReviewItems ? 'Nothing here' : 'Loading...') + '</td></tr>') +
+      '</tbody></table></div></section>';
+
+    return html;
+  }
+
   function techSectionHtml() {
     return (
       gatherAllTagPanelHtml() +
@@ -1192,6 +1375,7 @@
       competitionPanelHtml() +
       awardRefreshPanelHtml() +
       awardValuesFixPanelHtml() +
+      awardValueReviewPanelHtml() +
       buyerStatsPanelHtml() +
       shortTitlesPanelHtml() +
       generalAnalysisPanelHtml() +
@@ -2096,6 +2280,30 @@
       .catch(function () {});
   }
 
+  function loadAwardValueReviewItems() {
+    return request(
+      '/adm/tech/award-tenders/value-review/items?status=' + encodeURIComponent(state.awardValueReviewFilter),
+      { token: state.token },
+    )
+      .then(function (response) {
+        state.awardValueReviewItems = response.items || [];
+        state.awardValueReviewCounts = response.counts || {};
+      })
+      .catch(function () {});
+  }
+
+  function loadAwardValueReviewStatus() {
+    return request('/adm/tech/award-tenders/value-review/status', { token: state.token })
+      .then(function (status) {
+        var wasRunning = state.awardValueReviewStatus && state.awardValueReviewStatus.isRunning;
+        state.awardValueReviewStatus = status;
+        state.awardValueReviewLoading = status.isRunning;
+        // Items grow while the review runs, so keep the list fresh until it ends
+        if (status.isRunning || wasRunning || !state.awardValueReviewItems) return loadAwardValueReviewItems();
+      })
+      .catch(function () {});
+  }
+
   function loadSyncIndexesStatus() {
     return request('/adm/tech/sync-indexes/status', { token: state.token })
       .then(function (status) {
@@ -2188,6 +2396,7 @@
       loadGatherAllStatus(),
       loadAwardTendersRefreshStatus(),
       loadAwardValuesFixStatus(),
+      loadAwardValueReviewStatus(),
       loadSyncIndexesStatus(),
       loadCronTasks(),
       loadRecentCompetitionTendersCronStatus(),
@@ -2526,6 +2735,88 @@
       .finally(function () {
         render();
       });
+  }
+
+  function startAwardValueReview() {
+    state.awardValueReviewLoading = true;
+    state.message = '';
+    render();
+
+    request('/adm/tech/award-tenders/value-review', {
+      method: 'POST',
+      token: state.token,
+      body: JSON.stringify({
+        minAwardValueEur: Number(state.awardValueReviewMinM) * 1e6 || undefined,
+        limit: Number(state.awardValueReviewLimit) || undefined,
+        recheck: state.awardValueReviewRecheck,
+      }),
+    })
+      .then(function (status) {
+        state.awardValueReviewStatus = status;
+        state.awardValueReviewLoading = status.isRunning;
+        state.message = 'Award value review started.';
+      })
+      .catch(function (error) {
+        state.message = error && error.message ? error.message : 'Failed to start award value review';
+        state.awardValueReviewLoading = false;
+      })
+      .finally(render);
+  }
+
+  function stopAwardValueReview() {
+    request('/adm/tech/award-tenders/value-review/stop', { method: 'POST', token: state.token })
+      .then(function (status) {
+        state.awardValueReviewStatus = status;
+      })
+      .catch(function () {})
+      .finally(render);
+  }
+
+  function setAwardValueReviewFilter(value) {
+    state.awardValueReviewFilter = value;
+    state.awardValueReviewItems = null;
+    render();
+    loadAwardValueReviewItems().then(render);
+  }
+
+  function awardValueReviewAction(action, ids) {
+    if (!ids.length) return;
+
+    state.awardValueReviewBusy = true;
+    state.message = '';
+    render();
+
+    request('/adm/tech/award-tenders/value-review/' + action, {
+      method: 'POST',
+      token: state.token,
+      body: JSON.stringify({ ids: ids }),
+    })
+      .then(function (result) {
+        state.message =
+          action === 'apply'
+            ? 'Applied: ' + result.applied + (result.stale ? ', stale (values changed since review): ' + result.stale : '')
+            : 'Rejected: ' + result.rejected;
+        return loadAwardValueReviewItems();
+      })
+      .catch(function (error) {
+        state.message = error && error.message ? error.message : 'Failed to ' + action + ' award value review';
+      })
+      .finally(function () {
+        state.awardValueReviewBusy = false;
+        render();
+      });
+  }
+
+  function applyAllAwardValueReviews() {
+    var ids = (state.awardValueReviewItems || [])
+      .filter(function (item) {
+        return item.status === 'pending';
+      })
+      .map(function (item) {
+        return item._id;
+      });
+    if (!window.confirm('Apply ' + ids.length + ' suggested award value changes and refresh buyer/contractor stats?')) return;
+    awardValueReviewAction('apply', ids);
   }
 
   function backfillAwardDates() {
@@ -3161,6 +3452,16 @@
     gatherAllCompetitionTenders: gatherAllCompetitionTenders,
     refreshAwardTendersHistory: refreshAwardTendersHistory,
     fixAwardValues: fixAwardValues,
+    startAwardValueReview: startAwardValueReview,
+    stopAwardValueReview: stopAwardValueReview,
+    setAwardValueReviewFilter: setAwardValueReviewFilter,
+    applyAwardValueReviews: function (ids) {
+      awardValueReviewAction('apply', ids);
+    },
+    rejectAwardValueReviews: function (ids) {
+      awardValueReviewAction('reject', ids);
+    },
+    applyAllAwardValueReviews: applyAllAwardValueReviews,
     backfillAwardDates: backfillAwardDates,
     backfillAwardCountries: backfillAwardCountries,
     runCronTask: runCronTask,

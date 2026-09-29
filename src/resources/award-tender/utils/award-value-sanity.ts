@@ -55,7 +55,9 @@ export type AwardValueCorrectionRule =
   | 'tender-range'
   | 'estimate-ratio'
   | 'lots-sum'
-  | 'max-cap';
+  | 'max-cap'
+  // Reviewed by LLM and approved in the admin panel
+  | 'llm';
 
 export type AwardValueCorrection = {
   scope: 'tender' | 'lot';
@@ -362,7 +364,8 @@ export function restoreOriginalAwardValues<
   const lots = [...tender.lots];
   let restored: T = { ...tender };
 
-  for (const correction of corrections) {
+  // Backwards, so a value corrected twice gets the TED value back
+  for (const correction of [...corrections].reverse()) {
     const values = {
       awardValue: {
         amount: correction.original.amount,
@@ -379,4 +382,68 @@ export function restoreOriginalAwardValues<
   }
 
   return { ...restored, lots };
+}
+
+// Approved by a human, so re-running the rules must keep them
+export const isStickyAwardValueCorrection = (
+  correction: AwardValueCorrection,
+): boolean => correction.rule === 'llm';
+
+/**
+ * Re-applies approved corrections on top of the rules result. Their original
+ * becomes the value the rules produced, so restore still gets the TED value.
+ */
+export function applyStickyAwardValueCorrections<
+  T extends SanitizableAwardTender,
+  L extends SanitizableAwardLot,
+>(
+  tender: T,
+  lots: L[],
+  stored: AwardValueCorrection[] = [],
+): { tender: T; lots: L[]; corrections: AwardValueCorrection[] } {
+  const corrections: AwardValueCorrection[] = [];
+  const nextLots = [...lots];
+  let nextTender = tender;
+
+  for (const correction of stored.filter(isStickyAwardValueCorrection)) {
+    const values = {
+      awardValue: {
+        amount: correction.corrected.amount,
+        currency: correction.corrected.currency,
+      },
+      awardValueEur: correction.corrected.eur,
+    };
+
+    if (correction.scope === 'tender') {
+      corrections.push({
+        ...correction,
+        original: {
+          amount: nextTender.awardValue?.amount ?? null,
+          currency: nextTender.awardValue?.currency ?? null,
+          eur: nextTender.awardValueEur ?? null,
+        },
+      });
+      nextTender = { ...nextTender, ...values };
+      continue;
+    }
+
+    const lot =
+      correction.lotIndex !== undefined ? nextLots[correction.lotIndex] : null;
+
+    if (!lot) {
+      continue;
+    }
+
+    corrections.push({
+      ...correction,
+      original: {
+        amount: lot.awardValue?.amount ?? null,
+        currency: lot.awardValue?.currency ?? null,
+        eur: lot.awardValueEur ?? null,
+      },
+    });
+    nextLots[correction.lotIndex!] = { ...lot, ...values };
+  }
+
+  return { tender: nextTender, lots: nextLots, corrections };
 }

@@ -5,6 +5,7 @@ import {
   AwardTenderModel,
 } from '@/resources/award-tender/schemas';
 import {
+  applyStickyAwardValueCorrections,
   AwardValueCorrection,
   extractLotWinnersFromXml,
   restoreOriginalAwardValues,
@@ -295,11 +296,24 @@ export class AwardValuesFixTechService {
       lots = await this.attachTenderValueRanges(tender, lots);
     }
 
-    const { lots: sanitizedLots, corrections: lotCorrections } =
+    const { lots: ruleLots, corrections: lotCorrections } =
       sanitizeLotAwardValues(lots);
-    const { tender: sanitizedTender, corrections: tenderCorrections } =
-      sanitizeTenderAwardValue(restored, sanitizedLots);
-    const corrections = [...lotCorrections, ...tenderCorrections];
+    const { tender: ruleTender, corrections: tenderCorrections } =
+      sanitizeTenderAwardValue(restored, ruleLots);
+    const {
+      tender: sanitizedTender,
+      lots: sanitizedLots,
+      corrections: stickyCorrections,
+    } = applyStickyAwardValueCorrections(
+      ruleTender,
+      ruleLots,
+      tender.awardValueCorrections,
+    );
+    const corrections = [
+      ...lotCorrections,
+      ...tenderCorrections,
+      ...stickyCorrections,
+    ];
 
     const set: Record<string, unknown> = {};
 
