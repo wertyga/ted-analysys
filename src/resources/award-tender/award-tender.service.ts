@@ -57,7 +57,7 @@ import {
 export type AwardTenderPureSearchFilters = Pick<
   TedTenderSearchRequestDto,
   'cpvCodes' | 'placeOfPerformance' | 'procedureType' | 'contractNature'
->;
+> & { awardDateFrom?: string };
 
 const AWARD_TENDER_PURE_LIST_SELECT = [
   '_id',
@@ -197,9 +197,13 @@ export class AwardTenderService {
     filters: AwardTenderPureSearchFilters = {},
     pagination: { page?: number; limit?: number } = {},
   ) {
-    const query = (await this.tedSearchFilters.buildLocalTenderQuery(
-      filters,
+    const { awardDateFrom, ...tenderFilters } = filters;
+    const baseQuery = (await this.tedSearchFilters.buildLocalTenderQuery(
+      tenderFilters,
     )) as QueryFilter<AwardTenderDocument>;
+    const query: QueryFilter<AwardTenderDocument> = awardDateFrom
+      ? { $and: [baseQuery, { awardDate: { $gte: new Date(awardDateFrom) } }] }
+      : baseQuery;
 
     const { skip, limit } = getPaginationMeta(pagination);
     const [awardTenders, totalCount] = await Promise.all([

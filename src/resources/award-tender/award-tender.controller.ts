@@ -71,6 +71,7 @@ export class AwardTenderController {
         placeOfPerformance: query.placeOfPerformance,
         contractNature: query.contractNature,
         procedureType: query.procedureType,
+        awardDateFrom: query.awardDateFrom,
       },
       {
         page: query.page,

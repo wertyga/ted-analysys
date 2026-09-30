@@ -6,6 +6,7 @@ import {
   IsEnum,
   IsIn,
   IsInt,
+  IsDateString,
   IsOptional,
   Max,
   Min,
@@ -67,6 +68,14 @@ export class AwardTenderPureSearchRequestDto {
   @ArrayNotEmpty()
   @IsEnum(TedContractNature, { each: true })
   contractNature?: TedContractNature[];
+
+  @ApiPropertyOptional({
+    example: '2025-09-30',
+    description: 'Only awards with awardDate on or after this date.',
+  })
+  @IsOptional()
+  @IsDateString()
+  awardDateFrom?: string;
 
   @ApiPropertyOptional({ example: 20, minimum: 1, maximum: 100 })
   @IsOptional()
