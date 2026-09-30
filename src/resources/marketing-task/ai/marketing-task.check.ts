@@ -16,7 +16,10 @@ import {
   MarketingTaskHistoryType,
   MarketingTaskStatus,
 } from '../marketing-task.types';
-import { pushMarketingTaskHistory } from '../marketing-task.utils';
+import {
+  classifyPage,
+  pushMarketingTaskHistory,
+} from '../marketing-task.utils';
 import { toPromptHistoryEntry } from './marketing-task.prompt';
 import {
   buildMarketingTaskCheckSystemPrompt,
@@ -37,6 +40,36 @@ const DONE_CHECK_UNTIL_DAYS = 56;
 const RECHECK_INTERVAL_DAYS = 7;
 /** Upper bound of checks (LLM calls) per scheduled run. */
 const MAX_CHECKS_PER_RUN = 20;
+
+/**
+ * A template task has no pageUrl; the page it was found on is quoted in its
+ * text. Without a live sample the LLM only sees the old facts in "evidence"
+ * and reports them as the current state of the page.
+ */
+const findSamplePageUrl = (task: {
+  template?: string | null;
+  evidence?: string | null;
+  deliverable?: string | null;
+  acceptanceCriteria?: string | null;
+  description?: string | null;
+}): string | undefined => {
+  const urls = [
+    task.evidence,
+    task.deliverable,
+    task.acceptanceCriteria,
+    task.description,
+  ]
+    .flatMap((text) => text?.match(/https?:\/\/[^\s"'`<>()«»]+/g) ?? [])
+    .map((url) => url.replace(/[.,;:!?]+$/, ''));
+
+  return (
+    urls.find(
+      (url) =>
+        task.template &&
+        String(classifyPage(url).template) === task.template,
+    ) ?? urls[0]
+  );
+};
 
 export interface CheckDueMarketingTasksResult {
   checked: number;
@@ -70,7 +103,7 @@ export class MarketingTaskChecker {
    * Checks the tasks where a check can tell something new: in-progress tasks
    * (is the work on the site yet?) and tasks done 2-8 weeks ago (did it have
    * an effect?), skipping those checked within the last week. Tasks without a
-   * page or query are skipped: there is nothing to inspect for them.
+   * page, query or template are skipped: there is nothing to inspect for them.
    */
   async checkDue(
     options: CheckMarketingTaskOptions = {},
@@ -94,6 +127,7 @@ export class MarketingTaskChecker {
           $or: [
             { pageUrl: { $exists: true, $ne: '' } },
             { query: { $exists: true, $ne: '' } },
+            { template: { $exists: true, $ne: null } },
           ],
         },
       ],
@@ -146,9 +180,14 @@ export class MarketingTaskChecker {
       throw new NotFoundException(`Marketing task ${id} not found`);
     }
 
-    const pageUrl = this.marketingDataService.resolvePageUrl(task.pageUrl);
+    const pageUrl =
+      this.marketingDataService.resolvePageUrl(task.pageUrl) ??
+      findSamplePageUrl(task);
     const [metrics, livePage] = await Promise.all([
-      this.marketingDataService.collectTaskMetrics(task, days),
+      this.marketingDataService.collectTaskMetrics(
+        { pageUrl: pageUrl ?? task.pageUrl, query: task.query },
+        days,
+      ),
       pageUrl ? inspectMarketingPage(pageUrl, task.query) : undefined,
     ]);
     const history = task.history ?? [];
