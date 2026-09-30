@@ -156,6 +156,11 @@ const INDEXABLE_LOCALES: Partial<Record<SitePageTemplate, string[]>> = {
   [SitePageTemplate.app]: [],
 };
 
+/** Indexable locales of a template, undefined when there is no known rule. */
+export const getIndexableLocales = (
+  template: SitePageTemplate,
+): readonly string[] | undefined => INDEXABLE_LOCALES[template];
+
 /**
  * False when the page is a locale version the site keeps out of the index on
  * purpose (e.g. /de/tenders/{id}); true when it is meant to rank or the rule

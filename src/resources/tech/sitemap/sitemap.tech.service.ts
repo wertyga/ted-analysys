@@ -12,6 +12,12 @@ import { basename, dirname, isAbsolute, join, normalize, relative } from 'path';
 import { TenderModel } from '@/resources/tenders/schemas';
 import { BuyerModel } from '@/resources/buyer/schemas';
 import { ContractorModel } from '@/resources/contractor/schemas';
+import { AwardTenderModel } from '@/resources/award-tender/schemas';
+import { SitePageTemplate } from '@/resources/marketing-task/marketing-task.types';
+import {
+  getIndexableLocales,
+  isIndexableLocaleVersion,
+} from '@/resources/marketing-task/marketing-task.utils';
 
 type SitemapTender = {
   id?: string;
@@ -28,6 +34,11 @@ type SitemapContractor = {
   updatedAt?: Date;
 };
 
+type SitemapAwardTender = {
+  id?: string;
+  updatedAt?: Date;
+};
+
 type SitemapUrl = {
   loc: string;
   lastmod?: string;
@@ -41,6 +52,8 @@ type WrittenSitemapFile = {
 };
 
 const SITEMAP_ABSOLUTE_MAX_URLS = 40_000;
+// /award-tenders/country/{slug} is noindex below this many awards
+const AWARD_COUNTRY_MIN_AWARDS = 10;
 
 @Injectable()
 export class SitemapTechService {
@@ -76,6 +89,23 @@ export class SitemapTechService {
     });
     sitemapFiles.push(...tenderResult.files);
 
+    const awardTenderResult = await this.writeAwardTenderSitemapFiles({
+      domain,
+      locales,
+      outputDir,
+      maxUrlsPerFile,
+    });
+    sitemapFiles.push(...awardTenderResult.files);
+
+    const awardDirectoryResult = await this.writeSitemapEntityFiles({
+      domain,
+      outputDir,
+      entityName: 'award-directory',
+      urls: await this.buildAwardDirectorySitemapUrls(domain, locales),
+      maxUrlsPerFile,
+    });
+    sitemapFiles.push(...awardDirectoryResult.files);
+
     const buyersResult = await this.writeBuyerSitemapFiles({
       domain,
       locales,
@@ -96,7 +126,7 @@ export class SitemapTechService {
       domain,
       outputDir,
       entityName: 'industries',
-      urls: await this.buildCpvIndustrySitemapUrls(domain),
+      urls: await this.buildCpvIndustrySitemapUrls(domain, locales),
       maxUrlsPerFile,
     });
     sitemapFiles.push(...industryResult.files);
@@ -132,6 +162,8 @@ export class SitemapTechService {
     const urlsCount =
       staticResult.count +
       tenderResult.count +
+      awardTenderResult.count +
+      awardDirectoryResult.count +
       buyersResult.count +
       contractorsResult.count +
       industryResult.count +
@@ -143,6 +175,8 @@ export class SitemapTechService {
       downloadUrl: '/adm/tech/sitemap/download',
       staticCount: staticResult.count,
       tendersCount: tenderResult.count,
+      awardTendersCount: awardTenderResult.count,
+      awardDirectoryCount: awardDirectoryResult.count,
       buyersCount: buyersResult.count,
       contractorsCount: contractorsResult.count,
       industriesCount: industryResult.count,
@@ -195,6 +229,15 @@ export class SitemapTechService {
       });
     };
 
+    const tenderLocales = this.getTemplateLocales(
+      locales,
+      SitePageTemplate.tender,
+    );
+
+    if (!tenderLocales.length) {
+      return { count: 0, files };
+    }
+
     const cursor = TenderModel.find({
       id: { $exists: true, $ne: null },
     })
@@ -205,7 +248,7 @@ export class SitemapTechService {
     for await (const tender of cursor) {
       if (!tender.id) continue;
 
-      for (const locale of locales) {
+      for (const locale of tenderLocales) {
         buffer.push({
           loc: `${domain}/${locale}/tenders/${encodeURIComponent(tender.id)}`,
           lastmod: tender.updatedAt?.toISOString(),
@@ -225,6 +268,112 @@ export class SitemapTechService {
       count: totalCount,
       files,
     };
+  }
+
+  private async writeAwardTenderSitemapFiles(options: {
+    domain: string;
+    locales: string[];
+    outputDir: string;
+    maxUrlsPerFile: number;
+  }) {
+    const { domain, locales, outputDir, maxUrlsPerFile } = options;
+
+    const files: WrittenSitemapFile[] = [];
+    let buffer: SitemapUrl[] = [];
+    let totalCount = 0;
+
+    const flush = async () => {
+      if (!buffer.length) return;
+
+      const fileIndex = files.length;
+      const outputPath = join(outputDir, `award-tenders-${fileIndex}.xml`);
+      const chunk = buffer;
+
+      buffer = [];
+
+      await writeFile(outputPath, this.buildSitemapXml(chunk), 'utf8');
+
+      files.push({
+        filename: basename(outputPath),
+        outputPath,
+        loc: this.buildPublicSitemapUrl(domain, outputPath),
+        count: chunk.length,
+      });
+    };
+
+    const awardTenderLocales = this.getTemplateLocales(
+      locales,
+      SitePageTemplate.award_tender,
+    );
+
+    if (!awardTenderLocales.length) {
+      return { count: 0, files };
+    }
+
+    const cursor = AwardTenderModel.find({
+      id: { $exists: true, $ne: null },
+    })
+      .select('id updatedAt')
+      .lean<SitemapAwardTender>()
+      .cursor();
+
+    for await (const awardTender of cursor) {
+      if (!awardTender.id) continue;
+
+      for (const locale of awardTenderLocales) {
+        buffer.push({
+          loc: `${domain}/${locale}/award-tenders/${encodeURIComponent(
+            awardTender.id,
+          )}`,
+          lastmod: awardTender.updatedAt?.toISOString(),
+        });
+
+        totalCount++;
+
+        if (buffer.length >= maxUrlsPerFile) {
+          await flush();
+        }
+      }
+    }
+
+    await flush();
+
+    return {
+      count: totalCount,
+      files,
+    };
+  }
+
+  private async buildAwardDirectorySitemapUrls(
+    domain: string,
+    locales: string[],
+  ): Promise<SitemapUrl[]> {
+    const countryCounts = await AwardTenderModel.aggregate<{
+      _id: string;
+      count: number;
+    }>([
+      { $match: { 'placeOfPerformanceCountries.0': { $exists: true } } },
+      { $unwind: '$placeOfPerformanceCountries' },
+      { $group: { _id: '$placeOfPerformanceCountries', count: { $sum: 1 } } },
+      { $match: { count: { $gte: AWARD_COUNTRY_MIN_AWARDS } } },
+    ]);
+
+    const countrySlugs = countryCounts
+      .map((country) => COUNTRY_DATA[country._id]?.slug)
+      .filter(Boolean);
+
+    return this.getTemplateLocales(
+      locales,
+      SitePageTemplate.award_directory,
+    ).flatMap((locale) => [
+      { loc: `${domain}/${locale}/award-tenders` },
+      { loc: `${domain}/${locale}/award-tenders/country` },
+      ...countrySlugs.map((slug) => ({
+        loc: `${domain}/${locale}/award-tenders/country/${encodeURIComponent(
+          slug,
+        )}`,
+      })),
+    ]);
   }
 
   private async writeSitemapEntityFiles(options: {
@@ -289,7 +438,10 @@ export class SitemapTechService {
       });
     };
 
-    for (const locale of locales) {
+    for (const locale of this.getTemplateLocales(
+      locales,
+      SitePageTemplate.buyer_list,
+    )) {
       buffer.push({
         loc: `${domain}/${locale}/buyers`,
       });
@@ -299,6 +451,11 @@ export class SitemapTechService {
         await flush();
       }
     }
+
+    const buyerLocales = this.getTemplateLocales(
+      locales,
+      SitePageTemplate.buyer,
+    );
 
     const cursor = BuyerModel.find({})
       .select('_id updatedAt')
@@ -310,7 +467,7 @@ export class SitemapTechService {
 
       if (!buyerId) continue;
 
-      for (const locale of locales) {
+      for (const locale of buyerLocales) {
         buffer.push({
           loc: `${domain}/${locale}/buyers/${encodeURIComponent(buyerId)}`,
           lastmod: buyer.updatedAt?.toISOString(),
@@ -363,7 +520,10 @@ export class SitemapTechService {
       });
     };
 
-    for (const locale of locales) {
+    for (const locale of this.getTemplateLocales(
+      locales,
+      SitePageTemplate.contractor_list,
+    )) {
       buffer.push({
         loc: `${domain}/${locale}/contractors`,
       });
@@ -373,6 +533,11 @@ export class SitemapTechService {
         await flush();
       }
     }
+
+    const contractorLocales = this.getTemplateLocales(
+      locales,
+      SitePageTemplate.contractor,
+    );
 
     const cursor = ContractorModel.find({})
       .select('_id updatedAt')
@@ -384,7 +549,7 @@ export class SitemapTechService {
 
       if (!contractorId) continue;
 
-      for (const locale of locales) {
+      for (const locale of contractorLocales) {
         buffer.push({
           loc: `${domain}/${locale}/contractors/${encodeURIComponent(
             contractorId,
@@ -413,13 +578,11 @@ export class SitemapTechService {
     locales: string[],
   ): SitemapUrl[] {
     return locales.flatMap((locale) =>
-      STATIC_SITEMAP_PATHS.filter(
-        (page) => !page.locales || page.locales.includes(locale),
-      ).map((page) => ({
-        loc: page.path
-          ? `${domain}/${locale}/${page.path}`
-          : `${domain}/${locale}`,
-      })),
+      STATIC_SITEMAP_PATHS.map((page) =>
+        page.path ? `/${locale}/${page.path}` : `/${locale}`,
+      )
+        .filter((path) => isIndexableLocaleVersion(path))
+        .map((path) => ({ loc: `${domain}${path}` })),
     );
   }
 
@@ -455,7 +618,15 @@ export class SitemapTechService {
 
   private async buildCpvIndustrySitemapUrls(
     domain: string,
+    locales: string[],
   ): Promise<SitemapUrl[]> {
+    const industryLocales = this.getTemplateLocales(
+      locales,
+      SitePageTemplate.industry,
+    );
+
+    if (!industryLocales.length) return [];
+
     const cursor = TenderModel.find({
       'cpvCodes.0': { $exists: true },
     })
@@ -475,18 +646,30 @@ export class SitemapTechService {
       }
     }
 
-    return Array.from(industryCodeSet)
+    const industries = Array.from(industryCodeSet)
       .map((code) => CPV_INDUSTRIES[code])
-      .filter((industry) => industry?.slug)
-      .map((industry) => ({
-        loc: `${domain}/en/industries/${encodeURIComponent(industry.slug)}`,
-      }));
+      .filter((industry) => industry?.slug);
+
+    return industryLocales.flatMap((locale) =>
+      industries.map((industry) => ({
+        loc: `${domain}/${locale}/industries/${encodeURIComponent(
+          industry.slug,
+        )}`,
+      })),
+    );
   }
 
   private async buildCountrySitemapUrls(
     domain: string,
     locales: string[],
   ): Promise<SitemapUrl[]> {
+    const countryLocales = this.getTemplateLocales(
+      locales,
+      SitePageTemplate.country,
+    );
+
+    if (!countryLocales.length) return [];
+
     const countryCodeSet = new Set<string>();
 
     for (const countryCode of EUROPEAN_CODES) {
@@ -512,7 +695,7 @@ export class SitemapTechService {
 
     const urls = new Set<string>();
 
-    for (const locale of locales) {
+    for (const locale of countryLocales) {
       for (const countryCode of countryCodeSet) {
         const slug = COUNTRY_DATA[countryCode]?.slug;
 
@@ -529,6 +712,13 @@ export class SitemapTechService {
     domain: string,
     locales: string[],
   ): Promise<SitemapUrl[]> {
+    const countryIndustryLocales = this.getTemplateLocales(
+      locales,
+      SitePageTemplate.country_industry,
+    );
+
+    if (!countryIndustryLocales.length) return [];
+
     const cursor = TenderModel.find({
       'placeOfPerformanceCountries.0': { $exists: true },
       'cpvCodes.0': { $exists: true },
@@ -559,7 +749,7 @@ export class SitemapTechService {
 
             if (!industry?.slug) continue;
 
-            for (const locale of locales) {
+            for (const locale of countryIndustryLocales) {
               urlSet.add(
                 `${domain}/${locale}/${encodeURIComponent(
                   countrySlug,
@@ -572,6 +762,15 @@ export class SitemapTechService {
     }
 
     return Array.from(urlSet).map((loc) => ({ loc }));
+  }
+
+  // Requested locales in which the template is indexable, see SITE_BRIEF.md
+  private getTemplateLocales(locales: string[], template: SitePageTemplate) {
+    const indexableLocales = getIndexableLocales(template);
+
+    return indexableLocales
+      ? locales.filter((locale) => indexableLocales.includes(locale))
+      : locales;
   }
 
   private getIndexableCpvIndustryCodes(cpvCode: string) {

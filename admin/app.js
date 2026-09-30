@@ -1187,6 +1187,8 @@
         ['URLs per file', r.maxUrlsPerFile],
         ['Sitemap files', r.sitemapFilesCount + (r.isSitemapIndex ? ' + index' : '')],
         ['Tenders', r.tendersCount],
+        ['Award tenders', r.awardTendersCount],
+        ['Award directory', r.awardDirectoryCount],
         ['Industries', r.industriesCount],
         ['Countries', r.countriesCount],
       ]);
