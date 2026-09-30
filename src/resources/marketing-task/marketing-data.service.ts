@@ -17,6 +17,7 @@ import {
   classifyPage,
   estimateExtraClicks,
   expectedCtrForPosition,
+  isIndexableLocaleVersion,
   normalizePagePath,
   normalizeText,
   TARGET_POSITION_CTR,
@@ -665,12 +666,13 @@ export class MarketingDataService {
       ),
     ];
 
+    // Prefer a locale version meant to rank: a /de copy of an en-only
+    // template is noindex on purpose and says nothing about the template.
     for (const template of SAMPLE_TEMPLATES) {
-      add(
-        sampleCandidates.find(
-          (page) => page && classifyPage(page).template === template,
-        ),
+      const pages = sampleCandidates.filter(
+        (page) => page && classifyPage(page).template === template,
       );
+      add(pages.find((page) => isIndexableLocaleVersion(page)) ?? pages[0]);
     }
 
     if (!gsc) return this.inspectPages(targets);

@@ -47,6 +47,8 @@ export enum SitePageTemplate {
   home = 'home',
   tender = 'tender',
   award_tender = 'award_tender',
+  /** /award-tenders hub and /award-tenders/country[/{slug}]. */
+  award_directory = 'award_directory',
   buyer = 'buyer',
   buyer_list = 'buyer_list',
   contractor = 'contractor',
@@ -59,7 +61,10 @@ export enum SitePageTemplate {
   guide = 'guide',
   compare = 'compare',
   tool = 'tool',
+  pricing = 'pricing',
   legal = 'legal',
+  /** Logged-in app and auth pages, disallowed in robots.txt: never a target. */
+  app = 'app',
   other = 'other',
 }
 

@@ -1,8 +1,16 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { getSafeErrorMessage } from '@/utils';
-import { MarketingPageInspection } from './marketing-task.types';
-import { classifyPage, normalizePagePath } from './marketing-task.utils';
+import {
+  MarketingPageInspection,
+  SitePageTemplate,
+} from './marketing-task.types';
+import {
+  classifyPage,
+  isIndexableLocaleVersion,
+  normalizePagePath,
+  toDefaultLocalePath,
+} from './marketing-task.utils';
 
 const REQUEST_TIMEOUT_MS = 10000;
 const MAX_HEADINGS = 15;
@@ -22,7 +30,39 @@ export const detectPageIssues = (page: MarketingPageInspection): string[] => {
   if (page.error) return [`fetch_error: ${page.error}`];
 
   const issues: string[] = [];
-  const { locale } = classifyPage(page.url);
+  const { template, locale } = classifyPage(page.url);
+
+  if (template === SitePageTemplate.app) {
+    return ['not_a_seo_page: logged-in app page, disallowed in robots.txt'];
+  }
+
+  if (page.httpStatus && page.httpStatus !== 200) {
+    issues.push(`http_status: ${page.httpStatus}`);
+  }
+
+  // A locale version kept out of the index on purpose (e.g. /de/tenders/*):
+  // noindex, canonical to /en and no hreflang are expected there. Only check
+  // that this setup holds; its snippet and content do not matter for search.
+  if (!isIndexableLocaleVersion(page.url)) {
+    const enPath = toDefaultLocalePath(page.url);
+
+    if (!/noindex/i.test(page.robots ?? '')) {
+      issues.push(
+        `fallback_locale_indexable: ${locale} version is not meant to be indexed but robots is "${page.robots ?? 'none'}"`,
+      );
+    }
+    if (page.canonical && normalizePagePath(page.canonical) !== enPath) {
+      issues.push(
+        `fallback_locale_canonical: canonical ${page.canonical}, expected ${enPath}`,
+      );
+    }
+    if (page.hreflangs?.length) {
+      issues.push('fallback_locale_has_hreflang');
+    }
+
+    return issues;
+  }
+
   const title = page.title ?? '';
   // Title without ids and the brand suffix: what describes the entity.
   const titleWords = title
@@ -31,9 +71,6 @@ export const detectPageIssues = (page: MarketingPageInspection): string[] => {
     .split(/\s+/)
     .filter((word) => /\p{L}{2,}/u.test(word));
 
-  if (page.httpStatus && page.httpStatus !== 200) {
-    issues.push(`http_status: ${page.httpStatus}`);
-  }
   if (/noindex/i.test(page.robots ?? '')) {
     issues.push(`noindex: ${page.robots}`);
   }

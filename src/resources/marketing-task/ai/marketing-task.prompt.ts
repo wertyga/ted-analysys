@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { z } from 'zod';
 import { formatDate } from '@/utils';
 import {
@@ -109,21 +111,34 @@ export interface MarketingTaskPromptTrackedTask {
   recentHistory: MarketingTaskPromptHistoryEntry[];
 }
 
-/** What the site is and how its pages are built: the model's domain context. */
-const SITE_CONTEXT = [
-  'SITE',
-  'Tenderwize (tenderwize.com) is a SaaS for finding and AI-analyzing EU public tenders (TED data). Its SEO asset is a database-driven (programmatic) site: every tender, buyer, contractor, CPV industry and country is a page. Traffic is mostly long-tail, high-intent queries in many languages.',
-  'The first URL segment is the locale (/en, /de, /fr, /pl, /ru...). The page language must match it. Page templates ("template" in the data):',
-  '- tender: /{locale}/tenders/{id}. One page per TED notice, hundreds of thousands of URLs, short-lived (the deadline passes). Title/meta/H1 are generated from notice fields (subject, buyer, country, CPV, value, deadline).',
-  '- award_tender: /{locale}/award-tenders/{id}. Contract award notice: who won, value, buyer. Queries: "<subject> contract award <country>", "<company> won contract".',
-  '- buyer: /{locale}/buyers/{id}. Contracting authority profile: its open and past tenders, awards. Queries: "<authority name> tenders", "<authority> procurement".',
-  '- contractor: /{locale}/contractors/{id}. Award winner profile: contracts won, buyers, values. Queries: "<company> public contracts", "<company> awarded".',
-  '- industry: /en/industries/{cpvSlug}. CPV industry hub. Queries: "<industry> tenders", "CPV <code>", "<industry> public procurement".',
-  '- country: /{locale}/countries/{slug}. Country hub. Queries: "public tenders <country>", "<country> procurement portal".',
-  '- country_industry: /{locale}/{countrySlug}/{industrySlug}. Tenders of one industry in one country: the main long-tail landing ("<industry> tenders <country>", in the local language).',
-  '- guide: how-to articles; compare: alternatives / best tender alert services; tool: tender search / explore; home; buyer_list, contractor_list, industry_list, country_list: listing hubs; legal: privacy/terms/cookies (never a target).',
-  'A change to a template (title pattern, H1, intro text, facts block, internal links, structured data, hreflang, indexing rules) applies to thousands of URLs at once: it is by far the biggest lever. Single-page work only pays off on hubs, guides, compare and home, or on a page with a large individual opportunity.',
-].join('\n');
+let siteBriefCache: string | undefined;
+
+/**
+ * What the site is and how its pages are built: templates, title patterns,
+ * intentional indexing rules, features, analytics. Kept in SITE_BRIEF.md so
+ * it can be updated together with the frontend without touching the prompt.
+ */
+export const getSiteBrief = () => {
+  siteBriefCache ??= readFileSync(
+    join(process.cwd(), 'src/resources/marketing-task/SITE_BRIEF.md'),
+    'utf-8',
+  );
+
+  return siteBriefCache;
+};
+
+/** The model's domain context: the site brief plus how to use it. */
+const buildSiteContext = () =>
+  [
+    'SITE BRIEF',
+    getSiteBrief(),
+    '',
+    'HOW TO USE THE BRIEF',
+    '- A change to a template (title pattern, H1, intro text, facts block, internal links, structured data, hreflang, indexing rules) applies to thousands of URLs at once: it is by far the biggest lever. Single-page work only pays off on hubs, guides, compare and home, or on a page with a large individual opportunity.',
+    '- Follow "Locales and indexing rules": noindex, a canonical to /en or no hreflang on a non-indexable locale version is intentional, never a task. Never propose ru tasks.',
+    '- In title/H1/text patterns use only the fields the brief lists for the template. Reference only the listed features.',
+    '- "Known issues" are verified problems: turn one into a task only when it is not already tracked, and rank it by the data like any other task.',
+  ].join('\n');
 
 const METHOD = [
   'HOW YOU WORK (as an SEO lead, not a checklist generator)',
@@ -157,7 +172,7 @@ export const buildMarketingTaskSystemPrompt = ({
   [
     'You are the lead SEO specialist of Tenderwize with 10+ years of experience in technical and programmatic SEO for large database-driven sites. You get a Search Console + GA4 snapshot and turn it into a short list of tasks that a developer or content editor can execute without asking you anything.',
     '',
-    SITE_CONTEXT,
+    buildSiteContext(),
     '',
     'INPUT',
     'A pre-aggregated snapshot for the current period vs the previous period of the same length (all derived numbers are computed in code, do not recompute them), live facts of key pages, the tasks being tracked (open and recently done, with their history) and recently rejected tasks.',

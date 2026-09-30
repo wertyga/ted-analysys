@@ -60,9 +60,22 @@ const GUIDE_PATHS = new Set([
 ]);
 const TOOL_PATHS = new Set(['tender-search', 'explore']);
 const LEGAL_PATHS = new Set(['privacy', 'terms', 'cookies']);
+/** Logged-in app and auth routes (disallowed in robots.txt). */
+const APP_PATHS = new Set([
+  'dashboard',
+  'deep-analyses',
+  'opportunities',
+  'wishlist',
+  'settings',
+  'onboarding',
+  'checkout-redirect',
+  'login',
+  'register',
+  'auth',
+  'api',
+]);
 const LIST_TEMPLATES: Record<string, [SitePageTemplate, SitePageTemplate]> = {
   tenders: [SitePageTemplate.tool, SitePageTemplate.tender],
-  'award-tenders': [SitePageTemplate.tool, SitePageTemplate.award_tender],
   buyers: [SitePageTemplate.buyer_list, SitePageTemplate.buyer],
   contractors: [SitePageTemplate.contractor_list, SitePageTemplate.contractor],
   industries: [SitePageTemplate.industry_list, SitePageTemplate.industry],
@@ -86,16 +99,81 @@ export const classifyPage = (
 
   if (!first) return { template: SitePageTemplate.home, locale };
 
+  if (first === 'award-tenders') {
+    // /award-tenders and /award-tenders/country[/{slug}] are the directory.
+    const isAward = second && second !== 'country';
+    return {
+      template: isAward
+        ? SitePageTemplate.award_tender
+        : SitePageTemplate.award_directory,
+      locale,
+    };
+  }
+
   const list = LIST_TEMPLATES[first];
   if (list) return { template: second ? list[1] : list[0], locale };
   if (GUIDE_PATHS.has(first)) return { template: SitePageTemplate.guide, locale };
   if (TOOL_PATHS.has(first)) return { template: SitePageTemplate.tool, locale };
   if (LEGAL_PATHS.has(first)) return { template: SitePageTemplate.legal, locale };
+  if (first === 'pricing') {
+    return { template: SitePageTemplate.pricing, locale };
+  }
+  if (APP_PATHS.has(first)) return { template: SitePageTemplate.app, locale };
   if (second && !third) {
     return { template: SitePageTemplate.country_industry, locale };
   }
 
   return { template: SitePageTemplate.other, locale };
+};
+
+/**
+ * Locales in which a template is indexable, mirroring `INDEXABLE_LOCALES` of
+ * the frontend (`src/lib/seo/locale-indexing.ts`). Other locale versions are
+ * deliberately noindex,follow with a canonical to /en and no hreflang.
+ * Templates missing here (other) have no known rule.
+ */
+const EN_ONLY = ['en'];
+const EN_DE_FR_PL = ['en', 'de', 'fr', 'pl'];
+const INDEXABLE_LOCALES: Partial<Record<SitePageTemplate, string[]>> = {
+  [SitePageTemplate.home]: EN_ONLY,
+  [SitePageTemplate.tender]: EN_ONLY,
+  [SitePageTemplate.award_tender]: EN_ONLY,
+  [SitePageTemplate.award_directory]: EN_DE_FR_PL,
+  [SitePageTemplate.buyer]: EN_ONLY,
+  [SitePageTemplate.buyer_list]: EN_DE_FR_PL,
+  [SitePageTemplate.contractor]: EN_ONLY,
+  [SitePageTemplate.contractor_list]: EN_DE_FR_PL,
+  [SitePageTemplate.industry]: EN_DE_FR_PL,
+  [SitePageTemplate.industry_list]: EN_ONLY,
+  [SitePageTemplate.country]: EN_DE_FR_PL,
+  [SitePageTemplate.country_list]: EN_ONLY,
+  [SitePageTemplate.country_industry]: EN_DE_FR_PL,
+  [SitePageTemplate.guide]: EN_ONLY,
+  [SitePageTemplate.compare]: EN_DE_FR_PL,
+  [SitePageTemplate.tool]: EN_ONLY,
+  [SitePageTemplate.pricing]: EN_ONLY,
+  [SitePageTemplate.legal]: EN_ONLY,
+  [SitePageTemplate.app]: [],
+};
+
+/**
+ * False when the page is a locale version the site keeps out of the index on
+ * purpose (e.g. /de/tenders/{id}); true when it is meant to rank or the rule
+ * is unknown.
+ */
+export const isIndexableLocaleVersion = (pageUrl?: string | null) => {
+  const { template, locale } = classifyPage(pageUrl);
+  const locales = INDEXABLE_LOCALES[template];
+
+  return !locale || !locales || locales.includes(locale);
+};
+
+/** The /en counterpart of a localized page path (/de/tenders/1 -> /en/tenders/1). */
+export const toDefaultLocalePath = (pageUrl?: string | null) => {
+  const { locale } = classifyPage(pageUrl);
+  const path = normalizePagePath(pageUrl);
+
+  return locale ? path.replace(`/${locale}`, '/en') : path;
 };
 
 /**

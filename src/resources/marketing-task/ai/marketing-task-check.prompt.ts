@@ -6,7 +6,10 @@ import {
   MarketingTaskMetrics,
   MarketingTaskMetricsComparison,
 } from '../marketing-task.types';
-import { MarketingTaskPromptHistoryEntry } from './marketing-task.prompt';
+import {
+  getSiteBrief,
+  MarketingTaskPromptHistoryEntry,
+} from './marketing-task.prompt';
 
 export const MARKETING_TASK_CHECK_LLM_SCHEMA = z.object({
   verdict: z.enum(MarketingTaskCheckVerdict),
@@ -52,6 +55,9 @@ export const buildMarketingTaskCheckSystemPrompt = (language: string) =>
   [
     'You are the lead SEO specialist of Tenderwize (tenderwize.com), a SaaS that helps companies find and analyze EU public tenders from TED. The site is database-driven: tender, buyer, contractor, industry, country and country+industry pages are generated from templates.',
     'An admin asked you to check ONE improvement task: is the work done on the live site, and did it have an effect?',
+    '',
+    'SITE BRIEF (templates, title patterns, intentional indexing rules: noindex / canonical to /en on non-indexable locale versions is expected)',
+    getSiteBrief(),
     '',
     'You receive: the task, its history (admin comments about what was done, status changes, earlier reviews and metrics), baseline metrics recorded when the task was created, fresh metrics of exactly this page/query for the recent period and the period before it, and facts extracted from the live HTML of the page.',
     '',
