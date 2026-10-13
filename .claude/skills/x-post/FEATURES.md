@@ -21,6 +21,7 @@ Rules:
 - **Tender analysis** — an instant AI-generated summary of any tender notice (subject, requirements, key dates) without reading the full notice manually.
 - **Deep company-fit analysis** — AI scores a specific tender against a company's own profile and documents, producing a win-likelihood/recommendation and a requirements checklist — not just a generic summary.
 - **Company profile documents** — upload company documents (certificates, past project references, capability statements); the AI reads them to understand what the company can actually deliver, which feeds matching and deep analysis.
+- **Company profile from website** — enter the company's website address and the AI reads its key pages (about, services/products, certifications, references, contact) and pre-fills the company profile: what the company does, CPV categories, countries, certifications, experience. The user reviews and confirms the draft before it is saved, so onboarding takes minutes instead of filling the profile in by hand.
 
 ## Matching & alerts
 

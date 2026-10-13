@@ -19,6 +19,7 @@ import { CodelistModule } from './resources/codelist/codelist.module';
 import { CompanyFilterModule } from './resources/company-filter/company-filter.module';
 import { TenderMatchingModule } from './resources/tender-matching/tender-matching.module';
 import { CompanyProfileDocumentsModule } from './resources/company-profile-documents/company-profile-documents.module';
+import { CompanyProfileWebsiteModule } from './resources/company-profile-website/company-profile-website.module';
 import { CurrencyExchangeRatesModule } from './resources/currency-exchange-rates/currency-exchange-rates.module';
 import { PaymentsModule } from './resources/payments/payments.module';
 import { CouponModule } from './resources/coupon';
@@ -56,6 +57,7 @@ import { MarketingTaskModule } from '@/resources/marketing-task/marketing-task.m
     CompanyFilterModule,
     TenderMatchingModule,
     CompanyProfileDocumentsModule,
+    CompanyProfileWebsiteModule,
     CurrencyExchangeRatesModule,
     PaymentsModule,
     CouponModule,

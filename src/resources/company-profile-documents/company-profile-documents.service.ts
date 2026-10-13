@@ -11,7 +11,6 @@ import {
 import {
   getNormalizedStringArray,
   getOptionalNonNegativeNumber,
-  getOptionalPositiveNumber,
   getOptionalString,
   getSafeErrorMessage,
   getEnumOrNull,
@@ -21,8 +20,8 @@ import {
   sleep,
 } from '@/utils';
 import { CpvService } from '@/resources/cpv/cpv.service';
-import { CurrencySign } from '@/resources/codelist';
 import { COMPANY_PROFILE_DOCUMENT_SYSTEM_PROMPT } from './company-profile-documents.prompt';
+import { normalizeCompanyProfileAiResult } from './company-profile.normalizer';
 import {
   COMPANY_PROFILE_DOCUMENT_ANALYSIS_PROMPT_VERSION,
   COMPANY_PROFILE_SINGLE_DOCUMENT_ANALYSIS_PROMPT,
@@ -30,7 +29,6 @@ import {
 import {
   CompanyDocumentEvidence,
   CompanyProfileDocumentAnalysisResult,
-  CompanyProfileAiResult,
   CompanyProfileDocumentFile,
   CompanyProfileDocumentUploadResult,
 } from './company-profile-documents.types';
@@ -116,7 +114,7 @@ export class CompanyProfileDocumentsService {
       this.extractProfileWithAi(extractedDocuments),
     );
 
-    const profile = this.normalizeProfile(aiResult);
+    const profile = normalizeCompanyProfileAiResult(aiResult);
 
     const [industries, mainServices] = await Promise.all([
       this.cpvService.resolveCpvCodeIds(profile.industries ?? [], true),
@@ -269,19 +267,18 @@ export class CompanyProfileDocumentsService {
     processingAnalysis: CompanyProfileDocumentAnalysisDocument,
   ) {
     try {
-      const response =
-        await this.llmAnalysisService.createGeneralJsonResponse(
-          COMPANY_PROFILE_SINGLE_DOCUMENT_ANALYSIS_PROMPT,
-          [
-            `Document: ${document.file.originalname}`,
-            `MIME type: ${document.file.mimetype || 'unknown'}`,
-            '',
-            document.extraction.aiText.slice(
-              0,
-              COMPANY_PROFILE_DOCUMENTS_CONFIG.context.maxSingleDocumentChars,
-            ),
-          ].join('\n'),
-        );
+      const response = await this.llmAnalysisService.createGeneralJsonResponse(
+        COMPANY_PROFILE_SINGLE_DOCUMENT_ANALYSIS_PROMPT,
+        [
+          `Document: ${document.file.originalname}`,
+          `MIME type: ${document.file.mimetype || 'unknown'}`,
+          '',
+          document.extraction.aiText.slice(
+            0,
+            COMPANY_PROFILE_DOCUMENTS_CONFIG.context.maxSingleDocumentChars,
+          ),
+        ].join('\n'),
+      );
 
       const analysis = this.normalizeDocumentAnalysis(response);
       await this.supersedePreviousDocumentAnalyses(
@@ -391,49 +388,6 @@ export class CompanyProfileDocumentsService {
     return processingAnalysis;
   }
 
-  private normalizeProfile(value: unknown): CompanyProfileAiResult {
-    if (!isRecord(value)) {
-      throw new BadRequestException(
-        'AI profile extraction returned invalid JSON',
-      );
-    }
-
-    return {
-      companyName: getOptionalString(value.companyName),
-      country: getOptionalString(value.country),
-      operatingCountries: Array.from(
-        new Set(getNormalizedStringArray(value.operatingCountries)),
-      ),
-      companySize: getOptionalPositiveNumber(value.companySize),
-      summary: getOptionalString(value.summary),
-      companyDescription: getOptionalString(value.companyDescription),
-      industries: Array.from(
-        new Set(getNormalizedStringArray(value.industries)),
-      ),
-      mainServices: Array.from(
-        new Set(getNormalizedStringArray(value.mainServices)),
-      ),
-      languages: Array.from(
-        new Set(getNormalizedStringArray(value.languages)),
-      ).map((item) => item.toUpperCase()),
-      minDaysBeforeDeadline: getOptionalNonNegativeNumber(
-        value.minDaysBeforeDeadline,
-      ),
-      certifications: Array.from(
-        new Set(getNormalizedStringArray(value.certifications)),
-      ),
-      capabilities: Array.from(
-        new Set(getNormalizedStringArray(value.capabilities)),
-      ),
-      yearsOfExperience: getOptionalNonNegativeNumber(value.yearsOfExperience),
-      publicProcurementExperience:
-        typeof value.publicProcurementExperience === 'boolean'
-          ? value.publicProcurementExperience
-          : undefined,
-      typicalContractSize: this.typicalContractSize(value.typicalContractSize),
-    };
-  }
-
   private normalizeDocumentAnalysis(
     value: unknown,
   ): CompanyProfileDocumentAnalysisResult {
@@ -520,27 +474,4 @@ export class CompanyProfileDocumentsService {
 
     return Math.min(100, score);
   }
-
-  private typicalContractSize(
-    value: unknown,
-  ): CompanyProfileAiResult['typicalContractSize'] | undefined {
-    if (!isRecord(value)) {
-      return undefined;
-    }
-
-    const currency =
-      typeof value.currency === 'string' &&
-      Object.values(CurrencySign).includes(value.currency as CurrencySign)
-        ? (value.currency as CurrencySign)
-        : undefined;
-    const result = {
-      min: getOptionalNonNegativeNumber(value.min),
-      max: getOptionalNonNegativeNumber(value.max),
-      currency,
-    };
-
-    return result.min || result.max || result.currency ? result : undefined;
-  }
 }
-
-
