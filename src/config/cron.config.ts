@@ -13,11 +13,6 @@ export const CRON_CONFIG = {
     daily: '0 8 * * *',
     weekly: '0 8 * * 1',
   },
-  marketingTasks: {
-    weekly: '0 9 * * 1',
-    /** Mid-week, away from the Monday analysis run. */
-    checks: '0 9 * * 4',
-  },
   currencyExchangeRates: {
     syncLatestRates: '30 16 * * *',
   },

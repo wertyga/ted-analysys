@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LlmAnalysisService } from '@/llm/llm-analysis.service';
-import { formatDate, getSafeErrorMessage, shiftDays } from '@/utils';
+import { formatDate } from '@/utils';
 import { MarketingDataService } from '../marketing-data.service';
 import { inspectMarketingPage } from '../marketing-page-inspector';
 import { MarketingTaskModel } from '../schemas/marketing-task.schema';
@@ -14,7 +14,6 @@ import {
   MarketingTaskHistoryActor,
   MarketingTaskHistoryEntry,
   MarketingTaskHistoryType,
-  MarketingTaskStatus,
 } from '../marketing-task.types';
 import {
   classifyPage,
@@ -29,17 +28,6 @@ import {
 
 /** History entries of the task passed to the LLM. */
 const CHECK_HISTORY_ENTRIES = 20;
-
-/**
- * Scheduled checks: done tasks are checked for an effect only once search
- * data can show it, and until the effect had time to settle.
- */
-const DONE_CHECK_FROM_DAYS = 14;
-const DONE_CHECK_UNTIL_DAYS = 56;
-/** A task is not re-checked more often than this. */
-const RECHECK_INTERVAL_DAYS = 7;
-/** Upper bound of checks (LLM calls) per scheduled run. */
-const MAX_CHECKS_PER_RUN = 20;
 
 /**
  * A template task has no pageUrl; the page it was found on is quoted in its
@@ -71,13 +59,6 @@ const findSamplePageUrl = (task: {
   );
 };
 
-export interface CheckDueMarketingTasksResult {
-  checked: number;
-  failed: number;
-  /** Due tasks left for the next run because of MAX_CHECKS_PER_RUN. */
-  postponed: number;
-}
-
 export interface CheckMarketingTaskOptions {
   /** Length of the compared periods in days. */
   days?: number;
@@ -98,80 +79,6 @@ export class MarketingTaskChecker {
     private readonly llmAnalysisService: LlmAnalysisService,
     private readonly configService: ConfigService,
   ) {}
-
-  /**
-   * Checks the tasks where a check can tell something new: in-progress tasks
-   * (is the work on the site yet?) and tasks done 2-8 weeks ago (did it have
-   * an effect?), skipping those checked within the last week. Tasks without a
-   * page, query or template are skipped: there is nothing to inspect for them.
-   */
-  async checkDue(
-    options: CheckMarketingTaskOptions = {},
-  ): Promise<CheckDueMarketingTasksResult> {
-    const now = new Date();
-    const candidates = await MarketingTaskModel.find({
-      $and: [
-        {
-          $or: [
-            { status: MarketingTaskStatus.in_progress },
-            {
-              status: MarketingTaskStatus.done,
-              completedAt: {
-                $gte: shiftDays(now, -DONE_CHECK_UNTIL_DAYS),
-                $lte: shiftDays(now, -DONE_CHECK_FROM_DAYS),
-              },
-            },
-          ],
-        },
-        {
-          $or: [
-            { pageUrl: { $exists: true, $ne: '' } },
-            { query: { $exists: true, $ne: '' } },
-            { template: { $exists: true, $ne: null } },
-          ],
-        },
-      ],
-    })
-      .select('_id history.type history.at')
-      .lean()
-      .exec();
-
-    const recheckAfter = shiftDays(now, -RECHECK_INTERVAL_DAYS).getTime();
-    const lastCheckAt = (task: (typeof candidates)[number]) =>
-      Math.max(
-        0,
-        ...(task.history ?? [])
-          .filter((entry) => entry.type === MarketingTaskHistoryType.check)
-          .map((entry) => new Date(entry.at).getTime()),
-      );
-    // Never-checked and longest-unchecked tasks go first.
-    const due = candidates
-      .map((task) => ({ id: String(task._id), lastCheckAt: lastCheckAt(task) }))
-      .filter((task) => task.lastCheckAt < recheckAfter)
-      .sort((a, b) => a.lastCheckAt - b.lastCheckAt);
-    const batch = due.slice(0, MAX_CHECKS_PER_RUN);
-    let checked = 0;
-    let failed = 0;
-
-    // Sequential on purpose: each check calls the LLM and Google APIs.
-    for (const { id } of batch) {
-      try {
-        await this.check(id, options);
-        checked += 1;
-      } catch (error) {
-        failed += 1;
-        this.logger.error(
-          `Scheduled check of marketing task ${id} failed: ${getSafeErrorMessage(error)}`,
-        );
-      }
-    }
-
-    this.logger.log(
-      `Scheduled marketing task checks: checked ${checked}, failed ${failed}, postponed ${due.length - batch.length}`,
-    );
-
-    return { checked, failed, postponed: due.length - batch.length };
-  }
 
   async check(id: string, { days = 14, language }: CheckMarketingTaskOptions) {
     const task = await MarketingTaskModel.findById(id).lean().exec();

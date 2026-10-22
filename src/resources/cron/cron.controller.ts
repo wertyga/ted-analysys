@@ -11,7 +11,6 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { AdminAccessGuard } from '@/guards';
 import { CurrencyExchangeRatesCronService } from './currency-exchange-rates-cron/currency-exchange-rates-cron.service';
 import { DbCopyTechCron } from './db-copy-cron/db-copy.tech.cron';
-import { MarketingTaskCronService } from './marketing-task-cron/marketing-task-cron.service';
 import { TenderMatchCronService } from './tender-match-cron/tender-match-cron.service';
 import { TendersCronService } from './tenders-cron/tenders-cron.service';
 import { CronSettingsService } from './cron-settings.service';
@@ -23,9 +22,7 @@ type CronTaskId =
   | 'sync-latest-rates'
   | 'send-daily-reports'
   | 'send-weekly-reports'
-  | 'copy-database-dump-to-cdn'
-  | 'generate-marketing-tasks'
-  | 'check-marketing-tasks';
+  | 'copy-database-dump-to-cdn';
 
 type CronTaskDefinition = {
   id: CronTaskId;
@@ -43,8 +40,6 @@ const CRON_TASK_IDS: CronTaskId[] = [
   'send-daily-reports',
   'send-weekly-reports',
   'copy-database-dump-to-cdn',
-  'generate-marketing-tasks',
-  'check-marketing-tasks',
 ];
 
 @ApiTags('Admin Cron')
@@ -56,7 +51,6 @@ export class CronController {
     private readonly currencyExchangeRatesCronService: CurrencyExchangeRatesCronService,
     private readonly cronSettingsService: CronSettingsService,
     private readonly dbCopyTechCron: DbCopyTechCron,
-    private readonly marketingTaskCronService: MarketingTaskCronService,
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly tenderMatchCronService: TenderMatchCronService,
     private readonly tendersCronService: TendersCronService,
@@ -208,26 +202,6 @@ export class CronController {
         title: 'Copy database dump to CDN',
         description: 'Create a MongoDB dump and upload it to CDN.',
         run: async () => this.dbCopyTechCron.startCopyDatabaseDumpToCdn(),
-      },
-      {
-        id: 'generate-marketing-tasks',
-        title: 'Generate marketing tasks',
-        description:
-          'Analyze Search Console + GA4 data with AI, create tasks and review tracked ones.',
-        scheduled: true,
-        run: () => this.marketingTaskCronService.generateMarketingTasks(),
-      },
-      {
-        id: 'check-marketing-tasks',
-        title: 'Check marketing tasks',
-        description:
-          'AI-check in-progress tasks and tasks done 2-8 weeks ago (live page + metrics); results go to task history.',
-        scheduled: true,
-        // Up to ~20 LLM checks: runs in the background instead of holding the request.
-        run: async () => {
-          void this.marketingTaskCronService.checkMarketingTasks();
-          return { started: true };
-        },
       },
     ];
   }

@@ -34,16 +34,6 @@
       title: 'Copy database dump to CDN',
       description: 'Create and upload a database dump.',
     },
-    {
-      id: 'generate-marketing-tasks',
-      title: 'Generate marketing tasks',
-      description: 'Analyze Search Console + GA4 data with AI and create tasks.',
-    },
-    {
-      id: 'check-marketing-tasks',
-      title: 'Check marketing tasks',
-      description: 'AI-check in-progress and recently done tasks (live page + metrics).',
-    },
   ];
 
   var state = {
