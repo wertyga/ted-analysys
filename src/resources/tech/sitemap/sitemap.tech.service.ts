@@ -21,6 +21,7 @@ import {
 import {
   getCountryCpvKey,
   getIndexableScopes,
+  INDEXABLE_CONTRACTOR_FILTER,
 } from '@/resources/seo/page-indexability';
 
 type IndexableScopes = Awaited<ReturnType<typeof getIndexableScopes>>;
@@ -551,7 +552,7 @@ export class SitemapTechService {
       SitePageTemplate.contractor,
     );
 
-    const cursor = ContractorModel.find({})
+    const cursor = ContractorModel.find(INDEXABLE_CONTRACTOR_FILTER)
       .select('_id updatedAt')
       .lean<SitemapContractor>()
       .cursor();

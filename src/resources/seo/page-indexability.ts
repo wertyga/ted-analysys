@@ -127,3 +127,11 @@ export async function getIndexableScopes(now = new Date()) {
 
   return { countries, cpvCodes, countryCpvKeys };
 }
+
+// Contractor pages without a name all get the same title, so only named
+// contractors are indexable (detail endpoint `indexable` and the sitemap)
+export const INDEXABLE_CONTRACTOR_FILTER = { name: { $nin: [null, ''] } };
+
+export function isContractorIndexable(contractor: { name?: string | null }) {
+  return !!contractor.name?.trim();
+}

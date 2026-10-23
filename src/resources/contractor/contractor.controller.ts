@@ -18,6 +18,7 @@ import {
   AwardTenderListDto,
   AwardTenderModel,
 } from '@/resources/award-tender/schemas';
+import { isContractorIndexable } from '@/resources/seo/page-indexability';
 
 @ApiTags('contractors')
 @Controller('contractors')
@@ -74,6 +75,7 @@ export class ContractorController {
   async getContractorById(@Param('id') id: string): Promise<{
     contractor: ContractorDetailDto;
     awardTendersWithWonLots: Omit<AwardTenderListDto, 'winners'>[];
+    indexable: boolean;
   }> {
     const { contractor, awardTenders } =
       await this.contractorService.getContractorById(id);
@@ -93,6 +95,7 @@ export class ContractorController {
             }),
         };
       }),
+      indexable: isContractorIndexable(contractor),
     };
   }
 }
