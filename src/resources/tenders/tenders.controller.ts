@@ -18,6 +18,7 @@ import { TariffType } from '@/resources/tariff/tariff.types';
 import { TenderGeneralAnalysisService } from '@/resources/tender-analysis/tender-general-analysis.service';
 import { TenderGeneralAnalysisDetailDto } from '@/resources/tender-analysis/dto/tender-general-analysis.dto';
 import { logger } from '@/utils';
+import { isTenderIndexable } from '@/resources/seo/page-indexability';
 
 @ApiTags('tenders')
 @Controller('tenders')
@@ -37,7 +38,7 @@ export class TendersController {
     @Param('id') id: string,
     @Query('withGA') withGA: boolean,
     @Req() req,
-  ): Promise<TenderDetailDto> {
+  ): Promise<TenderDetailDto & { indexable: boolean }> {
     const withoutBaseAnalysisGenerating = !withGA || req.isBot;
 
     if (withGA) {
@@ -83,6 +84,7 @@ export class TendersController {
     return {
       ...tenderSerialized,
       generalAnalysis,
+      indexable: isTenderIndexable(tenderSerialized),
     };
   }
 }

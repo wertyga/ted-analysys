@@ -21,6 +21,7 @@ import {
 import {
   getCountryCpvKey,
   getIndexableScopes,
+  getIndexableTenderFilter,
   INDEXABLE_CONTRACTOR_FILTER,
 } from '@/resources/seo/page-indexability';
 
@@ -162,12 +163,22 @@ export class SitemapTechService {
     });
     sitemapFiles.push(...countryIndustryResult.files);
 
+    // Award tender, buyer and contractor files are still generated but not
+    // listed in the index, so search engines do not crawl them from it
+    const unlistedSitemapFiles = new Set([
+      ...awardTenderResult.files,
+      ...buyersResult.files,
+      ...contractorsResult.files,
+    ]);
+
     await writeFile(
       outputPath,
       this.buildSitemapIndexXml(
-        sitemapFiles.map((file) => ({
-          loc: file.loc,
-        })),
+        sitemapFiles
+          .filter((file) => !unlistedSitemapFiles.has(file))
+          .map((file) => ({
+            loc: file.loc,
+          })),
       ),
       'utf8',
     );
@@ -253,6 +264,7 @@ export class SitemapTechService {
 
     const cursor = TenderModel.find({
       id: { $exists: true, $ne: null },
+      ...getIndexableTenderFilter(),
     })
       .select('id updatedAt')
       .lean<SitemapTender>()

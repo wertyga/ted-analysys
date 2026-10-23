@@ -135,3 +135,39 @@ export const INDEXABLE_CONTRACTOR_FILTER = { name: { $nin: [null, ''] } };
 export function isContractorIndexable(contractor: { name?: string | null }) {
   return !!contractor.name?.trim();
 }
+
+const TENDER_INDEXABLE_DAYS_AFTER_DEADLINE = 60;
+
+// Tender pages stay indexable while open and for 60 days after the deadline
+// (detail endpoint `indexable` and the sitemap). Tenders without a deadline
+// are treated as open
+function getTenderIndexableDeadlineFrom(now = new Date()) {
+  const deadlineFrom = new Date(now);
+  deadlineFrom.setDate(
+    deadlineFrom.getDate() - TENDER_INDEXABLE_DAYS_AFTER_DEADLINE,
+  );
+
+  return deadlineFrom;
+}
+
+export function getIndexableTenderFilter(now = new Date()) {
+  return {
+    $or: [
+      { submissionDeadline: null },
+      { submissionDeadline: { $gte: getTenderIndexableDeadlineFrom(now) } },
+    ],
+  };
+}
+
+export function isTenderIndexable(
+  tender: { submissionDeadline?: Date | string | null },
+  now = new Date(),
+) {
+  if (!tender.submissionDeadline) {
+    return true;
+  }
+
+  return (
+    new Date(tender.submissionDeadline) >= getTenderIndexableDeadlineFrom(now)
+  );
+}
