@@ -18,6 +18,5 @@ export const STATIC_SITEMAP_PATHS: ReadonlyArray<{ path: string }> = [
   { path: 'compare/best-tender-alert-services-europe' },
 
   { path: 'privacy' },
-  { path: 'terms' },
   { path: 'cookies' },
 ];
