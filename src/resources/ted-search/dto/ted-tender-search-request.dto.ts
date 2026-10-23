@@ -270,10 +270,19 @@ export class TedTenderSearchRequestDto implements TedTenderSearchFilters {
   @Min(0)
   contractAwardTo?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: [String], example: ['722696-2026'] })
   @IsOptional()
   @IsArray()
+  @Transform(({ value }) => normalizeTrimmedStringInput(value))
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
   tenderIds?: string[];
+}
+
+function normalizeTrimmedStringInput(value: unknown): unknown {
+  return normalizeArrayInput(value, (item) =>
+    typeof item === 'string' ? item.trim() : item,
+  );
 }
 
 function normalizeCountryInput(value: unknown): unknown {
