@@ -14,6 +14,7 @@ import { TenderDocument, TenderModel } from '@/resources/tenders/schemas';
 import { TenderGeneralAnalysisService } from '@/resources/tender-analysis/tender-general-analysis.service';
 import { TenderGeneralAnalysisModel } from '@/resources/tender-analysis/schemas';
 import { logger } from '@/utils';
+import { isPageIndexable } from '@/resources/seo/page-indexability';
 
 @ApiTags('ted')
 @Controller('ted')
@@ -61,15 +62,21 @@ export class TedSearchController {
   async searchLocalPureTenders(
     @Body() body: TedTenderSearchRequestDto,
   ): Promise<TedSearchResponse> {
-    const { tenders, count } =
-      await this.tedSearchService.searchTendersForPureList(
+    const [{ tenders, count }, indexable] = await Promise.all([
+      this.tedSearchService.searchTendersForPureList(
         body,
         TENDER_SEARCH_PURE_RESPONSE_SELECT,
-      );
+      ),
+      isPageIndexable({
+        cpvCodes: body.cpvCodes,
+        placeOfPerformance: body.placeOfPerformance,
+      }),
+    ]);
 
     return {
       notices: tenders as unknown as TedSearchResponse['notices'],
       totalNoticeCount: count,
+      indexable,
     };
   }
 

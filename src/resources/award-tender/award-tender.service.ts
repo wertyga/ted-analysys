@@ -53,6 +53,7 @@ import {
   AwardTenderSortBy,
   AwardTenderSortOrder,
 } from './dto/award-tender-list-request.dto';
+import { isPageIndexable } from '@/resources/seo/page-indexability';
 
 export type AwardTenderPureSearchFilters = Pick<
   TedTenderSearchRequestDto,
@@ -68,6 +69,7 @@ const AWARD_TENDER_PURE_LIST_SELECT = [
   'placeOfPerformanceCountries',
   'awardValue',
   'awardValueEur',
+  'awardDate',
 ];
 
 const AWARD_LIST_SELECT = [
@@ -196,6 +198,10 @@ export class AwardTenderService {
   async searchAwardTendersLocalPure(
     filters: AwardTenderPureSearchFilters = {},
     pagination: { page?: number; limit?: number } = {},
+    sorting: {
+      sortBy?: AwardTenderSortBy;
+      sortOrder?: AwardTenderSortOrder;
+    } = {},
   ) {
     const { awardDateFrom, ...tenderFilters } = filters;
     const baseQuery = (await this.tedSearchFilters.buildLocalTenderQuery(
@@ -206,26 +212,70 @@ export class AwardTenderService {
       : baseQuery;
 
     const { skip, limit } = getPaginationMeta(pagination);
-    const [awardTenders, totalCount] = await Promise.all([
-      AwardTenderModel.find(query)
-        .select(AWARD_TENDER_PURE_LIST_SELECT)
-        .sort({ publicationDate: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean()
-        .exec(),
+    const [awardTenders, totalCount, indexable] = await Promise.all([
+      sorting.sortBy
+        ? this.findSortedAwards(query, {
+            ...sorting,
+            sortBy: sorting.sortBy,
+            skip,
+            limit,
+            select: AWARD_TENDER_PURE_LIST_SELECT,
+          })
+        : AwardTenderModel.find(query)
+            .select(AWARD_TENDER_PURE_LIST_SELECT)
+            .sort({ publicationDate: -1 })
+            .skip(skip)
+            .limit(limit)
+            .lean()
+            .exec(),
       AwardTenderModel.countDocuments(query),
+      isPageIndexable(filters),
     ]);
 
     return {
       totalNoticeCount: totalCount,
       notices: awardTenders,
+      indexable,
     };
   }
 
   async listAwards(query: AwardTenderListRequestDto) {
-    const sortBy = query.sortBy ?? AwardTenderSortBy.AWARD_DATE;
-    const direction = query.sortOrder === AwardTenderSortOrder.ASC ? 1 : -1;
+    const filter = await this.buildAwardsFilter(query);
+    const { skip, limit } = getPaginationMeta(query);
+
+    const [total, items] = await Promise.all([
+      AwardTenderModel.countDocuments(filter),
+      this.findSortedAwards(filter, {
+        sortBy: query.sortBy ?? AwardTenderSortBy.AWARD_DATE,
+        sortOrder: query.sortOrder,
+        skip,
+        limit,
+        select: AWARD_LIST_SELECT,
+        populate: AWARD_LIST_POPULATE,
+      }),
+    ]);
+
+    return {
+      total,
+      results: items.map((tender) =>
+        this.serializeAwardListItem(tender as unknown as AwardListLeanItem),
+      ),
+    };
+  }
+
+  private async findSortedAwards(
+    filter: QueryFilter<AwardTenderDocument>,
+    options: {
+      sortBy: AwardTenderSortBy;
+      sortOrder?: AwardTenderSortOrder;
+      skip: number;
+      limit: number;
+      select: string[];
+      populate?: typeof AWARD_LIST_POPULATE;
+    },
+  ) {
+    const { sortBy, skip, limit } = options;
+    const direction = options.sortOrder === AwardTenderSortOrder.ASC ? 1 : -1;
     const sortField =
       sortBy === AwardTenderSortBy.VALUE ? 'awardValueEur' : 'awardDate';
     // Zero award values are placeholders, they go to the end with nulls
@@ -234,35 +284,33 @@ export class AwardTenderService {
         ? { awardValueEur: { $gt: 0 } }
         : { awardDate: { $ne: null } };
 
-    const filter = await this.buildAwardsFilter(query);
-    const { skip, limit } = getPaginationMeta(query);
-
     // Mongo puts nulls first in ascending order, so records without the sort
     // value are paged separately after the ones with it, in both directions
     const withValue = { $and: [filter, hasSortValue] };
     const withoutValue = { $and: [filter, { $nor: [hasSortValue] }] };
 
-    const [total, withValueCount] = await Promise.all([
-      AwardTenderModel.countDocuments(filter),
-      AwardTenderModel.countDocuments(withValue),
-    ]);
+    const withValueCount = await AwardTenderModel.countDocuments(withValue);
 
     const findPage = (
       pageFilter: QueryFilter<AwardTenderDocument>,
       pageSkip: number,
       pageLimit: number,
       sort: Record<string, 1 | -1>,
-    ) =>
-      pageLimit > 0
-        ? AwardTenderModel.find(pageFilter)
-            .select(AWARD_LIST_SELECT)
-            .sort(sort)
-            .skip(pageSkip)
-            .limit(pageLimit)
-            .populate(AWARD_LIST_POPULATE)
-            .lean()
-            .exec()
-        : Promise.resolve([]);
+    ) => {
+      if (pageLimit <= 0) return Promise.resolve([]);
+
+      const pageQuery = AwardTenderModel.find(pageFilter)
+        .select(options.select)
+        .sort(sort)
+        .skip(pageSkip)
+        .limit(pageLimit);
+
+      return (
+        options.populate ? pageQuery.populate(options.populate) : pageQuery
+      )
+        .lean()
+        .exec();
+    };
 
     const withValueLimit = Math.max(0, Math.min(limit, withValueCount - skip));
     const [withValueItems, withoutValueItems] = await Promise.all([
@@ -278,12 +326,7 @@ export class AwardTenderService {
       ),
     ]);
 
-    return {
-      total,
-      results: [...withValueItems, ...withoutValueItems].map((tender) =>
-        this.serializeAwardListItem(tender as unknown as AwardListLeanItem),
-      ),
-    };
+    return [...withValueItems, ...withoutValueItems];
   }
 
   async getAwardsStats(query: AwardTenderFiltersRequestDto) {

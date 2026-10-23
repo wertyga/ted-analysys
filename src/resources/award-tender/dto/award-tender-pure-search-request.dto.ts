@@ -19,6 +19,10 @@ import {
   TED_ELIGIBLE_COUNTRY_CODES,
   type TedEligibleCountryCode,
 } from '@/resources/codelist';
+import {
+  AwardTenderSortBy,
+  AwardTenderSortOrder,
+} from './award-tender-list-request.dto';
 
 function normalizeCountryInput(value: unknown): unknown {
   const items = Array.isArray(value) ? value : [value];
@@ -76,6 +80,24 @@ export class AwardTenderPureSearchRequestDto {
   @IsOptional()
   @IsDateString()
   awardDateFrom?: string;
+
+  @ApiPropertyOptional({
+    enum: AwardTenderSortBy,
+    example: AwardTenderSortBy.AWARD_DATE,
+    description:
+      'Without it awards are sorted by publicationDate desc. Awards without the sort value go last.',
+  })
+  @IsOptional()
+  @IsEnum(AwardTenderSortBy)
+  sortBy?: AwardTenderSortBy;
+
+  @ApiPropertyOptional({
+    enum: AwardTenderSortOrder,
+    default: AwardTenderSortOrder.DESC,
+  })
+  @IsOptional()
+  @IsEnum(AwardTenderSortOrder)
+  sortOrder?: AwardTenderSortOrder;
 
   @ApiPropertyOptional({ example: 20, minimum: 1, maximum: 100 })
   @IsOptional()

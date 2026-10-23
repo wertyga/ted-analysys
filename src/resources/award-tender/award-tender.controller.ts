@@ -77,6 +77,10 @@ export class AwardTenderController {
         page: query.page,
         limit: query.limit,
       },
+      {
+        sortBy: query.sortBy,
+        sortOrder: query.sortOrder,
+      },
     );
   }
 

@@ -27,6 +27,8 @@ export interface TedNotice {
 export interface TedSearchResponse {
   notices: TedNotice[];
   totalNoticeCount?: number;
+  // Content gate for SEO pages, see seo/page-indexability.ts
+  indexable?: boolean;
   iterationNextToken?: string;
   nextPageToken?: string;
   [key: string]: unknown;

@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import CPV_INDUSTRIES from './cpv-obj.json';
 import { STATIC_SITEMAP_PATHS } from './static-pages';
-import { COUNTRY_DATA, EUROPEAN_CODES } from './countries';
+import { COUNTRY_DATA } from './countries';
 import { existsSync } from 'fs';
 import { mkdir, writeFile } from 'fs/promises';
 import { basename, dirname, isAbsolute, join, normalize, relative } from 'path';
@@ -18,6 +18,12 @@ import {
   getIndexableLocales,
   isIndexableLocaleVersion,
 } from '@/resources/marketing-task/marketing-task.utils';
+import {
+  getCountryCpvKey,
+  getIndexableScopes,
+} from '@/resources/seo/page-indexability';
+
+type IndexableScopes = Awaited<ReturnType<typeof getIndexableScopes>>;
 
 type SitemapTender = {
   id?: string;
@@ -122,11 +128,13 @@ export class SitemapTechService {
     });
     sitemapFiles.push(...contractorsResult.files);
 
+    const indexableScopes = await getIndexableScopes();
+
     const industryResult = await this.writeSitemapEntityFiles({
       domain,
       outputDir,
       entityName: 'industries',
-      urls: await this.buildCpvIndustrySitemapUrls(domain, locales),
+      urls: this.buildCpvIndustrySitemapUrls(domain, locales, indexableScopes),
       maxUrlsPerFile,
     });
     sitemapFiles.push(...industryResult.files);
@@ -135,7 +143,7 @@ export class SitemapTechService {
       domain,
       outputDir,
       entityName: 'countries',
-      urls: await this.buildCountrySitemapUrls(domain, locales),
+      urls: this.buildCountrySitemapUrls(domain, locales, indexableScopes),
       maxUrlsPerFile,
     });
     sitemapFiles.push(...countryResult.files);
@@ -144,7 +152,11 @@ export class SitemapTechService {
       domain,
       outputDir,
       entityName: 'country-industries',
-      urls: await this.buildCountryIndustrySitemapUrls(domain, locales),
+      urls: this.buildCountryIndustrySitemapUrls(
+        domain,
+        locales,
+        indexableScopes,
+      ),
       maxUrlsPerFile,
     });
     sitemapFiles.push(...countryIndustryResult.files);
@@ -616,10 +628,11 @@ export class SitemapTechService {
     return downloadPath;
   }
 
-  private async buildCpvIndustrySitemapUrls(
+  private buildCpvIndustrySitemapUrls(
     domain: string,
     locales: string[],
-  ): Promise<SitemapUrl[]> {
+    scopes: IndexableScopes,
+  ): SitemapUrl[] {
     const industryLocales = this.getTemplateLocales(
       locales,
       SitePageTemplate.industry,
@@ -627,28 +640,9 @@ export class SitemapTechService {
 
     if (!industryLocales.length) return [];
 
-    const cursor = TenderModel.find({
-      'cpvCodes.0': { $exists: true },
-    })
-      .select('cpvCodes')
-      .lean<{ cpvCodes?: string[] }>()
-      .cursor();
-
-    const industryCodeSet = new Set<string>();
-
-    for await (const tender of cursor) {
-      for (const cpvCode of tender.cpvCodes || []) {
-        for (const indexableCpvCode of this.getIndexableCpvIndustryCodes(
-          cpvCode,
-        )) {
-          industryCodeSet.add(indexableCpvCode);
-        }
-      }
-    }
-
-    const industries = Array.from(industryCodeSet)
-      .map((code) => CPV_INDUSTRIES[code])
-      .filter((industry) => industry?.slug);
+    const industries = Array.from(scopes.cpvCodes)
+      .map((code) => this.getSitemapIndustry(code))
+      .filter(Boolean);
 
     return industryLocales.flatMap((locale) =>
       industries.map((industry) => ({
@@ -659,10 +653,11 @@ export class SitemapTechService {
     );
   }
 
-  private async buildCountrySitemapUrls(
+  private buildCountrySitemapUrls(
     domain: string,
     locales: string[],
-  ): Promise<SitemapUrl[]> {
+    scopes: IndexableScopes,
+  ): SitemapUrl[] {
     const countryLocales = this.getTemplateLocales(
       locales,
       SitePageTemplate.country,
@@ -670,48 +665,22 @@ export class SitemapTechService {
 
     if (!countryLocales.length) return [];
 
-    const countryCodeSet = new Set<string>();
+    const slugs = Array.from(scopes.countries)
+      .map((countryCode) => COUNTRY_DATA[countryCode]?.slug)
+      .filter(Boolean);
 
-    for (const countryCode of EUROPEAN_CODES) {
-      if (COUNTRY_DATA[countryCode]?.slug) {
-        countryCodeSet.add(countryCode);
-      }
-    }
-
-    const cursor = TenderModel.find({
-      'placeOfPerformanceCountries.0': { $exists: true },
-    })
-      .select('placeOfPerformanceCountries')
-      .lean<{ placeOfPerformanceCountries?: string[] }>()
-      .cursor();
-
-    for await (const tender of cursor) {
-      for (const countryCode of tender.placeOfPerformanceCountries || []) {
-        if (COUNTRY_DATA[countryCode]?.slug) {
-          countryCodeSet.add(countryCode);
-        }
-      }
-    }
-
-    const urls = new Set<string>();
-
-    for (const locale of countryLocales) {
-      for (const countryCode of countryCodeSet) {
-        const slug = COUNTRY_DATA[countryCode]?.slug;
-
-        if (!slug) continue;
-
-        urls.add(`${domain}/${locale}/countries/${encodeURIComponent(slug)}`);
-      }
-    }
-
-    return Array.from(urls).map((loc) => ({ loc }));
+    return countryLocales.flatMap((locale) =>
+      slugs.map((slug) => ({
+        loc: `${domain}/${locale}/countries/${encodeURIComponent(slug)}`,
+      })),
+    );
   }
 
-  private async buildCountryIndustrySitemapUrls(
+  private buildCountryIndustrySitemapUrls(
     domain: string,
     locales: string[],
-  ): Promise<SitemapUrl[]> {
+    scopes: IndexableScopes,
+  ): SitemapUrl[] {
     const countryIndustryLocales = this.getTemplateLocales(
       locales,
       SitePageTemplate.country_industry,
@@ -719,49 +688,35 @@ export class SitemapTechService {
 
     if (!countryIndustryLocales.length) return [];
 
-    const cursor = TenderModel.find({
-      'placeOfPerformanceCountries.0': { $exists: true },
-      'cpvCodes.0': { $exists: true },
-    })
-      .select('placeOfPerformanceCountries cpvCodes')
-      .lean<{
-        placeOfPerformanceCountries?: string[];
-        cpvCodes?: string[];
-      }>()
-      .cursor();
+    const urls: SitemapUrl[] = [];
 
-    const urlSet = new Set<string>();
+    for (const countryCode of scopes.countries) {
+      const countrySlug = COUNTRY_DATA[countryCode]?.slug;
 
-    for await (const tender of cursor) {
-      const countries = tender.placeOfPerformanceCountries || [];
-      const cpvCodes = tender.cpvCodes || [];
+      if (!countrySlug) continue;
 
-      for (const countryCode of countries) {
-        const countrySlug = COUNTRY_DATA[countryCode]?.slug;
+      for (const cpvCode of scopes.cpvCodes) {
+        if (
+          !scopes.countryCpvKeys.has(getCountryCpvKey(countryCode, cpvCode))
+        ) {
+          continue;
+        }
 
-        if (!countrySlug) continue;
+        const industry = this.getSitemapIndustry(cpvCode);
 
-        for (const cpvCode of cpvCodes) {
-          for (const indexableCpvCode of this.getIndexableCpvIndustryCodes(
-            cpvCode,
-          )) {
-            const industry = CPV_INDUSTRIES[indexableCpvCode];
+        if (!industry) continue;
 
-            if (!industry?.slug) continue;
-
-            for (const locale of countryIndustryLocales) {
-              urlSet.add(
-                `${domain}/${locale}/${encodeURIComponent(
-                  countrySlug,
-                )}/${encodeURIComponent(industry.slug)}`,
-              );
-            }
-          }
+        for (const locale of countryIndustryLocales) {
+          urls.push({
+            loc: `${domain}/${locale}/${encodeURIComponent(
+              countrySlug,
+            )}/${encodeURIComponent(industry.slug)}`,
+          });
         }
       }
     }
 
-    return Array.from(urlSet).map((loc) => ({ loc }));
+    return urls;
   }
 
   // Requested locales in which the template is indexable, see SITE_BRIEF.md
@@ -773,24 +728,13 @@ export class SitemapTechService {
       : locales;
   }
 
-  private getIndexableCpvIndustryCodes(cpvCode: string) {
-    const normalized = String(cpvCode || '').trim();
+  // Industry pages listed in the sitemap: CPV levels 2–4 with a slug
+  private getSitemapIndustry(cpvCode: string) {
+    const industry = CPV_INDUSTRIES[cpvCode];
 
-    if (!/^\d{8}$/.test(normalized)) {
-      return [];
-    }
-
-    const candidates = [
-      normalized.slice(0, 2) + '000000',
-      normalized.slice(0, 3) + '00000',
-      normalized.slice(0, 4) + '0000',
-    ];
-
-    return Array.from(new Set(candidates)).filter((code) => {
-      const industry = CPV_INDUSTRIES[code];
-
-      return industry?.slug && industry.level >= 2 && industry.level <= 4;
-    });
+    return industry?.slug && industry.level >= 2 && industry.level <= 4
+      ? industry
+      : undefined;
   }
 
   private buildSitemapXml(urls: SitemapUrl[]) {
