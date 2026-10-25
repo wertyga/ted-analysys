@@ -9,8 +9,11 @@ import {
 // Single source of the content gate for country / industry / country_industry
 // pages (SITE_BRIEF.md): a page is indexable when its scope has an active
 // tender, a tender closed in the last 365 days or an award in the last
-// 12 months. search-pure endpoints return it as `indexable`, the sitemap
-// includes only indexable URLs.
+// 12 months. country_industry pages (country + cpv) need at least
+// COUNTRY_INDUSTRY_MIN_PROCUREMENTS of those together. search-pure endpoints
+// return it as `indexable`, the sitemap includes only indexable URLs.
+
+export const COUNTRY_INDUSTRY_MIN_PROCUREMENTS = 10;
 
 export type PageIndexabilityScope = {
   cpvCodes?: string[];
@@ -48,7 +51,7 @@ function buildScopeFilter(scope: PageIndexabilityScope) {
     parts.push({ placeOfPerformanceCountries: { $in: countries } });
   }
 
-  return parts;
+  return { parts, isCountryIndustry: !!cpvCodes.length && !!countries.length };
 }
 
 export async function isPageIndexable(
@@ -56,7 +59,28 @@ export async function isPageIndexable(
   now = new Date(),
 ): Promise<boolean> {
   const { tenderDeadlineFrom, awardDateFrom } = getIndexabilityWindows(now);
-  const scopeFilter = buildScopeFilter(scope);
+  const { parts: scopeFilter, isCountryIndustry } = buildScopeFilter(scope);
+
+  if (isCountryIndustry) {
+    const limit = COUNTRY_INDUSTRY_MIN_PROCUREMENTS;
+    const [tenders, awards] = await Promise.all([
+      TenderModel.countDocuments(
+        {
+          $and: [
+            ...scopeFilter,
+            { submissionDeadline: { $gte: tenderDeadlineFrom } },
+          ],
+        },
+        { limit },
+      ),
+      AwardTenderModel.countDocuments(
+        { $and: [...scopeFilter, { awardDate: { $gte: awardDateFrom } }] },
+        { limit },
+      ),
+    ]);
+
+    return tenders + awards >= limit;
+  }
 
   const [tender, award] = await Promise.all([
     TenderModel.exists({
@@ -77,18 +101,19 @@ export function getCountryCpvKey(countryCode: string, cpvCode: string) {
   return `${countryCode}|${cpvCode}`;
 }
 
-// Bulk variant of isPageIndexable for the sitemap: every country, cpv code
-// and country + cpv code pair that has qualifying tenders or awards
+// Bulk variant of isPageIndexable for the sitemap: every country and cpv code
+// that has qualifying tenders or awards, and every country + cpv code pair
+// with at least COUNTRY_INDUSTRY_MIN_PROCUREMENTS of them
 export async function getIndexableScopes(now = new Date()) {
   const { tenderDeadlineFrom, awardDateFrom } = getIndexabilityWindows(now);
 
   const countries = new Set<string>();
   const cpvCodes = new Set<string>();
-  const countryCpvKeys = new Set<string>();
+  const countryCpvCounts = new Map<string, number>();
 
   const collect = (doc: ScopeDocument) => {
-    const docCountries = doc.placeOfPerformanceCountries ?? [];
-    const docCpvCodes = doc.cpvCodes ?? [];
+    const docCountries = new Set(doc.placeOfPerformanceCountries ?? []);
+    const docCpvCodes = new Set(doc.cpvCodes ?? []);
 
     for (const countryCode of docCountries) {
       countries.add(countryCode);
@@ -98,7 +123,8 @@ export async function getIndexableScopes(now = new Date()) {
       cpvCodes.add(cpvCode);
 
       for (const countryCode of docCountries) {
-        countryCpvKeys.add(getCountryCpvKey(countryCode, cpvCode));
+        const key = getCountryCpvKey(countryCode, cpvCode);
+        countryCpvCounts.set(key, (countryCpvCounts.get(key) ?? 0) + 1);
       }
     }
   };
@@ -123,6 +149,14 @@ export async function getIndexableScopes(now = new Date()) {
 
   for await (const award of awardCursor) {
     collect(award);
+  }
+
+  const countryCpvKeys = new Set<string>();
+
+  for (const [key, count] of countryCpvCounts) {
+    if (count >= COUNTRY_INDUSTRY_MIN_PROCUREMENTS) {
+      countryCpvKeys.add(key);
+    }
   }
 
   return { countries, cpvCodes, countryCpvKeys };

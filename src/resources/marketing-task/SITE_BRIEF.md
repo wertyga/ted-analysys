@@ -39,7 +39,7 @@ URL locale prefix is mandatory: `en | de | fr | pl | ru`. `/` 308-redirects to `
 - The same map is mirrored in the backend (`INDEXABLE_LOCALES` in `marketing-task.utils.ts`): on such pages the inspected `issues` only report deviations from this setup (`fallback_locale_indexable`, `fallback_locale_canonical`, `fallback_locale_has_hreflang`).
 - Non-indexable locale versions are **deliberately** `noindex,follow`, have **no hreflang** and a **canonical to the `/en` version**. So `noindex`, `canonical_to_other_url` and `no_hreflang` on e.g. `/de/tenders/*`, `/fr/buyers/*`, `/pl/guides` are expected, not bugs. Their body content is often English fallback.
 - `ru` is never indexable (business decision 2026-07), even where Russian copy exists. Never propose ru SEO tasks.
-- Content gates (indexable locale but `noindex` with self-canonical): country/industry/country_industry pages with no active tenders, no tenders closed in 12 months and no awards in 12 months; unknown buyer/contractor/award ids; `/award-tenders?page=N` with N > 20 or any filter; `/award-tenders/country/{slug}` with fewer than 10 awards. Missing tender → real 404.
+- Content gates (indexable locale but `noindex` with self-canonical): country/industry pages with no active tenders, no tenders closed in 12 months and no awards in 12 months; country_industry pages with fewer than 10 of those together (active + closed in 12 months + awards in 12 months); unknown buyer/contractor/award ids; `/award-tenders?page=N` with N > 20 or any filter; `/award-tenders/country/{slug}` with fewer than 10 awards. Missing tender → real 404.
 - Indexable pages emit hreflang for their indexable locales + `x-default` = `/en`.
 - robots.txt disallows private app pages: dashboard, deep-analyses, opportunities, wishlist, settings, onboarding, checkout-redirect, login, register, `/auth/`, `/api/`.
 
@@ -89,7 +89,7 @@ URL locale prefix is mandatory: `en | de | fr | pl | ru`. `/` 308-redirects to `
 - Main long-tail landing ("{industry} tenders {country}").
 - Title: `{Industry} Tenders in {Country} | Tenderwize` (de `{Industry}-Ausschreibungen in {Country}`, fr `Appels d'offres {industry} en {country}`, pl `Przetargi na {industry} w {country}`). Meta: `Find {industry} tenders in {country}. Browse active public procurement opportunities, CPV codes, deadlines and AI tender analysis with Tenderwize.`
 - Blocks: H1; Market overview; Active tenders; Recently closed tenders; Awarded contracts; Typical buyers; Contract values (median etc.); Popular industries in {country} (internal links); FAQ. JSON-LD BreadcrumbList, ItemList, FAQPage.
-- Indexable en/de/fr/pl; noindex when no activity in 12 months.
+- Indexable en/de/fr/pl; `noindex,follow` (still 200) and out of the sitemap when it has fewer than 10 procurements in 12 months (active + closed + awards).
 
 ### Hubs and lists
 - `home` `/{locale}`: landing (hero with search, problem, AI demo, deep analysis, company matching, audience, sample opportunities, pricing, FAQ). JSON-LD WebSite+SearchAction, Organization, FAQPage. Title "Tenderwize — Find European Public Tenders with AI".
