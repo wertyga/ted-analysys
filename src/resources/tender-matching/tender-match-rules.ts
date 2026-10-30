@@ -19,7 +19,7 @@ export function buildTenderText(tender: TenderForMatching): string {
   return [
     tender.title,
     tender.description,
-    tender.buyers.map((b) => b.name),
+    ...(tender.buyers ?? []).map((b) => b.name),
     ...(tender.cpvCodes ?? []),
     ...(tender.lotTitles ?? []),
     ...(tender.lotDescriptions ?? []),
@@ -31,12 +31,15 @@ export function buildTenderText(tender: TenderForMatching): string {
     .trim();
 }
 
-export function findKeywordHits(text: string, keywords: string[]): string[] {
+export function findKeywordHits(
+  text: string,
+  keywords: string[] | null | undefined,
+): string[] {
   const normalizedText = text.toLowerCase().replace(/\s+/g, ' ').trim();
 
   return Array.from(
     new Set(
-      keywords
+      (keywords ?? [])
         .map((keyword) => keyword.trim().toLowerCase().replace(/\s+/g, ' '))
         .filter(Boolean)
         .filter((keyword) => normalizedText.includes(keyword)),
@@ -46,7 +49,7 @@ export function findKeywordHits(text: string, keywords: string[]): string[] {
 
 export function matchExcludedKeywords(
   tenderText: string,
-  excludedKeywords: string[],
+  excludedKeywords: string[] | null | undefined,
 ): RuleMatchResult {
   const hits = findKeywordHits(tenderText, excludedKeywords);
 
@@ -64,19 +67,19 @@ export function matchExcludedKeywords(
 }
 
 export function matchCpv(
-  tenderCpvCodes: string[],
-  filterCpvCodes: CompanyTenderFilterForMatching['cpvCodes'],
+  tenderCpvCodes: string[] | null | undefined,
+  filterCpvCodes: CompanyTenderFilterForMatching['cpvCodes'] | null | undefined,
 ): CpvMatchResult {
   let bestMatch: CpvMatchResult = { matched: false, score: 0 };
 
-  for (const tenderCodeRaw of tenderCpvCodes) {
+  for (const tenderCodeRaw of tenderCpvCodes ?? []) {
     const tenderCode = normalizeCpv(tenderCodeRaw);
 
     if (!tenderCode) {
       continue;
     }
 
-    for (const filterCodeConfig of filterCpvCodes) {
+    for (const filterCodeConfig of filterCpvCodes ?? []) {
       const filterCode = normalizeCpv(filterCodeConfig.code);
 
       if (!filterCode) {
@@ -109,8 +112,10 @@ export function matchCountry(
   const tenderCountry = normalizeCountry(
     tender.placeOfPerformanceCountry ?? tender.country,
   );
-  const excludedCountries = filter.excludedCountries.map(normalizeCountry);
-  const targetCountries = filter.targetCountries.map(normalizeCountry);
+  const excludedCountries = (filter.excludedCountries ?? []).map(
+    normalizeCountry,
+  );
+  const targetCountries = (filter.targetCountries ?? []).map(normalizeCountry);
 
   if (!tenderCountry) {
     return {
@@ -228,9 +233,9 @@ export function matchBudget(
 
 export function matchContractNature(
   contractNature: string | null | undefined,
-  contractNatures: string[],
+  contractNatures: string[] | null | undefined,
 ): RuleMatchResult {
-  if (contractNatures.length === 0) {
+  if (!contractNatures?.length) {
     return { rejected: false, score: 0, reasons: [], risks: [] };
   }
 
@@ -301,9 +306,9 @@ export function matchLanguages(
 
 export function matchRequiredKeywords(
   tenderText: string,
-  requiredKeywords: string[],
+  requiredKeywords: string[] | null | undefined,
 ): RuleMatchResult {
-  const normalizedKeywords = requiredKeywords.filter(
+  const normalizedKeywords = (requiredKeywords ?? []).filter(
     (keyword) => keyword.trim().length > 0,
   );
 
@@ -333,7 +338,7 @@ export function matchRequiredKeywords(
 
 export function scoreOptionalKeywords(
   tenderText: string,
-  optionalKeywords: string[],
+  optionalKeywords: string[] | null | undefined,
 ): RuleMatchResult {
   const hits = findKeywordHits(tenderText, optionalKeywords);
 

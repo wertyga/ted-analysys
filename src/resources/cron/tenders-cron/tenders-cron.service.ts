@@ -186,7 +186,10 @@ export class TendersCronService {
       const error = e instanceof Error ? e.message : 'unknown error';
 
       status.lastError = error;
-      this.logger.error(`All competition TED tender gather failed: ${error}`);
+      this.logger.error(
+        `All competition TED tender gather failed: ${error}`,
+        e instanceof Error ? e.stack : undefined,
+      );
       await logger.error('TED_ALL_COMPETITION_COLLECTED_FAILED', error);
     } finally {
       this.isGatheringAllCompetitionTenders = false;
@@ -264,7 +267,10 @@ export class TendersCronService {
       const error = e instanceof Error ? e.message : 'unknown error';
 
       status.lastError = error;
-      this.logger.error(`Recent TED tender gather failed: ${error}`);
+      this.logger.error(
+        `Recent TED tender gather failed: ${error}`,
+        e instanceof Error ? e.stack : undefined,
+      );
       await logger.error('TED_RECENT_COMPETITION_COLLECTED_FAILED', error);
     } finally {
       this.isGatheringRecentTenders = false;
@@ -417,7 +423,10 @@ export class TendersCronService {
       const error = e instanceof Error ? e.message : 'unknown error';
 
       status.lastError = error;
-      this.logger.error(`Recent TED award tender gather failed: ${error}`);
+      this.logger.error(
+        `Recent TED award tender gather failed: ${error}`,
+        e instanceof Error ? e.stack : undefined,
+      );
       await logger.error('TED_RECENT_AWARD_TENDERS_COLLECTED_FAILED', error);
     } finally {
       this.isGatheringRecentAwardTenders = false;
