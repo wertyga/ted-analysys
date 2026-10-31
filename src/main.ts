@@ -81,14 +81,15 @@ async function bootstrap() {
     });
   } else {
     expressApp.get(/^\/admin(?:\/.*)?$/, (_req, res) => {
-      res.status(503).send('Admin app is missing (admin/index.html not found).');
+      res
+        .status(503)
+        .send('Admin app is missing (admin/index.html not found).');
     });
   }
 
   await app.listen(port, () => {
     console.log(`Server ran on :${port}`);
     console.log(`Swagger docs: http://localhost:${port}/swagger`);
-    console.log(`Admin app: http://localhost:${port}/admin`);
   });
 }
 

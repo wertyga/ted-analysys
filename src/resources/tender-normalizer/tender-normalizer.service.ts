@@ -290,13 +290,13 @@ export class TenderNormalizerService {
   }
 
   private shouldLoadAwardCriteriaFromXml(data: {
-    identifiers: unknown[];
-    awardCriterionTypes: unknown[];
-    awardCriterionDescriptions: unknown[];
-    awardCriterionNumbers: unknown[];
-    awardCriterionNumberWeights: unknown[];
+    identifiers: unknown[] | null | undefined;
+    awardCriterionTypes: unknown[] | null | undefined;
+    awardCriterionDescriptions: unknown[] | null | undefined;
+    awardCriterionNumbers: unknown[] | null | undefined;
+    awardCriterionNumberWeights: unknown[] | null | undefined;
   }): boolean {
-    const lotCount = data.identifiers.length;
+    const lotCount = data.identifiers?.length ?? 0;
 
     if (lotCount === 0) {
       return false;
@@ -307,7 +307,7 @@ export class TenderNormalizerService {
       data.awardCriterionDescriptions,
       data.awardCriterionNumbers,
       data.awardCriterionNumberWeights,
-    ].some((values) => values.length > 0 && values.length !== lotCount);
+    ].some((values) => !!values?.length && values.length !== lotCount);
   }
 
   private mapNoticeAwardCriteriaForLot(
