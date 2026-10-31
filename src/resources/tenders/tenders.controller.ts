@@ -41,13 +41,6 @@ export class TendersController {
   ): Promise<TenderDetailDto & { indexable: boolean }> {
     const withoutBaseAnalysisGenerating = !withGA || req.isBot;
 
-    if (withGA) {
-      await logger.info('findById::withBa', {
-        userAgent: req.headers['user-agent'],
-        withGA,
-      });
-    }
-
     const [tenderSerialized, tariff] = await Promise.all([
       this.tendersService
         .findById(id, withoutBaseAnalysisGenerating)
