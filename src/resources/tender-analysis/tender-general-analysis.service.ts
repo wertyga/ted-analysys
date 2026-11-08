@@ -1,4 +1,4 @@
-import { Injectable, RequestTimeoutException } from '@nestjs/common';
+import { Injectable, Logger, RequestTimeoutException } from '@nestjs/common';
 import {
   TenderGeneralAnalysisDocument,
   TenderGeneralAnalysisModel,
@@ -17,6 +17,7 @@ import {
   devLog,
   getSafeErrorMessage,
   isDuplicateKeyError,
+  logger,
   QueueAsyncConcurrency,
   sleep,
 } from '@/utils';
@@ -47,6 +48,7 @@ export interface TenderGeneralAnalysisQueueStatus {
 
 @Injectable()
 export class TenderGeneralAnalysisService {
+  private readonly logger = new Logger(TenderGeneralAnalysisService.name);
   private readonly baseAnalysisQueue = new QueueAsyncConcurrency(
     TENDER_ANALYSIS_CONFIG.baseAnalysis.concurrency,
   );
@@ -101,6 +103,10 @@ export class TenderGeneralAnalysisService {
         },
       );
     } catch (error: unknown) {
+      await this.logGeneralAnalysisError(error, {
+        tenderId: tender.id,
+        generalAnalysisId: String(baseTenderAnalysis._id),
+      });
       return TenderGeneralAnalysisModel.findByIdAndUpdate(
         baseTenderAnalysis._id,
         {
@@ -166,9 +172,15 @@ export class TenderGeneralAnalysisService {
       );
 
       // Async update of analysis with bounded concurrency.
-      void this.baseAnalysisQueue.push(() =>
-        this.fetchBaseAnalysis(analysis, tender),
-      );
+      void this.baseAnalysisQueue
+        .push(() => this.fetchBaseAnalysis(analysis, tender))
+        .catch((error: unknown) =>
+          this.logGeneralAnalysisError(error, {
+            tenderId: tender.id,
+            generalAnalysisId: String(analysis._id),
+            stage: 'background-task',
+          }),
+        );
 
       return analysis;
     } catch (error: unknown) {
@@ -328,6 +340,27 @@ export class TenderGeneralAnalysisService {
         }),
       )
       .digest('hex');
+  }
+
+  private async logGeneralAnalysisError(
+    error: unknown,
+    data: Record<string, unknown>,
+  ): Promise<void> {
+    const errorMessage = getSafeErrorMessage(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+    this.logger.error(
+      `General tender analysis failed (${JSON.stringify(data)}): ${errorMessage}`,
+      stack,
+    );
+    try {
+      await logger.error('TENDER_GENERAL_ANALYSIS_FAILED', {
+        ...data,
+        errorMessage,
+        stack,
+      });
+    } catch {
+      // Logging must not affect analysis processing.
+    }
   }
 
   private isStaleProcessingAnalysis(
