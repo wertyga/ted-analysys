@@ -332,13 +332,7 @@ export abstract class BaseLlmAnalysisService {
         );
       }
 
-      const date = item.date;
-
-      if (date !== null && typeof date !== 'string') {
-        throw new Error(
-          `${this.providerName} analysis deadline date must be string or null`,
-        );
-      }
+      const date = this.normalizeNullableString(item.date, 'deadline date');
 
       return {
         name: this.requireString(item, 'name'),
@@ -346,6 +340,42 @@ export abstract class BaseLlmAnalysisService {
         description: this.requireString(item, 'description'),
       };
     });
+  }
+
+  /**
+   * The general analysis schema is only described in the prompt (not enforced),
+   * so the LLM sometimes omits optional fields or returns them as numbers or
+   * objects. Coerce those to string | null instead of failing the whole analysis.
+   */
+  protected normalizeNullableString(
+    value: unknown,
+    field: string,
+  ): string | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+
+    if (typeof value === 'string') {
+      return value.trim() || null;
+    }
+
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+
+    if (isRecord(value)) {
+      for (const key of ['date', 'value', 'text', 'description']) {
+        if (typeof value[key] === 'string' && value[key].trim()) {
+          return value[key].trim();
+        }
+      }
+    }
+
+    this.logger.warn(
+      `${this.providerName} analysis ${field} has unexpected type ${typeof value}; using null`,
+    );
+
+    return null;
   }
 
   protected requireLots(value: unknown): GeneralTenderAnalysisResult['lots'] {
@@ -362,29 +392,17 @@ export abstract class BaseLlmAnalysisService {
         );
       }
 
-      const identifier = item.identifier;
-      const title = item.title;
+      const identifier = this.normalizeNullableString(
+        item.identifier,
+        'lot identifier',
+      );
+      const title = this.normalizeNullableString(item.title, 'lot title');
       const estimatedValue = item.estimatedValue;
-      const deadline = item.deadline;
+      const deadline = this.normalizeNullableString(
+        item.deadline,
+        'lot deadline',
+      );
       const source = item.source;
-
-      if (identifier !== null && typeof identifier !== 'string') {
-        throw new Error(
-          `${this.providerName} analysis lot identifier must be string or null`,
-        );
-      }
-
-      if (title !== null && typeof title !== 'string') {
-        throw new Error(
-          `${this.providerName} analysis lot title must be string or null`,
-        );
-      }
-
-      if (deadline !== null && typeof deadline !== 'string') {
-        throw new Error(
-          `${this.providerName} analysis lot deadline must be string or null`,
-        );
-      }
 
       if (
         source !== 'STRUCTURED_DATA' &&
