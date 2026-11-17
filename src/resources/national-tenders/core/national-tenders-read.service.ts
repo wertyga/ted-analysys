@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { TenderDocument } from '@/resources/tenders/schemas';
 import {
+  NATIONAL_TENDER_POPULATE,
   NationalTenderDetailDto,
   serializeNationalTenderDetail,
   toAnalysisTender,
@@ -17,7 +18,10 @@ export type { NationalTenderDetailDto } from './national-tender.serializer';
 @Injectable()
 export class NationalTendersReadService {
   async findById(id: string): Promise<NationalTender | null> {
-    return NationalTenderModel.findOne({ id }).lean<NationalTender>().exec();
+    return NationalTenderModel.findOne({ id })
+      .populate(NATIONAL_TENDER_POPULATE)
+      .lean<NationalTender>()
+      .exec();
   }
 
   async findManyByObjectIds(ids: Types.ObjectId[]): Promise<NationalTender[]> {
@@ -26,6 +30,7 @@ export class NationalTendersReadService {
     }
 
     return NationalTenderModel.find({ _id: { $in: ids } })
+      .populate(NATIONAL_TENDER_POPULATE)
       .lean<NationalTender[]>()
       .exec();
   }
@@ -34,6 +39,7 @@ export class NationalTendersReadService {
   async findAnalysisTender(id: string): Promise<TenderDocument | null> {
     const tender = await NationalTenderModel.findOne({ id })
       .select('+rawData')
+      .populate(NATIONAL_TENDER_POPULATE)
       .lean<NationalTender>()
       .exec();
 

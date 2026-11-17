@@ -15,6 +15,8 @@ export interface NationalCollectorStatus extends NationalTenderStoreResult {
   lastPublicationDate: Date | null;
   /** Amendment notices (deadline changes etc.). */
   amendments: NationalAmendmentStats;
+  /** Shared `buyers` records created/updated in this run. */
+  buyersTouched: number;
 }
 
 export interface NationalAmendmentStats {
@@ -38,6 +40,7 @@ const emptyStatus = (): NationalCollectorStatus => ({
   noticesFetched: 0,
   skipped: 0,
   lastPublicationDate: null,
+  buyersTouched: 0,
   amendments: {
     fetched: 0,
     applied: 0,

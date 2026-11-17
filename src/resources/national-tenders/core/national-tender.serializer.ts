@@ -1,7 +1,6 @@
 import type { TenderDocument } from '@/resources/tenders/schemas';
 import {
   NationalTenderAmendment,
-  NationalTenderBuyer,
   NationalTenderSource,
 } from './national-tender.types';
 import type { NationalTender } from './schemas/national-tender.schema';
@@ -9,6 +8,9 @@ import type { NationalTender } from './schemas/national-tender.schema';
 /** Mongoose model name of `national_tenders`, for polymorphic refs. */
 export const NATIONAL_TENDER_MODEL_NAME = 'NationalTender';
 export const TED_TENDER_MODEL_NAME = 'Tender';
+
+/** Populate of the shared buyers, same as TED `tenderPopulateFields`. */
+export const NATIONAL_TENDER_POPULATE = [{ path: 'leadBuyers' }];
 
 /** Id prefix → source. Ids are built by country normalizers. */
 const NATIONAL_TENDER_ID_PREFIXES: Record<string, NationalTenderSource> = {
@@ -33,82 +35,46 @@ export function isNationalTenderRecord(
     typeof value === 'object' &&
     typeof (value as { id?: unknown }).id === 'string' &&
     isNationalTenderId((value as { id: string }).id) &&
-    Array.isArray((value as { buyers?: unknown }).buyers)
+    typeof (value as { source?: unknown }).source === 'string' &&
+    typeof (value as { sourceHash?: unknown }).sourceHash === 'string'
   );
-}
-
-/** Buyer in the shape of a serialized TED `Buyer` (without `id`: no buyer page). */
-export interface NationalTenderBuyerDto {
-  name: string;
-  address: {
-    street?: string;
-    postCode?: string;
-    city?: string;
-    country: string;
-    countrySub?: string;
-  };
-  contact: { email?: string; website?: string };
-  identifiers: string[];
-  legalTypes: { name: string }[];
-  mainActivities: { name: string }[];
-  websites: string[];
 }
 
 export type NationalTenderAmendmentDto = Omit<NationalTenderAmendment, 'patch'>;
 
-/** National tender served as `TenderDto` (see FRONTEND_CONTRACT.md). */
+/**
+ * National tender served as `TenderDto` (see FRONTEND_CONTRACT.md).
+ * `leadBuyers` are shared `Buyer`s: populated documents or ids, exactly as
+ * TED tenders return them.
+ */
 export type NationalTenderDetailDto = Omit<
   NationalTender,
-  'buyers' | 'amendments' | 'rawData' | 'sourceHash'
+  'amendments' | 'rawData' | 'sourceHash'
 > & {
   sourceNoticeId: string;
-  leadBuyers: NationalTenderBuyerDto[];
-  nonLeadBuyers: NationalTenderBuyerDto[];
+  nonLeadBuyers: [];
   amendments: NationalTenderAmendmentDto[];
 };
-
-function serializeBuyer(buyer: NationalTenderBuyer): NationalTenderBuyerDto {
-  const identifiers = [
-    buyer.nationalId ? `NIP ${buyer.nationalId}` : undefined,
-    buyer.registryId,
-  ].filter((value): value is string => !!value);
-
-  return {
-    name: buyer.name,
-    address: {
-      street: buyer.street,
-      postCode: buyer.postalCode,
-      city: buyer.city,
-      country: buyer.country,
-      countrySub: buyer.nuts,
-    },
-    contact: { email: buyer.email, website: buyer.website },
-    identifiers,
-    legalTypes: buyer.legalType ? [{ name: buyer.legalType }] : [],
-    mainActivities: buyer.mainActivity ? [{ name: buyer.mainActivity }] : [],
-    websites: buyer.website ? [buyer.website] : [],
-  };
-}
 
 export function serializeNationalTenderDetail(
   tender: NationalTender,
 ): NationalTenderDetailDto {
   const {
-    buyers,
     amendments,
     rawData: _rawData,
     sourceHash: _sourceHash,
     ...rest
-  } = tender as NationalTender & { __v?: number };
-  const buyerDtos = (buyers ?? []).map(serializeBuyer);
+  } = tender as NationalTender & { __v?: number; buyers?: unknown };
 
   delete (rest as { __v?: number }).__v;
+  // Legacy inline buyers (before the shared-buyers migration).
+  delete (rest as { buyers?: unknown }).buyers;
 
   return {
     ...rest,
+    leadBuyers: rest.leadBuyers ?? [],
     sourceNoticeId: tender.sourceId,
-    leadBuyers: buyerDtos.slice(0, 1),
-    nonLeadBuyers: buyerDtos.slice(1),
+    nonLeadBuyers: [],
     amendments: (amendments ?? []).map(
       ({ patch: _patch, ...amendment }) => amendment,
     ),
@@ -136,8 +102,8 @@ export interface NationalSourceNotice {
 
 /**
  * Adapts a national tender to the fields analyses read from a TED
- * `TenderDocument`: buyers as `leadBuyers`, no TED links, and the source
- * notice (from `rawData`, when selected) instead of the TED XML.
+ * `TenderDocument` (populated `leadBuyers`, no TED links) and attaches the
+ * source notice (from `rawData`, when selected) instead of the TED XML.
  */
 export function toAnalysisTender(tender: NationalTender): TenderDocument {
   const html = tender.rawData

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
+import { Types } from 'mongoose';
 import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rates/currency-exchange-rates.service';
 import { LlmAnalysisService } from '@/llm/llm-analysis.service';
 import { TenderLot, TenderShortTitle } from '@/resources/tenders/schemas';
@@ -24,6 +25,13 @@ export interface NationalTenderStoreOptions {
   force?: boolean;
   /** Generate AI short titles for saved tenders that lack them. */
   generateShortTitles?: boolean;
+  /**
+   * Finds/creates the shared `Buyer`s for the tender's buyers. Called only
+   * for tenders that are saved or changed.
+   */
+  resolveLeadBuyers?: (
+    tender: NormalizedNationalTender,
+  ) => Promise<Types.ObjectId[]>;
 }
 
 /**
@@ -53,7 +61,7 @@ export class NationalTendersStorageService {
 
     for (const tender of tenders) {
       try {
-        const outcome = await this.storeOne(tender, options.force);
+        const outcome = await this.storeOne(tender, options);
 
         result[outcome.status] += 1;
 
@@ -98,7 +106,7 @@ export class NationalTendersStorageService {
 
   private async storeOne(
     tender: NormalizedNationalTender,
-    force?: boolean,
+    options: NationalTenderStoreOptions,
   ): Promise<{
     status: 'saved' | 'updated' | 'unchanged';
     doc?: NationalTenderDocument;
@@ -108,7 +116,7 @@ export class NationalTendersStorageService {
       .select('sourceHash amendments.patch')
       .lean();
 
-    if (existing && existing.sourceHash === sourceHash && !force) {
+    if (existing && existing.sourceHash === sourceHash && !options.force) {
       return { status: 'unchanged' };
     }
 
@@ -130,18 +138,26 @@ export class NationalTendersStorageService {
       ),
     ]);
 
+    // Buyers live in the shared `buyers` collection, not inline.
+    const { buyers: _buyers, ...fields } = tender;
+    const leadBuyers = options.resolveLeadBuyers
+      ? await options.resolveLeadBuyers(tender)
+      : undefined;
+
     const doc = await NationalTenderModel.findOneAndUpdate(
       { id: tender.id },
       {
         $set: {
-          ...tender,
+          ...fields,
           ...patch,
+          ...(leadBuyers ? { leadBuyers } : {}),
           lots,
           estimatedValueEur,
           sourceHash,
         },
+        $unset: { buyers: '' },
       },
-      { upsert: true, returnDocument: 'after' },
+      { upsert: true, returnDocument: 'after', strict: false },
     );
 
     return { status: existing ? 'updated' : 'saved', doc };

@@ -93,9 +93,12 @@ export class TenderWishlistService {
       .map((item) => item.tender);
 
     const [tenders, nationalTenders] = await Promise.all([
-      this.tendersService.findMultipleLocalTendersWithBaseAnalysis({
-        _id: { $in: tenderIds },
-      }),
+      // Listing must not start analyses; it only returns existing ones.
+      this.tendersService.findMultipleLocalTendersWithBaseAnalysis(
+        { _id: { $in: tenderIds } },
+        {},
+        true,
+      ),
       this.nationalTendersReadService.findManyByObjectIds(nationalIds),
     ]);
     const tendersById = new Map<string, unknown>([

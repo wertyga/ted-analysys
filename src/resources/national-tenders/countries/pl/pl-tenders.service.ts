@@ -1,3 +1,4 @@
+import { NationalBuyersService } from '@/resources/national-tenders/buyers/national-buyers.service';
 import { Injectable, Logger } from '@nestjs/common';
 import {
   NationalCollectorRun,
@@ -34,6 +35,7 @@ export class PlTendersService {
     private readonly bzpNormalizer: BzpNormalizer,
     private readonly bzpUpdateNormalizer: BzpUpdateNormalizer,
     private readonly storage: NationalTendersStorageService,
+    private readonly nationalBuyersService: NationalBuyersService,
   ) {}
 
   getStatus() {
@@ -83,7 +85,9 @@ export class PlTendersService {
         )
       : new Date(now.getTime() - PL_BZP_CONFIG.recentDefaultLookbackMs);
 
-    await this.collectWindow(status, from, now);
+    const buyers = new Set<string>();
+
+    await this.collectWindow(status, from, now, buyers);
 
     // Updates go after contract notices so a tender and its first amendment
     // can arrive in the same run.
@@ -98,16 +102,33 @@ export class PlTendersService {
     );
 
     await this.collectUpdatesWindow(status, amendmentsFrom, now);
+    await this.refreshBuyerStats(status, buyers);
+  }
+
+  /** One-off migration of tenders stored with inline buyers. */
+  migrateInlineBuyers() {
+    return this.nationalBuyersService.migrateInlineBuyers(
+      NationalTenderSource.PL_BZP,
+    );
+  }
+
+  private async refreshBuyerStats(
+    status: NationalCollectorStatus,
+    buyers: Set<string>,
+  ) {
+    status.buyersTouched = buyers.size;
+    await this.nationalBuyersService.refreshStats([...buyers]);
   }
 
   private async collectBackfill(status: NationalCollectorStatus, days: number) {
     const now = new Date();
+    const buyers = new Set<string>();
 
     // One-day windows keep each query small and let progress show in status.
     for (let start = now.getTime() - days * DAY_MS; start < now.getTime(); ) {
       const end = Math.min(start + DAY_MS, now.getTime());
 
-      await this.collectWindow(status, new Date(start), new Date(end));
+      await this.collectWindow(status, new Date(start), new Date(end), buyers);
       start = end;
     }
 
@@ -118,6 +139,8 @@ export class PlTendersService {
       await this.collectUpdatesWindow(status, new Date(start), new Date(end));
       start = end;
     }
+
+    await this.refreshBuyerStats(status, buyers);
   }
 
   private async collectUpdatesWindow(
@@ -168,6 +191,7 @@ export class PlTendersService {
     status: NationalCollectorStatus,
     from: Date,
     to: Date,
+    buyers: Set<string>,
   ) {
     const pages = this.bzpClient.fetchNoticePages({
       noticeType: BzpNoticeType.CONTRACT_NOTICE,
@@ -185,6 +209,16 @@ export class PlTendersService {
       const open = normalized.filter((tender) => this.isOpen(tender));
       const result = await this.storage.storeMany(open, {
         generateShortTitles: PL_BZP_CONFIG.generateShortTitles,
+        resolveLeadBuyers: async (tender) => {
+          const ids = await this.nationalBuyersService.resolveBuyers(
+            tender.buyers,
+            tender.cpvCodes,
+          );
+
+          ids.forEach((id) => buyers.add(id.toString()));
+
+          return ids;
+        },
       });
 
       status.saved += result.saved;

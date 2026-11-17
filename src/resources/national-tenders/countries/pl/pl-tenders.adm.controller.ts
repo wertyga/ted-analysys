@@ -59,6 +59,15 @@ export class PlTendersAdmController {
     );
   }
 
+  @Post('/migrate-buyers')
+  @ApiOperation({
+    summary:
+      'One-off: move inline buyers of stored tenders to the shared buyers collection',
+  })
+  migrateBuyers() {
+    return this.plTendersService.migrateInlineBuyers();
+  }
+
   @Get('/tenders')
   @ApiOperation({ summary: 'Stored Polish tenders, newest first' })
   @ApiQuery({ name: 'offset', required: false, type: Number })

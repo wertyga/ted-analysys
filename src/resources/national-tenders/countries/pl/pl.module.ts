@@ -1,3 +1,4 @@
+import { NationalBuyersModule } from '@/resources/national-tenders/buyers/national-buyers.module';
 import { Module } from '@nestjs/common';
 import { NationalTendersCoreModule } from '@/resources/national-tenders/core/national-tenders-core.module';
 import { BzpClient } from './bzp/bzp.client';
@@ -8,7 +9,7 @@ import { PlTendersService } from './pl-tenders.service';
 
 /** Poland: BZP (ezamowienia.gov.pl). */
 @Module({
-  imports: [NationalTendersCoreModule],
+  imports: [NationalTendersCoreModule, NationalBuyersModule],
   controllers: [PlTendersAdmController],
   providers: [BzpClient, BzpNormalizer, BzpUpdateNormalizer, PlTendersService],
   exports: [PlTendersService],

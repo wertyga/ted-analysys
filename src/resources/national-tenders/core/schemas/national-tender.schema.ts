@@ -7,7 +7,6 @@ import {
 } from '@/resources/tenders/schemas';
 import {
   NationalTenderAmendment,
-  NationalTenderBuyer,
   NationalTenderChange,
   NationalTenderSource,
 } from '@/resources/national-tenders/core/national-tender.types';
@@ -55,7 +54,11 @@ export interface NationalTender {
   documentUrls: string[];
   submissionUrls: string[];
   euFundLot?: boolean;
-  buyers: NationalTenderBuyer[];
+  /**
+   * Buyers in the shared `buyers` collection (same records as TED buyers,
+   * matched by tax/registry id). Set when the tender is stored.
+   */
+  leadBuyers: mongoose.Types.ObjectId[];
   /** Amendment notices applied on top of the original notice, oldest first. */
   amendments: NationalTenderAmendment[];
   /** Original source payload. Excluded from queries by default. */
@@ -68,25 +71,6 @@ export interface NationalTender {
 
 export type NationalTenderDocument = NationalTender & Document;
 export type NationalTenderModelType = Model<NationalTenderDocument>;
-
-const NationalTenderBuyerSchema = new Schema<NationalTenderBuyer>(
-  {
-    name: { type: String, required: true },
-    nationalId: String,
-    registryId: String,
-    sourceOrganizationId: String,
-    street: String,
-    city: String,
-    postalCode: String,
-    country: { type: String, required: true },
-    nuts: String,
-    email: String,
-    website: String,
-    legalType: String,
-    mainActivity: String,
-  },
-  { _id: false },
-);
 
 const NationalTenderChangeSchema = new Schema<NationalTenderChange>(
   {
@@ -158,7 +142,7 @@ const NationalTenderSchema = new Schema<NationalTenderDocument>(
     documentUrls: { type: [String], default: [] },
     submissionUrls: { type: [String], default: [] },
     euFundLot: Boolean,
-    buyers: { type: [NationalTenderBuyerSchema], default: [] },
+    leadBuyers: { type: [Schema.Types.ObjectId], ref: 'Buyer', default: [] },
     amendments: { type: [NationalTenderAmendmentSchema], default: [] },
     rawData: { type: Schema.Types.Mixed, select: false },
     sourceHash: { type: String, required: true },
@@ -186,6 +170,10 @@ NationalTenderSchema.index(
   { name: 'idx_country_deadline' },
 );
 NationalTenderSchema.index({ cpvCodes: 1 }, { name: 'idx_cpv' });
+NationalTenderSchema.index(
+  { leadBuyers: 1, submissionDeadline: 1 },
+  { name: 'idx_lead_buyers_deadline' },
+);
 NationalTenderSchema.index(
   { source: 1, 'amendments.publicationDate': -1 },
   { name: 'idx_source_amendment_pubdate' },

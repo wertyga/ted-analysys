@@ -1,4 +1,7 @@
-import { serializeNationalTenderList } from '@/resources/national-tenders/core/national-tender.serializer';
+import {
+  NATIONAL_TENDER_POPULATE,
+  serializeNationalTenderList,
+} from '@/resources/national-tenders/core/national-tender.serializer';
 import {
   NationalTender,
   NationalTenderModel,
@@ -699,6 +702,7 @@ export class TendersService {
 
     const tenders = await NationalTenderModel.find({ id: { $in: ids } })
       .select(withoutBaseAnalysisGenerating ? '' : '+rawData')
+      .populate(NATIONAL_TENDER_POPULATE)
       .lean<NationalTender[]>()
       .exec();
     const analyses = withoutBaseAnalysisGenerating
