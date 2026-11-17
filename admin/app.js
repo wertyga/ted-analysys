@@ -34,6 +34,11 @@
       title: 'Copy database dump to CDN',
       description: 'Create and upload a database dump.',
     },
+    {
+      id: 'gather-pl-bzp-tenders',
+      title: 'Gather Poland (BZP) tenders',
+      description: 'Collect new contract notices and deadline changes from BZP.',
+    },
   ];
 
   var state = {
@@ -125,6 +130,7 @@
     cronRunResult: null,
     recentCompetitionTendersCronStatus: null,
     recentAwardTendersCronStatus: null,
+    plBzpCronStatus: null,
   };
 
   var X_POST_PILLARS = [
@@ -391,6 +397,8 @@
           ? 'Tenders'
           : state.section === 'tech'
             ? 'Tech'
+            : state.section === 'cron'
+            ? 'Cron'
             : state.section === 'x-posts'
               ? 'X Posts'
               : state.section === 'marketing-tasks'
@@ -407,6 +415,7 @@
       navLinkHtml('/admin/users', 'Users', 'users') +
       navLinkHtml('/admin/tenders', 'Tenders', 'tenders') +
       navLinkHtml('/admin/tech', 'Tech', 'tech') +
+      navLinkHtml('/admin/cron', 'Cron', 'cron') +
       navLinkHtml('/admin/x-posts', 'X Posts', 'x-posts') +
       navLinkHtml('/admin/marketing-tasks', 'Marketing Tasks', 'marketing-tasks') +
       '</nav>' +
@@ -457,6 +466,7 @@
     if (state.section === 'users') inner = usersSectionHtml();
     else if (state.section === 'tenders') inner = tendersSectionHtml();
     else if (state.section === 'tech') inner = techSectionHtml();
+    else if (state.section === 'cron') inner = cronSectionHtml();
     else if (state.section === 'x-posts') inner = xPostsSectionHtml();
     else if (state.section === 'marketing-tasks') inner = marketingTasksSectionHtml();
     else inner = dashboardSectionHtml();
@@ -614,6 +624,30 @@
         '</small>';
     }
 
+    if (task.id === 'gather-pl-bzp-tenders' && state.plBzpCronStatus && state.plBzpCronStatus.recent) {
+      var s3 = state.plBzpCronStatus.recent;
+      var a3 = s3.amendments || {};
+      extra +=
+        '<small>' +
+        (s3.isRunning ? 'Running: ' : 'Last run: ') +
+        s3.noticesFetched +
+        ' notices, saved ' +
+        s3.saved +
+        ', updated ' +
+        s3.updated +
+        ', skipped ' +
+        s3.skipped +
+        ', failed ' +
+        s3.failed +
+        '; deadline changes applied ' +
+        (a3.applied || 0) +
+        ', not found ' +
+        (a3.notFound || 0) +
+        (s3.finishedAt ? ', finished ' + fmtDateTime(s3.finishedAt) : '') +
+        '</small>' +
+        (s3.lastError ? '<small>Error: ' + escapeHtml(s3.lastError) + '</small>' : '');
+    }
+
     if (task.scheduled && task.schedule) {
       extra +=
         '<small>Schedule: ' +
@@ -666,7 +700,7 @@
   function cronPanelHtml() {
     return (
       '<section class="panel panelWide"><div class="panelHeader"><div><h2>Cron jobs</h2>' +
-      '<p>Run scheduled jobs manually from the admin panel.</p></div></div>' +
+      '<p>Enable, disable or run scheduled jobs. Enabled state is saved and restored on restart.</p></div></div>' +
       '<div class="statusList">' +
       state.cronTasks.map(cronTaskRowHtml).join('') +
       '</div>' +
@@ -1361,10 +1395,13 @@
     return html;
   }
 
+  function cronSectionHtml() {
+    return cronPanelHtml();
+  }
+
   function techSectionHtml() {
     return (
       gatherAllTagPanelHtml() +
-      cronPanelHtml() +
       mongoIndexesPanelHtml() +
       competitionPanelHtml() +
       awardRefreshPanelHtml() +
@@ -2038,6 +2075,7 @@
     if (pathname.indexOf('/tenders') !== -1) return 'tenders';
     if (pathname.indexOf('/users') !== -1) return 'users';
     if (pathname.indexOf('/tech') !== -1) return 'tech';
+    if (pathname.indexOf('/cron') !== -1) return 'cron';
     if (pathname.indexOf('/x-posts') !== -1) return 'x-posts';
     if (pathname.indexOf('/marketing-tasks') !== -1) return 'marketing-tasks';
     return 'dashboard';
@@ -2145,6 +2183,7 @@
         if (state.section === 'users') return loadUsers(state.usersPage, state.usersPageSize);
         if (state.section === 'tenders') return loadTenders(state.tendersPage, state.tendersPageSize);
         if (state.section === 'tech') return loadGatherAllStatus();
+        if (state.section === 'cron') return loadCronSectionData();
         if (state.section === 'x-posts') return loadXPosts(state.xPostsPage, state.xPostsPageSize);
         if (state.section === 'marketing-tasks')
           return state.marketingTaskId ? loadMarketingTask(state.marketingTaskId) : loadMarketingTasks();
@@ -2337,6 +2376,23 @@
       .catch(function () {});
   }
 
+  function loadPlBzpCronStatus() {
+    return request('/adm/cron/gather-pl-bzp-tenders/status', { token: state.token })
+      .then(function (status) {
+        state.plBzpCronStatus = status;
+      })
+      .catch(function () {});
+  }
+
+  function loadCronSectionData() {
+    return Promise.all([
+      loadCronTasks(),
+      loadRecentCompetitionTendersCronStatus(),
+      loadRecentAwardTendersCronStatus(),
+      loadPlBzpCronStatus(),
+    ]);
+  }
+
   function loadRecentAwardTendersCronStatus() {
     return request('/adm/cron/gather-recent-award-tenders/status', { token: state.token })
       .then(function (status) {
@@ -2381,7 +2437,7 @@
   }
 
   function updatePolling() {
-    if (state.token && state.section === 'tech') startPolling();
+    if (state.token && (state.section === 'tech' || state.section === 'cron')) startPolling();
     else stopPolling();
   }
 
@@ -2400,15 +2456,16 @@
 
   function pollTick() {
     if (!state.token) return;
+    if (state.section === 'cron') {
+      loadCronSectionData().then(render).catch(render);
+      return;
+    }
     Promise.all([
       loadGatherAllStatus(),
       loadAwardTendersRefreshStatus(),
       loadAwardValuesFixStatus(),
       loadAwardValueReviewStatus(),
       loadSyncIndexesStatus(),
-      loadCronTasks(),
-      loadRecentCompetitionTendersCronStatus(),
-      loadRecentAwardTendersCronStatus(),
       loadCollectTenderBuyersStatus(),
       loadContractorStatsRefreshStatus(),
       loadGeneralAnalysisStatus(),

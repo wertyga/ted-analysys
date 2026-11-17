@@ -6,6 +6,10 @@ export const CRON_CONFIG = {
     recentAwardTenders: '0 4 * * *',
     expiredCompetitionTenderBuyerMeta: '30 0 * * *',
   },
+  nationalTenders: {
+    /** Poland (BZP): after the TED run (01:00), before award tenders (04:00) and match reports (08:00). */
+    plBzp: '0 2 * * *',
+  },
   databaseCopy: {
     toCdn: '0 7 * * *',
   },

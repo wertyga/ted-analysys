@@ -17,6 +17,7 @@ import {
 } from '@/resources/tender-normalizer/tender-normalizer-xml';
 import { DOCUMENT_EXTRACTOR_CONFIG } from '@/config/document-extractor.config';
 import { BuyerDocument } from '@/resources/buyer/schemas';
+import type { NationalSourceNotice } from '@/resources/national-tenders/core/national-tender.serializer';
 
 export type TenderAnalysisDocumentSource =
   | 'xml'
@@ -210,6 +211,14 @@ export class DocumentExtractor {
   private async buildXmlDocument(
     tender: TenderDocument,
   ): Promise<DocumentInputAnalysis | undefined> {
+    const sourceNotice = (tender as { sourceNotice?: NationalSourceNotice })
+      .sourceNotice;
+
+    // National tenders have no TED XML; their full source notice plays its role.
+    if (sourceNotice) {
+      return this.buildSourceNoticeDocument(tender, sourceNotice);
+    }
+
     const xmlContent = await fetchXmlContentFromNotice(tender.links);
     const xmlSourceUrl = findXmlUrl(tender.links);
 
@@ -236,6 +245,36 @@ export class DocumentExtractor {
         filename: xmlSourceUrl ? undefined : 'ted-notice.xml',
         language: extraction.detectedLanguages?.[0] ?? null,
         documentType: TenderSourceDocumentType.TED_XML_NOTICE,
+        extractedText: extraction.aiText,
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async buildSourceNoticeDocument(
+    tender: TenderDocument,
+    notice: NationalSourceNotice,
+  ): Promise<DocumentInputAnalysis | undefined> {
+    try {
+      const extraction = await this.textExtractor.extractAndPrepareText({
+        sourceUrl: notice.url,
+        mimeType: 'text/html',
+        language: undefined,
+        documentType: TenderSourceDocumentType.PROCUREMENT_HTML,
+        content: Buffer.from(notice.html, 'utf8'),
+        buyerCountry: (tender.leadBuyers[0] as BuyerDocument)?.address.country,
+      });
+
+      if (extraction.aiText.length === 0) {
+        return undefined;
+      }
+
+      return {
+        id: notice.url,
+        filename: 'source-notice.html',
+        language: extraction.detectedLanguages?.[0] ?? null,
+        documentType: TenderSourceDocumentType.PROCUREMENT_HTML,
         extractedText: extraction.aiText,
       };
     } catch {

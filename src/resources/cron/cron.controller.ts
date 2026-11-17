@@ -1,4 +1,11 @@
-import { Controller, Get, NotFoundException, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiDefaultResponse,
@@ -14,6 +21,7 @@ import { DbCopyTechCron } from './db-copy-cron/db-copy.tech.cron';
 import { TenderMatchCronService } from './tender-match-cron/tender-match-cron.service';
 import { TendersCronService } from './tenders-cron/tenders-cron.service';
 import { CronSettingsService } from './cron-settings.service';
+import { PlTendersCronService } from './national-tenders-cron/pl-tenders-cron.service';
 
 type CronTaskId =
   | 'gather-recent-competition-tenders'
@@ -22,7 +30,8 @@ type CronTaskId =
   | 'sync-latest-rates'
   | 'send-daily-reports'
   | 'send-weekly-reports'
-  | 'copy-database-dump-to-cdn';
+  | 'copy-database-dump-to-cdn'
+  | 'gather-pl-bzp-tenders';
 
 type CronTaskDefinition = {
   id: CronTaskId;
@@ -40,6 +49,7 @@ const CRON_TASK_IDS: CronTaskId[] = [
   'send-daily-reports',
   'send-weekly-reports',
   'copy-database-dump-to-cdn',
+  'gather-pl-bzp-tenders',
 ];
 
 @ApiTags('Admin Cron')
@@ -54,6 +64,7 @@ export class CronController {
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly tenderMatchCronService: TenderMatchCronService,
     private readonly tendersCronService: TendersCronService,
+    private readonly plTendersCronService: PlTendersCronService,
   ) {}
 
   @Get()
@@ -149,6 +160,12 @@ export class CronController {
     return this.tendersCronService.getExpiredCompetitionTenderBuyerMetaStatus();
   }
 
+  @Get('gather-pl-bzp-tenders/status')
+  @ApiOkResponse({ description: 'Poland (BZP) tenders collector status.' })
+  getPlBzpTendersStatus() {
+    return this.plTendersCronService.getStatus();
+  }
+
   private getTaskDefinitions(): CronTaskDefinition[] {
     return [
       {
@@ -181,7 +198,8 @@ export class CronController {
         title: 'Sync latest exchange rates',
         description: 'Synchronize the latest currency exchange rates.',
         scheduled: true,
-        run: () => this.currencyExchangeRatesCronService.syncLatestRatesQueued(),
+        run: () =>
+          this.currencyExchangeRatesCronService.syncLatestRatesQueued(),
       },
       {
         id: 'send-daily-reports',
@@ -202,6 +220,14 @@ export class CronController {
         title: 'Copy database dump to CDN',
         description: 'Create a MongoDB dump and upload it to CDN.',
         run: async () => this.dbCopyTechCron.startCopyDatabaseDumpToCdn(),
+      },
+      {
+        id: 'gather-pl-bzp-tenders',
+        title: 'Gather Poland (BZP) tenders',
+        description:
+          'Collect new contract notices and deadline changes from BZP (ezamowienia.gov.pl) into national_tenders. Off by default.',
+        scheduled: true,
+        run: () => this.plTendersCronService.gatherPlBzpTendersQueued(),
       },
     ];
   }

@@ -34,6 +34,7 @@ import { BuyerModule } from '@/resources/buyer/buyer.module';
 import { SettingsModule } from '@/resources/settings/settings.module';
 import { XPostModule } from '@/resources/x-post/x-post.module';
 import { MarketingTaskModule } from '@/resources/marketing-task/marketing-task.module';
+import { NationalTendersModule } from '@/resources/national-tenders/national-tenders.module';
 
 @Module({
   imports: [
@@ -71,6 +72,7 @@ import { MarketingTaskModule } from '@/resources/marketing-task/marketing-task.m
     SettingsModule,
     XPostModule,
     MarketingTaskModule,
+    NationalTendersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

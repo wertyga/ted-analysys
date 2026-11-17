@@ -1,3 +1,4 @@
+import { NationalTendersCoreModule } from '@/resources/national-tenders/core/national-tenders-core.module';
 import { forwardRef, Module } from '@nestjs/common';
 import { TedSearchModule } from '../ted-search/ted-search.module';
 import { TenderGeneralAnalysisModule } from '../tender-analysis/tender-general-analysis.module';
@@ -13,6 +14,7 @@ import { BuyerModule } from '@/resources/buyer/buyer.module';
 
 @Module({
   imports: [
+    NationalTendersCoreModule,
     forwardRef(() => TedSearchModule),
     forwardRef(() => TenderGeneralAnalysisModule),
     forwardRef(() => TenderWishlistModule),

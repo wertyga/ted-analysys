@@ -1,7 +1,9 @@
+import { getTenderModelName } from '@/resources/national-tenders/core/national-tender.serializer';
 import mongoose, { Document, Model, Schema } from 'mongoose';
 
 export interface TenderWishlistItem {
   user: mongoose.Types.ObjectId;
+  /** `_id` in `tenders`, or in `national_tenders` for national ids. */
   tender: mongoose.Types.ObjectId;
   tenderId: string;
   createdAt?: Date;
@@ -20,7 +22,10 @@ const TenderWishlistItemSchema = new Schema<TenderWishlistItemDocument>(
     },
     tender: {
       type: Schema.Types.ObjectId,
-      ref: 'Tender',
+      // Polymorphic by `tenderId`: TED tender or national tender.
+      ref: function (this: { tenderId?: string }) {
+        return getTenderModelName(this.tenderId ?? '');
+      },
       required: true,
       index: true,
     },

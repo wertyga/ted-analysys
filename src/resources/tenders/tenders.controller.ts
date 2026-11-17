@@ -19,6 +19,11 @@ import { TenderGeneralAnalysisService } from '@/resources/tender-analysis/tender
 import { TenderGeneralAnalysisDetailDto } from '@/resources/tender-analysis/dto/tender-general-analysis.dto';
 import { logger } from '@/utils';
 import { isTenderIndexable } from '@/resources/seo/page-indexability';
+import {
+  isNationalTenderId,
+  NationalTenderDetailDto,
+  NationalTendersReadService,
+} from '@/resources/national-tenders/core/national-tenders-read.service';
 
 @ApiTags('tenders')
 @Controller('tenders')
@@ -29,6 +34,7 @@ export class TendersController {
     private readonly tariffService: TariffService,
     @Inject(forwardRef(() => TenderGeneralAnalysisService))
     private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
+    private readonly nationalTendersReadService: NationalTendersReadService,
   ) {}
 
   @Get(':id')
@@ -38,8 +44,14 @@ export class TendersController {
     @Param('id') id: string,
     @Query('withGA') withGA: boolean,
     @Req() req,
-  ): Promise<TenderDetailDto & { indexable: boolean }> {
+  ): Promise<
+    (TenderDetailDto | NationalTenderDetailDto) & { indexable: boolean }
+  > {
     const withoutBaseAnalysisGenerating = !withGA || req.isBot;
+
+    if (isNationalTenderId(id)) {
+      return this.findNationalById(id, withoutBaseAnalysisGenerating, req);
+    }
 
     const [tenderSerialized, tariff] = await Promise.all([
       this.tendersService
@@ -79,5 +91,59 @@ export class TendersController {
       generalAnalysis,
       indexable: isTenderIndexable(tenderSerialized),
     };
+  }
+
+  /** National (non-TED) tender, served in the TenderDto shape. */
+  private async findNationalById(
+    id: string,
+    withoutBaseAnalysisGenerating: boolean,
+    req,
+  ): Promise<NationalTenderDetailDto & { indexable: boolean }> {
+    const tender = await this.nationalTendersReadService.findById(id);
+
+    if (!tender) {
+      throw new NotFoundException(`Tender ${id} not found`);
+    }
+
+    const [analysis, tariff] = await Promise.all([
+      withoutBaseAnalysisGenerating
+        ? TenderGeneralAnalysisModel.findOne({ tenderId: id }).lean()
+        : this.nationalTendersReadService
+            .findAnalysisTender(id)
+            .then((analysisTender) =>
+              this.tenderGeneralAnalysisService.ensureAnalysisForTender(
+                analysisTender!,
+              ),
+            ),
+      withoutBaseAnalysisGenerating
+        ? { type: TariffType.free }
+        : this.tariffService.getUserTariff(req.user),
+    ]);
+
+    let generalAnalysis = analysis
+      ? TenderGeneralAnalysisModel.serializeDetail(analysis)
+      : undefined;
+
+    if (generalAnalysis && tariff.type === TariffType.free) {
+      generalAnalysis =
+        this.tenderGeneralAnalysisService.filterFreeBasicAnalysisFields(
+          generalAnalysis,
+        ) as TenderGeneralAnalysisDetailDto;
+    }
+
+    const detail = this.nationalTendersReadService.serializeDetail(tender);
+
+    if (req.user) {
+      await this.tendersService.fillUpTenderListByDeepAnalysisAndWishListStatus(
+        [detail],
+        String(req.user._id),
+      );
+    }
+
+    return {
+      ...detail,
+      generalAnalysis,
+      indexable: isTenderIndexable(detail),
+    } as NationalTenderDetailDto & { indexable: boolean };
   }
 }

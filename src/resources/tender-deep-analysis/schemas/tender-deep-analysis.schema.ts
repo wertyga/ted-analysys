@@ -1,3 +1,8 @@
+import {
+  isNationalTenderRecord,
+  serializeNationalTenderDetail,
+  TED_TENDER_MODEL_NAME,
+} from '@/resources/national-tenders/core/national-tender.serializer';
 import mongoose, { Document, Model, Schema } from 'mongoose';
 import { validateTenderDeepCompanyFitResult } from '@/openai/schemas/deep-analysis';
 import { TenderDeepAnalysisResult, TenderDeepRecommendation } from '@/types';
@@ -18,6 +23,8 @@ export type DeepCompanyFitResultJson = TenderDeepAnalysisResult;
 export interface TenderDeepAnalysis {
   tenderId: string;
   tender: mongoose.Types.ObjectId;
+  /** Model of `tender`: absent/'Tender' for TED, 'NationalTender' for national. */
+  tenderModel?: string;
   company: mongoose.Types.ObjectId;
   generalAnalysis: mongoose.Types.ObjectId;
   status: TenderDeepAnalysisStatus;
@@ -54,7 +61,15 @@ export const TenderDeepAnalysisSchema: Schema<
 > = new Schema<TenderDeepAnalysisDocument, TenderDeepAnalysisModelType>(
   {
     tenderId: { type: String, required: true },
-    tender: { type: Schema.Types.ObjectId, ref: 'Tender', required: true },
+    tender: {
+      type: Schema.Types.ObjectId,
+      // Polymorphic: TED tenders (default) or national tenders.
+      ref: function (this: { tenderModel?: string }) {
+        return this.tenderModel || TED_TENDER_MODEL_NAME;
+      },
+      required: true,
+    },
+    tenderModel: String,
     company: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     generalAnalysis: {
       type: Schema.Types.ObjectId,
@@ -116,6 +131,9 @@ TenderDeepAnalysisSchema.statics.serializeDetail = function serializeDetail(
           excludeFields: ['sourceHash', 'promptVersion'],
         }),
         generalAnalysis,
+        tender: isNationalTenderRecord(analysis.tender)
+          ? serializeNationalTenderDetail(analysis.tender)
+          : analysis.tender,
         // Populated for the analysis itself; strip password hash, tokens etc.
         company: isPopulatedRecord(analysis.company)
           ? UserModel.serializeUser(

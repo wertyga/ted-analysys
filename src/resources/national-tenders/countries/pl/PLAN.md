@@ -1,0 +1,157 @@
+# Польша: план сбора национальных тендеров
+
+Статус на 2026-11-17: этапы 1–4 реализованы, детальная страница (часть этапа 6) отдаётся через `GET /tenders/:id`.
+
+## Источники
+
+Источники Польши делятся на три слоя.
+
+| Слой | Что это | Источник в Польше | Статус |
+|---|---|---|---|
+| 1. Обязательный реестр публикаций | Сюда заказчик по закону обязан отправить объявление | **BZP** (Biuletyn Zamówień Publicznych на ezamowienia.gov.pl): закупки от 130 тыс. PLN до порога ЕС. Надпороговые идут в TED | ✅ `ContractNotice` собирается |
+| 2. Площадки e-закупок | Здесь лежит документация и проходят торги | platformazakupowa.pl, ezamawiajacy.pl (Marketplanet), Open Nexus, сам e-Zamówienia | ⏳ позже |
+| 3. Результаты | Итоги процедур | BZP `TenderResultNotice` → `award-tender` | ⏳ позже |
+| Ниже порога | Закупки меньше 130 тыс. PLN, публиковать их не обязаны | Площадки из слоя 2, страницы BIP заказчиков | ⏳ позже, полного покрытия не будет |
+
+Слой 2 сначала подключаем для обогащения уже собранных тендеров (документы, ссылка на подачу), а как источник новых тендеров только потом. Решение принимаем после замера покрытия: какая доля тендеров с крупных площадок уже есть в BZP.
+
+## BZP API (проверено вживую)
+
+- `GET https://ezamowienia.gov.pl/mo-board/api/v1/notice`, без авторизации.
+- **Обязательные параметры:** `NoticeType`, `PublicationDateFrom`/`PublicationDateTo` (формат `YYYY-MM-DDTHH:mm:ss`), `PageSize` (максимум 500).
+- **Подвох с окном:** `From` соблюдается точно, а к `To` API добавляет 24 часа (проверено 2026-11-17). Клиент отправляет `To − 24h`.
+- **Пагинация:** курсор `SearchAfter=<objectId последней записи>`, сортировка по дате публикации по возрастанию. Последняя страница короче 500.
+- **Лимит:** 30 запросов в минуту с одного IP, при превышении отвечает 403.
+- **Типы объявлений:**
+  - `ContractNotice`: новый тендер.
+  - `NoticeUpdateNotice`: изменение объявления, например перенос дедлайна.
+  - `TenderResultNotice`: результат процедуры.
+  - Прочие: `AgreementIntentionNotice`, `ContractPerformingNotice`, `CompetitionNotice`, `CompetitionResultNotice`, `SmallContractNotice`, `AgreementUpdateNotice`.
+- **Ответ:** голый массив. Поля:
+  - Номера и идентификаторы: `bzpNumber`, `noticeNumber` (с версией), `tenderId` (OCDS-id процедуры), `objectId`.
+  - Предмет: `orderObject` (название), `orderType` (Delivery/Services/Works), `cpvCode` (строка, основной код первым).
+  - Дедлайн: `submittingOffersDate`.
+  - Заказчик: `organization*` (с NIP).
+  - Прочее: `isTenderAmountBelowEU`; `htmlBody` (полный текст, секции I–VIII).
+- **Объём:** около 500–600 `ContractNotice` в будний день, в выходные единицы (раньше насчитали 1100 из-за ошибки с окном). `NoticeUpdateNotice` около 400 в день. Почти все записи помечены `isTenderAmountBelowEU = true`, так что пересечение с TED минимальное.
+- **Где что лежит:**
+  - Только в `htmlBody`: описание, лоты, стоимость, критерии и длительность.
+  - Оценочная стоимость указана примерно у 12% объявлений.
+  - Документация хранится на площадке, ссылка на неё в п. 3.1.
+
+### Разбор `htmlBody`
+
+Структура плоская:
+
+- секции — заголовки `h2`;
+- поля — нумерованные `h3`, значение в `span.normal` или в следующем `p`/тексте;
+- части (лоты) и критерии начинаются с заголовков «Część N» и «Kryterium N».
+
+| Поле | Куда |
+|---|---|
+| 1.5.6 | NUTS заказчика, используем как место исполнения |
+| 3.1 | URL площадки (`sourceUrl`, `submissionUrls`) |
+| 3.14 | языки подачи |
+| 4.1.5 | общая стоимость всех частей |
+| 4.1.6 | стоимость этой процедуры, приоритетнее 4.1.5 |
+| 4.1.9 | число частей, используется для сверки |
+| 4.2.x | поля части; 4.2.5 — стоимость части |
+| 4.3.4 / 4.3.5 / 4.3.6 | тип, название и вес критерия |
+| 8.2 | ссылка на подачу |
+
+## Архитектура (как реализовано)
+
+Код разделён по странам. Общий код лежит в `core/`, переключателя по `country` в нём нет.
+
+```
+src/resources/national-tenders/
+  national-tenders.module.ts             # подключает модули стран
+  core/
+    national-tender.types.ts             # NationalTenderSource, NormalizedNationalTender
+    schemas/national-tender.schema.ts    # коллекция national_tenders
+    national-tenders-storage.service.ts  # sourceHash, перевод в EUR, upsert, shortTitle
+    national-collector-run.ts            # один запуск за раз + статус прогона
+  countries/pl/
+    pl.config.ts, pl.module.ts
+    pl-tenders.service.ts                # сбор новых объявлений, бэкфилл, renormalize
+    pl-tenders.adm.controller.ts         # /adm/national-tenders/pl/*
+    bzp/                                 # client, types, html parser, normalizer, tests
+```
+
+Cron лежит отдельно, вместе с остальными cron-задачами: `src/resources/cron/national-tenders-cron/pl-tenders-cron.service.ts`. Задача `gather-pl-bzp-tenders` запускается раз в сутки в 02:00 по Варшаве (`CRON_CONFIG.nationalTenders.plBzp`) и идёт через общую очередь `CronTaskQueueService`, поэтому не пересекается с задачами TED. По умолчанию выключена, включается в админке, в разделе Cron.
+
+Другие польские площадки потом ляжут рядом, в `pl/platformazakupowa/` и т.п. Следующая страна получит свою папку `countries/<cc>/`.
+
+**Принцип (2026-11-17):** коллекции делятся по типу сущности (`national_tenders`, `national_award_tenders`, `national_tender_company_matches`), а не по стране. Страна и источник хранятся в полях `country` и `source`. Свой код у каждой страны только там, где различаются источники: клиент, парсер, нормализатор, сбор, cron и админка. Чтение для фронта, матчинг и хранение общие, в `core/`.
+
+### Отличия от первоначального плана
+
+- **Отдельная коллекция `national_tenders`** вместо поля `source` в `Tender`. Решение окончательное (2026-11-17), переносить в `tenders` не будем. Поиск, страницы заказчиков, sitemap, SEO, x-post и матчинг TED их не используют. Национальные тендеры подключаются к этим функциям явно и по отдельности. Поля повторяют `Tender`, чтобы отдавать их фронту в форме `TenderDto`.
+- Документы `Buyer` пока не создаются: заказчик хранится внутри тендера, в `buyers[]`.
+
+## Маппинг BZP → Tender
+
+| Tender | BZP |
+|---|---|
+| `id` | `pl-bzp-2026-00531057`, получается из `bzpNumber` |
+| `sourceId` / `sourceProcedureId` | `bzpNumber` / `tenderId` |
+| title | `orderObject` |
+| contractNature | `orderType`: Delivery → supplies, Services → services, Works → works |
+| noticeType | `ContractNotice` → `cn-standard` |
+| procedureType | тип процедуры в тексте: art. 275 pkt 1 → `open`, остальные варианты trybu podstawowego → `neg-w-call`, и т.д. |
+| cpvCodes / main CPV | `cpvCode`, коды CPV из HTML; храним 8 цифр |
+| submissionDeadline | `submittingOffersDate` |
+| buyers | `organization*` + раздел I в HTML |
+| country / NUTS | `POL` / поле 1.5.6 |
+| description, lots, value, criteria, duration | разделы IV–VI в HTML; лоты `LOT-000N`, при отсутствии частей один лот |
+| sourceUrl | поле 3.1, иначе `https://ezamowienia.gov.pl/mp-client/search/list/<tenderId>` |
+| shortTitle | генерируется через LLM сразу при сохранении |
+| анализ | генерируется лениво, как у TED |
+
+## Решения
+
+- **Фильтр на входе:** берём все `ContractNotice`. BZP и так содержит только процедуры от 130 тыс. PLN.
+- **Сохраняем только открытые тендеры:** с дедлайном в будущем или без дедлайна. Просроченные считаются как `skipped`.
+- **Расходы на LLM:** `shortTitle` генерируем сразу, анализ лениво.
+- **Фронтенд:** контракт с фронтендом не придумываем, сначала спрашиваем.
+
+## Этапы
+
+1. ✅ **Фундамент:** `core/`, коллекция, модуль `pl`. TED не затронут.
+2. ✅ **Клиент, парсер и нормализатор BZP.** Тесты на реальных фикстурах. Прогон по 500 объявлениям:
+   - лоты совпадают с полем 4.1.9 в 500 из 500;
+   - критерии есть в 500, сумма весов 100 в 487;
+   - тип процедуры определён в 499;
+   - стоимость есть в 59.
+3. ✅ **Сбор `ContractNotice`:**
+   - cron раз в сутки в 02:00 по Варшаве, окно — от последней сохранённой публикации минус 1 час;
+   - бэкфилл: `POST /adm/national-tenders/pl/backfill?days=90`, около 10 минут;
+   - админка: `status`, `gather-recent`, `tenders`, `tenders/:id?raw=true`, `tenders/:id/renormalize`.
+4. ✅ **`NoticeUpdateNotice`** (`bzp/bzp-update.normalizer.ts`):
+   - берём только изменения объявления о закупке (3.1 = «Ogłoszenie o zamówieniu», около 89% всех update), тендер ищем по 3.2 = `sourceId`;
+   - каждый блок 3.4.1 разбирается в `{ field, label, before, after }`, история хранится в `amendments[]`;
+   - из структурированных полей применяем пока только 8.1 → `submissionDeadline` (время в тексте по Варшаве, переводим в UTC). Остальные изменения (описание, условия) хранятся текстом;
+   - `amendments[].patch` накладывается заново при каждой перезаписи исходного объявления, поэтому перенесённый дедлайн не откатывается. `sourceHash` считается по исходному объявлению;
+   - идемпотентно: повторно одно изменение не применяется;
+   - recent: после `ContractNotice`, окно от последнего применённого изменения минус 1 час, но не дальше 3 дней. Бэкфилл догоняет изменения после тендеров;
+   - на дневной выборке из 396 update: 353 относятся к тендерам, все 1042 изменения разобраны, дедлайн применён в 322 из 322 случаев;
+   - не решено: если тендер не попал в базу, потому что на момент сбора дедлайн уже прошёл, а потом его продлили, он остаётся потерянным (`notFound` в статусе).
+5. ⏳ **Матчинг и уведомления.** Отдельный сервис и cron в `national-tenders`, `TenderMatchingService` не трогаем. `tender_company_matches` ссылается на `Tender`, поэтому совпадения храним в своей коллекции `national_tender_company_matches`. Для пользователя всё общее: один список в кабинете и одно письмо вместе с TED, у национальных тендеров бейдж источника и страны. Формат списка нужно дописать в контракт.
+6. 🟡 **Фронтенд.** Контракт лежит в `../../FRONTEND_CONTRACT.md`.
+   - ✅ `GET /tenders/:id`: по префиксу `pl-bzp-` отдаёт тендер из `national_tenders` в форме `TenderDto` + `source`, `sourceUrl`, `sourceNoticeId`, `country`, `amendments`, `indexable`, `isInWishlist`, `deepAnalysisStatus` (`core/national-tender.serializer.ts`).
+   - ✅ Base analysis, deep analysis и избранное работают как у TED. Документ объявления для анализа — полный текст объявления из источника (`htmlBody` в BZP) вместо TED XML. Deep analysis и избранное ссылаются на тендер полиморфно: `tender_deep_analyses.tenderModel` и, для избранного, модель определяется по `tenderId`. Общий поиск тендера по двум коллекциям: `TendersService.findLocalOrNationalTender`.
+   - ✅ Поиск: национальные тендеры участвуют во всех поисках (`/ted/search`, `/ted/search-page`, `/ted/search-pure`), фильтр `sources` (`TED`, `PL_BZP`; пусто = все). Тот же Mongo-запрос применяется к обеим коллекциям. Из каждой берутся первые `skip + limit` id в нужной сортировке, затем они сливаются, а записи страницы догружаются (`ted-search/ted.search.sources.ts`, `TedSearchService.pickMergedPage`). Без национальных источников (`sources=TED`) работает старый путь без изменений.
+   - ⏳ Sitemap.
+7. ❌ **Перенос `national_tenders` → `tenders` отменён:** коллекции остаются раздельными навсегда. Всё, что читает тендеры (детальная страница, поиск, sitemap, матчинг), учитывает обе коллекции явно.
+8. ⏳ **Результаты процедур:** `TenderResultNotice` → итоги (победитель, цена) по аналогии с TED `award-tender`. Нужны для страниц победителей и статистики. Хранить в отдельной коллекции `national_award_tenders`, общей для всех стран, как `national_tenders`.
+9. ⏳ **Слой 2:** сначала обогащение документами с площадок, затем новые тендеры с площадок, **без фильтра по сумме**. Закупки ниже 130 тыс. PLN тоже берём.
+
+## Мелкие известные проблемы
+
+- Upsert делает `$set`. Если поле из нового разбора пропало, в базе остаётся старое значение.
+
+## Запуск
+
+1. Включить cron в админке: `POST /adm/cron/gather-pl-bzp-tenders/enable` (состояние сохраняется в `settings`, `cron.tasks.enabled`). По умолчанию задача выключена. Работает только на cron-leader инстансе. Ручной запуск: `POST /adm/cron/gather-pl-bzp-tenders`, статус: `GET /adm/cron/gather-pl-bzp-tenders/status`.
+2. Первая загрузка: `POST /adm/national-tenders/pl/backfill?days=90`.
+3. Проверка хода: `GET /adm/national-tenders/pl/status`.

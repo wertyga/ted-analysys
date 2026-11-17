@@ -1,3 +1,12 @@
+import { serializeNationalTenderList } from '@/resources/national-tenders/core/national-tender.serializer';
+import {
+  NationalTender,
+  NationalTenderModel,
+} from '@/resources/national-tenders/core/schemas/national-tender.schema';
+import {
+  isNationalTenderId,
+  NationalTendersReadService,
+} from '@/resources/national-tenders/core/national-tenders-read.service';
 import {
   forwardRef,
   Inject,
@@ -128,6 +137,7 @@ export class TendersService {
     private readonly tenderGeneralAnalysisService: TenderGeneralAnalysisService,
     @Inject(forwardRef(() => BuyerService))
     private readonly buyerService: BuyerService,
+    private readonly nationalTendersReadService: NationalTendersReadService,
   ) {}
 
   async upsertTender(
@@ -537,9 +547,8 @@ export class TendersService {
 
       return {
         ...tender,
-        generalAnalysis: TenderGeneralAnalysisModel.serializeDetail(
-          generalAnalysis,
-        ),
+        generalAnalysis:
+          TenderGeneralAnalysisModel.serializeDetail(generalAnalysis),
       };
     });
   }
@@ -661,6 +670,56 @@ export class TendersService {
     return TenderModel.findOne({
       id: publicationNumber,
     }).populate(tenderPopulateFields);
+  }
+
+  /**
+   * TED tender, or a national tender adapted to the `TenderDocument` fields
+   * analyses read. Use where a feature works for both sources (deep analysis,
+   * wishlist); national ones carry `_id` of their own collection.
+   */
+  async findLocalOrNationalTender(id: string): Promise<TenderDocument | null> {
+    if (isNationalTenderId(id.trim())) {
+      return this.nationalTendersReadService.findAnalysisTender(id.trim());
+    }
+
+    return this.findLocalTender(id);
+  }
+
+  /**
+   * National tenders for lists, in `TenderListDto` shape with the general
+   * analysis (generated unless `withoutBaseAnalysisGenerating`).
+   */
+  async findMultipleNationalTendersWithBaseAnalysis(
+    ids: string[],
+    withoutBaseAnalysisGenerating = true,
+  ) {
+    if (!ids.length) {
+      return [];
+    }
+
+    const tenders = await NationalTenderModel.find({ id: { $in: ids } })
+      .select(withoutBaseAnalysisGenerating ? '' : '+rawData')
+      .lean<NationalTender[]>()
+      .exec();
+    const analyses = withoutBaseAnalysisGenerating
+      ? await TenderGeneralAnalysisModel.find({
+          tenderId: { $in: ids },
+        }).exec()
+      : await this.tenderGeneralAnalysisService.ensureBaseAnalysisForMultipleTenders(
+          tenders.map((tender) =>
+            this.nationalTendersReadService.toAnalysisTender(tender),
+          ),
+        );
+    const analysisById = new Map<string, TenderGeneralAnalysisDocument>(
+      analyses.map((analysis) => [analysis.tenderId, analysis] as const),
+    );
+
+    return tenders.map((tender) => ({
+      ...serializeNationalTenderList(tender),
+      generalAnalysis: TenderGeneralAnalysisModel.serializeList(
+        analysisById.get(tender.id) as unknown as TenderGeneralAnalysis,
+      ),
+    }));
   }
 
   toWholeTenderListDto(
