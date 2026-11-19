@@ -201,6 +201,9 @@ export interface NationalTenderStoreResult {
   failed: number;
 }
 
+/** Outcome of storing one record (reported per record for live progress). */
+export type NationalStoreOutcome = keyof NationalTenderStoreResult;
+
 export interface NationalTenderShortTitleHolder {
   id: string;
   title?: string;

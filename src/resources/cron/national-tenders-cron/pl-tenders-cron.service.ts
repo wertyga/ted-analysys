@@ -8,7 +8,7 @@ import { isCronLeaderInstance } from '@/utils';
 /** Cron task id, managed in the admin panel (`/admin/cron`). */
 export const PL_BZP_CRON_TASK_ID = 'gather-pl-bzp-tenders';
 
-/** Poland (BZP): daily collection of new tenders and deadline changes. */
+/** Poland (BZP): daily collection of new tenders, deadline changes and results. */
 @Injectable()
 export class PlTendersCronService {
   constructor(

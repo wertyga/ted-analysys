@@ -2,8 +2,19 @@ import { Logger } from '@nestjs/common';
 import { logger } from '@/utils';
 import { NationalTenderStoreResult } from './national-tender.types';
 
+/** Step the running job is on (null when idle). */
+export type NationalCollectorStage =
+  | 'tenders'
+  | 'shortTitles'
+  | 'amendments'
+  | 'results'
+  | 'stats'
+  | 'matching'
+  | 'reports';
+
 export interface NationalCollectorStatus extends NationalTenderStoreResult {
   isRunning: boolean;
+  stage: NationalCollectorStage | null;
   startedAt: Date | null;
   finishedAt: Date | null;
   lastError: string | null;
@@ -13,6 +24,8 @@ export interface NationalCollectorStatus extends NationalTenderStoreResult {
   skipped: number;
   /** Publication date of the newest notice processed in the last run. */
   lastPublicationDate: Date | null;
+  /** AI short titles generated for saved tenders. */
+  shortTitlesGenerated: number;
   /** Amendment notices (deadline changes etc.). */
   amendments: NationalAmendmentStats;
   /** Shared `buyers` records created/updated in this run. */
@@ -39,6 +52,7 @@ export interface NationalAmendmentStats {
 
 const emptyStatus = (): NationalCollectorStatus => ({
   isRunning: false,
+  stage: null,
   startedAt: null,
   finishedAt: null,
   lastError: null,
@@ -46,6 +60,7 @@ const emptyStatus = (): NationalCollectorStatus => ({
   noticesFetched: 0,
   skipped: 0,
   lastPublicationDate: null,
+  shortTitlesGenerated: 0,
   buyersTouched: 0,
   awards: { fetched: 0, saved: 0, updated: 0, unchanged: 0, failed: 0 },
   contractorsTouched: 0,
@@ -105,6 +120,8 @@ export class NationalCollectorRun {
 
     try {
       await job(status);
+      // Kept on failure: shows the step the job broke on.
+      status.stage = null;
       this.logger.log(
         `${this.name} done: fetched=${status.noticesFetched} saved=${status.saved} updated=${status.updated} unchanged=${status.unchanged} skipped=${status.skipped} failed=${status.failed} amendments=${JSON.stringify(status.amendments)} awards=${JSON.stringify(status.awards)} matching=${JSON.stringify(status.matching)}`,
       );

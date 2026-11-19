@@ -9,6 +9,7 @@ import {
   NationalTenderAmendment,
   NationalTenderPatch,
   NationalTenderShortTitleHolder,
+  NationalStoreOutcome,
   NationalTenderSource,
   NationalTenderStoreResult,
   NormalizedNationalTender,
@@ -34,6 +35,12 @@ export interface NationalTenderStoreOptions {
   ) => Promise<Types.ObjectId[]>;
   /** Called with the `_id` of each saved or changed tender (for matching). */
   onChanged?: (id: Types.ObjectId) => void;
+  /** Called after each tender with its outcome (live progress). */
+  onStored?: (outcome: NationalStoreOutcome) => void;
+  /** Called before short titles are generated for the batch. */
+  onShortTitlesStart?: () => void;
+  /** Called with the number of short titles saved per LLM call. */
+  onShortTitlesGenerated?: (count: number) => void;
 }
 
 /**
@@ -66,6 +73,7 @@ export class NationalTendersStorageService {
         const outcome = await this.storeOne(tender, options);
 
         result[outcome.status] += 1;
+        options.onStored?.(outcome.status);
 
         if (outcome.doc) {
           options.onChanged?.(outcome.doc._id);
@@ -79,6 +87,7 @@ export class NationalTendersStorageService {
         }
       } catch (e: unknown) {
         result.failed += 1;
+        options.onStored?.('failed');
         this.logger.warn(
           `Failed to store national tender ${tender.id}: ${
             e instanceof Error ? e.message : 'unknown error'
@@ -87,8 +96,12 @@ export class NationalTendersStorageService {
       }
     }
 
-    if (options.generateShortTitles) {
-      await this.fillMissingShortTitles(needShortTitle);
+    if (options.generateShortTitles && needShortTitle.length) {
+      options.onShortTitlesStart?.();
+      await this.fillMissingShortTitles(
+        needShortTitle,
+        options.onShortTitlesGenerated,
+      );
     }
 
     return result;
@@ -256,6 +269,7 @@ export class NationalTendersStorageService {
 
   private async fillMissingShortTitles(
     tenders: NationalTenderShortTitleHolder[],
+    onGenerated?: (count: number) => void,
   ): Promise<void> {
     const pending = tenders.filter((tender) => tender.title);
 
@@ -268,16 +282,19 @@ export class NationalTendersStorageService {
             batch.map((tender) => ({ id: tender.id, title: tender.title! })),
           );
 
-        await Promise.all(
-          generated
-            .filter((item) => this.hasCompleteShortTitle(item.shortTitle))
-            .map((item) =>
-              NationalTenderModel.updateOne(
-                { id: item.id },
-                { $set: { shortTitle: item.shortTitle } },
-              ),
-            ),
+        const complete = generated.filter((item) =>
+          this.hasCompleteShortTitle(item.shortTitle),
         );
+
+        await Promise.all(
+          complete.map((item) =>
+            NationalTenderModel.updateOne(
+              { id: item.id },
+              { $set: { shortTitle: item.shortTitle } },
+            ),
+          ),
+        );
+        onGenerated?.(complete.length);
       } catch (e: unknown) {
         this.logger.warn(
           `Failed to generate national tender short titles: ${
