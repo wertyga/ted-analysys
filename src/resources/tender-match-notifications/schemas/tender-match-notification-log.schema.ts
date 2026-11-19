@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema, Types } from 'mongoose';
+import { TED_TENDER_MODEL_NAME } from '@/resources/national-tenders/core/national-tender.serializer';
 import { AiFitDecision } from '@/resources/tender-matching/tender-match.types';
 import { UserNotificationFrequency } from '@/resources/user/user.types';
 
@@ -6,6 +7,8 @@ export interface TenderMatchNotificationLog {
   user: Types.ObjectId;
   match: Types.ObjectId;
   tender: Types.ObjectId;
+  /** Model of `tender`: absent/'Tender' for TED, 'NationalTender' for national. */
+  tenderModel?: string;
   aiFitDecision: AiFitDecision;
   frequency: UserNotificationFrequency;
   sentAt: Date;
@@ -33,9 +36,12 @@ export const TenderMatchNotificationLogSchema =
       },
       tender: {
         type: Schema.Types.ObjectId,
-        ref: 'Tender',
+        ref: function (this: { tenderModel?: string }) {
+          return this.tenderModel || TED_TENDER_MODEL_NAME;
+        },
         required: true,
       },
+      tenderModel: String,
       aiFitDecision: {
         type: String,
         enum: AiFitDecision,

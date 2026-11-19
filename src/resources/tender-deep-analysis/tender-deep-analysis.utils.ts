@@ -1,3 +1,5 @@
+import { NATIONAL_TENDER_MODEL_NAME } from '@/resources/national-tenders/core/national-tender.serializer';
+import { NationalTenderModel } from '@/resources/national-tenders/core/schemas/national-tender.schema';
 import {
   TenderDeepAnalysisDocument,
   TenderDeepAnalysisRecord,
@@ -21,7 +23,12 @@ export async function getTenderSourceHash(
     return (deepAnalysis.tender as any).sourceHash;
   }
 
-  const tenderRecord = await TenderModel.findById(deepAnalysis.tender)
+  const model =
+    deepAnalysis.tenderModel === NATIONAL_TENDER_MODEL_NAME
+      ? NationalTenderModel
+      : TenderModel;
+  const tenderRecord = await (model as typeof TenderModel)
+    .findById(deepAnalysis.tender)
     .select('sourceHash')
     .lean<Pick<TenderDocument, 'sourceHash'>>()
     .exec();

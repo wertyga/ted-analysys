@@ -2,6 +2,12 @@ import mongoose, { Document, Model, Schema, Types } from 'mongoose';
 import { TenderModel, TenderSerializable } from '@/resources/tenders/schemas';
 import { filterModel, isPopulatedRecord } from '@/utils';
 import {
+  isNationalTenderRecord,
+  serializeNationalTenderDetail,
+  serializeNationalTenderList,
+  TED_TENDER_MODEL_NAME,
+} from '@/resources/national-tenders/core/national-tender.serializer';
+import {
   AiFitDecision,
   AiFitStatus,
   HardMatchStatus,
@@ -12,6 +18,8 @@ import {
 
 export interface TenderCompanyMatch {
   tender: Types.ObjectId;
+  /** Model of `tender`: absent/'Tender' for TED, 'NationalTender' for national. */
+  tenderModel?: string;
   company: Types.ObjectId;
   companyTenderFilter: Types.ObjectId;
   hardMatchStatus: HardMatchStatus;
@@ -52,10 +60,14 @@ export const TenderCompanyMatchSchema = new Schema<TenderCompanyMatchDocument>(
   {
     tender: {
       type: Schema.Types.ObjectId,
-      ref: 'Tender',
+      // Polymorphic: TED tenders (default) or national tenders.
+      ref: function (this: { tenderModel?: string }) {
+        return this.tenderModel || TED_TENDER_MODEL_NAME;
+      },
       required: true,
       index: true,
     },
+    tenderModel: String,
     company: {
       type: Schema.Types.ObjectId,
       ref: 'Company',
@@ -170,7 +182,9 @@ function serializeMatchList(
 
   return {
     ...rest,
-    tender: TenderModel.serializeList(tender as unknown as TenderSerializable),
+    tender: isNationalTenderRecord(tender)
+      ? serializeNationalTenderList(tender)
+      : TenderModel.serializeList(tender as unknown as TenderSerializable),
   };
 }
 
@@ -187,9 +201,11 @@ function serializeMatchDetail(
 
   return {
     ...rest,
-    tender: isPopulatedRecord(tender)
-      ? TenderModel.serializeDetail(tender as unknown as TenderSerializable)
-      : tender,
+    tender: isNationalTenderRecord(tender)
+      ? serializeNationalTenderDetail(tender)
+      : isPopulatedRecord(tender)
+        ? TenderModel.serializeDetail(tender as unknown as TenderSerializable)
+        : tender,
   };
 }
 

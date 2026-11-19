@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
+  IsArray,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -8,6 +10,11 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { normalizeSourcesInput } from './award-tender-list-request.dto';
+import {
+  TENDER_SOURCE_FILTER_VALUES,
+  type TenderSourceFilter,
+} from '@/resources/ted-search/ted.search.sources';
 
 export class AwardTenderAwardsRequestDto {
   @ApiProperty({ example: '12345678-2026' })
@@ -29,4 +36,16 @@ export class AwardTenderAwardsRequestDto {
   @IsInt()
   @Min(1)
   page?: number;
+
+  @ApiPropertyOptional({
+    enum: TENDER_SOURCE_FILTER_VALUES,
+    isArray: true,
+    example: ['TED', 'PL_BZP'],
+    description: 'Award sources: TED and/or national sources. Empty = all.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => normalizeSourcesInput(value))
+  @IsArray()
+  @IsIn(TENDER_SOURCE_FILTER_VALUES, { each: true })
+  sources?: TenderSourceFilter[];
 }

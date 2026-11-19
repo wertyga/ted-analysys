@@ -22,7 +22,12 @@ import {
 import {
   AwardTenderSortBy,
   AwardTenderSortOrder,
+  normalizeSourcesInput,
 } from './award-tender-list-request.dto';
+import {
+  TENDER_SOURCE_FILTER_VALUES,
+  type TenderSourceFilter,
+} from '@/resources/ted-search/ted.search.sources';
 
 function normalizeCountryInput(value: unknown): unknown {
   const items = Array.isArray(value) ? value : [value];
@@ -113,4 +118,16 @@ export class AwardTenderPureSearchRequestDto {
   @IsInt()
   @Min(1)
   page?: number;
+
+  @ApiPropertyOptional({
+    enum: TENDER_SOURCE_FILTER_VALUES,
+    isArray: true,
+    example: ['TED', 'PL_BZP'],
+    description: 'Award sources: TED and/or national sources. Empty = all.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => normalizeSourcesInput(value))
+  @IsArray()
+  @IsIn(TENDER_SOURCE_FILTER_VALUES, { each: true })
+  sources?: TenderSourceFilter[];
 }

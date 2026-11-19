@@ -1,4 +1,13 @@
 import {
+  isNationalTenderRecord,
+  serializeNationalTenderDetail,
+} from '@/resources/national-tenders/core/national-tender.serializer';
+import {
+  TenderGeneralAnalysis,
+  TenderGeneralAnalysisModel,
+  TenderGeneralAnalysisRecord,
+} from '@/resources/tender-analysis/schemas';
+import {
   Controller,
   Delete,
   Get,
@@ -49,8 +58,30 @@ export class TenderWishlistController {
       limit,
     );
 
+    const nationalIds = wishlist.tenders
+      .filter(isNationalTenderRecord)
+      .map((tender) => tender.id);
+    const nationalAnalyses = nationalIds.length
+      ? await TenderGeneralAnalysisModel.find({
+          tenderId: { $in: nationalIds },
+        })
+          .lean<TenderGeneralAnalysisRecord[]>()
+          .exec()
+      : [];
+    const nationalAnalysisById = new Map(
+      nationalAnalyses.map((analysis) => [analysis.tenderId, analysis]),
+    );
+
+    // National tenders are served in the detail TenderDto shape.
     const tendersDtos = wishlist.tenders.map((tender) =>
-      this.tendersService.toWholeTenderListDto(tender as any),
+      isNationalTenderRecord(tender)
+        ? {
+            ...serializeNationalTenderDetail(tender),
+            generalAnalysis: TenderGeneralAnalysisModel.serializeList(
+              nationalAnalysisById.get(tender.id) as TenderGeneralAnalysis,
+            ),
+          }
+        : this.tendersService.toWholeTenderListDto(tender as any),
     );
 
     if (req.user) {

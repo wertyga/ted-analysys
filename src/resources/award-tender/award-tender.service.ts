@@ -54,11 +54,27 @@ import {
   AwardTenderSortOrder,
 } from './dto/award-tender-list-request.dto';
 import { isPageIndexable } from '@/resources/seo/page-indexability';
+import { NationalAwardTenderModel } from '@/resources/national-tenders/core/schemas/national-award-tender.schema';
+import type { NationalAwardTender } from '@/resources/national-tenders/core/schemas/national-award-tender.schema';
+import { NationalTenderModel } from '@/resources/national-tenders/core/schemas/national-tender.schema';
+import {
+  isNationalAwardId,
+  nationalAwardSourceFields,
+} from '@/resources/national-tenders/core/national-award.serializer';
+import { resolveSearchSources } from '@/resources/ted-search/ted.search.sources';
+import { mergeAwardPages, toAwardSortValue } from './utils/award-merge';
+
+type AwardSources = ReturnType<typeof resolveSearchSources>;
+
+/** Source fields selected from national awards for list responses. */
+const NATIONAL_AWARD_SOURCE_SELECT = ['source', 'sourceUrl', 'sourceId', 'country'];
+
+type AwardModel = typeof AwardTenderModel;
 
 export type AwardTenderPureSearchFilters = Pick<
   TedTenderSearchRequestDto,
   'cpvCodes' | 'placeOfPerformance' | 'procedureType' | 'contractNature'
-> & { awardDateFrom?: string };
+> & { awardDateFrom?: string; sources?: string[] };
 
 const AWARD_TENDER_PURE_LIST_SELECT = [
   '_id',
@@ -91,6 +107,8 @@ const AWARD_LIST_POPULATE = [
 ];
 
 type AwardListRef = { _id: Types.ObjectId; name?: string };
+
+type AwardPopulate = typeof AWARD_LIST_POPULATE | typeof awardTenderPopulateFields;
 
 type AwardListLeanItem = {
   id: string;
@@ -163,10 +181,16 @@ export class AwardTenderService {
   async searchAwardTendersLocal(
     tenderId: string,
     pagination: { page?: number; limit?: number } = {},
+    sourcesFilter?: string[],
   ) {
-    const tender: TenderDocument | null = await TenderModel.findOne({
-      id: tenderId,
-    });
+    // TED or national tender: both have cpvCodes and contractNature.
+    const tender: Pick<TenderDocument, 'cpvCodes' | 'contractNature'> | null =
+      (await TenderModel.findOne({ id: tenderId })
+        .select('cpvCodes contractNature')
+        .lean()) ??
+      (await NationalTenderModel.findOne({ id: tenderId })
+        .select('cpvCodes contractNature')
+        .lean());
     if (!tender) {
       throw new NotFoundException('Tender not found');
     }
@@ -177,6 +201,28 @@ export class AwardTenderService {
     };
 
     const { skip, limit } = getPaginationMeta(pagination);
+    const sources = resolveSearchSources(sourcesFilter);
+
+    if (sources.nationalSources.length) {
+      const page = await this.findMergedAwards(query, sources, {
+        skip,
+        limit,
+        populate: awardTenderPopulateFields,
+      });
+
+      return {
+        totalNoticeCount: page.total,
+        notices: page.rows.map(({ record, national }) =>
+          national
+            ? {
+                ...AwardTenderModel.serializeList(record as never),
+                ...nationalAwardSourceFields(record as NationalAwardTender),
+              }
+            : AwardTenderModel.serializeList(record as never),
+        ),
+      };
+    }
+
     const [savedTenders, totalCount] = await Promise.all([
       AwardTenderModel.find(query)
         .sort({ publicationDate: -1 })
@@ -203,7 +249,7 @@ export class AwardTenderService {
       sortOrder?: AwardTenderSortOrder;
     } = {},
   ) {
-    const { awardDateFrom, ...tenderFilters } = filters;
+    const { awardDateFrom, sources: sourcesFilter, ...tenderFilters } = filters;
     const baseQuery = (await this.tedSearchFilters.buildLocalTenderQuery(
       tenderFilters,
     )) as QueryFilter<AwardTenderDocument>;
@@ -212,9 +258,31 @@ export class AwardTenderService {
       : baseQuery;
 
     const { skip, limit } = getPaginationMeta(pagination);
+    const sources = resolveSearchSources(sourcesFilter);
+
+    if (sources.nationalSources.length) {
+      const [page, indexable] = await Promise.all([
+        this.findMergedAwards(query, sources, {
+          ...sorting,
+          skip,
+          limit,
+          select: AWARD_TENDER_PURE_LIST_SELECT,
+        }),
+        isPageIndexable(tenderFilters),
+      ]);
+
+      return {
+        totalNoticeCount: page.total,
+        notices: page.rows.map(({ record, national }) =>
+          national ? this.toPureNationalAward(record) : record,
+        ),
+        indexable,
+      };
+    }
+
     const [awardTenders, totalCount, indexable] = await Promise.all([
       sorting.sortBy
-        ? this.findSortedAwards(query, {
+        ? this.findSortedAwards(AwardTenderModel, query, {
             ...sorting,
             sortBy: sorting.sortBy,
             skip,
@@ -229,7 +297,7 @@ export class AwardTenderService {
             .lean()
             .exec(),
       AwardTenderModel.countDocuments(query),
-      isPageIndexable(filters),
+      isPageIndexable(tenderFilters),
     ]);
 
     return {
@@ -242,10 +310,32 @@ export class AwardTenderService {
   async listAwards(query: AwardTenderListRequestDto) {
     const filter = await this.buildAwardsFilter(query);
     const { skip, limit } = getPaginationMeta(query);
+    const sources = resolveSearchSources(query.sources);
+
+    if (sources.nationalSources.length) {
+      const page = await this.findMergedAwards(filter, sources, {
+        sortBy: query.sortBy ?? AwardTenderSortBy.AWARD_DATE,
+        sortOrder: query.sortOrder,
+        skip,
+        limit,
+        select: AWARD_LIST_SELECT,
+        populate: AWARD_LIST_POPULATE,
+      });
+
+      return {
+        total: page.total,
+        results: page.rows.map(({ record, national }) => ({
+          ...this.serializeAwardListItem(record as AwardListLeanItem),
+          ...(national
+            ? nationalAwardSourceFields(record as NationalAwardTender)
+            : {}),
+        })),
+      };
+    }
 
     const [total, items] = await Promise.all([
       AwardTenderModel.countDocuments(filter),
-      this.findSortedAwards(filter, {
+      this.findSortedAwards(AwardTenderModel, filter, {
         sortBy: query.sortBy ?? AwardTenderSortBy.AWARD_DATE,
         sortOrder: query.sortOrder,
         skip,
@@ -263,17 +353,161 @@ export class AwardTenderService {
     };
   }
 
+  /**
+   * One page of TED and national awards together: each collection returns
+   * its first `skip + limit` records in the same order, then they are merged.
+   * Without `sortBy` the order is publicationDate desc (as the TED lists).
+   */
+  private async findMergedAwards(
+    filter: QueryFilter<AwardTenderDocument>,
+    sources: AwardSources,
+    options: {
+      sortBy?: AwardTenderSortBy;
+      sortOrder?: AwardTenderSortOrder;
+      skip: number;
+      limit: number;
+      select?: string[];
+      populate?: AwardPopulate;
+    },
+  ) {
+    const { sortBy, skip, limit } = options;
+    const take = skip + limit;
+    const direction: 1 | -1 =
+      sortBy && options.sortOrder === AwardTenderSortOrder.ASC ? 1 : -1;
+    const sortField =
+      sortBy === AwardTenderSortBy.VALUE
+        ? 'awardValueEur'
+        : sortBy === AwardTenderSortBy.AWARD_DATE
+          ? 'awardDate'
+          : 'publicationDate';
+    const nationalFilter = {
+      $and: [filter, { source: { $in: sources.nationalSources } }],
+    } as QueryFilter<AwardTenderDocument>;
+    const select = options.select
+      ? [...options.select, sortField, ...NATIONAL_AWARD_SOURCE_SELECT]
+      : undefined;
+
+    const fetch = (
+      model: AwardModel,
+      pageFilter: QueryFilter<AwardTenderDocument>,
+    ): Promise<unknown[]> => {
+      if (sortBy) {
+        return this.findSortedAwards(model, pageFilter, {
+          sortBy,
+          sortOrder: options.sortOrder,
+          skip: 0,
+          limit: take,
+          select,
+          populate: options.populate,
+        });
+      }
+
+      const query = model
+        .find(pageFilter)
+        .sort({ publicationDate: -1, _id: -1 })
+        .limit(take);
+
+      if (select) query.select(select);
+      if (options.populate) query.populate(options.populate as never);
+
+      return query.lean().exec() as Promise<unknown[]>;
+    };
+
+    // Field names of national awards mirror AwardTender.
+    const nationalModel = NationalAwardTenderModel as unknown as AwardModel;
+    const [ted, national, tedCount, nationalCount] = await Promise.all([
+      sources.includeTed ? fetch(AwardTenderModel, filter) : [],
+      fetch(nationalModel, nationalFilter),
+      sources.includeTed ? AwardTenderModel.countDocuments(filter) : 0,
+      nationalModel.countDocuments(nationalFilter),
+    ]);
+
+    const toRow = (isNational: boolean) => (record: unknown) => ({
+      record,
+      national: isNational,
+      value: toAwardSortValue(
+        (record as Record<string, unknown>)[sortField],
+        sortBy === AwardTenderSortBy.VALUE,
+      ),
+    });
+
+    return {
+      total: tedCount + nationalCount,
+      rows: mergeAwardPages(
+        ted.map(toRow(false)),
+        national.map(toRow(true)),
+        direction,
+        skip,
+        limit,
+      ),
+    };
+  }
+
+  /** National award in the `search-pure` shape (+ source fields). */
+  private toPureNationalAward(record: unknown) {
+    const award = record as NationalAwardTender & Record<string, unknown>;
+    const picked = Object.fromEntries(
+      AWARD_TENDER_PURE_LIST_SELECT.filter((field) => field in award).map(
+        (field) => [field, award[field]],
+      ),
+    );
+
+    return { ...picked, ...nationalAwardSourceFields(award) };
+  }
+
+  /** Runs an aggregation over TED and/or national awards matching `filter`. */
+  private async aggregateAwards<T>(
+    filter: QueryFilter<AwardTenderDocument>,
+    sources: AwardSources,
+    stages: Record<string, unknown>[],
+  ): Promise<T[]> {
+    const nationalMatch = {
+      $match: { $and: [filter, { source: { $in: sources.nationalSources } }] },
+    };
+
+    if (sources.includeTed) {
+      return AwardTenderModel.aggregate<T>([
+        { $match: filter },
+        ...(sources.nationalSources.length
+          ? [
+              {
+                $unionWith: {
+                  coll: NationalAwardTenderModel.collection.name,
+                  pipeline: [nationalMatch],
+                },
+              },
+            ]
+          : []),
+        ...stages,
+      ] as never[])
+        .allowDiskUse(true)
+        .exec();
+    }
+
+    if (sources.nationalSources.length) {
+      return NationalAwardTenderModel.aggregate<T>([
+        nationalMatch,
+        ...stages,
+      ] as never[])
+        .allowDiskUse(true)
+        .exec();
+    }
+
+    return [];
+  }
+
   private async findSortedAwards(
+    model: AwardModel,
     filter: QueryFilter<AwardTenderDocument>,
     options: {
       sortBy: AwardTenderSortBy;
       sortOrder?: AwardTenderSortOrder;
       skip: number;
       limit: number;
-      select: string[];
-      populate?: typeof AWARD_LIST_POPULATE;
+      select?: string[];
+      populate?: AwardPopulate;
     },
-  ) {
+  ): Promise<unknown[]> {
     const { sortBy, skip, limit } = options;
     const direction = options.sortOrder === AwardTenderSortOrder.ASC ? 1 : -1;
     const sortField =
@@ -289,7 +523,7 @@ export class AwardTenderService {
     const withValue = { $and: [filter, hasSortValue] };
     const withoutValue = { $and: [filter, { $nor: [hasSortValue] }] };
 
-    const withValueCount = await AwardTenderModel.countDocuments(withValue);
+    const withValueCount = await model.countDocuments(withValue);
 
     const findPage = (
       pageFilter: QueryFilter<AwardTenderDocument>,
@@ -297,19 +531,18 @@ export class AwardTenderService {
       pageLimit: number,
       sort: Record<string, 1 | -1>,
     ) => {
-      if (pageLimit <= 0) return Promise.resolve([]);
+      if (pageLimit <= 0) return Promise.resolve([] as unknown[]);
 
-      const pageQuery = AwardTenderModel.find(pageFilter)
-        .select(options.select)
+      const pageQuery = model
+        .find(pageFilter)
         .sort(sort)
         .skip(pageSkip)
         .limit(pageLimit);
 
-      return (
-        options.populate ? pageQuery.populate(options.populate) : pageQuery
-      )
-        .lean()
-        .exec();
+      if (options.select) pageQuery.select(options.select);
+      if (options.populate) pageQuery.populate(options.populate as never);
+
+      return pageQuery.lean().exec() as Promise<unknown[]>;
     };
 
     const withValueLimit = Math.max(0, Math.min(limit, withValueCount - skip));
@@ -331,26 +564,29 @@ export class AwardTenderService {
 
   async getAwardsStats(query: AwardTenderFiltersRequestDto) {
     const filter = await this.buildAwardsFilter(query);
+    const sources = resolveSearchSources(query.sources);
 
     const countDistinct = async (expression: string | object) => {
-      const [result] = await AwardTenderModel.aggregate<{ count: number }>([
-        { $match: filter },
-        { $project: { value: expression } },
-        { $unwind: '$value' },
-        { $group: { _id: '$value' } },
-        { $count: 'count' },
-      ]).allowDiskUse(true);
+      const [result] = await this.aggregateAwards<{ count: number }>(
+        filter,
+        sources,
+        [
+          { $project: { value: expression } },
+          { $unwind: '$value' },
+          { $group: { _id: '$value' } },
+          { $count: 'count' },
+        ],
+      );
 
       return result?.count ?? 0;
     };
 
     const [totals, winnersCount, buyersCount, countriesCount] =
       await Promise.all([
-        AwardTenderModel.aggregate<{
+        this.aggregateAwards<{
           awardsCount: number;
           totalAwardValueEur: number;
-        }>([
-          { $match: filter },
+        }>(filter, sources, [
           {
             $group: {
               _id: null,
@@ -358,7 +594,7 @@ export class AwardTenderService {
               totalAwardValueEur: { $sum: '$awardValueEur' },
             },
           },
-        ]).allowDiskUse(true),
+        ]),
         countDistinct('$winners'),
         countDistinct({ $setUnion: ['$leadBuyers', '$nonLeadBuyers'] }),
         countDistinct('$placeOfPerformanceCountries'),
@@ -481,6 +717,10 @@ export class AwardTenderService {
   }
 
   async getAwardTenderById(id: string) {
+    if (isNationalAwardId(id)) {
+      return this.getNationalAwardTenderById(id);
+    }
+
     const awardTender = await AwardTenderModel.findOne({ id })
       .populate(awardTenderPopulateFields)
       .exec();
@@ -490,6 +730,44 @@ export class AwardTenderService {
     }
 
     return AwardTenderModel.serializeDetail(awardTender);
+  }
+
+  /**
+   * National award in the `AwardTenderDetailDto` shape, plus source fields
+   * and `tenderId` of our tender of the same procedure (when stored).
+   */
+  private async getNationalAwardTenderById(id: string) {
+    const award = await NationalAwardTenderModel.findOne({ id })
+      .populate(awardTenderPopulateFields)
+      .lean<NationalAwardTender>()
+      .exec();
+
+    if (!award) {
+      throw new NotFoundException('Award tender not found');
+    }
+
+    const tender = award.sourceProcedureId
+      ? await NationalTenderModel.findOne({
+          source: award.source,
+          sourceProcedureId: award.sourceProcedureId,
+        })
+          .select('id')
+          .lean()
+      : null;
+    const detail = AwardTenderModel.serializeDetail(
+      award as never,
+    ) as unknown as Record<string, unknown>;
+
+    // Internal / duplicated by `sourceNoticeId` and `tenderId`.
+    for (const field of ['rawData', 'sourceHash', 'sourceId', 'sourceProcedureId', '__v']) {
+      delete detail[field];
+    }
+
+    return {
+      ...detail,
+      ...nationalAwardSourceFields(award),
+      tenderId: tender?.id ?? null,
+    };
   }
 
   private async getLotsWithEurValues(

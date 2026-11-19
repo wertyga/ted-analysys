@@ -1,4 +1,8 @@
 import {
+  isNationalTenderId,
+  NationalTendersReadService,
+} from '@/resources/national-tenders/core/national-tenders-read.service';
+import {
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -16,12 +20,14 @@ export class TenderWishlistService {
   constructor(
     private readonly tendersService: TendersService,
     private readonly tariffService: TariffService,
+    private readonly nationalTendersReadService: NationalTendersReadService,
   ) {}
 
   async addTender(user: UserDocument, tenderId: string) {
     await this.canAddTenderGuard(user, tenderId);
 
-    const tender = await this.tendersService.findLocalTender(tenderId);
+    const tender =
+      await this.tendersService.findLocalOrNationalTender(tenderId);
 
     if (!tender) {
       throw new NotFoundException(`Tender ${tenderId} not found`);
@@ -75,21 +81,32 @@ export class TenderWishlistService {
         .sort({ createdAt: -1 })
         .skip(pagination.skip)
         .limit(pagination.limit)
-        .select('tender')
+        .select('tender tenderId')
         .lean()
         .exec(),
       TenderWishlistItemModel.countDocuments({ user: userId }).exec(),
     ]);
 
     const tenderIds = items.map((item) => item.tender);
+    const nationalIds = items
+      .filter((item) => isNationalTenderId(item.tenderId))
+      .map((item) => item.tender);
 
-    const tenders =
-      await this.tendersService.findMultipleLocalTendersWithBaseAnalysis({
-        _id: { $in: tenderIds },
-      });
-    const tendersById = new Map(
-      tenders.map((tender) => [tender._id.toString(), tender]),
-    );
+    const [tenders, nationalTenders] = await Promise.all([
+      // Listing must not start analyses; it only returns existing ones.
+      this.tendersService.findMultipleLocalTendersWithBaseAnalysis(
+        { _id: { $in: tenderIds } },
+        {},
+        true,
+      ),
+      this.nationalTendersReadService.findManyByObjectIds(nationalIds),
+    ]);
+    const tendersById = new Map<string, unknown>([
+      ...tenders.map((tender) => [tender._id.toString(), tender] as const),
+      ...nationalTenders.map(
+        (tender) => [tender._id.toString(), tender] as const,
+      ),
+    ]);
 
     return {
       tenders: tenderIds

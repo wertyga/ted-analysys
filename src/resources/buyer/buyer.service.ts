@@ -1,3 +1,47 @@
+import {
+  NationalAwardTenderDocument,
+  NationalAwardTenderModel,
+} from '@/resources/national-tenders/core/schemas/national-award-tender.schema';
+
+/** TED and national awards, newest first. */
+function mergeAwardsByDate<T extends { publicationDate?: Date }>(
+  ted: T[],
+  national: unknown[],
+): T[] {
+  return [...ted, ...(national as T[])].sort(
+    (a, b) =>
+      new Date(b.publicationDate ?? 0).getTime() -
+      new Date(a.publicationDate ?? 0).getTime(),
+  );
+}
+
+/** `AwardTenderModel.serializeList` + the national source fields. */
+function serializeAnyAwardList(award: unknown) {
+  const record = award as {
+    source?: string;
+    sourceUrl?: string;
+    country?: string;
+  };
+  const list = AwardTenderModel.serializeList(award as never);
+
+  return record.source
+    ? {
+        ...list,
+        source: record.source,
+        sourceUrl: record.sourceUrl,
+        country: record.country,
+      }
+    : list;
+}
+
+import {
+  NATIONAL_TENDER_POPULATE,
+  serializeNationalTenderList,
+} from '@/resources/national-tenders/core/national-tender.serializer';
+import {
+  NationalTender,
+  NationalTenderModel,
+} from '@/resources/national-tenders/core/schemas/national-tender.schema';
 import mongoose, { QueryFilter, SortOrder, Types } from 'mongoose';
 import {
   BadRequestException,
@@ -266,31 +310,60 @@ export class BuyerService {
       submissionDeadline: { $gte: new Date() },
     };
 
-    const [nonLeadTenders, leadTenders, nonLeadAwardTenders, leadAwardTenders] =
-      await Promise.all([
-        TenderModel.find({
-          ...activeTenderFilter,
-          nonLeadBuyers: buyer._id,
-        })
-          .select(tenderSelectFields)
-          .lean(),
-        TenderModel.find({
-          ...activeTenderFilter,
-          leadBuyers: buyer._id,
-        })
-          .select(tenderSelectFields)
-          .lean(),
-        AwardTenderModel.find({
-          nonLeadBuyers: buyer._id,
-        })
-          .select(awardTenderSelectFields)
-          .lean(),
-        AwardTenderModel.find({
-          leadBuyers: buyer._id,
-        })
-          .select(awardTenderSelectFields)
-          .lean(),
-      ]);
+    const [
+      nonLeadTenders,
+      tedLeadTenders,
+      nonLeadAwardTenders,
+      tedLeadAwardTenders,
+      nationalLeadTenders,
+      nationalLeadAwardTenders,
+    ] = await Promise.all([
+      TenderModel.find({
+        ...activeTenderFilter,
+        nonLeadBuyers: buyer._id,
+      })
+        .select(tenderSelectFields)
+        .lean(),
+      TenderModel.find({
+        ...activeTenderFilter,
+        leadBuyers: buyer._id,
+      })
+        .select(tenderSelectFields)
+        .lean(),
+      AwardTenderModel.find({
+        nonLeadBuyers: buyer._id,
+      })
+        .select(awardTenderSelectFields)
+        .lean(),
+      AwardTenderModel.find({
+        leadBuyers: buyer._id,
+      })
+        .select(awardTenderSelectFields)
+        .lean(),
+      // National tenders count as the buyer's own (lead) tenders.
+      NationalTenderModel.find({
+        ...activeTenderFilter,
+        leadBuyers: buyer._id,
+      })
+        .select(
+          'publicationDate estimatedValueEur cpvCodes placeOfPerformanceCountries leadBuyers',
+        )
+        .lean(),
+      // National results count as the buyer's own awards.
+      NationalAwardTenderModel.find({
+        leadBuyers: buyer._id,
+      })
+        .select(awardTenderSelectFields)
+        .lean(),
+    ]);
+    const leadAwardTenders = [
+      ...tedLeadAwardTenders,
+      ...nationalLeadAwardTenders,
+    ] as unknown as typeof tedLeadAwardTenders;
+    const leadTenders = [
+      ...tedLeadTenders,
+      ...nationalLeadTenders,
+    ] as typeof tedLeadTenders;
 
     const tendersCount = leadTenders.length;
     const awardTendersCount = leadAwardTenders.length;
@@ -539,33 +612,116 @@ export class BuyerService {
     });
   }
 
+  /**
+   * Finds or creates the shared `Buyer` for a buyer of a national tender,
+   * with the same identity rule as TED (identifiers + country, else name).
+   */
+  async upsertNationalBuyer(input: {
+    name: string;
+    identifiers: string[];
+    country: string;
+    street?: string;
+    postCode?: string;
+    city?: string;
+    countrySub?: string;
+    email?: string;
+    website?: string;
+    cpvCodes: string[];
+  }): Promise<BuyerDocument> {
+    return this.upsertPureNormalizedBuyer({
+      name: input.name,
+      identifiers: input.identifiers,
+      address: {
+        street: input.street ?? '',
+        postCode: input.postCode ?? '',
+        city: input.city ?? '',
+        country: input.country,
+        countrySub: input.countrySub ?? '',
+      },
+      contact: {
+        contactPoint: '',
+        person: '',
+        email: input.email ?? '',
+        phone: '',
+        fax: '',
+        website: input.website ?? '',
+        gateway: '',
+      },
+      legalTypes: [],
+      mainActivities: [],
+      profiles: [],
+      gateways: [],
+      websites: input.website ? [input.website] : [],
+      cpvCodes: input.cpvCodes,
+      countries: [input.country],
+      isLead: true,
+    });
+  }
+
   async getBuyerDetails(buyerId: string) {
     return BuyerModel.findById(buyerId).populate('stats.topSuppliers.winner');
   }
 
   async getRecentTenders(buyerId: string) {
-    const tenders = await TenderModel.find({
-      $or: [{ leadBuyers: buyerId }, { nonLeadBuyers: buyerId }],
-      submissionDeadline: { $gte: new Date() },
-    })
-      .sort({ publicationDate: -1 })
-      .limit(BUYER_RECENT_TENDERS_LIMIT)
-      .populate(tenderPopulateFields)
-      .exec();
+    const [tenders, nationalTenders] = await Promise.all([
+      TenderModel.find({
+        $or: [{ leadBuyers: buyerId }, { nonLeadBuyers: buyerId }],
+        submissionDeadline: { $gte: new Date() },
+      })
+        .sort({ publicationDate: -1 })
+        .limit(BUYER_RECENT_TENDERS_LIMIT)
+        .populate(tenderPopulateFields)
+        .exec(),
+      NationalTenderModel.find({
+        leadBuyers: buyerId,
+        submissionDeadline: { $gte: new Date() },
+      })
+        .sort({ publicationDate: -1 })
+        .limit(BUYER_RECENT_TENDERS_LIMIT)
+        .populate(NATIONAL_TENDER_POPULATE)
+        .lean<NationalTender[]>()
+        .exec(),
+    ]);
 
-    return tenders.map(TenderModel.serializeList);
+    // TED and national tenders of the buyer, newest first.
+    return [
+      ...tenders.map((tender) => ({
+        date: tender.publicationDate,
+        dto: TenderModel.serializeList(tender),
+      })),
+      ...nationalTenders.map((tender) => ({
+        date: tender.publicationDate,
+        dto: serializeNationalTenderList(tender),
+      })),
+    ]
+      .sort(
+        (a, b) =>
+          new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime(),
+      )
+      .slice(0, BUYER_RECENT_TENDERS_LIMIT)
+      .map(({ dto }) => dto) as ReturnType<typeof TenderModel.serializeList>[];
   }
 
   async getRecentAwardTenders(buyerId: string) {
-    const awardTenders = await AwardTenderModel.find({
+    const query = {
       $or: [{ leadBuyers: buyerId }, { nonLeadBuyers: buyerId }],
-    })
-      .sort({ publicationDate: -1 })
-      .limit(MAX_AWARD_TENDER_FOR_CONTRACTOR_OR_BUYER)
-      .populate(awardTenderPopulateFields)
-      .exec();
+    };
+    const [awardTenders, nationalAwardTenders] = await Promise.all([
+      AwardTenderModel.find(query)
+        .sort({ publicationDate: -1 })
+        .limit(MAX_AWARD_TENDER_FOR_CONTRACTOR_OR_BUYER)
+        .populate(awardTenderPopulateFields)
+        .exec(),
+      NationalAwardTenderModel.find(query)
+        .sort({ publicationDate: -1 })
+        .limit(MAX_AWARD_TENDER_FOR_CONTRACTOR_OR_BUYER)
+        .populate(awardTenderPopulateFields)
+        .exec(),
+    ]);
 
-    return awardTenders.map(AwardTenderModel.serializeList);
+    return mergeAwardsByDate(awardTenders, nationalAwardTenders)
+      .slice(0, MAX_AWARD_TENDER_FOR_CONTRACTOR_OR_BUYER)
+      .map(serializeAnyAwardList);
   }
 
   async getAwardTendersByBuyerId(
@@ -581,21 +737,32 @@ export class BuyerService {
     };
 
     const { skip, limit } = getPaginationMeta(pagination);
-    const [awardTenders, totalCount] = await Promise.all([
-      AwardTenderModel.find(query)
-        .sort({ publicationDate: -1, _id: -1 })
-        .skip(skip)
-        .limit(limit)
-        .populate(awardTenderPopulateFields)
-        .exec(),
-      AwardTenderModel.countDocuments(query),
-    ]);
+    // TED and national results, newest first: take skip+limit of each, merge.
+    const [awardTenders, nationalAwardTenders, tedCount, nationalCount] =
+      await Promise.all([
+        AwardTenderModel.find(query)
+          .sort({ publicationDate: -1, _id: -1 })
+          .limit(skip + limit)
+          .populate(awardTenderPopulateFields)
+          .exec(),
+        NationalAwardTenderModel.find(
+          query as QueryFilter<NationalAwardTenderDocument>,
+        )
+          .sort({ publicationDate: -1, _id: -1 })
+          .limit(skip + limit)
+          .populate(awardTenderPopulateFields)
+          .exec(),
+        AwardTenderModel.countDocuments(query),
+        NationalAwardTenderModel.countDocuments(
+          query as QueryFilter<NationalAwardTenderDocument>,
+        ),
+      ]);
 
     return {
-      totalCount,
-      awardTenders: awardTenders.map((awardTender) =>
-        AwardTenderModel.serializeList(awardTender),
-      ),
+      totalCount: tedCount + nationalCount,
+      awardTenders: mergeAwardsByDate(awardTenders, nationalAwardTenders)
+        .slice(skip, skip + limit)
+        .map(serializeAnyAwardList),
     };
   }
 

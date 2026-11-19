@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { QueryFilter, Types, UpdateQuery } from 'mongoose';
+import { PopulateOptions, QueryFilter, Types, UpdateQuery } from 'mongoose';
 import { CompanyTenderFilterModel } from '@/resources/company-filter/company-filter.schema';
 import { TenderDocument, TenderModel } from '@/resources/tenders/schemas';
 import {
@@ -15,7 +15,6 @@ import {
   readStringArray,
   toObjectId,
   toIsoString,
-  tenderPopulateFields,
   // tenderCpvPopulateFields,
 } from '@/utils';
 import { TENDER_COMPETITION_NOTICE_TYPES } from '@/resources/ted-search/utils/niticies';
@@ -44,6 +43,20 @@ import { TENDER_MATCHING_CONFIG } from '@/config/tender-matching.config';
 import { BuyerDocument } from '@/resources/buyer/schemas';
 import { buildCompanyTenderFitUserPrompt } from './tender-matching.prompt';
 import { CpvService } from '@/resources/cpv/cpv.service';
+import { getTenderModelName } from '@/resources/national-tenders/core/national-tender.serializer';
+import { NationalTenderModel } from '@/resources/national-tenders/core/schemas/national-tender.schema';
+
+/**
+ * Populate of a match's polymorphic `tender`: TED tenders have
+ * `nonLeadBuyers`, national tenders only `leadBuyers`.
+ */
+export const MATCH_TENDER_POPULATE: PopulateOptions = {
+  path: 'tender',
+  populate: [
+    { path: 'leadBuyers' },
+    { path: 'nonLeadBuyers', strictPopulate: false },
+  ],
+};
 
 @Injectable()
 export class TenderMatchingService {
@@ -109,10 +122,7 @@ export class TenderMatchingService {
         .sort({ aiFitScore: -1, updatedAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate({
-          path: 'tender',
-          populate: tenderPopulateFields,
-        })
+        .populate(MATCH_TENDER_POPULATE)
         .exec(),
       TenderCompanyMatchModel.countDocuments(query).exec(),
     ]);
@@ -145,11 +155,29 @@ export class TenderMatchingService {
     filter: CompanyTenderFilterForMatching,
   ): Promise<TenderCompanyMatchDocument[]> {
     const savedMatches: TenderCompanyMatchDocument[] = [];
+
+    for (const findBatch of [
+      (lastId?: Types.ObjectId) => this.findActiveCompetitionTendersBatch(lastId),
+      (lastId?: Types.ObjectId) =>
+        this.findActiveNationalTendersBatch(lastId),
+    ]) {
+      savedMatches.push(
+        ...(await this.rematchTendersBatched(filter, findBatch)),
+      );
+    }
+
+    return savedMatches;
+  }
+
+  private async rematchTendersBatched(
+    filter: CompanyTenderFilterForMatching,
+    findBatch: (lastTenderId?: Types.ObjectId) => Promise<TenderDocument[]>,
+  ): Promise<TenderCompanyMatchDocument[]> {
+    const savedMatches: TenderCompanyMatchDocument[] = [];
     let lastTenderId: Types.ObjectId | undefined;
 
     while (true) {
-      const tenders =
-        await this.findActiveCompetitionTendersBatch(lastTenderId);
+      const tenders = await findBatch(lastTenderId);
 
       if (tenders.length === 0) {
         break;
@@ -182,6 +210,43 @@ export class TenderMatchingService {
     const companyFilters = await CompanyTenderFilterModel.find({});
 
     return this.matchTenderWithFilters(tender, companyFilters, source);
+  }
+
+  /**
+   * Matches national tenders (by `_id`) with all company filters. Field names
+   * of national tenders mirror `Tender`, so the same rules and AI-fit apply;
+   * matches are stored in `tender_company_matches` with `tenderModel`.
+   */
+  async matchNationalTendersWithAllCompanyFilters(
+    tenderIds: Types.ObjectId[],
+    source: TenderMatchSource,
+  ): Promise<TenderCompanyMatchDocument[]> {
+    if (tenderIds.length === 0) {
+      return [];
+    }
+
+    const companyFilters = await CompanyTenderFilterModel.find({});
+
+    if (companyFilters.length === 0) {
+      return [];
+    }
+
+    const savedMatches: TenderCompanyMatchDocument[] = [];
+    const batchSize = TENDER_MATCHING_CONFIG.activeCompetitionTendersMatchBatchSize;
+
+    for (let i = 0; i < tenderIds.length; i += batchSize) {
+      const tenders = await this.findNationalTendersForMatching({
+        _id: { $in: tenderIds.slice(i, i + batchSize) },
+      });
+
+      for (const tender of tenders) {
+        savedMatches.push(
+          ...(await this.matchTenderWithFilters(tender, companyFilters, source)),
+        );
+      }
+    }
+
+    return savedMatches;
   }
 
   private async matchTenderWithFilters(
@@ -225,6 +290,7 @@ export class TenderMatchingService {
 
     const savedMatch = await this.saveMatch(
       tenderId,
+      getTenderModelName(tender.id ?? ''),
       companyId,
       filterId,
       result,
@@ -327,6 +393,36 @@ export class TenderMatchingService {
       .sort({ _id: 1 })
       .limit(TENDER_MATCHING_CONFIG.activeCompetitionTendersMatchBatchSize)
       .exec();
+  }
+
+  /** Open national tenders, same order/batching as TED competition tenders. */
+  private async findActiveNationalTendersBatch(
+    lastTenderId?: Types.ObjectId,
+  ): Promise<TenderDocument[]> {
+    return this.findNationalTendersForMatching(
+      {
+        noticeType: { $in: TENDER_COMPETITION_NOTICE_TYPES },
+        submissionDeadline: { $gte: new Date() },
+        ...(lastTenderId ? { _id: { $gt: lastTenderId } } : {}),
+      },
+      TENDER_MATCHING_CONFIG.activeCompetitionTendersMatchBatchSize,
+    );
+  }
+
+  /** National tenders with populated buyers, typed as TED tenders for rules. */
+  private async findNationalTendersForMatching(
+    query: Record<string, unknown>,
+    limit?: number,
+  ): Promise<TenderDocument[]> {
+    const find = NationalTenderModel.find(query)
+      .sort({ _id: 1 })
+      .populate('leadBuyers');
+
+    if (limit) {
+      find.limit(limit);
+    }
+
+    return (await find.exec()) as unknown as TenderDocument[];
   }
 
   private async markMatchedMatchStale(
@@ -549,6 +645,7 @@ export class TenderMatchingService {
 
   private async saveMatch(
     tenderId: Types.ObjectId | null,
+    tenderModel: string,
     companyId: Types.ObjectId,
     filterId: Types.ObjectId | null,
     result: TenderCompanyMatchResult,
@@ -566,6 +663,7 @@ export class TenderMatchingService {
     const update: UpdateQuery<TenderCompanyMatchDocument> = {
       $set: {
         tender: tenderId,
+        tenderModel,
         company: companyId,
         companyTenderFilter: filterId,
         hardMatchStatus: result.status,

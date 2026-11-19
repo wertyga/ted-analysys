@@ -15,6 +15,7 @@ import { TenderGeneralAnalysisService } from '@/resources/tender-analysis/tender
 import { TenderGeneralAnalysisModel } from '@/resources/tender-analysis/schemas';
 import { logger } from '@/utils';
 import { isPageIndexable } from '@/resources/seo/page-indexability';
+import { isNationalTenderId } from '@/resources/national-tenders/core/national-tender.serializer';
 
 @ApiTags('ted')
 @Controller('ted')
@@ -33,24 +34,38 @@ export class TedSearchController {
     const { tenders, count } =
       await this.tedSearchService.searchTendersForPureList(query);
 
-    const generalAnalysis = await this.tenderGeneralAnalysisService
-      .ensureBaseAnalysisForMultipleTenders([
-        tenders[0],
-      ] as unknown as TenderDocument[])
-      .then((analyses) => analyses[0]);
+    // National records come serialized; analyses need their adapted form.
+    const first = tenders[0];
+    const firstForAnalysis =
+      first && isNationalTenderId(first.id)
+        ? await this.tendersService.findLocalOrNationalTender(first.id)
+        : first;
+    const generalAnalysis = firstForAnalysis
+      ? await this.tenderGeneralAnalysisService
+          .ensureBaseAnalysisForMultipleTenders([
+            firstForAnalysis,
+          ] as unknown as TenderDocument[])
+          .then((analyses) => analyses[0])
+      : undefined;
 
     return {
-      notices: tenders.map(TenderModel.serializeList).map((t, i) => {
-        if (t.id === generalAnalysis?.tenderId) {
-          return {
-            ...t,
-            generalAnalysis:
-              TenderGeneralAnalysisModel.serializeList(generalAnalysis),
-          };
-        }
+      notices: tenders
+        .map((tender) =>
+          isNationalTenderId(tender.id)
+            ? (tender as unknown as { id: string })
+            : TenderModel.serializeList(tender),
+        )
+        .map((t) => {
+          if (t.id === generalAnalysis?.tenderId) {
+            return {
+              ...t,
+              generalAnalysis:
+                TenderGeneralAnalysisModel.serializeList(generalAnalysis),
+            };
+          }
 
-        return t;
-      }) as any,
+          return t;
+        }),
       totalNoticeCount: count,
     };
   }

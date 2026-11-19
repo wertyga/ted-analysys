@@ -14,7 +14,6 @@ import {
   AwardTenderListRequestDto,
 } from './dto/award-tender-list-request.dto';
 import { AwardTenderService } from './award-tender.service';
-import { AwardTenderDetailDto } from './schemas';
 
 @ApiTags('award-tender')
 @Controller('awards')
@@ -48,10 +47,11 @@ export class AwardTenderController {
   @ApiBadRequestResponse({ description: 'Invalid award tender filters' })
   @ApiServiceUnavailableResponse({ description: 'TED API is unavailable' })
   async searchHistoryAwards(@Query() query: AwardTenderAwardsRequestDto) {
-    return this.awardTenderService.searchAwardTendersLocal(query.tenderId, {
-      page: query.page,
-      limit: query.limit,
-    });
+    return this.awardTenderService.searchAwardTendersLocal(
+      query.tenderId,
+      { page: query.page, limit: query.limit },
+      query.sources,
+    );
   }
 
   @Get('/search-pure')
@@ -72,6 +72,7 @@ export class AwardTenderController {
         contractNature: query.contractNature,
         procedureType: query.procedureType,
         awardDateFrom: query.awardDateFrom,
+        sources: query.sources,
       },
       {
         page: query.page,
@@ -87,9 +88,7 @@ export class AwardTenderController {
   @Get('/:id')
   @ApiOperation({ summary: 'Get award tender by publication number' })
   @ApiOkResponse({ description: 'Award tender detail.' })
-  async getAwardTenderById(
-    @Param('id') id: string,
-  ): Promise<AwardTenderDetailDto> {
+  async getAwardTenderById(@Param('id') id: string) {
     return this.awardTenderService.getAwardTenderById(id);
   }
 }

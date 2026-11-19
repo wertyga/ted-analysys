@@ -1,3 +1,31 @@
+import {
+  mergeSearchPage,
+  readPath,
+  resolveSearchSources,
+} from './ted.search.sources';
+import { serializeNationalTenderList } from '@/resources/national-tenders/core/national-tender.serializer';
+import {
+  NationalTender,
+  NationalTenderModel,
+} from '@/resources/national-tenders/core/schemas/national-tender.schema';
+
+/** Keeps the selected top-level fields (plus `source`) of a serialized record. */
+function pickSelected<T extends object>(record: T, select: string | string[]) {
+  const fields = (Array.isArray(select) ? select : select.split(/\s+/))
+    .filter(Boolean)
+    .map((field) => field.split('.')[0]);
+
+  if (!fields.length) {
+    return record;
+  }
+
+  const keep = new Set([...fields, 'source', 'sourceUrl', 'country']);
+
+  return Object.fromEntries(
+    Object.entries(record).filter(([key]) => keep.has(key)),
+  ) as Partial<T>;
+}
+
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import { TedSearchRequestDto } from './dto/ted-search-request.dto';
@@ -115,6 +143,10 @@ export class TedSearchService {
     });
   }
 
+  /**
+   * TED tenders as lean records, national ones already serialized
+   * (`NationalTenderListDto`, recognizable by `isNationalTenderId(id)`).
+   */
   async searchTendersForPureList(
     filters: TedTenderSearchRequestDto,
     select: string | string[] = TENDER_PURE_LIST_SELECT,
@@ -126,6 +158,39 @@ export class TedSearchService {
     const sort = this.sorting.buildLocalTenderSort(filters);
 
     const query = await this.filters.buildLocalTenderQuery(filters);
+    const sources = resolveSearchSources(filters.sources);
+
+    if (sources.nationalSources.length) {
+      const page = await this.pickMergedPage(query, sources, sort, skip, limit);
+      const [tedTenders, nationalTenders] = await Promise.all([
+        page.tedIds.length
+          ? this.tendersService.findLocalTenders(
+              { id: { $in: page.tedIds } },
+              { select, isPure: true },
+            )
+          : [],
+        NationalTenderModel.find({ id: { $in: page.nationalIds } })
+          .lean<NationalTender[]>()
+          .exec(),
+      ]);
+      const byId = new Map<string, unknown>([
+        ...tedTenders.map((tender) => [tender.id, tender] as const),
+        ...nationalTenders.map(
+          (tender) =>
+            [
+              tender.id,
+              pickSelected(serializeNationalTenderList(tender), select),
+            ] as const,
+        ),
+      ]);
+
+      return {
+        tenders: page.order
+          .map((id) => byId.get(id))
+          .filter(Boolean) as typeof tedTenders,
+        count: page.count,
+      };
+    }
 
     const [localTenders, count] = await Promise.all([
       this.tendersService.findLocalTenders(query, {
@@ -153,6 +218,41 @@ export class TedSearchService {
     });
     const query = await this.filters.buildLocalTenderQuery(filters);
     const sort = this.sorting.buildLocalTenderSort(filters);
+    const sources = resolveSearchSources(filters.sources);
+
+    if (sources.nationalSources.length) {
+      const page = await this.pickMergedPage(query, sources, sort, skip, limit);
+      const [tedTenders, nationalTenders] = await Promise.all([
+        page.tedIds.length
+          ? this.tendersService.findMultipleLocalTendersWithBaseAnalysis(
+              { id: { $in: page.tedIds } },
+              {},
+              filters.withoutBaseAnalysisGenerating,
+            )
+          : [],
+        this.tendersService.findMultipleNationalTendersWithBaseAnalysis(
+          page.nationalIds,
+          filters.withoutBaseAnalysisGenerating,
+        ),
+      ]);
+      const byId = new Map<string, unknown>([
+        ...tedTenders.map(
+          (tender) =>
+            [
+              tender.id,
+              this.tendersService.toWholeTenderListDto(tender),
+            ] as const,
+        ),
+        ...nationalTenders.map((tender) => [tender.id, tender] as const),
+      ]);
+
+      return {
+        notices: page.order
+          .map((id) => byId.get(id))
+          .filter(Boolean) as TedSearchResponse['notices'],
+        totalNoticeCount: page.count,
+      };
+    }
 
     devLog(
       `Local Search request: ${JSON.stringify(query)}`,
@@ -177,6 +277,64 @@ export class TedSearchService {
         this.tendersService.toWholeTenderListDto(notice),
       ),
       totalNoticeCount: totalCount,
+    };
+  }
+
+  /**
+   * Page of ids across `tenders` and `national_tenders`: the first
+   * `skip + limit` rows of each in the requested order, merged.
+   */
+  private async pickMergedPage(
+    query: Record<string, unknown>,
+    sources: ReturnType<typeof resolveSearchSources>,
+    sort: Record<string, 1 | -1>,
+    skip: number,
+    limit: number,
+  ) {
+    const [field, direction] = Object.entries(sort)[0];
+    const take = skip + limit;
+    const nationalQuery = {
+      $and: [query, { source: { $in: sources.nationalSources } }],
+    };
+    const projection = { id: 1, [field]: 1 };
+
+    const [ted, national, tedCount, nationalCount] = await Promise.all([
+      sources.includeTed
+        ? TenderModel.find(query)
+            .sort({ [field]: direction, _id: direction })
+            .limit(take)
+            .select(projection)
+            .lean<{ id: string }[]>()
+            .exec()
+        : [],
+      NationalTenderModel.find(nationalQuery)
+        .sort({ [field]: direction, _id: direction })
+        .limit(take)
+        .select(projection)
+        .lean<{ id: string }[]>()
+        .exec(),
+      sources.includeTed ? TenderModel.countDocuments(query).exec() : 0,
+      NationalTenderModel.countDocuments(nationalQuery).exec(),
+    ]);
+
+    const toRow = (national: boolean) => (record: { id: string }) => ({
+      id: record.id,
+      national,
+      value: readPath(record, field),
+    });
+    const rows = mergeSearchPage(
+      ted.map(toRow(false)),
+      national.map(toRow(true)),
+      direction,
+      skip,
+      limit,
+    );
+
+    return {
+      order: rows.map((row) => row.id),
+      tedIds: rows.filter((row) => !row.national).map((row) => row.id),
+      nationalIds: rows.filter((row) => row.national).map((row) => row.id),
+      count: tedCount + nationalCount,
     };
   }
 

@@ -7,6 +7,7 @@ import { TendersCronModule } from './tenders-cron/tenders-cron.module';
 import { CronController } from './cron.controller';
 import { SettingsModule } from '@/resources/settings/settings.module';
 import { CronSettingsService } from './cron-settings.service';
+import { NationalTendersCronModule } from './national-tenders-cron/national-tenders-cron.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { CronSettingsService } from './cron-settings.service';
     TenderMatchCronModule,
     DbCopyCronModule,
     SettingsModule,
+    NationalTendersCronModule,
   ],
   controllers: [CronController],
   providers: [CronSettingsService],

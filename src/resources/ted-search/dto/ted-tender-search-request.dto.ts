@@ -1,3 +1,7 @@
+import {
+  TENDER_SOURCE_FILTER_VALUES,
+  TenderSourceFilter,
+} from '@/resources/ted-search/ted.search.sources';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
@@ -277,6 +281,20 @@ export class TedTenderSearchRequestDto implements TedTenderSearchFilters {
   @IsString({ each: true })
   @IsNotEmpty({ each: true })
   tenderIds?: string[];
+
+  @ApiPropertyOptional({
+    enum: TENDER_SOURCE_FILTER_VALUES,
+    isArray: true,
+    example: ['TED', 'PL_BZP'],
+    description:
+      'Tender sources to search: TED and/or national sources. Empty = all.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @Transform(({ value }) => normalizeStringCodeInput(value))
+  @IsIn(TENDER_SOURCE_FILTER_VALUES, { each: true })
+  sources?: TenderSourceFilter[];
 }
 
 function normalizeTrimmedStringInput(value: unknown): unknown {

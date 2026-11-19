@@ -18,12 +18,10 @@ import {
   UserNotificationFrequency,
 } from '@/resources/user/user.types';
 import { UserModel } from '@/resources/user/user.schema';
-import {
-  getSafeErrorMessage,
-  isDuplicateKeyError,
-  logger,
-  tenderPopulateFields,
-} from '@/utils';
+import { getSafeErrorMessage, isDuplicateKeyError, logger } from '@/utils';
+import { MATCH_TENDER_POPULATE } from '@/resources/tender-matching/tender-matching.service';
+import { getTenderModelName } from '@/resources/national-tenders/core/national-tender.serializer';
+import { NationalTenderSource } from '@/resources/national-tenders/core/national-tender.types';
 import { TenderMatchNotificationLogModel } from './schemas';
 import { TariffService } from '@/resources/tariff';
 import { TENDER_MATCH_NOTIFICATIONS_CONFIG } from '@/config/tender-match-notifications.config';
@@ -35,7 +33,13 @@ type NotifiableFrequency =
   | UserNotificationFrequency.WEEKLY;
 
 type PopulatedTenderMatch = TenderCompanyMatchDocument & {
-  tender: TenderDocument;
+  /** TED tender, or national tender (same field names + `source`). */
+  tender: TenderDocument & { source?: NationalTenderSource; sourceId?: string };
+};
+
+/** Label of the notice id in the report, by tender source. */
+const NOTICE_ID_LABELS: Record<NationalTenderSource, string> = {
+  [NationalTenderSource.PL_BZP]: 'BZP ID (Poland)',
 };
 
 @Injectable()
@@ -179,10 +183,7 @@ export class TenderMatchNotificationsService {
       ...(sentMatchIds.length > 0 ? { _id: { $nin: sentMatchIds } } : {}),
     })
       .sort({ aiFitScore: -1, updatedAt: -1 })
-      .populate({
-        path: 'tender',
-        populate: tenderPopulateFields,
-      })
+      .populate(MATCH_TENDER_POPULATE)
       .exec();
 
     return matches.filter((match) =>
@@ -236,6 +237,7 @@ export class TenderMatchNotificationsService {
           user: user._id,
           match: match._id,
           tender: match.tender._id,
+          tenderModel: getTenderModelName(match.tender.id ?? ''),
           aiFitDecision: match.aiFitDecision,
           frequency,
           sentAt,
@@ -404,8 +406,8 @@ export class TenderMatchNotificationsService {
           '<table role="presentation" class="details-table" cellpadding="0" cellspacing="0">',
           '<tr>',
           '<td class="detail-cell" width="34%">',
-          '<span class="detail-label">TED ID</span>',
-          `<span class="detail-value">${this.escapeHtml(tender.id)}</span>`,
+          `<span class="detail-label">${tender.source ? (NOTICE_ID_LABELS[tender.source] ?? 'Notice ID') : 'TED ID'}</span>`,
+          `<span class="detail-value">${this.escapeHtml(tender.sourceId ?? tender.id)}</span>`,
           '</td>',
           '<td class="detail-cell" width="33%">',
           '<span class="detail-label">Buyer</span>',

@@ -1,3 +1,4 @@
+import { getTenderModelName } from '@/resources/national-tenders/core/national-tender.serializer';
 import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { LlmAnalysisService } from '@/llm/llm-analysis.service';
@@ -80,7 +81,7 @@ export class TenderDeepAnalysisService {
     });
     try {
       const [tender, company] = await Promise.all([
-        TenderModel.findOne({ id: tenderId }).populate(tenderPopulateFields),
+        this.tendersService.findLocalOrNationalTender(tenderId),
         UserModel.findById(companyId).populate(companyCpvPopulateFields),
       ]);
       if (!tender) {
@@ -186,7 +187,7 @@ export class TenderDeepAnalysisService {
   }): Promise<TenderDeepAnalysisDocument> {
     const language = normalizeDeepAnalysisLanguage(params.language);
     const [tender, company] = await Promise.all([
-      this.tendersService.findLocalTender(params.tenderId),
+      this.tendersService.findLocalOrNationalTender(params.tenderId),
       UserModel.findById(params.companyId),
     ]);
     if (!tender) {
@@ -313,6 +314,7 @@ export class TenderDeepAnalysisService {
         {
           $set: {
             tender: tender._id,
+            tenderModel: getTenderModelName(tender.id),
             company: companyId,
             sourceHash,
             generalAnalysis: generalAnalysisId,
@@ -404,9 +406,10 @@ export class TenderDeepAnalysisService {
   private async getBuyerIntelligenceInputForTender(
     tender: Pick<TenderDocument, 'leadBuyers'>,
   ): Promise<TenderDeepBuyerIntelligenceInput[]> {
-    const buyerIds = tender.leadBuyers.map((b: BuyerDocument) =>
-      b._id.toString(),
-    );
+    // National buyers are inline (no `Buyer` document, no intelligence yet).
+    const buyerIds = tender.leadBuyers
+      .filter((b: BuyerDocument) => !!b?._id)
+      .map((b: BuyerDocument) => b._id.toString());
 
     if (!buyerIds.length) {
       return [];
