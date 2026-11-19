@@ -21,6 +21,8 @@ export interface NationalCollectorStatus extends NationalTenderStoreResult {
   awards: NationalTenderStoreResult & { fetched: number };
   /** Shared `contractors` records created/updated in this run. */
   contractorsTouched: number;
+  /** Company matching of saved/changed tenders (`tender_company_matches`). */
+  matching: { tendersMatched: number; matchesSaved: number };
 }
 
 export interface NationalAmendmentStats {
@@ -47,6 +49,7 @@ const emptyStatus = (): NationalCollectorStatus => ({
   buyersTouched: 0,
   awards: { fetched: 0, saved: 0, updated: 0, unchanged: 0, failed: 0 },
   contractorsTouched: 0,
+  matching: { tendersMatched: 0, matchesSaved: 0 },
   amendments: {
     fetched: 0,
     applied: 0,
@@ -78,6 +81,7 @@ export class NationalCollectorRun {
       ...this.status,
       amendments: { ...this.status.amendments },
       awards: { ...this.status.awards },
+      matching: { ...this.status.matching },
     };
   }
 
@@ -102,7 +106,7 @@ export class NationalCollectorRun {
     try {
       await job(status);
       this.logger.log(
-        `${this.name} done: fetched=${status.noticesFetched} saved=${status.saved} updated=${status.updated} unchanged=${status.unchanged} skipped=${status.skipped} failed=${status.failed} amendments=${JSON.stringify(status.amendments)} awards=${JSON.stringify(status.awards)}`,
+        `${this.name} done: fetched=${status.noticesFetched} saved=${status.saved} updated=${status.updated} unchanged=${status.unchanged} skipped=${status.skipped} failed=${status.failed} amendments=${JSON.stringify(status.amendments)} awards=${JSON.stringify(status.awards)} matching=${JSON.stringify(status.matching)}`,
       );
     } catch (e: unknown) {
       const error = e instanceof Error ? e.message : 'unknown error';

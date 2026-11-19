@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { NationalBuyersModule } from '@/resources/national-tenders/buyers/national-buyers.module';
 import { NationalContractorsModule } from '@/resources/national-tenders/contractors/national-contractors.module';
 import { NationalTendersCoreModule } from '@/resources/national-tenders/core/national-tenders-core.module';
+import { NationalMatchingModule } from '@/resources/national-tenders/matching/national-matching.module';
 import { BzpClient } from './bzp/bzp.client';
 import { BzpNormalizer } from './bzp/bzp.normalizer';
 import { BzpResultNormalizer } from './bzp/bzp-result.normalizer';
@@ -15,6 +16,7 @@ import { PlTendersService } from './pl-tenders.service';
     NationalTendersCoreModule,
     NationalBuyersModule,
     NationalContractorsModule,
+    NationalMatchingModule,
   ],
   controllers: [PlTendersAdmController],
   providers: [

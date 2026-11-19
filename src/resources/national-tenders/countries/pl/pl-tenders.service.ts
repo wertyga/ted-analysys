@@ -3,6 +3,8 @@ import { NationalContractorsService } from '@/resources/national-tenders/contrac
 import { NationalAwardsStorageService } from '@/resources/national-tenders/core/national-awards-storage.service';
 import { NationalAwardTenderModel } from '@/resources/national-tenders/core/schemas/national-award-tender.schema';
 import { BzpResultNormalizer } from './bzp/bzp-result.normalizer';
+import { NationalTenderMatchingService } from '@/resources/national-tenders/matching/national-tender-matching.service';
+import { Types } from 'mongoose';
 import { Injectable, Logger } from '@nestjs/common';
 import {
   NationalCollectorRun,
@@ -37,6 +39,9 @@ export class PlTendersService {
   private readonly resultsBackfillRun = new NationalCollectorRun(
     'PL_BZP results backfill',
   );
+  private readonly matchOpenRun = new NationalCollectorRun(
+    'PL_BZP match open',
+  );
 
   constructor(
     private readonly bzpClient: BzpClient,
@@ -47,6 +52,7 @@ export class PlTendersService {
     private readonly awardsStorage: NationalAwardsStorageService,
     private readonly nationalBuyersService: NationalBuyersService,
     private readonly nationalContractorsService: NationalContractorsService,
+    private readonly matchingService: NationalTenderMatchingService,
   ) {}
 
   getStatus() {
@@ -54,7 +60,21 @@ export class PlTendersService {
       recent: this.recentRun.getStatus(),
       backfill: this.backfillRun.getStatus(),
       resultsBackfill: this.resultsBackfillRun.getStatus(),
+      matchOpen: this.matchOpenRun.getStatus(),
     };
+  }
+
+  /**
+   * Matches all open tenders with company filters (initial run after a
+   * backfill; the daily run matches only new and changed tenders).
+   */
+  startMatchOpen() {
+    return this.matchOpenRun.start(async (status) => {
+      status.matching = await this.matchingService.matchOpen(
+        NationalTenderSource.PL_BZP,
+      );
+      await this.matchingService.sendInstantReports();
+    });
   }
 
   /** Starts the recent run in background; returns its status. */
@@ -98,8 +118,10 @@ export class PlTendersService {
       : new Date(now.getTime() - PL_BZP_CONFIG.recentDefaultLookbackMs);
 
     const buyers = new Set<string>();
+    const changed: Types.ObjectId[] = [];
+    const amended = new Set<string>();
 
-    await this.collectWindow(status, from, now, buyers);
+    await this.collectWindow(status, from, now, buyers, changed);
 
     // Updates go after contract notices so a tender and its first amendment
     // can arrive in the same run.
@@ -113,7 +135,7 @@ export class PlTendersService {
       ),
     );
 
-    await this.collectUpdatesWindow(status, amendmentsFrom, now);
+    await this.collectUpdatesWindow(status, amendmentsFrom, now, amended);
 
     // Results (winners, contract values) of any procedure, not only stored ones.
     const contractors = new Set<string>();
@@ -140,6 +162,15 @@ export class PlTendersService {
     );
     await this.refreshBuyerStats(status, buyers);
     await this.refreshContractorStats(status, contractors);
+
+    // Same flow as TED: match new/changed tenders, then instant reports
+    // (daily/weekly reports pick the matches up on their own schedule).
+    status.matching = await this.matchingService.matchChanged(
+      NationalTenderSource.PL_BZP,
+      changed,
+      amended,
+    );
+    await this.matchingService.sendInstantReports();
   }
 
   /** Starts a backfill of results only (winners, contracts) for `days` days. */
@@ -293,6 +324,7 @@ export class PlTendersService {
     status: NationalCollectorStatus,
     from: Date,
     to: Date,
+    amended?: Set<string>,
   ) {
     const stats = status.amendments;
     const pages = this.bzpClient.fetchNoticePages({
@@ -321,6 +353,10 @@ export class PlTendersService {
           );
 
           stats[result] += 1;
+
+          if (result === 'applied') {
+            amended?.add(normalized.tenderSourceId);
+          }
         } catch (e: unknown) {
           stats.failed += 1;
           this.logger.warn(
@@ -338,6 +374,7 @@ export class PlTendersService {
     from: Date,
     to: Date,
     buyers: Set<string>,
+    changed?: Types.ObjectId[],
   ) {
     const pages = this.bzpClient.fetchNoticePages({
       noticeType: BzpNoticeType.CONTRACT_NOTICE,
@@ -365,6 +402,7 @@ export class PlTendersService {
 
           return ids;
         },
+        onChanged: (id) => changed?.push(id),
       });
 
       status.saved += result.saved;

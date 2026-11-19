@@ -74,6 +74,15 @@ export class PlTendersAdmController {
     );
   }
 
+  @Post('/match-open')
+  @ApiOperation({
+    summary:
+      'Match all open Polish tenders with company filters and send instant reports',
+  })
+  matchOpen() {
+    return this.plTendersService.startMatchOpen();
+  }
+
   @Post('/migrate-buyers')
   @ApiOperation({
     summary:

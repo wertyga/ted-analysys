@@ -32,6 +32,8 @@ export interface NationalTenderStoreOptions {
   resolveLeadBuyers?: (
     tender: NormalizedNationalTender,
   ) => Promise<Types.ObjectId[]>;
+  /** Called with the `_id` of each saved or changed tender (for matching). */
+  onChanged?: (id: Types.ObjectId) => void;
 }
 
 /**
@@ -64,6 +66,10 @@ export class NationalTendersStorageService {
         const outcome = await this.storeOne(tender, options);
 
         result[outcome.status] += 1;
+
+        if (outcome.doc) {
+          options.onChanged?.(outcome.doc._id);
+        }
 
         if (
           outcome.doc &&
