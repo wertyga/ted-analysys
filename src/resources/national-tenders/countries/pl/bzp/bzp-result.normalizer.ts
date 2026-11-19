@@ -9,6 +9,7 @@ import {
   NormalizedNationalAwardLot,
 } from '@/resources/national-tenders/core/national-tender.types';
 import { PL_BZP_CONFIG } from '../pl.config';
+import { getAwardDate } from '@/resources/award-tender/utils/award-date';
 import { firstValue, parseBzpHtml } from './bzp-html.parser';
 import { BzpResultPart, parseBzpResultHtml } from './bzp-result.parser';
 import {
@@ -270,7 +271,12 @@ export function normalizeBzpResultNotice(
     estimatedValue: procedureValue,
     awardValue: { amount: awarded.length ? awardAmount : null, currency },
     contractConclusionDates: contractDates,
-    awardDate: contractDates[contractDates.length - 1] ?? null,
+    // Latest contract date that fits the publication window (same rule as
+    // TED): buyers sometimes mistype the year (2027 instead of 2026).
+    awardDate: getAwardDate(
+      contractDates,
+      Number.isNaN(publicationDate.getTime()) ? undefined : publicationDate,
+    ),
     placeOfPerformanceCountries: [COUNTRY],
     lots,
     buyers: buyer.name ? [buyer] : [],

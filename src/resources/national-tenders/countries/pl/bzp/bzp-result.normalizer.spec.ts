@@ -40,6 +40,18 @@ describe('normalizeBzpResultNotice', () => {
     expect(award.buyers[0].country).toBe('POL');
   });
 
+  it('ignores contract dates after the result publication (year typos)', () => {
+    const notice = fixture('result-multi-part');
+    const award = normalizeBzpResultNotice({
+      ...notice,
+      // Contract dates (2026-11-13) now lie after the publication.
+      publicationDate: '2026-11-01T10:00:00',
+    })!;
+
+    expect(award.contractConclusionDates.length).toBeGreaterThan(0);
+    expect(award.awardDate).toBeNull();
+  });
+
   it('treats a notice without parts as one part', () => {
     const award = normalizeBzpResultNotice(fixture('result-single'))!;
 

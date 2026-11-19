@@ -146,6 +146,19 @@ NationalAwardTenderSchema.index(
   { leadBuyers: 1, publicationDate: -1 },
   { name: 'idx_lead_buyers' },
 );
+// Sorting of the shared /awards lists (same as TED award_tenders).
+NationalAwardTenderSchema.index(
+  { awardDate: -1, _id: -1 },
+  { name: 'idx_award_date' },
+);
+NationalAwardTenderSchema.index(
+  { awardValueEur: -1, _id: -1 },
+  { name: 'idx_award_value' },
+);
+NationalAwardTenderSchema.index(
+  { publicationDate: -1, _id: -1 },
+  { name: 'idx_pubdate' },
+);
 
 export const NationalAwardTenderModel: NationalAwardTenderModelType =
   (mongoose.models.NationalAwardTender as

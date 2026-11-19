@@ -21,6 +21,10 @@ import {
   TED_ELIGIBLE_COUNTRY_CODES,
   type TedEligibleCountryCode,
 } from '@/resources/codelist';
+import {
+  TENDER_SOURCE_FILTER_VALUES,
+  type TenderSourceFilter,
+} from '@/resources/ted-search/ted.search.sources';
 
 export enum AwardTenderSortBy {
   AWARD_DATE = 'awardDate',
@@ -38,6 +42,12 @@ function toStringArray(value: unknown): unknown {
   return items
     .map((item) => (typeof item === 'string' ? item.trim() : item))
     .filter((item) => item !== '');
+}
+
+export function normalizeSourcesInput(value: unknown): unknown {
+  return (toStringArray(value) as unknown[]).map((item) =>
+    typeof item === 'string' ? item.toUpperCase() : item,
+  );
 }
 
 function normalizeCountryInput(value: unknown): unknown {
@@ -125,6 +135,18 @@ export class AwardTenderFiltersRequestDto {
   @IsOptional()
   @IsMongoId()
   buyerId?: string;
+
+  @ApiPropertyOptional({
+    enum: TENDER_SOURCE_FILTER_VALUES,
+    isArray: true,
+    example: ['TED', 'PL_BZP'],
+    description: 'Award sources: TED and/or national sources. Empty = all.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => normalizeSourcesInput(value))
+  @IsArray()
+  @IsIn(TENDER_SOURCE_FILTER_VALUES, { each: true })
+  sources?: TenderSourceFilter[];
 }
 
 export class AwardTenderListRequestDto extends AwardTenderFiltersRequestDto {

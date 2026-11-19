@@ -104,13 +104,13 @@ export class ContractorService {
       AwardTenderModel.find({
         winners: { $in: winnerIds },
       })
-        .select('_id publicationDate lots')
+        .select('_id publicationDate lots awardDate')
         .lean(),
       // National results (BZP etc.) share the contractors collection.
       NationalAwardTenderModel.find({
         winners: { $in: winnerIds },
       })
-        .select('_id publicationDate lots contractConclusionDates')
+        .select('_id publicationDate lots awardDate')
         .lean(),
     ]);
     const awardTenders = [
@@ -136,8 +136,10 @@ export class ContractorService {
           cpvCodes: new Set<string>(),
         };
 
+        // awardDate is already checked against the publication date; raw
+        // contract dates contain year typos (e.g. 2027 instead of 2026).
         const times = [
-          ...(awardTender.contractConclusionDates ?? []),
+          awardTender.awardDate,
           current.lastAwardWinDate,
           awardTender.publicationDate,
         ].filter(Boolean) as Date[];
