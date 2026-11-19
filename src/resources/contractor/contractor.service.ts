@@ -1,3 +1,31 @@
+import { NationalAwardTenderModel } from '@/resources/national-tenders/core/schemas/national-award-tender.schema';
+
+/**
+ * Spellings of a tax id found in TED contractor identifiers, e.g. NIP
+ * 5212935353 → "521-293-53-53", "521-29-35-353", "521 293 53 53",
+ * "PL5212935353".
+ */
+export function taxIdSpellings(digits: string): string[] {
+  const spellings = new Set([digits, `PL${digits}`]);
+
+  if (digits.length === 10) {
+    const [a, b, c, d] = [
+      digits.slice(0, 3),
+      digits.slice(3, 6),
+      digits.slice(6, 8),
+      digits.slice(8),
+    ];
+
+    spellings.add(`${a}-${b}-${c}-${d}`);
+    spellings.add(`${a} ${b} ${c} ${d}`);
+    spellings.add(
+      `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5, 7)}-${digits.slice(7)}`,
+    );
+  }
+
+  return [...spellings];
+}
+
 import {
   BadRequestException,
   Injectable,
@@ -72,11 +100,23 @@ export class ContractorService {
       }
     >();
 
-    const awardTenders = await AwardTenderModel.find({
-      winners: { $in: winnerIds },
-    })
-      .select('_id publicationDate lots')
-      .lean();
+    const [tedAwardTenders, nationalAwardTenders] = await Promise.all([
+      AwardTenderModel.find({
+        winners: { $in: winnerIds },
+      })
+        .select('_id publicationDate lots')
+        .lean(),
+      // National results (BZP etc.) share the contractors collection.
+      NationalAwardTenderModel.find({
+        winners: { $in: winnerIds },
+      })
+        .select('_id publicationDate lots contractConclusionDates')
+        .lean(),
+    ]);
+    const awardTenders = [
+      ...tedAwardTenders,
+      ...nationalAwardTenders,
+    ] as unknown as typeof tedAwardTenders;
 
     for (const awardTender of awardTenders) {
       const awardTenderId = awardTender._id.toString();
@@ -226,20 +266,39 @@ export class ContractorService {
       winners: new Types.ObjectId(id),
     };
     const { skip, limit } = getPaginationMeta(pagination);
-    const [awardTenders, totalCount] = await Promise.all([
-      AwardTenderModel.find(query)
-        .sort({ publicationDate: -1 })
-        .skip(skip)
-        .limit(limit)
-        .populate('leadBuyers')
-        .populate('winners')
-        .select('-nonLeadBuyers')
-        .exec(),
-      AwardTenderModel.countDocuments(query),
-    ]);
+    // TED and national results, newest first: take skip+limit of each, merge.
+    const [tedAwardTenders, nationalAwardTenders, tedCount, nationalCount] =
+      await Promise.all([
+        AwardTenderModel.find(query)
+          .sort({ publicationDate: -1 })
+          .limit(skip + limit)
+          .populate('leadBuyers')
+          .populate('winners')
+          .select('-nonLeadBuyers')
+          .exec(),
+        NationalAwardTenderModel.find(query)
+          .sort({ publicationDate: -1 })
+          .limit(skip + limit)
+          .populate('leadBuyers')
+          .populate('winners')
+          .select('-nonLeadBuyers')
+          .exec(),
+        AwardTenderModel.countDocuments(query),
+        NationalAwardTenderModel.countDocuments(query),
+      ]);
+    const awardTenders = [
+      ...tedAwardTenders,
+      ...(nationalAwardTenders as unknown as typeof tedAwardTenders),
+    ]
+      .sort(
+        (a, b) =>
+          new Date(b.publicationDate ?? 0).getTime() -
+          new Date(a.publicationDate ?? 0).getTime(),
+      )
+      .slice(skip, skip + limit);
 
     return {
-      totalCount,
+      totalCount: tedCount + nationalCount,
       awardTenders,
     };
   }
@@ -404,6 +463,66 @@ export class ContractorService {
 
       return null;
     }
+  }
+
+  /**
+   * Finds or creates the shared `Contractor` for a winner of a national
+   * result. Matches by tax id in any spelling TED uses (digits, dashes,
+   * spaces, VAT prefix) within the country, else by name + city.
+   * Only adds data to an existing record, never overwrites it.
+   */
+  async upsertNationalWinner(winner: {
+    name: string;
+    nationalId?: string;
+    country?: string;
+    city?: string;
+    postalCode?: string;
+  }): Promise<ContractorDocument> {
+    const countries = winner.country ? [winner.country] : [];
+    const identityFilter: QueryFilter<ContractorDocument> = winner.nationalId
+      ? {
+          identifiers: { $in: taxIdSpellings(winner.nationalId) },
+          ...(countries.length ? { countries: { $in: countries } } : {}),
+        }
+      : {
+          name: winner.name,
+          ...(countries.length ? { countries: { $in: countries } } : {}),
+          ...(winner.city ? { cities: winner.city } : {}),
+        };
+
+    const existing = await ContractorModel.findOne(identityFilter);
+
+    if (existing) {
+      return ContractorModel.findByIdAndUpdate(
+        existing._id,
+        {
+          $addToSet: {
+            ...(winner.nationalId ? { identifiers: winner.nationalId } : {}),
+            ...(countries.length ? { countries: { $each: countries } } : {}),
+            ...(winner.city ? { cities: winner.city } : {}),
+            ...(winner.postalCode ? { postCodes: winner.postalCode } : {}),
+          },
+          ...(existing.name ? {} : { $set: { name: winner.name } }),
+        },
+        { returnDocument: 'after' },
+      ) as Promise<ContractorDocument>;
+    }
+
+    return ContractorModel.create({
+      name: winner.name,
+      identifiers: winner.nationalId ? [winner.nationalId] : [],
+      countries,
+      cities: winner.city ? [winner.city] : [],
+      postCodes: winner.postalCode ? [winner.postalCode] : [],
+      legalTypes: [],
+      cpvCodes: [],
+      stats: {
+        lastAwardWinDate: null,
+        totalAwardAmountEur: 0,
+        awardTendersCount: 0,
+        awardLotsCount: 0,
+      },
+    });
   }
 
   async refreshContractorsAwardMeta(contractorIds: string[]): Promise<void> {

@@ -1,3 +1,4 @@
+import { NationalAwardsStorageService } from './national-awards-storage.service';
 import { Module } from '@nestjs/common';
 import { CurrencyExchangeRatesModule } from '@/resources/currency-exchange-rates/currency-exchange-rates.module';
 import { LlmModule } from '@/llm/llm.module';
@@ -6,7 +7,15 @@ import { NationalTendersStorageService } from './national-tenders-storage.servic
 
 @Module({
   imports: [CurrencyExchangeRatesModule, LlmModule],
-  providers: [NationalTendersStorageService, NationalTendersReadService],
-  exports: [NationalTendersStorageService, NationalTendersReadService],
+  providers: [
+    NationalTendersStorageService,
+    NationalTendersReadService,
+    NationalAwardsStorageService,
+  ],
+  exports: [
+    NationalTendersStorageService,
+    NationalTendersReadService,
+    NationalAwardsStorageService,
+  ],
 })
 export class NationalTendersCoreModule {}

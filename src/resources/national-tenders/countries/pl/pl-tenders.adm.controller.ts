@@ -59,6 +59,21 @@ export class PlTendersAdmController {
     );
   }
 
+  @Post('/backfill-results')
+  @ApiOperation({
+    summary: 'Collect BZP results (winners, contracts) for the last N days',
+  })
+  @ApiQuery({ name: 'days', required: false, type: Number })
+  backfillResults(@Query('days') days?: string) {
+    const parsed = Number(days);
+
+    return this.plTendersService.startResultsBackfill(
+      Number.isFinite(parsed) && parsed > 0
+        ? Math.min(parsed, 365)
+        : PL_BZP_CONFIG.backfillDays,
+    );
+  }
+
   @Post('/migrate-buyers')
   @ApiOperation({
     summary:

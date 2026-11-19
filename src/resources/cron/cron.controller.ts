@@ -225,7 +225,7 @@ export class CronController {
         id: 'gather-pl-bzp-tenders',
         title: 'Gather Poland (BZP) tenders',
         description:
-          'Collect new contract notices and deadline changes from BZP (ezamowienia.gov.pl) into national_tenders. Off by default.',
+          'Collect new contract notices, deadline changes and results (winners, contracts) from BZP (ezamowienia.gov.pl). Off by default.',
         scheduled: true,
         run: () => this.plTendersCronService.gatherPlBzpTendersQueued(),
       },

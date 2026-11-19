@@ -37,7 +37,7 @@
     {
       id: 'gather-pl-bzp-tenders',
       title: 'Gather Poland (BZP) tenders',
-      description: 'Collect new contract notices and deadline changes from BZP.',
+      description: 'Collect new contract notices, deadline changes and results from BZP.',
     },
   ];
 
@@ -643,6 +643,12 @@
         (a3.applied || 0) +
         ', not found ' +
         (a3.notFound || 0) +
+        '; results saved ' +
+        ((s3.awards && s3.awards.saved) || 0) +
+        ', updated ' +
+        ((s3.awards && s3.awards.updated) || 0) +
+        ', new/updated contractors ' +
+        (s3.contractorsTouched || 0) +
         (s3.finishedAt ? ', finished ' + fmtDateTime(s3.finishedAt) : '') +
         '</small>' +
         (s3.lastError ? '<small>Error: ' + escapeHtml(s3.lastError) + '</small>' : '');

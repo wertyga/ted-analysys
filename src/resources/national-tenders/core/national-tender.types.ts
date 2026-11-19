@@ -126,6 +126,74 @@ export interface NormalizedNationalAmendment {
 
 export type NationalAmendmentApplyStatus = 'applied' | 'duplicate' | 'notFound';
 
+/** Winner of an awarded part, as printed by the source. */
+export interface NationalAwardWinner {
+  name: string;
+  /** Tax id (NIP in Poland), digits only. */
+  nationalId?: string;
+  street?: string;
+  city?: string;
+  postalCode?: string;
+  /** ISO 3166-1 alpha-3. */
+  country?: string;
+  /** Awarded to a consortium (the leader is the winner). */
+  isJointVenture?: boolean;
+}
+
+/** Outcome of one part of a procedure. */
+export type NationalAwardLotStatus = 'awarded' | 'cancelled' | 'unresolved';
+
+type Money = { amount: number | null; currency: string | null };
+
+/** Part of a result notice; field names mirror `AwardTenderLot`. */
+export interface NormalizedNationalAwardLot {
+  identifier: string;
+  title?: string;
+  description?: string;
+  contractNature?: string;
+  mainClassification: string[];
+  estimatedValue?: Money;
+  status?: NationalAwardLotStatus;
+  cancellationReason?: string;
+  offersCount?: number;
+  smeOffersCount?: number;
+  lowestOfferValue?: Money;
+  highestOfferValue?: Money;
+  awardValue?: Money;
+  contractConclusionDate?: Date;
+  duration?: TenderLot['duration'];
+  winner?: NationalAwardWinner;
+}
+
+/**
+ * Output of a country result-notice normalizer. Field names mirror
+ * `AwardTender` so TED award serializers and stats can read it.
+ */
+export interface NormalizedNationalAward {
+  /** Canonical id from the result notice, e.g. `pl-bzp-2026-00536538`. */
+  id: string;
+  source: NationalTenderSource;
+  /** Id of the result notice in the source portal. */
+  sourceId: string;
+  /** Procedure id, shared with the contract notice (`national_tenders`). */
+  sourceProcedureId?: string;
+  sourceUrl?: string;
+  country: string;
+  title?: string;
+  contractNature?: string;
+  cpvCodes: string[];
+  publicationDate?: Date;
+  estimatedValue?: Money;
+  awardValue: Money;
+  contractConclusionDates: Date[];
+  awardDate: Date | null;
+  placeOfPerformanceCountries: string[];
+  lots: NormalizedNationalAwardLot[];
+  /** Buyers as printed (resolved to shared `buyers` when stored). */
+  buyers: NationalTenderBuyer[];
+  rawData: unknown;
+}
+
 export interface NationalTenderStoreResult {
   saved: number;
   updated: number;

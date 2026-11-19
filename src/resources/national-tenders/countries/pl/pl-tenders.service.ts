@@ -1,4 +1,8 @@
 import { NationalBuyersService } from '@/resources/national-tenders/buyers/national-buyers.service';
+import { NationalContractorsService } from '@/resources/national-tenders/contractors/national-contractors.service';
+import { NationalAwardsStorageService } from '@/resources/national-tenders/core/national-awards-storage.service';
+import { NationalAwardTenderModel } from '@/resources/national-tenders/core/schemas/national-award-tender.schema';
+import { BzpResultNormalizer } from './bzp/bzp-result.normalizer';
 import { Injectable, Logger } from '@nestjs/common';
 import {
   NationalCollectorRun,
@@ -7,6 +11,7 @@ import {
 import { NationalTendersStorageService } from '@/resources/national-tenders/core/national-tenders-storage.service';
 import {
   NationalTenderSource,
+  NormalizedNationalAward,
   NormalizedNationalTender,
 } from '@/resources/national-tenders/core/national-tender.types';
 import { NationalTenderModel } from '@/resources/national-tenders/core/schemas/national-tender.schema';
@@ -29,19 +34,26 @@ export class PlTendersService {
   private readonly logger = new Logger(PlTendersService.name);
   private readonly recentRun = new NationalCollectorRun('PL_BZP recent');
   private readonly backfillRun = new NationalCollectorRun('PL_BZP backfill');
+  private readonly resultsBackfillRun = new NationalCollectorRun(
+    'PL_BZP results backfill',
+  );
 
   constructor(
     private readonly bzpClient: BzpClient,
     private readonly bzpNormalizer: BzpNormalizer,
     private readonly bzpUpdateNormalizer: BzpUpdateNormalizer,
+    private readonly bzpResultNormalizer: BzpResultNormalizer,
     private readonly storage: NationalTendersStorageService,
+    private readonly awardsStorage: NationalAwardsStorageService,
     private readonly nationalBuyersService: NationalBuyersService,
+    private readonly nationalContractorsService: NationalContractorsService,
   ) {}
 
   getStatus() {
     return {
       recent: this.recentRun.getStatus(),
       backfill: this.backfillRun.getStatus(),
+      resultsBackfill: this.resultsBackfillRun.getStatus(),
     };
   }
 
@@ -102,7 +114,125 @@ export class PlTendersService {
     );
 
     await this.collectUpdatesWindow(status, amendmentsFrom, now);
+
+    // Results (winners, contract values) of any procedure, not only stored ones.
+    const contractors = new Set<string>();
+    const latestAward = await NationalAwardTenderModel.findOne({
+      source: NationalTenderSource.PL_BZP,
+    })
+      .sort({ publicationDate: -1 })
+      .select('publicationDate')
+      .lean();
+    const resultsFrom = new Date(
+      Math.max(
+        (latestAward?.publicationDate?.getTime() ?? 0) -
+          PL_BZP_CONFIG.recentOverlapMs,
+        now.getTime() - PL_BZP_CONFIG.resultsMaxLookbackMs,
+      ),
+    );
+
+    await this.collectResultsWindow(
+      status,
+      resultsFrom,
+      now,
+      buyers,
+      contractors,
+    );
     await this.refreshBuyerStats(status, buyers);
+    await this.refreshContractorStats(status, contractors);
+  }
+
+  /** Starts a backfill of results only (winners, contracts) for `days` days. */
+  startResultsBackfill(days = PL_BZP_CONFIG.backfillDays) {
+    return this.resultsBackfillRun.start(async (status) => {
+      const now = new Date();
+      const buyers = new Set<string>();
+      const contractors = new Set<string>();
+
+      for (let start = now.getTime() - days * DAY_MS; start < now.getTime(); ) {
+        const end = Math.min(start + DAY_MS, now.getTime());
+
+        await this.collectResultsWindow(
+          status,
+          new Date(start),
+          new Date(end),
+          buyers,
+          contractors,
+        );
+        start = end;
+      }
+
+      await this.refreshBuyerStats(status, buyers);
+      await this.refreshContractorStats(status, contractors);
+    });
+  }
+
+  private async refreshContractorStats(
+    status: NationalCollectorStatus,
+    contractors: Set<string>,
+  ) {
+    status.contractorsTouched = contractors.size;
+    await this.nationalContractorsService.refreshStats([...contractors]);
+  }
+
+  private async collectResultsWindow(
+    status: NationalCollectorStatus,
+    from: Date,
+    to: Date,
+    buyers: Set<string>,
+    contractors: Set<string>,
+  ) {
+    const stats = status.awards;
+    const pages = this.bzpClient.fetchNoticePages({
+      noticeType: BzpNoticeType.TENDER_RESULT_NOTICE,
+      publicationDateFrom: from,
+      publicationDateTo: to,
+    });
+
+    for await (const page of pages) {
+      status.pagesFetched += 1;
+      stats.fetched += page.length;
+
+      const awards = page
+        .map((notice) => {
+          try {
+            return this.bzpResultNormalizer.normalize(notice);
+          } catch (e: unknown) {
+            this.logger.warn(
+              `Failed to normalize BZP result ${notice.bzpNumber}: ${
+                e instanceof Error ? e.message : 'unknown error'
+              }`,
+            );
+            return undefined;
+          }
+        })
+        .filter((award): award is NormalizedNationalAward => !!award);
+      const result = await this.awardsStorage.storeMany(awards, {
+        resolveLeadBuyers: async (award) => {
+          const ids = await this.nationalBuyersService.resolveBuyers(
+            award.buyers,
+            award.cpvCodes,
+          );
+
+          ids.forEach((id) => buyers.add(id.toString()));
+
+          return ids;
+        },
+        resolveWinners: async (award) => {
+          const ids =
+            await this.nationalContractorsService.resolveWinners(award);
+
+          ids.forEach((id) => id && contractors.add(id.toString()));
+
+          return ids;
+        },
+      });
+
+      stats.saved += result.saved;
+      stats.updated += result.updated;
+      stats.unchanged += result.unchanged;
+      stats.failed += result.failed + (page.length - awards.length);
+    }
   }
 
   /** One-off migration of tenders stored with inline buyers. */
@@ -140,7 +270,23 @@ export class PlTendersService {
       start = end;
     }
 
+    const contractors = new Set<string>();
+
+    for (let start = now.getTime() - days * DAY_MS; start < now.getTime(); ) {
+      const end = Math.min(start + DAY_MS, now.getTime());
+
+      await this.collectResultsWindow(
+        status,
+        new Date(start),
+        new Date(end),
+        buyers,
+        contractors,
+      );
+      start = end;
+    }
+
     await this.refreshBuyerStats(status, buyers);
+    await this.refreshContractorStats(status, contractors);
   }
 
   private async collectUpdatesWindow(

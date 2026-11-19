@@ -17,6 +17,10 @@ export interface NationalCollectorStatus extends NationalTenderStoreResult {
   amendments: NationalAmendmentStats;
   /** Shared `buyers` records created/updated in this run. */
   buyersTouched: number;
+  /** Result notices (winners, contracts) → `national_award_tenders`. */
+  awards: NationalTenderStoreResult & { fetched: number };
+  /** Shared `contractors` records created/updated in this run. */
+  contractorsTouched: number;
 }
 
 export interface NationalAmendmentStats {
@@ -41,6 +45,8 @@ const emptyStatus = (): NationalCollectorStatus => ({
   skipped: 0,
   lastPublicationDate: null,
   buyersTouched: 0,
+  awards: { fetched: 0, saved: 0, updated: 0, unchanged: 0, failed: 0 },
+  contractorsTouched: 0,
   amendments: {
     fetched: 0,
     applied: 0,
@@ -68,7 +74,11 @@ export class NationalCollectorRun {
   }
 
   getStatus(): NationalCollectorStatus {
-    return { ...this.status, amendments: { ...this.status.amendments } };
+    return {
+      ...this.status,
+      amendments: { ...this.status.amendments },
+      awards: { ...this.status.awards },
+    };
   }
 
   /** Starts the job in background and returns the current status. */
@@ -92,7 +102,7 @@ export class NationalCollectorRun {
     try {
       await job(status);
       this.logger.log(
-        `${this.name} done: fetched=${status.noticesFetched} saved=${status.saved} updated=${status.updated} unchanged=${status.unchanged} skipped=${status.skipped} failed=${status.failed} amendments=${JSON.stringify(status.amendments)}`,
+        `${this.name} done: fetched=${status.noticesFetched} saved=${status.saved} updated=${status.updated} unchanged=${status.unchanged} skipped=${status.skipped} failed=${status.failed} amendments=${JSON.stringify(status.amendments)} awards=${JSON.stringify(status.awards)}`,
       );
     } catch (e: unknown) {
       const error = e instanceof Error ? e.message : 'unknown error';

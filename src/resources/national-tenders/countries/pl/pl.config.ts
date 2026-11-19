@@ -17,6 +17,8 @@ export const PL_BZP_CONFIG = {
   recentOverlapMs: 60 * 60 * 1000,
   /** First recent run (no state yet) starts this far back. */
   recentDefaultLookbackMs: 2 * 24 * 60 * 60 * 1000,
+  /** Result notices are never re-read further back than this. */
+  resultsMaxLookbackMs: 3 * 24 * 60 * 60 * 1000,
   /** Update notices are never re-read further back than this. */
   updatesMaxLookbackMs: 3 * 24 * 60 * 60 * 1000,
   /** Backfill reads notices published this many days back; open ones are kept. */
