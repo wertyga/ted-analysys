@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Logger,
   NotFoundException,
   Param,
   Post,
@@ -39,6 +40,12 @@ type CronTaskDefinition = {
   description: string;
   run: () => Promise<unknown>;
   scheduled?: boolean;
+  /**
+   * Long task: the manual run is started in background and the request
+   * returns at once (a long request ends in a proxy 502); progress is in
+   * the task's status endpoint.
+   */
+  background?: boolean;
 };
 
 const CRON_TASK_IDS: CronTaskId[] = [
@@ -57,6 +64,8 @@ const CRON_TASK_IDS: CronTaskId[] = [
 @Controller('/adm/cron')
 @UseGuards(AdminAccessGuard)
 export class CronController {
+  private readonly logger = new Logger(CronController.name);
+
   constructor(
     private readonly currencyExchangeRatesCronService: CurrencyExchangeRatesCronService,
     private readonly cronSettingsService: CronSettingsService,
@@ -93,12 +102,28 @@ export class CronController {
   @Post(':taskId')
   @ApiOperation({ summary: 'Run cron task manually' })
   @ApiParam({ name: 'taskId', enum: CRON_TASK_IDS })
-  @ApiDefaultResponse({ description: 'Cron task finished.' })
+  @ApiDefaultResponse({
+    description:
+      'Cron task finished (status "finished"), or started in background for long tasks (status "started").',
+  })
   async runTask(@Param('taskId') taskId: CronTaskId) {
     const task = this.getTaskDefinitions().find(({ id }) => id === taskId);
 
     if (!task) {
       throw new NotFoundException('Cron task not found');
+    }
+
+    if (task.background) {
+      void task.run().catch((e: unknown) => {
+        this.logger.error(
+          `Cron task ${task.id} failed: ${
+            e instanceof Error ? e.message : 'unknown error'
+          }`,
+          e instanceof Error ? e.stack : undefined,
+        );
+      });
+
+      return { id: task.id, status: 'started', result: null };
     }
 
     const result = await task.run();
@@ -225,8 +250,9 @@ export class CronController {
         id: 'gather-pl-bzp-tenders',
         title: 'Gather Poland (BZP) tenders',
         description:
-          'Collect new contract notices, deadline changes and results (winners, contracts) from BZP (ezamowienia.gov.pl). Off by default.',
+          'Collect new contract notices, deadline changes and results (winners, contracts) from BZP (ezamowienia.gov.pl). Off by default. Manual run starts in background, progress: GET /adm/cron/gather-pl-bzp-tenders/status.',
         scheduled: true,
+        background: true,
         run: () => this.plTendersCronService.gatherPlBzpTendersQueued(),
       },
     ];

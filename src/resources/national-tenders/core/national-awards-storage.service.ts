@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import { Types } from 'mongoose';
 import { CurrencyExchangeRatesService } from '@/resources/currency-exchange-rates/currency-exchange-rates.service';
 import {
+  NationalStoreOutcome,
   NationalTenderStoreResult,
   NormalizedNationalAward,
 } from './national-tender.types';
@@ -22,6 +23,8 @@ export interface NationalAwardStoreOptions {
   resolveWinners: (
     award: NormalizedNationalAward,
   ) => Promise<(Types.ObjectId | undefined)[]>;
+  /** Called after each award with its outcome (live progress). */
+  onStored?: (outcome: NationalStoreOutcome) => void;
 }
 
 /** Country-agnostic persistence of national results (`national_award_tenders`). */
@@ -46,9 +49,13 @@ export class NationalAwardsStorageService {
 
     for (const award of awards) {
       try {
-        result[await this.storeOne(award, options)] += 1;
+        const outcome = await this.storeOne(award, options);
+
+        result[outcome] += 1;
+        options.onStored?.(outcome);
       } catch (e: unknown) {
         result.failed += 1;
+        options.onStored?.('failed');
         this.logger.warn(
           `Failed to store national award ${award.id}: ${
             e instanceof Error ? e.message : 'unknown error'

@@ -39,9 +39,7 @@ export class PlTendersService {
   private readonly resultsBackfillRun = new NationalCollectorRun(
     'PL_BZP results backfill',
   );
-  private readonly matchOpenRun = new NationalCollectorRun(
-    'PL_BZP match open',
-  );
+  private readonly matchOpenRun = new NationalCollectorRun('PL_BZP match open');
 
   constructor(
     private readonly bzpClient: BzpClient,
@@ -70,9 +68,11 @@ export class PlTendersService {
    */
   startMatchOpen() {
     return this.matchOpenRun.start(async (status) => {
+      status.stage = 'matching';
       status.matching = await this.matchingService.matchOpen(
         NationalTenderSource.PL_BZP,
       );
+      status.stage = 'reports';
       await this.matchingService.sendInstantReports();
     });
   }
@@ -135,6 +135,7 @@ export class PlTendersService {
       ),
     );
 
+    status.stage = 'amendments';
     await this.collectUpdatesWindow(status, amendmentsFrom, now, amended);
 
     // Results (winners, contract values) of any procedure, not only stored ones.
@@ -153,6 +154,7 @@ export class PlTendersService {
       ),
     );
 
+    status.stage = 'results';
     await this.collectResultsWindow(
       status,
       resultsFrom,
@@ -160,16 +162,19 @@ export class PlTendersService {
       buyers,
       contractors,
     );
+    status.stage = 'stats';
     await this.refreshBuyerStats(status, buyers);
     await this.refreshContractorStats(status, contractors);
 
     // Same flow as TED: match new/changed tenders, then instant reports
     // (daily/weekly reports pick the matches up on their own schedule).
+    status.stage = 'matching';
     status.matching = await this.matchingService.matchChanged(
       NationalTenderSource.PL_BZP,
       changed,
       amended,
     );
+    status.stage = 'reports';
     await this.matchingService.sendInstantReports();
   }
 
@@ -180,6 +185,7 @@ export class PlTendersService {
       const buyers = new Set<string>();
       const contractors = new Set<string>();
 
+      status.stage = 'results';
       for (let start = now.getTime() - days * DAY_MS; start < now.getTime(); ) {
         const end = Math.min(start + DAY_MS, now.getTime());
 
@@ -193,6 +199,7 @@ export class PlTendersService {
         start = end;
       }
 
+      status.stage = 'stats';
       await this.refreshBuyerStats(status, buyers);
       await this.refreshContractorStats(status, contractors);
     });
@@ -238,7 +245,12 @@ export class PlTendersService {
           }
         })
         .filter((award): award is NormalizedNationalAward => !!award);
-      const result = await this.awardsStorage.storeMany(awards, {
+      stats.failed += page.length - awards.length;
+
+      await this.awardsStorage.storeMany(awards, {
+        onStored: (outcome) => {
+          stats[outcome] += 1;
+        },
         resolveLeadBuyers: async (award) => {
           const ids = await this.nationalBuyersService.resolveBuyers(
             award.buyers,
@@ -258,11 +270,6 @@ export class PlTendersService {
           return ids;
         },
       });
-
-      stats.saved += result.saved;
-      stats.updated += result.updated;
-      stats.unchanged += result.unchanged;
-      stats.failed += result.failed + (page.length - awards.length);
     }
   }
 
@@ -294,6 +301,7 @@ export class PlTendersService {
     }
 
     // Amendments last: they need the amended tenders to be stored already.
+    status.stage = 'amendments';
     for (let start = now.getTime() - days * DAY_MS; start < now.getTime(); ) {
       const end = Math.min(start + DAY_MS, now.getTime());
 
@@ -303,6 +311,7 @@ export class PlTendersService {
 
     const contractors = new Set<string>();
 
+    status.stage = 'results';
     for (let start = now.getTime() - days * DAY_MS; start < now.getTime(); ) {
       const end = Math.min(start + DAY_MS, now.getTime());
 
@@ -316,6 +325,7 @@ export class PlTendersService {
       start = end;
     }
 
+    status.stage = 'stats';
     await this.refreshBuyerStats(status, buyers);
     await this.refreshContractorStats(status, contractors);
   }
@@ -376,6 +386,7 @@ export class PlTendersService {
     buyers: Set<string>,
     changed?: Types.ObjectId[],
   ) {
+    status.stage = 'tenders';
     const pages = this.bzpClient.fetchNoticePages({
       noticeType: BzpNoticeType.CONTRACT_NOTICE,
       publicationDateFrom: from,
@@ -383,6 +394,7 @@ export class PlTendersService {
     });
 
     for await (const page of pages) {
+      status.stage = 'tenders';
       status.pagesFetched += 1;
       status.noticesFetched += page.length;
 
@@ -390,8 +402,21 @@ export class PlTendersService {
         .map((notice) => this.normalizeSafe(notice))
         .filter((tender): tender is NormalizedNationalTender => !!tender);
       const open = normalized.filter((tender) => this.isOpen(tender));
-      const result = await this.storage.storeMany(open, {
+
+      status.skipped += normalized.length - open.length;
+      status.failed += page.length - normalized.length;
+
+      await this.storage.storeMany(open, {
         generateShortTitles: PL_BZP_CONFIG.generateShortTitles,
+        onStored: (outcome) => {
+          status[outcome] += 1;
+        },
+        onShortTitlesStart: () => {
+          status.stage = 'shortTitles';
+        },
+        onShortTitlesGenerated: (count) => {
+          status.shortTitlesGenerated += count;
+        },
         resolveLeadBuyers: async (tender) => {
           const ids = await this.nationalBuyersService.resolveBuyers(
             tender.buyers,
@@ -404,12 +429,6 @@ export class PlTendersService {
         },
         onChanged: (id) => changed?.push(id),
       });
-
-      status.saved += result.saved;
-      status.updated += result.updated;
-      status.unchanged += result.unchanged;
-      status.skipped += normalized.length - open.length;
-      status.failed += result.failed + (page.length - normalized.length);
 
       const lastPublication = page[page.length - 1]?.publicationDate;
 
