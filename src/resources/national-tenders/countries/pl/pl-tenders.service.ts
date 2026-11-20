@@ -53,8 +53,19 @@ export class PlTendersService {
     private readonly matchingService: NationalTenderMatchingService,
   ) {}
 
-  getStatus() {
+  async getStatus() {
+    const source = NationalTenderSource.PL_BZP;
+    const [tenders, openTenders, awards] = await Promise.all([
+      NationalTenderModel.countDocuments({ source }),
+      NationalTenderModel.countDocuments({
+        source,
+        submissionDeadline: { $gte: new Date() },
+      }),
+      NationalAwardTenderModel.countDocuments({ source }),
+    ]);
+
     return {
+      totals: { tenders, openTenders, awards },
       recent: this.recentRun.getStatus(),
       backfill: this.backfillRun.getStatus(),
       resultsBackfill: this.resultsBackfillRun.getStatus(),

@@ -131,6 +131,12 @@
     recentCompetitionTendersCronStatus: null,
     recentAwardTendersCronStatus: null,
     plBzpCronStatus: null,
+
+    plStatus: null,
+    plStatusError: '',
+    plStartingJob: null,
+    plBackfillDays: '90',
+    plResultsBackfillDays: '90',
   };
 
   var X_POST_PILLARS = [
@@ -397,6 +403,8 @@
           ? 'Tenders'
           : state.section === 'tech'
             ? 'Tech'
+            : state.section === 'poland'
+            ? 'Poland (BZP) tenders'
             : state.section === 'cron'
             ? 'Cron'
             : state.section === 'x-posts'
@@ -416,6 +424,7 @@
       navLinkHtml('/admin/tenders', 'Tenders', 'tenders') +
       navLinkHtml('/admin/tech', 'Tech', 'tech') +
       navLinkHtml('/admin/cron', 'Cron', 'cron') +
+      navLinkHtml('/admin/poland', 'Poland (BZP)', 'poland') +
       navLinkHtml('/admin/x-posts', 'X Posts', 'x-posts') +
       navLinkHtml('/admin/marketing-tasks', 'Marketing Tasks', 'marketing-tasks') +
       '</nav>' +
@@ -467,6 +476,7 @@
     else if (state.section === 'tenders') inner = tendersSectionHtml();
     else if (state.section === 'tech') inner = techSectionHtml();
     else if (state.section === 'cron') inner = cronSectionHtml();
+    else if (state.section === 'poland') inner = polandSectionHtml();
     else if (state.section === 'x-posts') inner = xPostsSectionHtml();
     else if (state.section === 'marketing-tasks') inner = marketingTasksSectionHtml();
     else inner = dashboardSectionHtml();
@@ -1405,6 +1415,241 @@
     return cronPanelHtml();
   }
 
+  // ---- poland (BZP) ----
+
+  var PL_STAGE_LABELS = {
+    tenders: 'Contract notices',
+    amendments: 'Deadline changes (amendments)',
+    results: 'Results (winners, contracts)',
+    stats: 'Buyer / contractor stats',
+    matching: 'Company matching',
+    reports: 'Instant reports',
+  };
+
+  var PL_JOBS = [
+    {
+      key: 'recent',
+      path: 'gather-recent',
+      title: 'Recent (daily run)',
+      description:
+        'Collects only what was published after the newest stored tender (first run: last 2 days), then deadline changes and results of the last 3 days, matching and instant reports. Same job as the daily cron.',
+      steps: ['tenders', 'amendments', 'results', 'stats', 'matching', 'reports'],
+    },
+    {
+      key: 'backfill',
+      path: 'backfill',
+      daysField: 'plBackfillDays',
+      title: 'Backfill open tenders',
+      description:
+        'Reads every contract notice of the last N days day by day and keeps the open ones, then their deadline changes and results. Use it to fill the database; takes hours (BZP allows 30 requests/min). Run "Match open tenders" after it.',
+      confirm: 'Start a BZP backfill for the last {days} days? It can take several hours.',
+      steps: ['tenders', 'amendments', 'results', 'stats'],
+    },
+    {
+      key: 'resultsBackfill',
+      path: 'backfill-results',
+      daysField: 'plResultsBackfillDays',
+      title: 'Backfill results',
+      description: 'Collects only result notices (winners, contract values) of the last N days.',
+      confirm: 'Start a BZP results backfill for the last {days} days? It can take a long time.',
+      steps: ['results', 'stats'],
+    },
+    {
+      key: 'matchOpen',
+      path: 'match-open',
+      title: 'Match open tenders',
+      description:
+        'Matches every open Polish tender with company filters and sends instant reports. Run after a backfill; the daily run matches only new and changed tenders.',
+      confirm: 'Match all open Polish tenders with company filters and send instant reports?',
+      steps: ['matching', 'reports'],
+    },
+  ];
+
+  function plDuration(from, to) {
+    if (!from) return '-';
+    var ms = new Date(to || Date.now()).getTime() - new Date(from).getTime();
+    if (!(ms >= 0)) return '-';
+    var sec = Math.floor(ms / 1000);
+    var h = Math.floor(sec / 3600);
+    var m = Math.floor((sec % 3600) / 60);
+    var s = sec % 60;
+    return (h ? h + 'h ' : '') + (h || m ? m + 'm ' : '') + s + 's';
+  }
+
+  function plRunState(run) {
+    if (!run || !run.startedAt) return { text: 'NEVER RUN', variant: 'default' };
+    if (run.isRunning) return { text: 'RUNNING', variant: 'processing' };
+    if (run.lastError) return { text: 'FAILED', variant: 'red' };
+    return { text: 'FINISHED', variant: 'green' };
+  }
+
+  function plStepsHtml(job, run) {
+    if (!run || !run.startedAt) return '';
+
+    // `stage` stays set when a run fails, so it marks the failed step.
+    var stage = run.stage === 'shortTitles' ? 'tenders' : run.stage;
+    var current = job.steps.indexOf(stage);
+    var finishedOk = !run.isRunning && !run.lastError;
+
+    return (
+      '<ol class="plSteps">' +
+      job.steps
+        .map(function (step, index) {
+          var cls = 'pending';
+          var note = '';
+          if (finishedOk || (current !== -1 && index < current)) cls = 'done';
+          else if (index === current) {
+            cls = run.isRunning ? 'current' : 'failed';
+            if (run.isRunning && run.stage === 'shortTitles') note = ' — generating AI short titles';
+            if (run.isRunning && step === 'reports') note = ' — waiting for the AI fit queue';
+          }
+          return '<li class="' + cls + '">' + escapeHtml(PL_STAGE_LABELS[step] + note) + '</li>';
+        })
+        .join('') +
+      '</ol>'
+    );
+  }
+
+  function plRunDetailsHtml(job, run) {
+    if (!run || !run.startedAt) {
+      return '<p class="mutedText">Not run since the last server restart (status is kept in memory).</p>';
+    }
+
+    var a = run.amendments || {};
+    var aw = run.awards || {};
+    var m = run.matching || {};
+    var html = '';
+
+    html += statsHtml([
+      ['Started', escapeHtml(fmtDateTime(run.startedAt)), 'smallStat'],
+      ['Finished', escapeHtml(run.finishedAt ? fmtDateTime(run.finishedAt) : '-'), 'smallStat'],
+      [run.isRunning ? 'Running for' : 'Took', escapeHtml(plDuration(run.startedAt, run.finishedAt)), 'smallStat'],
+      ['BZP pages fetched', run.pagesFetched],
+    ]);
+
+    if (job.steps.indexOf('tenders') !== -1) {
+      html +=
+        '<h3 class="plGroupTitle">Contract notices</h3>' +
+        statsHtml([
+          ['Fetched', run.noticesFetched],
+          ['New saved', run.saved],
+          ['Updated', run.updated],
+          ['Unchanged', run.unchanged],
+          ['Skipped (deadline passed)', run.skipped],
+          ['Failed', run.failed],
+          ['AI short titles', run.shortTitlesGenerated],
+          ['Reached publication date', escapeHtml(run.lastPublicationDate ? fmtDateTime(run.lastPublicationDate) : '-'), 'smallStat'],
+        ]);
+    }
+
+    if (job.steps.indexOf('amendments') !== -1) {
+      html +=
+        '<h3 class="plGroupTitle">Deadline changes</h3>' +
+        statsHtml([
+          ['Fetched', a.fetched],
+          ['Applied', a.applied],
+          ['Already applied', a.duplicate],
+          ['Tender not stored', a.notFound],
+          ['Ignored', a.ignored],
+          ['Failed', a.failed],
+        ]);
+    }
+
+    if (job.steps.indexOf('results') !== -1) {
+      html +=
+        '<h3 class="plGroupTitle">Results</h3>' +
+        statsHtml([
+          ['Fetched', aw.fetched],
+          ['New saved', aw.saved],
+          ['Updated', aw.updated],
+          ['Unchanged', aw.unchanged],
+          ['Failed', aw.failed],
+          ['Buyers touched', run.buyersTouched],
+          ['Contractors touched', run.contractorsTouched],
+        ]);
+    }
+
+    if (job.steps.indexOf('matching') !== -1) {
+      html +=
+        '<h3 class="plGroupTitle">Matching</h3>' +
+        statsHtml([
+          ['Tenders matched', m.tendersMatched],
+          ['Matches saved', m.matchesSaved],
+        ]);
+    }
+
+    if (run.lastError) {
+      html += '<div class="errorList"><div><strong>Error</strong>: ' + escapeHtml(run.lastError) + '</div></div>';
+    }
+
+    return html;
+  }
+
+  function plJobPanelHtml(job) {
+    var status = state.plStatus || {};
+    var run = status[job.key];
+    var runState = plRunState(run);
+    var running = Boolean(run && run.isRunning);
+    var starting = state.plStartingJob === job.key;
+    var buttonLabel = starting ? 'Starting...' : running ? 'Running...' : 'Start';
+
+    var controls = '';
+    if (job.daysField) {
+      controls +=
+        '<label class="plDays">Days<input max="365" min="1" type="number" value="' +
+        escapeHtml(state[job.daysField]) +
+        '" oninput="Admin.setField(\'' +
+        job.daysField +
+        '\', this.value)"></label>';
+    }
+    controls +=
+      '<button ' +
+      (running || starting ? 'disabled' : '') +
+      ' onclick="Admin.startPlJob(\'' +
+      job.key +
+      '\')" type="button">' +
+      buttonLabel +
+      '</button>';
+
+    return (
+      '<section class="panel panelWide plPanel"><div class="panelHeader"><div><h2>' +
+      escapeHtml(job.title) +
+      ' ' +
+      tagHtml(runState.text, runState.variant) +
+      '</h2><p>' +
+      escapeHtml(job.description) +
+      '</p></div><div class="buttonGroup">' +
+      controls +
+      '</div></div>' +
+      plStepsHtml(job, run) +
+      plRunDetailsHtml(job, run) +
+      '</section>'
+    );
+  }
+
+  function plTotalsPanelHtml() {
+    var totals = (state.plStatus && state.plStatus.totals) || {};
+    var fmt = function (value) {
+      return typeof value === 'number' ? value.toLocaleString('en') : '-';
+    };
+
+    return (
+      '<section class="panel panelWide plPanel"><div class="panelHeader"><div><h2>Stored Polish data</h2>' +
+      '<p>Refreshes every 3 seconds. Only one run of each job can go at a time; jobs keep running when this page is closed.</p></div></div>' +
+      (state.plStatusError ? '<div class="errorList"><div>' + escapeHtml(state.plStatusError) + '</div></div>' : '') +
+      statsHtml([
+        ['Tenders stored', fmt(totals.tenders)],
+        ['Open (deadline ahead)', fmt(totals.openTenders)],
+        ['Results (awards) stored', fmt(totals.awards)],
+      ]) +
+      '</section>'
+    );
+  }
+
+  function polandSectionHtml() {
+    return plTotalsPanelHtml() + PL_JOBS.map(plJobPanelHtml).join('');
+  }
+
   function techSectionHtml() {
     return (
       gatherAllTagPanelHtml() +
@@ -2078,6 +2323,7 @@
   // ---------------- routing ----------------
 
   function sectionFromPath(pathname) {
+    if (pathname.indexOf('/poland') !== -1) return 'poland';
     if (pathname.indexOf('/tenders') !== -1) return 'tenders';
     if (pathname.indexOf('/users') !== -1) return 'users';
     if (pathname.indexOf('/tech') !== -1) return 'tech';
@@ -2190,6 +2436,7 @@
         if (state.section === 'tenders') return loadTenders(state.tendersPage, state.tendersPageSize);
         if (state.section === 'tech') return loadGatherAllStatus();
         if (state.section === 'cron') return loadCronSectionData();
+        if (state.section === 'poland') return loadPlStatus();
         if (state.section === 'x-posts') return loadXPosts(state.xPostsPage, state.xPostsPageSize);
         if (state.section === 'marketing-tasks')
           return state.marketingTaskId ? loadMarketingTask(state.marketingTaskId) : loadMarketingTasks();
@@ -2443,7 +2690,7 @@
   }
 
   function updatePolling() {
-    if (state.token && (state.section === 'tech' || state.section === 'cron')) startPolling();
+    if (state.token && (state.section === 'tech' || state.section === 'cron' || state.section === 'poland')) startPolling();
     else stopPolling();
   }
 
@@ -2464,6 +2711,14 @@
     if (!state.token) return;
     if (state.section === 'cron') {
       loadCronSectionData().then(render).catch(render);
+      return;
+    }
+    if (state.section === 'poland') {
+      // Re-rendering would drop focus from the "days" inputs while typing.
+      loadPlStatus().then(function () {
+        var active = document.activeElement;
+        if (!active || active.tagName !== 'INPUT') render();
+      });
       return;
     }
     Promise.all([
@@ -2690,6 +2945,57 @@
         state.collectTenderBuyersLoading = false;
       })
       .finally(function () {
+        render();
+      });
+  }
+
+  function loadPlStatus() {
+    return request('/adm/national-tenders/pl/status', { token: state.token })
+      .then(function (status) {
+        state.plStatus = status;
+        state.plStatusError = '';
+      })
+      .catch(function (error) {
+        state.plStatusError = error && error.message ? error.message : 'Failed to load BZP status';
+      });
+  }
+
+  function startPlJob(key) {
+    var job = PL_JOBS.filter(function (j) {
+      return j.key === key;
+    })[0];
+    if (!job) return;
+
+    var path = '/adm/national-tenders/pl/' + job.path;
+    var days = null;
+
+    if (job.daysField) {
+      days = Math.floor(Number(state[job.daysField]));
+      if (!(days >= 1 && days <= 365)) {
+        state.message = 'Days must be between 1 and 365.';
+        render();
+        return;
+      }
+      path += '?days=' + days;
+    }
+
+    if (job.confirm && !window.confirm(job.confirm.replace('{days}', String(days)))) return;
+
+    state.plStartingJob = key;
+    state.message = '';
+    render();
+
+    request(path, { method: 'POST', token: state.token })
+      .then(function (run) {
+        if (state.plStatus && run) state.plStatus[key] = run;
+        state.message = job.title + ' started.';
+        return loadPlStatus();
+      })
+      .catch(function (error) {
+        state.message = error && error.message ? error.message : 'Failed to start ' + job.title;
+      })
+      .finally(function () {
+        state.plStartingJob = null;
         render();
       });
   }
@@ -3520,6 +3826,7 @@
     syncMongoIndexes: syncMongoIndexes,
     collectBuyersFromTenders: collectBuyersFromTenders,
     refreshContractorStats: refreshContractorStats,
+    startPlJob: startPlJob,
     gatherAllCompetitionTenders: gatherAllCompetitionTenders,
     refreshAwardTendersHistory: refreshAwardTendersHistory,
     fixAwardValues: fixAwardValues,
