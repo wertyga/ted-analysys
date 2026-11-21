@@ -38,7 +38,6 @@ import { replaceTemplateVars } from '@/resources/email/email.utils';
 import { EMAIL_TEMPLATES } from '@/resources/email/type';
 import { HttpErrorLoggingFilter } from '@/http-logger/HTTPLogger';
 import { AuthGuard } from '@/guards';
-import { CouponService } from '@/resources/coupon';
 
 export const AUTH_EXCLUDE_FIELDS = [] as (keyof UserDocument)[];
 
@@ -46,10 +45,7 @@ export const AUTH_EXCLUDE_FIELDS = [] as (keyof UserDocument)[];
 @UseFilters(HttpErrorLoggingFilter)
 @Controller('/auth')
 export class AuthController {
-  constructor(
-    private authService: AuthService,
-    private readonly couponService: CouponService,
-  ) {}
+  constructor(private authService: AuthService) {}
 
   @Get('/google-test')
   googleAuthTest(@Res() res) {
@@ -61,10 +57,6 @@ export class AuthController {
   @Post('/oauth/google')
   async oauthGoogle(@Body() data: OauthSignInDto) {
     const { user, isNewUser } = await this.authService.oauthSignIn(data);
-
-    if (isNewUser) {
-      await this.couponService.redeemFreeUseCouponForUser(user);
-    }
 
     return {
       user: UserModel.serializeUser(user, undefined, {
