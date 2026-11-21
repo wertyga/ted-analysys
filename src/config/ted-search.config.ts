@@ -61,6 +61,7 @@ export const COMPETITION_FIELDS = [
 
 export const SEARCH_DEFAULT_FIELDS = [
   'notice-identifier',
+  'procedure-identifier',
   'publication-number',
   'notice-type',
   'notice-subtype',
