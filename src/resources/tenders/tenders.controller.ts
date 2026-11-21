@@ -24,6 +24,12 @@ import {
   NationalTenderDetailDto,
   NationalTendersReadService,
 } from '@/resources/national-tenders/core/national-tenders-read.service';
+import {
+  findProcedureAward,
+  ProcedureAwardDto,
+} from '@/resources/award-tender/procedure-award';
+
+type WithAward = { indexable: boolean; award: ProcedureAwardDto | null };
 
 @ApiTags('tenders')
 @Controller('tenders')
@@ -44,9 +50,7 @@ export class TendersController {
     @Param('id') id: string,
     @Query('withGA') withGA: boolean,
     @Req() req,
-  ): Promise<
-    (TenderDetailDto | NationalTenderDetailDto) & { indexable: boolean }
-  > {
+  ): Promise<(TenderDetailDto | NationalTenderDetailDto) & WithAward> {
     const withoutBaseAnalysisGenerating = !withGA || req.isBot;
 
     if (isNationalTenderId(id)) {
@@ -68,12 +72,18 @@ export class TendersController {
       throw new NotFoundException(`Tender ${id} not found`);
     }
 
-    if (req.user) {
-      await this.tendersService.fillUpTenderListByDeepAnalysisAndWishListStatus(
-        [tenderSerialized],
-        req.user._id.toString(),
-      );
-    }
+    const [award] = await Promise.all([
+      findProcedureAward({
+        source: 'TED',
+        procedureId: tenderSerialized.procedureId,
+      }),
+      req.user
+        ? this.tendersService.fillUpTenderListByDeepAnalysisAndWishListStatus(
+            [tenderSerialized],
+            String(req.user._id),
+          )
+        : undefined,
+    ]);
 
     let generalAnalysis = TenderGeneralAnalysisModel.serializeDetail(
       (tenderSerialized as any).generalAnalysis,
@@ -90,6 +100,7 @@ export class TendersController {
       ...tenderSerialized,
       generalAnalysis,
       indexable: isTenderIndexable(tenderSerialized),
+      award,
     };
   }
 
@@ -98,14 +109,14 @@ export class TendersController {
     id: string,
     withoutBaseAnalysisGenerating: boolean,
     req,
-  ): Promise<NationalTenderDetailDto & { indexable: boolean }> {
+  ): Promise<NationalTenderDetailDto & WithAward> {
     const tender = await this.nationalTendersReadService.findById(id);
 
     if (!tender) {
       throw new NotFoundException(`Tender ${id} not found`);
     }
 
-    const [analysis, tariff] = await Promise.all([
+    const [analysis, tariff, award] = await Promise.all([
       withoutBaseAnalysisGenerating
         ? TenderGeneralAnalysisModel.findOne({ tenderId: id }).lean()
         : this.nationalTendersReadService
@@ -118,6 +129,10 @@ export class TendersController {
       withoutBaseAnalysisGenerating
         ? { type: TariffType.free }
         : this.tariffService.getUserTariff(req.user),
+      findProcedureAward({
+        source: tender.source,
+        procedureId: tender.sourceProcedureId,
+      }),
     ]);
 
     let generalAnalysis = analysis
@@ -144,6 +159,7 @@ export class TendersController {
       ...detail,
       generalAnalysis,
       indexable: isTenderIndexable(detail),
-    } as NationalTenderDetailDto & { indexable: boolean };
+      award,
+    } as NationalTenderDetailDto & WithAward;
   }
 }

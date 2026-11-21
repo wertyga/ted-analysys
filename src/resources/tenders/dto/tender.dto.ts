@@ -171,6 +171,13 @@ export class TenderDto {
   noticeVersion?: string;
 
   @ApiPropertyOptional({
+    example: 'e12da7fb-75aa-4544-8104-e5ef45c77d75',
+    description:
+      'TED procedure-identifier (BT-04): shared by the contract notice and its result notices.',
+  })
+  procedureId?: string;
+
+  @ApiPropertyOptional({
     example: 'restricted',
     description:
       'TED procedure-type: open, restricted, negotiated, and similar procedure kinds.',

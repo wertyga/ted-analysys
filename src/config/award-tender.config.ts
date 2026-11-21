@@ -11,6 +11,7 @@ export const AWARD_TENDER_CONFIG = {
 
 export const AWARD_TENDER_FIELDS = [
   'publication-number',
+  'procedure-identifier',
   'notice-type',
   'notice-subtype',
   'notice-version',

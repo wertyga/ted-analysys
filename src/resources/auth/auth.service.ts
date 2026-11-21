@@ -15,16 +15,12 @@ import {
   getEmailTemplate,
 } from '@/resources/email/email.utils';
 import { AuthServiceUtils } from './auth.service.utils';
-import { CouponService } from '@/resources/coupon';
 
 @Injectable()
 export class AuthService {
   utils: AuthServiceUtils;
 
-  constructor(
-    private emailService: EmailService,
-    private readonly couponService: CouponService,
-  ) {
+  constructor(private emailService: EmailService) {
     this.utils = new AuthServiceUtils();
   }
 
@@ -118,8 +114,6 @@ export class AuthService {
     user.token = generateToken(user.email);
 
     await user.save();
-
-    await this.couponService.redeemFreeUseCouponForUser(user);
 
     return user;
   }

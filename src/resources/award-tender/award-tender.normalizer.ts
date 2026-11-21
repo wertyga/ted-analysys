@@ -268,6 +268,7 @@ export class AwardTenderNormalizer {
       noticeType: getStringValue('notice-type', notice),
       noticeSubtype: getStringValue('notice-subtype', notice),
       noticeVersion: getStringValue('notice-version', notice),
+      procedureId: getStringValue('procedure-identifier', notice) || undefined,
       procedureType: getStringValue('procedure-type', notice),
       title: getEngValueOrFirst('notice-title', notice),
       titleProc: getEngValueOrFirst('title-proc', notice),

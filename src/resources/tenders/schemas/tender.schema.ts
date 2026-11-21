@@ -85,6 +85,8 @@ export interface Tender {
   noticeSubtype?: string;
   /** TED notice-version: version of the notice, useful for detecting changes. */
   noticeVersion?: string;
+  /** TED procedure-identifier (BT-04): shared by the contract notice and its result notices. */
+  procedureId?: string;
   /** TED procedure-type: open, restricted, negotiated, and similar procedure kinds. */
   procedureType?: string;
   /** Main card title, normally notice-title with procedure/lot title fallback. */
@@ -242,6 +244,7 @@ const TenderSchema = new Schema<TenderDocument, TenderModelType>(
     noticeType: String,
     noticeSubtype: String,
     noticeVersion: String,
+    procedureId: String,
     procedureType: String,
     title: String,
     shortTitle: {

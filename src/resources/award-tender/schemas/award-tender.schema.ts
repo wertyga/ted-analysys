@@ -38,6 +38,8 @@ export interface AwardTender {
   noticeType?: string;
   noticeSubtype?: string;
   noticeVersion?: string;
+  /** TED procedure-identifier (BT-04): links the result to its contract notice. */
+  procedureId?: string;
   procedureType?: string;
   title?: string;
   titleProc?: string;
@@ -292,6 +294,7 @@ const AwardTenderSchema = new Schema<AwardTenderDocument, AwardTenderModelType>(
     noticeType: { type: String },
     noticeSubtype: String,
     noticeVersion: String,
+    procedureId: String,
     procedureType: String,
     title: String,
     titleProc: String,
@@ -367,6 +370,8 @@ AwardTenderSchema.index({
   publicationDate: -1,
 });
 AwardTenderSchema.index({ winners: 1, publicationDate: -1 });
+// Result of the procedure on the tender page (filled for new notices only).
+AwardTenderSchema.index({ procedureId: 1 }, { sparse: true });
 AwardTenderSchema.index({ 'lots.winner': 1 });
 AwardTenderSchema.index({ 'winners.identifier': 1 });
 AwardTenderSchema.index({ 'winners.name': 1 });
