@@ -418,7 +418,7 @@ export class PlTendersService {
       status.failed += page.length - normalized.length;
 
       await this.storage.storeMany(open, {
-        generateShortTitles: PL_BZP_CONFIG.generateShortTitles,
+        // generateShortTitles: PL_BZP_CONFIG.generateShortTitles,
         onStored: (outcome) => {
           status[outcome] += 1;
         },

@@ -23,5 +23,5 @@ export const PL_BZP_CONFIG = {
   updatesMaxLookbackMs: 3 * 24 * 60 * 60 * 1000,
   /** Backfill reads notices published this many days back; open ones are kept. */
   backfillDays: 90,
-  generateShortTitles: true,
+  generateShortTitles: false,
 };
