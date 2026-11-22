@@ -33,6 +33,29 @@ const emptyIndexHealthReport = (): IndexHealthReport => ({
 
 const MONGO_NAMESPACE_NOT_FOUND = 26;
 
+// Index build running in MongoDB right now, whoever started it (Mongoose
+// autoIndex on startup, sync-indexes, manual createIndex in mongosh).
+export type IndexBuildProgress = {
+  collection: string;
+  indexes: string[];
+  phase: string | null;
+  done: number | null;
+  total: number | null;
+  percent: number | null;
+  secondsRunning: number | null;
+};
+
+type CurrentOp = {
+  ns?: string;
+  msg?: string;
+  secs_running?: number;
+  progress?: { done?: number; total?: number };
+  command?: {
+    createIndexes?: string;
+    indexes?: Array<{ name?: string; key?: Record<string, unknown> }>;
+  };
+};
+
 export type SyncIndexesStatus = {
   isRunning: boolean;
   mode: 'ensure' | 'rebuild';
@@ -97,12 +120,82 @@ export class IndexesTechService implements OnApplicationBootstrap {
     void this.runIndexHealthCheck('startup');
   }
 
-  getIndexHealth(): IndexHealthReport {
+  async getIndexHealth(): Promise<
+    IndexHealthReport & { builds: IndexBuildProgress[] }
+  > {
     return {
       ...this.health,
       missing: [...this.health.missing],
       errors: [...this.health.errors],
+      builds: await this.getIndexBuilds(),
     };
+  }
+
+  private async getIndexBuilds(): Promise<IndexBuildProgress[]> {
+    const db = mongoose.connection.db;
+
+    if (!db) {
+      return [];
+    }
+
+    let ops: CurrentOp[];
+
+    try {
+      const result = (await db.admin().command({
+        currentOp: 1,
+        'command.createIndexes': { $exists: true },
+        ns: { $regex: `^${db.databaseName}\\.` },
+      })) as { inprog?: CurrentOp[] };
+      ops = result.inprog ?? [];
+    } catch (error) {
+      this.logger.warn(
+        `Cannot read index builds from currentOp: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return [];
+    }
+
+    // The client createIndexes call and the server build thread are separate
+    // ops for the same build; keep one per collection + indexes, preferring
+    // the one that reports progress.
+    const builds = new Map<string, IndexBuildProgress>();
+
+    for (const op of ops) {
+      const collection = op.command?.createIndexes;
+
+      if (!collection) {
+        continue;
+      }
+
+      const indexes = (op.command?.indexes ?? []).map(
+        (index) => index.name ?? this.getGeneratedIndexName(index.key ?? {}),
+      );
+      const key = `${collection}|${indexes.join(',')}`;
+      const done = op.progress?.done ?? null;
+      const total = op.progress?.total ?? null;
+      const build: IndexBuildProgress = {
+        collection,
+        indexes,
+        // e.g. "Index Build: scanning collection Index Build: scanning collection: 1/2 50%"
+        phase:
+          op.msg?.match(/Index Build: ([a-z ]+?)(?= Index Build|:|$)/i)?.[1] ??
+          null,
+        done,
+        total,
+        percent:
+          done !== null && total ? Math.floor((done / total) * 100) : null,
+        secondsRunning: op.secs_running ?? null,
+      };
+
+      const existing = builds.get(key);
+
+      if (!existing || (existing.total === null && build.total !== null)) {
+        builds.set(key, build);
+      }
+    }
+
+    return [...builds.values()];
   }
 
   private async runIndexHealthCheck(

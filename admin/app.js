@@ -783,6 +783,28 @@
     return html;
   }
 
+  function indexBuildsHtml() {
+    var h = state.indexHealth;
+    if (!h || !h.builds || !h.builds.length) return '';
+
+    return h.builds
+      .map(function (b) {
+        var name = b.collection + '.' + (b.indexes.length ? b.indexes.join(', ') : '?');
+        var details = [];
+        if (b.percent !== null) details.push(b.percent + '%');
+        if (b.done !== null && b.total) details.push(b.done.toLocaleString() + ' / ' + b.total.toLocaleString());
+        if (b.phase) details.push(b.phase);
+        if (b.secondsRunning !== null) details.push(Math.round(b.secondsRunning / 60) + ' min');
+
+        return (
+          '<div class="resultNote"><strong>Building index</strong> ' + escapeHtml(name) +
+          (details.length ? ': ' + escapeHtml(details.join(' · ')) : '') + '</div>' +
+          (b.percent !== null ? progressBarHtml(b.percent, 'active') : '')
+        );
+      })
+      .join('');
+  }
+
   function indexHealthHtml() {
     var h = state.indexHealth;
     if (!h) return '';
@@ -834,6 +856,7 @@
       ' onclick="Admin.syncMongoIndexes()" type="button">' +
       (busy ? 'Syncing indexes...' : state.forceRebuildIndexes ? 'Rebuild indexes' : 'Sync indexes') +
       '</button></div></div>' +
+      indexBuildsHtml() +
       indexHealthHtml() +
       syncIndexesResultHtml() +
       '</section>'
