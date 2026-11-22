@@ -1,5 +1,37 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import mongoose from 'mongoose';
+
+export type IndexHealthIssue = {
+  model: string;
+  collection: string;
+  index: string;
+  unique: boolean;
+  reason: string;
+};
+
+export type IndexHealthReport = {
+  isRunning: boolean;
+  trigger: 'startup' | 'sync' | null;
+  checkedAt: Date | null;
+  totalModels: number;
+  indexesChecked: number;
+  // Indexes declared in Mongoose schemas but absent in MongoDB.
+  missing: IndexHealthIssue[];
+  // Errors from automatic index builds at startup or from the check itself.
+  errors: Array<{ model: string; message: string }>;
+};
+
+const emptyIndexHealthReport = (): IndexHealthReport => ({
+  isRunning: false,
+  trigger: null,
+  checkedAt: null,
+  totalModels: 0,
+  indexesChecked: 0,
+  missing: [],
+  errors: [],
+});
+
+const MONGO_NAMESPACE_NOT_FOUND = 26;
 
 export type SyncIndexesStatus = {
   isRunning: boolean;
@@ -53,8 +85,127 @@ const LEGACY_INDEXES_TO_DROP: Record<string, Array<Record<string, 1 | -1>>> = {
 };
 
 @Injectable()
-export class IndexesTechService {
+export class IndexesTechService implements OnApplicationBootstrap {
+  private readonly logger = new Logger(IndexesTechService.name);
   private status = emptySyncIndexesStatus();
+  private health = emptyIndexHealthReport();
+
+  onApplicationBootstrap(): void {
+    // Mongoose builds indexes on startup but only emits failures on the model
+    // (e.g. a unique index blocked by duplicates), so nobody notices. Check
+    // in the background and surface the result in logs and the admin panel.
+    void this.runIndexHealthCheck('startup');
+  }
+
+  getIndexHealth(): IndexHealthReport {
+    return {
+      ...this.health,
+      missing: [...this.health.missing],
+      errors: [...this.health.errors],
+    };
+  }
+
+  private async runIndexHealthCheck(
+    trigger: 'startup' | 'sync',
+  ): Promise<void> {
+    if (this.health.isRunning) {
+      return;
+    }
+
+    const modelNames = mongoose.modelNames().sort();
+    const report: IndexHealthReport = {
+      ...emptyIndexHealthReport(),
+      isRunning: true,
+      trigger,
+      totalModels: modelNames.length,
+    };
+    this.health = report;
+
+    for (const modelName of modelNames) {
+      const model = mongoose.model(modelName);
+      let buildError: string | null = null;
+
+      // The startup build result is cached in model.init(); after a manual
+      // sync it is stale, so only consult it on the startup check.
+      if (trigger === 'startup') {
+        try {
+          await model.init();
+        } catch (error) {
+          buildError = error instanceof Error ? error.message : String(error);
+          report.errors.push({ model: modelName, message: buildError });
+          this.logger.error(
+            `Automatic index build failed for ${modelName}: ${buildError}`,
+          );
+        }
+      }
+
+      try {
+        const existingIndexes = await this.getCollectionIndexes(modelName);
+
+        if (!existingIndexes) {
+          continue;
+        }
+
+        for (const [fields, options] of model.schema.indexes()) {
+          report.indexesChecked += 1;
+
+          const exists = existingIndexes.some((index) =>
+            this.isSameIndexKey(index.key as Record<string, unknown>, fields),
+          );
+
+          if (exists) {
+            continue;
+          }
+
+          const issue: IndexHealthIssue = {
+            model: modelName,
+            collection: model.collection.collectionName,
+            index: this.getGeneratedIndexName(fields),
+            unique: options?.unique === true,
+            reason: buildError ?? 'Declared in schema but missing in MongoDB',
+          };
+          report.missing.push(issue);
+          this.logger.error(
+            `Missing Mongo index ${issue.collection}.${issue.index}` +
+              `${issue.unique ? ' (unique)' : ''}: ${issue.reason}`,
+          );
+        }
+      } catch (error) {
+        report.errors.push({
+          model: modelName,
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+
+    report.isRunning = false;
+    report.checkedAt = new Date();
+
+    if (report.missing.length || report.errors.length) {
+      this.logger.warn(
+        `Mongo index check (${trigger}): ${report.missing.length} missing, ` +
+          `${report.errors.length} errors. See /adm/tech/sync-indexes/health`,
+      );
+    } else {
+      this.logger.log(
+        `Mongo index check (${trigger}): all ${report.indexesChecked} indexes present`,
+      );
+    }
+  }
+
+  private async getCollectionIndexes(
+    modelName: string,
+  ): Promise<Array<{ key: unknown }> | null> {
+    try {
+      return await mongoose.model(modelName).collection.indexes();
+    } catch (error) {
+      // Collection not created yet: no data, nothing to index.
+      if ((error as { code?: number })?.code === MONGO_NAMESPACE_NOT_FOUND) {
+        return null;
+      }
+      throw error;
+    }
+  }
 
   getSyncIndexesStatus(): SyncIndexesStatus {
     return {
@@ -119,6 +270,8 @@ export class IndexesTechService {
       status.currentModel = null;
       status.finishedAt = new Date();
     }
+
+    await this.runIndexHealthCheck('sync');
 
     return this.getSyncIndexesStatus();
   }

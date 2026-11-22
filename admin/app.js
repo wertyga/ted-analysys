@@ -92,6 +92,7 @@
 
     syncIndexesLoading: false,
     syncIndexesStatus: null,
+    indexHealth: null,
     forceRebuildIndexes: false,
 
     collectTenderBuyersLoading: false,
@@ -782,6 +783,41 @@
     return html;
   }
 
+  function indexHealthHtml() {
+    var h = state.indexHealth;
+    if (!h) return '';
+    if (h.isRunning) return '<div class="resultNote">Checking Mongo indexes...</div>';
+
+    var checkedAt = h.checkedAt ? new Date(h.checkedAt).toLocaleString() : '-';
+    var source = h.trigger === 'startup' ? 'on server start' : 'after last sync';
+
+    if (!h.missing.length && !h.errors.length) {
+      return (
+        '<div class="resultNote">Index check ' + escapeHtml(source) + ' (' + escapeHtml(checkedAt) + '): all ' +
+        h.indexesChecked + ' declared indexes are present.</div>'
+      );
+    }
+
+    return (
+      '<div class="resultNote"><strong>Index problems</strong> found ' + escapeHtml(source) + ' (' + escapeHtml(checkedAt) + '): ' +
+      h.missing.length + ' missing, ' + h.errors.length + ' build errors. Queries on these fields do a full collection scan.</div>' +
+      errorListHtml(
+        h.missing
+          .map(function (m) {
+            return {
+              id: m.collection + '.' + m.index + (m.unique ? ' (unique)' : ''),
+              message: m.reason,
+            };
+          })
+          .concat(
+            h.errors.map(function (e) {
+              return { id: e.model, message: e.message };
+            }),
+          ),
+      )
+    );
+  }
+
   function mongoIndexesPanelHtml() {
     var busy = state.syncIndexesLoading || (state.syncIndexesStatus && state.syncIndexesStatus.isRunning);
     return (
@@ -798,6 +834,7 @@
       ' onclick="Admin.syncMongoIndexes()" type="button">' +
       (busy ? 'Syncing indexes...' : state.forceRebuildIndexes ? 'Rebuild indexes' : 'Sync indexes') +
       '</button></div></div>' +
+      indexHealthHtml() +
       syncIndexesResultHtml() +
       '</section>'
     );
@@ -2613,6 +2650,14 @@
       .catch(function () {});
   }
 
+  function loadIndexHealth() {
+    return request('/adm/tech/sync-indexes/health', { token: state.token })
+      .then(function (health) {
+        state.indexHealth = health;
+      })
+      .catch(function () {});
+  }
+
   function loadCronTasks() {
     return request('/adm/cron', { token: state.token })
       .then(function (response) {
@@ -2727,6 +2772,7 @@
       loadAwardValuesFixStatus(),
       loadAwardValueReviewStatus(),
       loadSyncIndexesStatus(),
+      loadIndexHealth(),
       loadCollectTenderBuyersStatus(),
       loadContractorStatsRefreshStatus(),
       loadGeneralAnalysisStatus(),

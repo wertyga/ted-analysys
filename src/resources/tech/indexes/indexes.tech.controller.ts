@@ -21,4 +21,13 @@ export class IndexesTechController {
   getSyncIndexesStatus() {
     return this.indexesTechService.getSyncIndexesStatus();
   }
+
+  @ApiDefaultResponse({
+    description:
+      'Indexes declared in schemas but missing in MongoDB, plus startup index build errors.',
+  })
+  @Get('/health')
+  getIndexHealth() {
+    return this.indexesTechService.getIndexHealth();
+  }
 }
