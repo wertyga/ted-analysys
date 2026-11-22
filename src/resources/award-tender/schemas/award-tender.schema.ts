@@ -379,6 +379,12 @@ AwardTenderSchema.index({ awardDate: -1, _id: -1 });
 AwardTenderSchema.index({ awardValueEur: -1, _id: -1 });
 AwardTenderSchema.index({ leadBuyers: 1, publicationDate: -1 });
 AwardTenderSchema.index({ nonLeadBuyers: 1, publicationDate: -1 });
+// Country pages / search by place of performance: find sorted by
+// publicationDate (+ _id in merged TED/national lists) and countDocuments.
+AwardTenderSchema.index(
+  { placeOfPerformanceCountries: 1, publicationDate: -1, _id: -1 },
+  { name: 'idx_country_pubdate' },
+);
 
 function serializeAwardTenderRelations<T extends Partial<AwardTender>>(
   tender: T,
